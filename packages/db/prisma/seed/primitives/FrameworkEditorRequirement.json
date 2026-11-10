@@ -9245,11 +9245,11 @@
   {
     "id": "frk_rq_69dcfee58e52a2062649dacd",
     "frameworkId": "frk_69dcfb280b550e7ee231f312",
-    "name": "All permitted services, protocols, and ports are identified, approved, and have a defined business justification.",
+    "name": "All services, protocols, and ports allowed are identified, approved, and have a defined business need.",
     "description": "Approved services/ports/protocols list; firewall rule justification log; change management tickets",
-    "identifier": "1.2.2",
+    "identifier": "1.2.5",
     "createdAt": "2026-04-13 14:34:13.247",
-    "updatedAt": "2026-04-13 14:34:13.247"
+    "updatedAt": "2026-11-10 12:00:00.000"
   },
   {
     "id": "frk_rq_69dcfee61935b50ba3d0a22c",
@@ -9272,11 +9272,11 @@
   {
     "id": "frk_rq_69dcfee8e213a935800448c6",
     "frameworkId": "frk_69dcfb280b550e7ee231f312",
-    "name": "All services, protocols, and ports in use are reviewed at least every six months.",
-    "description": "Bi-annual review records; updated approved services list; reviewer sign-offs",
-    "identifier": "1.2.5",
+    "name": "All changes to network connections and to configurations of NSCs are approved and managed in accordance with the change control process defined at Requirement 6.5.1.",
+    "description": "Change tickets for NSC/firewall rule and network connection changes; approval records; change control procedure covering network changes",
+    "identifier": "1.2.2",
     "createdAt": "2026-04-13 14:34:16.131",
-    "updatedAt": "2026-04-13 14:34:16.131"
+    "updatedAt": "2026-11-10 12:00:00.000"
   },
   {
     "id": "frk_rq_69dcfee943bdcd3eef5178b1",
@@ -9304,24 +9304,6 @@
     "identifier": "1.2.8",
     "createdAt": "2026-04-13 14:34:19.010",
     "updatedAt": "2026-04-13 14:34:19.010"
-  },
-  {
-    "id": "frk_rq_69dcfeec0b624eb54eb28e89",
-    "frameworkId": "frk_69dcfb280b550e7ee231f312",
-    "name": "Network and data-flow diagrams are kept current, reviewed at least every 12 months or on significant change.",
-    "description": "12-month or on-change review evidence; version history; change-triggered update records",
-    "identifier": "1.2.9",
-    "createdAt": "2026-04-13 14:34:19.935",
-    "updatedAt": "2026-04-13 14:34:19.935"
-  },
-  {
-    "id": "frk_rq_69dcfeedbe961b4ad3875add",
-    "frameworkId": "frk_69dcfb280b550e7ee231f312",
-    "name": "All connections between the CDE and third-party/cloud environments are documented and reviewed.",
-    "description": "Third-party connection register; cloud connectivity documentation; approved connection records",
-    "identifier": "1.2.10",
-    "createdAt": "2026-04-13 14:34:20.949",
-    "updatedAt": "2026-04-13 14:34:20.949"
   },
   {
     "id": "frk_rq_69dcfeeecdf5ed81b9692fa2",
@@ -9452,11 +9434,11 @@
   {
     "id": "frk_rq_69dcfefaf0ce72126bd10d60",
     "frameworkId": "frk_69dcfb280b550e7ee231f312",
-    "name": "All non-console administrative access is encrypted using strong cryptography.",
-    "description": "SSH/TLS configuration; disabled Telnet/plain HTTP configs; admin access method documentation",
+    "name": "Primary functions requiring different security levels are managed so that only one primary function exists per system component, functions with differing security levels are isolated, or all are secured to the level of the highest need.",
+    "description": "System inventory with assigned primary functions; VM/container/network isolation configuration; configuration standard covering primary functions",
     "identifier": "2.2.3",
     "createdAt": "2026-04-13 14:34:33.817",
-    "updatedAt": "2026-04-13 14:34:33.817"
+    "updatedAt": "2026-11-10 12:00:00.000"
   },
   {
     "id": "frk_rq_69dcfefb1b23d778e3f0f70c",
@@ -9749,11 +9731,11 @@
   {
     "id": "frk_rq_69dcff25f930412d8f4a7fdc",
     "frameworkId": "frk_69dcfb280b550e7ee231f312",
-    "name": "Anti-malware mechanisms cannot be disabled or altered by users.",
-    "description": "Endpoint protection tamper-protection configuration; admin-only access controls; policy enforcement logs",
+    "name": "For removable electronic media, the anti-malware solution(s) perform automatic scans when the media is inserted, connected, or logically mounted, or perform continuous behavioral analysis of systems or processes.",
+    "description": "Endpoint protection policy for removable media; scan logs for media insertion events; behavioral analysis configuration",
     "identifier": "5.3.3",
     "createdAt": "2026-04-13 14:35:17.151",
-    "updatedAt": "2026-04-13 14:35:17.151"
+    "updatedAt": "2026-11-10 12:00:00.000"
   },
   {
     "id": "frk_rq_69dcff26e497c0d93bb8b841",
@@ -9794,11 +9776,11 @@
   {
     "id": "frk_rq_69dcff1b3c019806a66495aa",
     "frameworkId": "frk_69dcfb280b550e7ee231f312",
-    "name": "Certificates used for PAN transmission are confirmed as valid and not expired.",
-    "description": "Certificate monitoring tool alerts; current certificate status report; renewal records",
+    "name": "Wireless networks transmitting PAN or connected to the CDE use industry best practices to implement strong cryptography for authentication and transmission.",
+    "description": "Wireless network inventory; WPA3/WPA2-Enterprise configuration; wireless authentication settings",
     "identifier": "4.2.1.2",
     "createdAt": "2026-04-13 14:35:06.635",
-    "updatedAt": "2026-04-13 14:35:06.635"
+    "updatedAt": "2026-11-10 12:00:00.000"
   },
   {
     "id": "frk_rq_69dcff1eb2e612067cc06689",
@@ -10046,11 +10028,11 @@
   {
     "id": "frk_rq_69dcff42de2711fed58334d5",
     "frameworkId": "frk_69dcfb280b550e7ee231f312",
-    "name": "All application and system accounts and related access rights are reviewed at least once every six months.",
+    "name": "All access by application and system accounts and related access privileges is reviewed periodically, at the frequency defined in the entity's targeted risk analysis.",
     "description": "Semi-annual service account review records; sign-offs; remediation records",
     "identifier": "7.2.5.1",
     "createdAt": "2026-04-13 14:35:46.157",
-    "updatedAt": "2026-04-13 14:35:46.157"
+    "updatedAt": "2026-11-10 12:00:00.000"
   },
   {
     "id": "frk_rq_69dcff43e91cb5685c511c93",
@@ -10073,11 +10055,11 @@
   {
     "id": "frk_rq_69dcff4683b09426d28bd353",
     "frameworkId": "frk_69dcfb280b550e7ee231f312",
-    "name": "The access control system(s) are configured to enforce access control settings after each login request.",
+    "name": "The access control system(s) is configured to enforce permissions assigned to individuals, applications, and systems based on job classification and function.",
     "description": "IAM configuration; session control settings; re-authentication settings",
     "identifier": "7.3.2",
     "createdAt": "2026-04-13 14:35:49.579",
-    "updatedAt": "2026-04-13 14:35:49.579"
+    "updatedAt": "2026-11-10 12:00:00.000"
   },
   {
     "id": "frk_rq_69dcff463d117670a150959e",
@@ -10334,11 +10316,11 @@
   {
     "id": "frk_rq_69dcff505832b24179f594da",
     "frameworkId": "frk_69dcfb280b550e7ee231f312",
-    "name": "All user and admin passwords/passphrases meet a minimum length of at least 12 characters (or 8 if system does not support 12).",
-    "description": "Password policy configuration; AD/IAM password policy settings screenshot",
+    "name": "All user access to system components for users and administrators is authenticated via at least one authentication factor: something you know, something you have, or something you are.",
+    "description": "IdP/IAM configuration showing authentication on all system components; list of authentication factors in use",
     "identifier": "8.3.1",
     "createdAt": "2026-04-13 14:36:00.203",
-    "updatedAt": "2026-04-13 14:36:00.203"
+    "updatedAt": "2026-11-10 12:00:00.000"
   },
   {
     "id": "frk_rq_69dcff512f1643822ffc40e9",
@@ -10361,11 +10343,11 @@
   {
     "id": "frk_rq_69dcff53f0d3e72346c35750",
     "frameworkId": "frk_69dcfb280b550e7ee231f312",
-    "name": "If passwords are used as authentication factors, they meet minimum complexity requirements.",
+    "name": "If passwords/passphrases are used as authentication factors, they are at least 12 characters long (8 if the system does not support 12) and contain both numeric and alphabetic characters.",
     "description": "Password complexity policy configuration; enforcement evidence across all systems",
     "identifier": "8.3.6",
     "createdAt": "2026-04-13 14:36:03.189",
-    "updatedAt": "2026-04-13 14:36:03.189"
+    "updatedAt": "2026-11-10 12:00:00.000"
   },
   {
     "id": "frk_rq_69dcff5459bbc24b82e95346",
@@ -10525,27 +10507,27 @@
     "frameworkId": "frk_69dcfb280b550e7ee231f312",
     "name": "POI device surfaces are periodically inspected to detect tampering and unauthorized substitution.",
     "description": "Inspection checklist; periodic inspection records; photo evidence of inspection",
-    "identifier": "9.5.1.1",
+    "identifier": "9.5.1.2",
     "createdAt": "2026-04-13 14:36:33.880",
-    "updatedAt": "2026-04-13 14:36:33.880"
+    "updatedAt": "2026-11-10 12:00:00.000"
   },
   {
     "id": "frk_rq_69dcff73fd64fa5ccce46aa9",
     "frameworkId": "frk_69dcfb280b550e7ee231f312",
     "name": "Personnel are trained to be aware of attempted tampering or substitution of POI devices.",
     "description": "Training records covering POI tampering awareness; training curriculum with tampering indicators",
-    "identifier": "9.5.1.2",
+    "identifier": "9.5.1.3",
     "createdAt": "2026-04-13 14:36:34.801",
-    "updatedAt": "2026-04-13 14:36:34.801"
+    "updatedAt": "2026-11-10 12:00:00.000"
   },
   {
     "id": "frk_rq_69dcff7462dbb18b93e55650",
     "frameworkId": "frk_69dcfb280b550e7ee231f312",
     "name": "A list of POI devices is maintained, including device make, model, location, and serial or other identifier.",
     "description": "POI device register with make, model, serial, location; last-update date",
-    "identifier": "9.5.1.3",
+    "identifier": "9.5.1.1",
     "createdAt": "2026-04-13 14:36:35.720",
-    "updatedAt": "2026-04-13 14:36:35.720"
+    "updatedAt": "2026-11-10 12:00:00.000"
   },
   {
     "id": "frk_rq_69dcff75b6b39b136c68f7ef",
@@ -10570,54 +10552,54 @@
     "frameworkId": "frk_69dcfb280b550e7ee231f312",
     "name": "Audit logs capture all individual user access to cardholder data.",
     "description": "SIEM configuration; log samples showing user access to CHD systems; log policy",
-    "identifier": "10.2.1",
+    "identifier": "10.2.1.1",
     "createdAt": "2026-04-13 14:36:38.482",
-    "updatedAt": "2026-04-13 14:36:38.482"
+    "updatedAt": "2026-11-10 12:00:00.000"
   },
   {
     "id": "frk_rq_69dcff770e9408ee767d7d61",
     "frameworkId": "frk_69dcfb280b550e7ee231f312",
-    "name": "Audit logs capture all actions taken by any individual with root or administrative privileges.",
+    "name": "Audit logs capture all actions taken by any individual with administrative access, including any interactive use of application or system accounts.",
     "description": "Log samples showing admin/root actions; SIEM alert configuration for privileged actions",
-    "identifier": "10.2.1.1",
+    "identifier": "10.2.1.2",
     "createdAt": "2026-04-13 14:36:39.434",
-    "updatedAt": "2026-04-13 14:36:39.434"
+    "updatedAt": "2026-11-10 12:00:00.000"
   },
   {
     "id": "frk_rq_69dcff78e9f10b1a12834a54",
     "frameworkId": "frk_69dcfb280b550e7ee231f312",
-    "name": "Audit logs capture all access to audit trails.",
+    "name": "Audit logs capture all access to audit logs.",
     "description": "Log samples showing audit trail access; SIEM configuration for log-read events",
-    "identifier": "10.2.1.2",
+    "identifier": "10.2.1.3",
     "createdAt": "2026-04-13 14:36:40.411",
-    "updatedAt": "2026-04-13 14:36:40.411"
+    "updatedAt": "2026-11-10 12:00:00.000"
   },
   {
     "id": "frk_rq_69dcff79046ad91bb49f4bc6",
     "frameworkId": "frk_69dcfb280b550e7ee231f312",
     "name": "Audit logs capture all invalid logical access attempts.",
     "description": "Failed login log samples; SIEM failed authentication events; brute-force detection alerts",
-    "identifier": "10.2.1.3",
+    "identifier": "10.2.1.4",
     "createdAt": "2026-04-13 14:36:41.332",
-    "updatedAt": "2026-04-13 14:36:41.332"
+    "updatedAt": "2026-11-10 12:00:00.000"
   },
   {
     "id": "frk_rq_69dcff7af382be7a8fddd851",
     "frameworkId": "frk_69dcfb280b550e7ee231f312",
-    "name": "Audit logs capture all use of and changes to identification and authentication mechanisms.",
+    "name": "Audit logs capture all changes to identification and authentication credentials, including creation of new accounts, elevation of privileges, and all changes, additions, or deletions to accounts with administrative access.",
     "description": "Log samples for account creation, deletion, password changes, privilege escalation",
-    "identifier": "10.2.1.4",
+    "identifier": "10.2.1.5",
     "createdAt": "2026-04-13 14:36:42.260",
-    "updatedAt": "2026-04-13 14:36:42.260"
+    "updatedAt": "2026-11-10 12:00:00.000"
   },
   {
     "id": "frk_rq_69dcff7bca5070a954e4b926",
     "frameworkId": "frk_69dcfb280b550e7ee231f312",
-    "name": "Audit logs capture all changes to and deletions of audit log records.",
-    "description": "Log samples showing log deletion/modification attempts; SIEM integrity alerts",
-    "identifier": "10.2.1.5",
+    "name": "Audit logs are enabled and active for all system components and cardholder data.",
+    "description": "Logging configuration for all in-scope systems; SIEM log-source inventory reconciled to asset inventory; log samples",
+    "identifier": "10.2.1",
     "createdAt": "2026-04-13 14:36:43.178",
-    "updatedAt": "2026-04-13 14:36:43.178"
+    "updatedAt": "2026-11-10 12:00:00.000"
   },
   {
     "id": "frk_rq_69dcff7c6886d812e3bca1a2",
@@ -10687,18 +10669,18 @@
     "frameworkId": "frk_69dcfb280b550e7ee231f312",
     "name": "Automated mechanisms are used to perform audit log reviews.",
     "description": "SIEM alert rules; automated review schedule; SIEM dashboard",
-    "identifier": "10.4.1",
+    "identifier": "10.4.1.1",
     "createdAt": "2026-04-13 14:36:50.655",
-    "updatedAt": "2026-04-13 14:36:50.655"
+    "updatedAt": "2026-11-10 12:00:00.000"
   },
   {
     "id": "frk_rq_69dcff84eb2f0175af1a5a4a",
     "frameworkId": "frk_69dcfb280b550e7ee231f312",
-    "name": "Automated log review processes cover all defined auditable events.",
-    "description": "SIEM use case list; mapping of use cases to required audit events (per Req 10.2.1)",
-    "identifier": "10.4.1.1",
+    "name": "Security events and logs of all CHD/SAD systems, critical system components, and security-function components are reviewed at least once daily.",
+    "description": "Daily log review procedure; SIEM daily review records or tickets; list of log sources in daily-review scope",
+    "identifier": "10.4.1",
     "createdAt": "2026-04-13 14:36:51.571",
-    "updatedAt": "2026-04-13 14:36:51.571"
+    "updatedAt": "2026-11-10 12:00:00.000"
   },
   {
     "id": "frk_rq_69dcff85c4d2a8dae74164a1",
@@ -10757,11 +10739,11 @@
   {
     "id": "frk_rq_69dcff89e8f8db6da78dca7a",
     "frameworkId": "frk_69dcfb280b550e7ee231f312",
-    "name": "Systems are configured to prevent unauthorized modifications of time.",
-    "description": "NTP ACL configuration; admin-only access to time settings; audit records for time changes",
+    "name": "Systems are configured to the correct and consistent time: designated time servers are in use, only central time servers receive time from external UTC/TAI sources, and internal systems receive time only from them.",
+    "description": "NTP configuration for in-scope systems; designated time server list; external time source configuration",
     "identifier": "10.6.2",
     "createdAt": "2026-04-13 14:36:57.230",
-    "updatedAt": "2026-04-13 14:36:57.230"
+    "updatedAt": "2026-11-10 12:00:00.000"
   },
   {
     "id": "frk_rq_69dcff8a58ad310935d80fad",
@@ -10793,11 +10775,11 @@
   {
     "id": "frk_rq_69dcff936bcdd3953dd57be7",
     "frameworkId": "frk_69dcfb280b550e7ee231f312",
-    "name": "Internal vulnerability scans are performed by a qualified internal resource or qualified external third party.",
-    "description": "Scanner qualifications; internal resource training/certification; third-party scanner credentials",
+    "name": "Internal vulnerability scans are performed via authenticated scanning; systems unable to accept credentials are documented, and scan accounts use sufficient privileges and are managed per Requirement 8.2.2.",
+    "description": "Authenticated scan configuration; list of systems excluded from authenticated scanning with justification; scan account management records",
     "identifier": "11.3.1.2",
     "createdAt": "2026-04-13 14:37:06.916",
-    "updatedAt": "2026-04-13 14:37:06.916"
+    "updatedAt": "2026-11-10 12:00:00.000"
   },
   {
     "id": "frk_rq_69dcff9833b29ae89c1eb64f",
@@ -11027,20 +11009,20 @@
   {
     "id": "frk_rq_69dcff92f25a500690ecb1d2",
     "frameworkId": "frk_69dcfb280b550e7ee231f312",
-    "name": "Internal vulnerability scans are performed after significant changes.",
+    "name": "Internal vulnerability scans are performed after any significant change; high-risk and critical vulnerabilities are resolved and rescans conducted as needed, by qualified personnel.",
     "description": "Change-triggered scan records; scan reports linked to change tickets",
-    "identifier": "11.3.1.1",
+    "identifier": "11.3.1.3",
     "createdAt": "2026-04-13 14:37:05.875",
-    "updatedAt": "2026-04-13 14:37:05.875"
+    "updatedAt": "2026-11-10 12:00:00.000"
   },
   {
     "id": "frk_rq_69dcff944cc63873ea85c709",
     "frameworkId": "frk_69dcfb280b550e7ee231f312",
-    "name": "Internal vulnerability scan findings are remediated and a rescan is performed to confirm resolution.",
-    "description": "Remediation records for high/critical findings; rescan reports confirming resolution; exception register for accepted risks",
-    "identifier": "11.3.1.3",
+    "name": "All other applicable vulnerabilities (not ranked high-risk or critical) are addressed based on the risk defined in the entity's targeted risk analysis, with rescans conducted as needed.",
+    "description": "Targeted risk analysis for lower-ranked vulnerabilities; remediation records; rescan reports",
+    "identifier": "11.3.1.1",
     "createdAt": "2026-04-13 14:37:07.858",
-    "updatedAt": "2026-04-13 14:37:07.858"
+    "updatedAt": "2026-11-10 12:00:00.000"
   },
   {
     "id": "frk_rq_69dcff95ecf248dcbe4462f7",
@@ -11054,11 +11036,11 @@
   {
     "id": "frk_rq_69dcff965d4daf381dbebb56",
     "frameworkId": "frk_69dcfb280b550e7ee231f312",
-    "name": "External vulnerability scan findings are remediated and passing scans are achieved.",
-    "description": "Remediation records; re-scan reports showing passing status; ASV dispute process records if applicable",
+    "name": "External vulnerability scans are performed after any significant change; vulnerabilities scored CVSS 4.0 or higher are resolved and rescans conducted as needed, by qualified and independent personnel.",
+    "description": "Post-change external scan reports; remediation records; rescan reports; tester qualification and independence evidence",
     "identifier": "11.3.2.1",
     "createdAt": "2026-04-13 14:37:09.762",
-    "updatedAt": "2026-04-13 14:37:09.762"
+    "updatedAt": "2026-11-10 12:00:00.000"
   },
   {
     "id": "frk_rq_69dcff977f23cf8501f592c3",
@@ -11090,11 +11072,11 @@
   {
     "id": "frk_rq_69dcff9b08ac85014f447336",
     "frameworkId": "frk_69dcfb280b550e7ee231f312",
-    "name": "If segmentation is used to isolate the CDE, segmentation controls are verified at least every six months and after significant change.",
+    "name": "If segmentation is used to isolate the CDE, penetration tests are performed on segmentation controls at least once every 12 months and after any change to segmentation controls or methods.",
     "description": "Bi-annual segmentation test reports; methodology documentation; on-change test records",
     "identifier": "11.4.5",
     "createdAt": "2026-04-13 14:37:14.501",
-    "updatedAt": "2026-04-13 14:37:14.501"
+    "updatedAt": "2026-11-10 12:00:00.000"
   },
   {
     "id": "frk_rq_69dcff9b7b0dfdd22bc2d410",
@@ -11275,6 +11257,447 @@
     "identifier": "12.10.7",
     "createdAt": "2026-04-13 14:37:52.400",
     "updatedAt": "2026-04-13 14:37:52.400"
+  },
+  {
+    "id": "frk_rq_31ebbcf9757002d815ac0768",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "The full contents of any track are not stored upon completion of the authorization process.",
+    "description": "Data discovery scan results; database and log samples showing no track data; application data-flow documentation",
+    "identifier": "3.3.1.1",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_8a6fcae657a20771b246b91f",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "The card verification code is not stored upon completion of the authorization process.",
+    "description": "Data discovery scan results; database schema and log samples showing no CVV/CVC storage",
+    "identifier": "3.3.1.2",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_46b6609088cc26fb74b23527",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "The personal identification number (PIN) and the PIN block are not stored upon completion of the authorization process.",
+    "description": "Data discovery scan results; database and log samples showing no PIN or PIN block storage",
+    "identifier": "3.3.1.3",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_d9f115230248db7aa85f9d5c",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "Additional requirement for issuers and companies that support issuing services: any storage of SAD is limited to a legitimate issuing business need, secured, and encrypted using strong cryptography. (Issuers)",
+    "description": "Documented issuing business need; SAD storage inventory; encryption configuration",
+    "identifier": "3.3.3",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_c8957f1933e51de12e45e8f7",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "Additional requirement for service providers: Where cryptographic keys are shared with customers for transmission or storage of account data, guidance on secure transmission, storage, and updating of such keys is documented and distributed to customers. (SP)",
+    "description": "Customer key-handling guidance; distribution records",
+    "identifier": "3.7.9",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_d692346c93d3840bb4d78983",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "Additional requirement for service providers: Service providers with remote access to customer premises use unique authentication factors for each customer premises. (SP)",
+    "description": "Per-customer credential inventory; remote access configuration",
+    "identifier": "8.2.3",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_950001bd20e86f721dfd49db",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "User identity is verified before modifying any authentication factor.",
+    "description": "Password/MFA reset procedure; helpdesk identity verification records; self-service reset configuration",
+    "identifier": "8.3.3",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_04e4fac4a7b3095e3c267e6b",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "If passwords/passphrases are used as authentication factors, they are set to a unique value for first-time use and upon reset, and forced to be changed immediately after first use.",
+    "description": "IdP configuration for initial/reset passwords; force-change-on-first-login setting",
+    "identifier": "8.3.5",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_e5c930106a1ec6f968a4dece",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "Authentication policies and procedures are documented and communicated to all users, including guidance on selecting and protecting authentication factors, not reusing passwords, and changing them if compromise is suspected.",
+    "description": "Authentication policy; user communication or training records",
+    "identifier": "8.3.8",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_efba85e100ea3e107de84b03",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "Additional requirement for service providers: If passwords/passphrases are the only authentication factor for customer user access to cardholder data, guidance is provided to customers on periodically changing them and when to change them. (SP)",
+    "description": "Customer-facing authentication guidance; documentation distribution records",
+    "identifier": "8.3.10",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_d1e4e868056077905762d4f2",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "Additional requirement for service providers: If passwords/passphrases are the only authentication factor for customer user access, they are changed at least every 90 days or account security posture is analyzed dynamically. (SP)",
+    "description": "Customer password expiry configuration or dynamic risk-based access configuration",
+    "identifier": "8.3.10.1",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_a3ab3252e7c6d1742193a975",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "Where authentication factors such as physical or logical security tokens, smart cards, or certificates are used, they are assigned to an individual user, not shared, and controls ensure only the intended user can use them.",
+    "description": "Token/certificate assignment register; issuance procedure; access configuration",
+    "identifier": "8.3.11",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_539f557ffedf88fa61878f44",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "Physical access to sensitive areas within the CDE is authorized based on job function, revoked immediately upon termination, and all access mechanisms are returned or disabled upon termination.",
+    "description": "Sensitive-area access list; badge system configuration; termination checklists showing badge return/deactivation",
+    "identifier": "9.3.1.1",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_556aac51c1eba365d30c68bf",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "The frequency of periodic POI device inspections and the type of inspections performed is defined in the entity's targeted risk analysis.",
+    "description": "Targeted risk analysis for POI inspection frequency; inspection schedule",
+    "identifier": "9.5.1.2.1",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_1d3b2104f5319c194f6d7393",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "Additional requirement for service providers: Failures of critical security control systems (NSCs, IDS/IPS, FIM, anti-malware, physical and logical access controls, audit logging, segmentation) are detected, alerted, and addressed promptly. (SP)",
+    "description": "Control-failure alert rules; incident tickets for control failures; monitoring dashboards",
+    "identifier": "10.7.1",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_24cfc90a7a92697a63fe231e",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "Additional requirement for service providers: Intrusion-detection and/or intrusion-prevention techniques detect, alert on or prevent, and address covert malware communication channels. (SP)",
+    "description": "IDS/IPS rules for C2 and covert channels; DNS/egress monitoring configuration; alert response records",
+    "identifier": "11.5.1.1",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_79b6a46a6619503f69f01d43",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "Additional requirement for service providers: Reviews conducted per Requirement 12.4.2 are documented, including results, remediation actions, and review sign-off by personnel responsible for the PCI DSS compliance program. (SP)",
+    "description": "Quarterly review reports; remediation records; sign-off records",
+    "identifier": "12.4.2.1",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_e718a8ce1524a65318591455",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "Additional requirement for service providers: Significant changes to organizational structure result in a documented internal review of the impact to PCI DSS scope and applicability of controls, with results communicated to executive management. (SP)",
+    "description": "Org-change impact reviews; executive communication records",
+    "identifier": "12.5.3",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_49b151164d68f051be2924b1",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "The frequency of periodic training for incident response personnel is defined in the entity's targeted risk analysis.",
+    "description": "Targeted risk analysis for incident response training frequency; training schedule",
+    "identifier": "12.10.4.1",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_b27395d03abe2faf58e7573a",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "Multi-tenant service providers (Appendix A1): Logical separation ensures the provider cannot access customer environments, and customers cannot access the provider's environment, without authorization.",
+    "description": "Tenant isolation architecture; access control configuration; authorization records",
+    "identifier": "A1.1.1",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_e88d27377441b7bf5d5e8e93",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "Multi-tenant service providers (Appendix A1): Controls ensure each customer only has permission to access its own cardholder data and CDE.",
+    "description": "Tenant access control configuration; isolation test results",
+    "identifier": "A1.1.2",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_63a4bbf3dad11460343712d8",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "Multi-tenant service providers (Appendix A1): Controls ensure each customer can only access resources allocated to them.",
+    "description": "Resource quota and allocation configuration; tenant isolation tests",
+    "identifier": "A1.1.3",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_2d098f88e01c59a71485a7f0",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "Multi-tenant service providers (Appendix A1): The effectiveness of logical separation controls between customer environments is confirmed at least once every six months via penetration testing.",
+    "description": "Semi-annual tenant segmentation penetration test reports",
+    "identifier": "A1.1.4",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_aa5db9d0a58e85f20582068b",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "Multi-tenant service providers (Appendix A1): Audit logging is enabled for each customer's environment consistent with Requirement 10, active by default and available only to the owning customer.",
+    "description": "Per-tenant logging configuration; log access controls; customer log access documentation",
+    "identifier": "A1.2.1",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_92f5d9005a22fb01aedb6081",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "Multi-tenant service providers (Appendix A1): Processes or mechanisms support prompt forensic investigation of suspected or confirmed security incidents for any customer.",
+    "description": "Forensic investigation procedure; log and snapshot retention configuration",
+    "identifier": "A1.2.2",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_879c52a502a6a54d35172602",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "Multi-tenant service providers (Appendix A1): Processes allow customers to securely report security incidents and vulnerabilities, and the provider addresses and remediates them per Requirement 6.3.1.",
+    "description": "Customer security reporting channel; incident and vulnerability tickets from customer reports",
+    "identifier": "A1.2.3",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_a8ffb4fbc59238f6b7521dc5",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "SSL/early TLS for card-present POS POI terminals (Appendix A2): Where POS POI terminals use SSL and/or early TLS, the entity confirms the devices are not susceptible to any known exploits for those protocols.",
+    "description": "POI vendor documentation; terminal inventory with protocol versions",
+    "identifier": "A2.1.1",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_98a8f845070650a34b66d158",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "SSL/early TLS for card-present POS POI terminals (Appendix A2): Additional requirement for service providers: Service providers with connection points to POS POI terminals that use SSL and/or early TLS have a formal Risk Mitigation and Migration Plan. (SP)",
+    "description": "Risk Mitigation and Migration Plan",
+    "identifier": "A2.1.2",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_6b498f32465f340af113f116",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "SSL/early TLS for card-present POS POI terminals (Appendix A2): Additional requirement for service providers: All service providers provide a secure service offering. (SP)",
+    "description": "TLS configuration for service endpoints; secure protocol documentation",
+    "identifier": "A2.1.3",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_c5a5472c00b9f1ac26c866a3",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "Designated entities supplemental validation (Appendix A3, only if designated): Executive management establishes responsibility for protecting account data and a PCI DSS compliance program, including accountability, a charter, and updates to executive management and the board.",
+    "description": "PCI DSS program charter; executive assignment; board reporting records",
+    "identifier": "A3.1.1",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_ea762a41cdafa22ba896a869",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "Designated entities supplemental validation (Appendix A3, only if designated): A formal PCI DSS compliance program defines activities for maintaining and monitoring compliance, annual assessments, continuous validation, and impact analysis.",
+    "description": "PCI DSS compliance program document; BAU activity calendar",
+    "identifier": "A3.1.2",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_484f269b22f6cd10ad690918",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "Designated entities supplemental validation (Appendix A3, only if designated): PCI DSS compliance roles and responsibilities are specifically defined and formally assigned to one or more personnel.",
+    "description": "RACI for PCI DSS activities; assignment records",
+    "identifier": "A3.1.3",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_2cd2721031d98e2193771df2",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "Designated entities supplemental validation (Appendix A3, only if designated): Up-to-date PCI DSS and/or information security training is provided at least once every 12 months to personnel with PCI DSS compliance responsibilities.",
+    "description": "Training records for PCI DSS compliance personnel",
+    "identifier": "A3.1.4",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_2c305b4278a29f09607d684c",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "Designated entities supplemental validation (Appendix A3, only if designated): PCI DSS scope is documented and confirmed at least once every three months and upon significant change to the in-scope environment.",
+    "description": "Quarterly scope confirmation records; data flow and system inventory updates",
+    "identifier": "A3.2.1",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_35679b5a5c31997e3e0d5927",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "Designated entities supplemental validation (Appendix A3, only if designated): PCI DSS scope impact is determined for all changes to systems or networks, including new systems and network connections.",
+    "description": "Change records with PCI scope impact assessment",
+    "identifier": "A3.2.2",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_819a86318f0ba4bf5471c97e",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "Designated entities supplemental validation (Appendix A3, only if designated): Upon completion of a change, all relevant PCI DSS requirements are confirmed on new or changed systems and networks, and documentation is updated.",
+    "description": "Post-change PCI validation checklists; updated documentation",
+    "identifier": "A3.2.2.1",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_80d26dd9f78225b2f408bab8",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "Designated entities supplemental validation (Appendix A3, only if designated): Changes to organizational structure result in a formal internal review of the impact to PCI DSS scope and applicability of controls.",
+    "description": "Org-change PCI impact reviews",
+    "identifier": "A3.2.3",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_6cc6b77fca665a5925f850d2",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "Designated entities supplemental validation (Appendix A3, only if designated): If segmentation is used, PCI DSS scope is confirmed by penetration testing segmentation controls at least once every six months and after changes to segmentation.",
+    "description": "Semi-annual segmentation penetration test reports",
+    "identifier": "A3.2.4",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_32d83e36f9433be9519872d5",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "Designated entities supplemental validation (Appendix A3, only if designated): A data-discovery methodology confirms PCI DSS scope and locates cleartext PAN at least once every three months and upon significant change.",
+    "description": "Data discovery methodology; quarterly discovery scan results",
+    "identifier": "A3.2.5",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_896007944b584670d6841fca",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "Designated entities supplemental validation (Appendix A3, only if designated): Data-discovery methods are tested for effectiveness across all system component types and file formats at least once every 12 months.",
+    "description": "Data discovery effectiveness test records",
+    "identifier": "A3.2.5.1",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_2c1456ef6388887341866f6e",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "Designated entities supplemental validation (Appendix A3, only if designated): Response procedures are initiated when cleartext PAN is detected outside the CDE, covering retrieval, secure deletion, or migration into the CDE.",
+    "description": "Cleartext PAN response procedure; response records",
+    "identifier": "A3.2.5.2",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_454d80e43743cf3cc4e4aa14",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "Designated entities supplemental validation (Appendix A3, only if designated): Mechanisms are implemented to detect and prevent cleartext PAN from leaving the CDE via an unauthorized channel, method, or process.",
+    "description": "DLP configuration; DLP alert samples",
+    "identifier": "A3.2.6",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_046c9419aa7d595a58bfb869",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "Designated entities supplemental validation (Appendix A3, only if designated): Response procedures are initiated upon detection of attempts to remove cleartext PAN from the CDE via an unauthorized channel, method, or process.",
+    "description": "DLP response procedure; alert investigation records",
+    "identifier": "A3.2.6.1",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_445c4c50cd978e2d0eea52c1",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "Designated entities supplemental validation (Appendix A3, only if designated): Failures of critical security control systems are detected, alerted, and addressed promptly.",
+    "description": "Control-failure alert rules; incident tickets for control failures",
+    "identifier": "A3.3.1",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_a39586fbe86faee70a84703f",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "Designated entities supplemental validation (Appendix A3, only if designated): Failures of critical security control systems are responded to promptly: security functions are restored, and the failure duration, cause, and remediation are documented.",
+    "description": "Control-failure response procedure; failure incident records with root cause",
+    "identifier": "A3.3.1.1",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_d831a8fc10200a9aea6de5cb",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "Designated entities supplemental validation (Appendix A3, only if designated): Hardware and software technologies are reviewed at least once every 12 months to confirm they continue to meet PCI DSS requirements.",
+    "description": "Annual technology review records",
+    "identifier": "A3.3.2",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_8adad5d168ed44dcedd67d37",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "Designated entities supplemental validation (Appendix A3, only if designated): Reviews are performed at least once every three months by PCI DSS compliance personnel to verify BAU activities are followed.",
+    "description": "Quarterly BAU review reports and sign-offs",
+    "identifier": "A3.3.3",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_e2a60454e5aa0af4a971d731",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "Designated entities supplemental validation (Appendix A3, only if designated): User accounts and access privileges to in-scope system components are reviewed at least once every six months.",
+    "description": "Semi-annual access review records",
+    "identifier": "A3.4.1",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
+  },
+  {
+    "id": "frk_rq_5313fc0612f84298cc49923a",
+    "frameworkId": "frk_69dcfb280b550e7ee231f312",
+    "name": "Designated entities supplemental validation (Appendix A3, only if designated): A methodology is implemented for prompt identification of attack patterns and undesirable behavior across systems, with alerting and response.",
+    "description": "SIEM correlation rules; alert response records",
+    "identifier": "A3.5.1",
+    "createdAt": "2026-11-10 12:00:00.000",
+    "updatedAt": "2026-11-10 12:00:00.000"
   },
   {
     "id": "frk_rq_681ed20a3f7335dd1ec64b6c",
