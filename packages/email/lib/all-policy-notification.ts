@@ -1,5 +1,5 @@
 import AllPolicyNotificationEmail from '../emails/all-policy-notification';
-import { sendEmail } from './resend';
+import { sendEmail } from './send-email';
 
 export const sendAllPolicyNotificationEmail = async (params: {
   email: string;

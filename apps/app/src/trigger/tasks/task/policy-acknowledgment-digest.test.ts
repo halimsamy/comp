@@ -285,7 +285,7 @@ describe('policyAcknowledgmentDigest', () => {
         ],
       },
     ]);
-    mockSendBatchEmailViaApi.mockRejectedValueOnce(new Error('Resend 500'));
+    mockSendBatchEmailViaApi.mockRejectedValueOnce(new Error('SendGrid 500'));
 
     const result = await taskUnderTest.run({
       timestamp: new Date(),

@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { Resend } from 'resend';
+import { render } from '@react-email/render';
+import type { ReactElement } from 'react';
+import { type EmailAttachment, sendWithSendGrid } from './sendgrid';
 
-export const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+export type { EmailAttachment } from './sendgrid';
 
 function maskEmail(value: string): string {
   const [name = '', domain = ''] = value.toLowerCase().split('@');
@@ -18,12 +20,6 @@ function maskEmailList(value: string): string {
     .join(', ');
 }
 
-export interface EmailAttachment {
-  filename: string;
-  content: Buffer | string;
-  contentType?: string;
-}
-
 export const sendEmail = async ({
   to,
   subject,
@@ -37,7 +33,7 @@ export const sendEmail = async ({
 }: {
   to: string;
   subject: string;
-  react: React.ReactNode;
+  react: ReactElement;
   marketing?: boolean;
   system?: boolean;
   test?: boolean;
@@ -45,25 +41,14 @@ export const sendEmail = async ({
   scheduledAt?: string;
   attachments?: EmailAttachment[];
 }) => {
-  if (!resend) {
-    throw new Error('Resend not initialized - missing API key');
-  }
+  const fromAddress = marketing
+    ? process.env.EMAIL_FROM_MARKETING
+    : system
+      ? process.env.EMAIL_FROM_SYSTEM
+      : process.env.EMAIL_FROM_DEFAULT;
+  const toAddress = test ? process.env.EMAIL_TO_TEST : to;
+  const replyTo = marketing ? process.env.EMAIL_REPLY_TO_MARKETING : undefined;
 
-  // 1) Pull each env var into its own constant
-  const fromMarketing = process.env.RESEND_FROM_MARKETING;
-  const fromSystem = process.env.RESEND_FROM_SYSTEM;
-  const fromDefault = process.env.RESEND_FROM_DEFAULT;
-  const toTest = process.env.RESEND_TO_TEST;
-  const replyMarketing = process.env.RESEND_REPLY_TO_MARKETING;
-
-  // 2) Decide which one you need for this email
-  const fromAddress = marketing ? fromMarketing : system ? fromSystem : fromDefault;
-
-  const toAddress = test ? toTest : to;
-
-  const replyTo = marketing ? replyMarketing : undefined;
-
-  // 3) Guard against undefined
   if (!fromAddress) {
     throw new Error('Missing FROM address in environment variables');
   }
@@ -77,7 +62,7 @@ export const sendEmail = async ({
   try {
     console.info('[email] send start', {
       requestId,
-      provider: 'resend',
+      provider: 'sendgrid',
       from: fromAddress,
       to: maskEmailList(toAddress),
       subject,
@@ -89,43 +74,30 @@ export const sendEmail = async ({
       },
     });
 
-    const { data, error } = await resend.emails.send({
-      from: fromAddress, // now always a string
-      to: toAddress, // now always a string
+    const { id } = await sendWithSendGrid({
+      from: fromAddress,
+      to: toAddress,
       cc,
       replyTo,
       subject,
-      // @ts-ignore – React node allowed by the SDK
-      react,
-      scheduledAt,
-      attachments: attachments?.map((att) => ({
-        filename: att.filename,
-        content: att.content,
-        contentType: att.contentType,
-      })),
+      html: await render(react),
+      sendAt: scheduledAt,
+      attachments,
     });
-
-    if (error) {
-      console.error('Resend API error:', error);
-      throw new Error(`Failed to send email: ${error.message}`);
-    }
 
     console.info('[email] send success', {
       requestId,
-      provider: 'resend',
+      provider: 'sendgrid',
       to: maskEmailList(toAddress),
-      messageId: data?.id,
+      messageId: id,
       durationMs: Date.now() - startTime,
     });
 
-    return {
-      message: 'Email sent successfully',
-      id: data?.id,
-    };
+    return { message: 'Email sent successfully', id };
   } catch (error) {
     console.error('[email] send failure', {
       requestId,
-      provider: 'resend',
+      provider: 'sendgrid',
       to: maskEmailList(toAddress),
       durationMs: Date.now() - startTime,
       error: error instanceof Error ? error.message : String(error),

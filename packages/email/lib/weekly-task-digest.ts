@@ -1,5 +1,5 @@
 import WeeklyTaskDigestEmail from '../emails/reminders/weekly-task-digest';
-import { sendEmail } from './resend';
+import { sendEmail } from './send-email';
 
 const getTaskCountMessage = (count: number) => {
   const plural = count !== 1 ? 's' : '';

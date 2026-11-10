@@ -23,7 +23,7 @@ For a functional deployment:
 
 - **Database**: `DATABASE_URL` in all three env files
 - **Auth**: `AUTH_SECRET`, `SECRET_KEY`, `BETTER_AUTH_URL`, `NEXT_PUBLIC_BETTER_AUTH_URL` (app); `BETTER_AUTH_SECRET` (portal)
-- **Email**: `RESEND_API_KEY` in app and portal
+- **Email**: `SENDGRID_API_KEY` and `EMAIL_FROM_SYSTEM` / `EMAIL_FROM_DEFAULT` in api (sent by the api job worker)
 - **Background jobs**: no extra keys; the job workers use `DATABASE_URL`
 - **Misc**: `REVALIDATION_SECRET`, `NEXT_PUBLIC_PORTAL_URL` in app
 
@@ -36,7 +36,7 @@ For a functional deployment:
 
 - Docker Desktop or Docker Engine
 - External PostgreSQL 14+ with SSL
-- [Resend](https://resend.com) account for email
+- [SendGrid](https://sendgrid.com) account with a verified sender domain
 
 ### Build & Run
 

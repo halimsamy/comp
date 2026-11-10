@@ -1,5 +1,5 @@
 import TrainingCompletedEmail from '../emails/training-completed';
-import { EmailAttachment, sendEmail } from './resend';
+import { EmailAttachment, sendEmail } from './send-email';
 
 export const sendTrainingCompletedEmail = async (params: {
   email: string;

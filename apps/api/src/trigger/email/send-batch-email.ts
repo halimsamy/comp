@@ -1,9 +1,9 @@
 import { logger, queue, schemaTask } from '@trycompai/jobs';
 import { z } from 'zod';
-import { resend } from '../../email/resend';
-import { generateUnsubscribeToken } from '@trycompai/email';
+import { generateUnsubscribeToken, sendWithSendGrid } from '@trycompai/email';
 
-const RESEND_BATCH_LIMIT = 100;
+// SendGrid has no multi-message batch endpoint; send this many at a time.
+const PARALLEL_SENDS = 10;
 
 const batchEmailQueue = queue({
   name: 'send-batch-email',
@@ -28,77 +28,56 @@ export const sendBatchEmailTask = schemaTask({
     emails: z.array(batchEmailItemSchema).min(1),
   }),
   run: async (params) => {
-    if (!resend) {
-      logger.error('Resend not initialized - missing RESEND_API_KEY');
-      throw new Error('Resend not initialized - missing API key');
-    }
-
     const fromDefault =
-      process.env.RESEND_FROM_SYSTEM ?? process.env.RESEND_FROM_DEFAULT;
+      process.env.EMAIL_FROM_SYSTEM ?? process.env.EMAIL_FROM_DEFAULT;
 
     if (!fromDefault) {
       throw new Error('Missing FROM address in environment variables');
     }
 
-    const toTest = process.env.RESEND_TO_TEST;
+    const toTest = process.env.EMAIL_TO_TEST;
     const apiBaseUrl =
       process.env.NEXT_PUBLIC_API_URL || 'https://api.trycomp.ai';
 
     let totalSent = 0;
     let totalFailed = 0;
 
-    for (let i = 0; i < params.emails.length; i += RESEND_BATCH_LIMIT) {
-      const chunk = params.emails.slice(i, i + RESEND_BATCH_LIMIT);
+    for (let i = 0; i < params.emails.length; i += PARALLEL_SENDS) {
+      const chunk = params.emails.slice(i, i + PARALLEL_SENDS);
 
-      const payload = chunk.map((email) => {
-        const token = generateUnsubscribeToken(email.to);
-        const oneClickUrl = `${apiBaseUrl}/v1/email/unsubscribe?email=${encodeURIComponent(email.to)}&token=${encodeURIComponent(token)}`;
+      const results = await Promise.allSettled(
+        chunk.map((email) => {
+          const token = generateUnsubscribeToken(email.to);
+          const oneClickUrl = `${apiBaseUrl}/v1/email/unsubscribe?email=${encodeURIComponent(email.to)}&token=${encodeURIComponent(token)}`;
 
-        return {
-          from: email.from ?? fromDefault,
-          to: toTest ?? email.to,
-          cc: email.cc,
-          subject: email.subject,
-          html: email.html,
-          headers: {
-            'List-Unsubscribe': `<${oneClickUrl}>`,
-            'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
-          },
-        };
-      });
-
-      const { data, error } = await resend.batch.send(payload, {
-        batchValidation: 'permissive',
-      });
-
-      if (error) {
-        logger.error('Resend batch API error', {
-          error,
-          chunkIndex: i,
-          chunkSize: chunk.length,
-        });
-        totalFailed += chunk.length;
-        continue;
-      }
-
-      const sent = data?.data?.length ?? 0;
-      totalSent += sent;
-
-      if ('errors' in data && Array.isArray(data.errors)) {
-        for (const err of data.errors) {
-          logger.warn('Batch email failed for recipient', {
-            index: err.index,
-            message: err.message,
-            to: chunk[err.index]?.to,
+          return sendWithSendGrid({
+            from: email.from ?? fromDefault,
+            to: toTest ?? email.to,
+            cc: email.cc,
+            subject: email.subject,
+            html: email.html,
+            headers: {
+              'List-Unsubscribe': `<${oneClickUrl}>`,
+              'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+            },
           });
-          totalFailed += 1;
-        }
-      }
+        }),
+      );
 
-      logger.info('Batch chunk sent', {
-        chunkIndex: i,
-        chunkSize: chunk.length,
-        sent,
+      results.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          totalSent += 1;
+          return;
+        }
+        totalFailed += 1;
+        logger.warn('Batch email failed for recipient', {
+          index: i + index,
+          to: chunk[index]?.to,
+          message:
+            result.reason instanceof Error
+              ? result.reason.message
+              : String(result.reason),
+        });
       });
     }
 

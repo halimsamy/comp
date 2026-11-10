@@ -1,7 +1,6 @@
 import { logger, queue, schemaTask } from '@trycompai/jobs';
 import { z } from 'zod';
-import { resend } from '../../email/resend';
-import { generateUnsubscribeToken } from '@trycompai/email';
+import { generateUnsubscribeToken, sendWithSendGrid } from '@trycompai/email';
 
 const emailQueue = queue({
   name: 'send-email',
@@ -19,10 +18,10 @@ export type EmailChannel = z.infer<typeof emailChannelSchema>;
 function resolveFromAddressForChannel(
   channel: EmailChannel | undefined,
 ): string | undefined {
-  const fromMarketing = process.env.RESEND_FROM_MARKETING;
-  const fromSystem = process.env.RESEND_FROM_SYSTEM;
-  const fromDefault = process.env.RESEND_FROM_DEFAULT;
-  const fromTrustPortal = process.env.RESEND_FROM_TRUST_PORTAL;
+  const fromMarketing = process.env.EMAIL_FROM_MARKETING;
+  const fromSystem = process.env.EMAIL_FROM_SYSTEM;
+  const fromDefault = process.env.EMAIL_FROM_DEFAULT;
+  const fromTrustPortal = process.env.EMAIL_FROM_TRUST_PORTAL;
 
   switch (channel) {
     case 'trustPortal':
@@ -63,17 +62,9 @@ export const sendEmailTask = schemaTask({
       .optional(),
   }),
   run: async (params) => {
-    if (!resend) {
-      logger.error('Resend not initialized - missing RESEND_API_KEY', {
-        to: params.to,
-        subject: params.subject,
-      });
-      throw new Error('Resend not initialized - missing API key');
-    }
-
-    const toTest = process.env.RESEND_TO_TEST;
-    const fromSystem = process.env.RESEND_FROM_SYSTEM;
-    const fromDefault = process.env.RESEND_FROM_DEFAULT;
+    const toTest = process.env.EMAIL_TO_TEST;
+    const fromSystem = process.env.EMAIL_FROM_SYSTEM;
+    const fromDefault = process.env.EMAIL_FROM_DEFAULT;
 
     const fromAddress =
       params.from ??
@@ -97,36 +88,23 @@ export const sendEmailTask = schemaTask({
         'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
       };
 
-      const { data, error } = await resend.emails.send({
+      const { id } = await sendWithSendGrid({
         from: fromAddress,
         to: toAddress,
         cc: params.cc,
         subject: params.subject,
         html: params.html,
         headers,
-        scheduledAt: params.scheduledAt,
-        attachments: params.attachments?.map((att) => ({
-          filename: att.filename,
-          content: att.content,
-          contentType: att.contentType,
-        })),
+        sendAt: params.scheduledAt,
+        attachments: params.attachments,
       });
 
-      if (error) {
-        logger.error('Resend API error', {
-          error,
-          to: params.to,
-          subject: params.subject,
-        });
-        throw new Error(`Failed to send email: ${error.message}`);
-      }
-
-      logger.info('Email sent', { to: params.to, id: data?.id });
+      logger.info('Email sent', { to: params.to, id });
 
       // Throttle: hold the concurrency slot for 1s to space out sends
       await new Promise((r) => setTimeout(r, 1000));
 
-      return { id: data?.id };
+      return { id };
     } catch (error) {
       logger.error('Email sending failed', {
         to: params.to,

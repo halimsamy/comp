@@ -33,7 +33,7 @@ interface SendBatchEmailViaApiParams {
 /**
  * Renders a React email template to HTML and sends it through the
  * API's centralized send-email Trigger task.
- * Used by app-side Trigger tasks to avoid calling Resend directly.
+ * Used by app-side Trigger tasks to avoid calling the email provider directly.
  */
 export async function sendEmailViaApi(
   params: SendEmailViaApiParams,

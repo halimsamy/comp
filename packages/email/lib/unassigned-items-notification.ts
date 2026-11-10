@@ -1,5 +1,5 @@
 import UnassignedItemsNotificationEmail from '../emails/unassigned-items-notification';
-import { sendEmail } from './resend';
+import { sendEmail } from './send-email';
 
 export interface UnassignedItem {
   type: 'task' | 'policy' | 'risk' | 'vendor';

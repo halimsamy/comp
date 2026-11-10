@@ -1,5 +1,5 @@
 import InviteEmail from '../emails/invite';
-import { sendEmail } from './resend';
+import { sendEmail } from './send-email';
 
 export const sendInviteMemberEmail = async (params: {
   organizationName: string;

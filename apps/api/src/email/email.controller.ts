@@ -57,7 +57,7 @@ export class EmailController {
   @ApiResponse({ status: 200, description: 'Batch email task triggered' })
   async sendBatchEmail(@Body() dto: SendBatchEmailDto) {
     const fromAddress =
-      process.env.RESEND_FROM_SYSTEM ?? process.env.RESEND_FROM_DEFAULT;
+      process.env.EMAIL_FROM_SYSTEM ?? process.env.EMAIL_FROM_DEFAULT;
 
     const emails = dto.emails.map((email) => ({
       to: email.to,

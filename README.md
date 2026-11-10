@@ -197,7 +197,6 @@ Additionally, ensure the following required environment variables are added to `
 ```env
 AUTH_SECRET=""                  # Use `openssl rand -base64 32` to generate
 DATABASE_URL="postgresql://user:password@host:port/database"
-RESEND_API_KEY="" # Resend (https://resend.com/api-keys) - Resend Dashboard -> API Keys
 NEXT_PUBLIC_PORTAL_URL="http://localhost:3002"
 REVALIDATION_SECRET=""         # Use `openssl rand -base64 32` to generate
 ```

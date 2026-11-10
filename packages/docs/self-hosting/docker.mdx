@@ -18,7 +18,7 @@ This guide covers running Comp with Docker Compose. The stack includes:
 
 - Docker Desktop or Docker Engine installed
 - External PostgreSQL 14+ with SSL (e.g., Neon, DigitalOcean, RDS)
-- [Resend](https://resend.com) account for transactional email
+- [SendGrid](https://sendgrid.com) account with a verified sender domain for transactional email
 
 ## Environment File Layout
 
@@ -57,9 +57,6 @@ For a functional Docker deployment, you need:
     NEXT_PUBLIC_BETTER_AUTH_URL="https://app.yourdomain.com"
     NEXT_PUBLIC_PORTAL_URL="https://portal.yourdomain.com"
 
-    # Email
-    RESEND_API_KEY="re_..."
-
     # Revalidation
     REVALIDATION_SECRET="<random string>"
     ```
@@ -74,9 +71,6 @@ For a functional Docker deployment, you need:
     BETTER_AUTH_SECRET="<openssl rand -base64 32>"
     BETTER_AUTH_URL="https://portal.yourdomain.com"
     NEXT_PUBLIC_BETTER_AUTH_URL="https://portal.yourdomain.com"
-
-    # Email
-    RESEND_API_KEY="re_..."
     ```
   </Accordion>
 </AccordionGroup>
