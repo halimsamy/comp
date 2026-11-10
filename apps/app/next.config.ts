@@ -53,7 +53,8 @@ const config: NextConfig = {
     unoptimized: true,
   },
 
-  serverExternalPackages: ['jspdf'],
+  // pg-boss (via @trycompai/jobs) talks to Postgres at runtime; never bundle it.
+  serverExternalPackages: ['jspdf', 'pg-boss'],
 
   experimental: {
     serverActions: {
