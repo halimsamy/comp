@@ -2,7 +2,7 @@ import 'server-only';
 
 const VOYAGE_URL = 'https://api.voyageai.com/v1/embeddings';
 export const VOYAGE_MODEL = 'voyage-4';
-/** voyage-4's default output dimension — the Upstash index must match. */
+/** voyage-4's default output dimension — the VectorEmbedding column must match. */
 export const VOYAGE_DIMENSIONS = 1024;
 const VOYAGE_MAX_BATCH = 1000;
 

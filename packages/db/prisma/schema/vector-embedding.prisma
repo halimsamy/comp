@@ -1,0 +1,17 @@
+// Embeddings for semantic search (questionnaire answers, knowledge base, risk/vendor
+// auto-link). Written and queried with raw SQL by PgVectorIndex in apps/api and apps/app.
+// `id` is the caller's deterministic key (e.g. `task_<orgId>_<taskId>`), not a CUID,
+// because re-syncing must overwrite the same row.
+// No HNSW index on purpose: queries are exact (sequential within the org), which is fast
+// enough for a single company's vectors and Prisma would drop a hand-made HNSW index as drift.
+// shortcut: exact KNN, add an HNSW index (and keep it out of migrate dev drift) past ~100k rows.
+model VectorEmbedding {
+  id             String                      @id
+  organizationId String?
+  embedding      Unsupported("vector(1024)")
+  metadata       Json                        @default("{}")
+  createdAt      DateTime                    @default(now())
+  updatedAt      DateTime                    @default(now())
+
+  @@index([organizationId])
+}

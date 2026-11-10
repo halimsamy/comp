@@ -1,13 +1,13 @@
 # Vector Search Utilities
 
-This directory contains utilities for semantic search using Upstash Vector and Voyage AI embeddings (`voyage-4`, 1024 dimensions).
+This directory contains utilities for semantic search using pgvector and Voyage AI embeddings (`voyage-4`, 1024 dimensions).
 
 ## Structure
 
 ```
 lib/vector/
 ├── core/                    # Core functionality
-│   ├── client.ts           # Upstash Vector client initialization
+│   ├── client.ts           # pgvector client initialization
 │   ├── generate-embedding.ts # Voyage AI embedding generation
 │   ├── find-similar.ts     # Semantic search function
 │   └── upsert-embedding.ts # Embedding storage
@@ -20,22 +20,17 @@ lib/vector/
 
 ## Setup
 
-1. **Create Upstash Vector Database**
-   - Go to [Upstash Console](https://console.upstash.com)
-   - Create a new Vector Database with **1024 dimensions** and the COSINE metric (voyage-4 output size)
-   - Copy the REST URL and Token
+1. **Postgres with pgvector**
+   Embeddings live in the `VectorEmbedding` table (`vector(1024)`, cosine) of the main
+   database, created by the `add_vector_embedding` migration. The server needs the
+   pgvector extension (RDS supports it; locally use the `pgvector/pgvector` image).
 
-   > **Migrating from OpenAI embeddings:** vectors were previously 1536-dim
-   > OpenAI `text-embedding-3-*`. Voyage `voyage-4` returns 1024-dim vectors and
-   > lives in a different embedding space, so the Upstash Vector index must be
-   > recreated at 1024 dimensions and every organization re-synced. Old vectors
-   > cannot be mixed with new ones.
+   > **Migrating from Upstash / OpenAI embeddings:** run a full re-sync per
+   > organization after deploying; old vectors are not copied over.
 
 2. **Add Environment Variables**
    Add to your `.env` file:
    ```
-   UPSTASH_VECTOR_REST_URL=your_vector_rest_url
-   UPSTASH_VECTOR_REST_TOKEN=your_vector_rest_token
    VOYAGE_API_KEY=your_voyage_api_key
    ```
 
@@ -100,7 +95,7 @@ const text = extractTextFromPolicy(policy);
 ## Files
 
 ### Core (`core/`)
-- `client.ts` - Upstash Vector client initialization
+- `client.ts` - pgvector client initialization
 - `generate-embedding.ts` - Voyage AI embedding generation (REST, `input_type` query vs document)
 - `find-similar.ts` - Semantic search function
 - `upsert-embedding.ts` - Embedding storage

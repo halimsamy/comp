@@ -78,7 +78,8 @@ Want the managed version? [Get started with Comp AI Cloud](https://trycomp.ai).
 - [pg-boss](https://github.com/timgit/pg-boss)
 - [Prisma](https://prisma.io/?ref=trycomp.ai)
 - [Tailwind CSS](https://tailwindcss.com/?ref=trycomp.ai)
-- [Upstash](https://upstash.com/?ref=trycomp.ai)
+- [pgvector](https://github.com/pgvector/pgvector)
+- [Valkey](https://valkey.io)
 - [Vercel](https://vercel.com/?ref=trycomp.ai)
 
 ## Contact us
@@ -244,15 +245,13 @@ bun run --cwd apps/app worker
     comp/apps/portal/src/app/lib/auth.ts
     ```
 
-#### 3. Redis (Upstash)
+#### 3. Redis (optional, self-hosted Valkey)
 
-- Go to [https://console.upstash.com](https://console.upstash.com)
-- Create a Redis database
-- Copy the **Redis URL** and **TOKEN**
-- Add them to your `.env` file, or hard-code them if the environment variables are not being recognized in:
-  ```
-  comp/packages/kv/src/index.ts
-  ```
+Rate limits and caches use Redis over HTTP. Without it they fall back to per-process memory.
+`docker-compose.yml` runs Valkey behind SRH (an Upstash-compatible REST proxy):
+
+- Set `SRH_TOKEN` to a long random string
+- In the app, portal and api `.env` files set `UPSTASH_REDIS_REST_URL=http://redis-http` (or `http://localhost:<port>` outside Docker) and `UPSTASH_REDIS_REST_TOKEN` to the same `SRH_TOKEN`
 
 ---
 
@@ -363,7 +362,7 @@ This repository uses semantic-release to automatically publish packages to npm w
 
 - `@trycompai/db` - Database utilities with Prisma client
 - `@trycompai/email` - Email templates and components
-- `@trycompai/kv` - Key-value store utilities using Upstash Redis
+- `@trycompai/kv` - Key-value store utilities (Redis over HTTP: Valkey + SRH, or Upstash)
 - `@trycompai/ui` - UI component library with Tailwind CSS
 
 ### Setup

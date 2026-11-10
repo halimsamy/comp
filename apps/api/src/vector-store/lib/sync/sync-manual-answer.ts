@@ -15,12 +15,10 @@ export async function syncManualAnswerToVector(
   // Check if vectorIndex is configured
   if (!vectorIndex) {
     logger.error(
-      '❌ Upstash Vector not configured - check UPSTASH_VECTOR_REST_URL and UPSTASH_VECTOR_REST_TOKEN',
+      '❌ Vector store is not configured',
       {
         manualAnswerId,
         organizationId,
-        hasUrl: !!process.env.UPSTASH_VECTOR_REST_URL,
-        hasToken: !!process.env.UPSTASH_VECTOR_REST_TOKEN,
       },
     );
     return { success: false, error: 'Vector DB not configured' };
@@ -70,7 +68,7 @@ export async function syncManualAnswerToVector(
     });
 
     // Verify the embedding was actually added by fetching it directly by ID
-    // Using direct fetch with retry to handle eventual consistency in Upstash Vector
+    // Direct fetch with retry (kept from Upstash; pgvector writes are immediately visible)
     // Even direct fetch can have slight delays, so we retry a few times with exponential backoff
     let wasFound = false;
     const maxRetries = 3;
@@ -131,7 +129,7 @@ export async function syncManualAnswerToVector(
 
     // Only log info if verification failed after all retries (non-critical)
     // This is non-critical - upsert succeeded, so embedding will be available soon
-    // Upstash Vector has eventual consistency, so immediate fetch might not find it
+    // (pgvector writes are immediately visible, so this should not happen)
     // We don't log this as a warning since it's expected behavior
     if (!wasFound) {
       // Silently continue - upsert succeeded, embedding will be available soon

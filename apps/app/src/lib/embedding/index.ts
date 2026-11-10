@@ -1,12 +1,13 @@
 import 'server-only';
 
-import { Index, type RangeResult } from '@upstash/vector';
 import { createHash } from 'node:crypto';
 import {
   VOYAGE_DIMENSIONS as EMBEDDING_DIMENSIONS,
   VOYAGE_MODEL as EMBEDDING_MODEL,
   voyageEmbed,
 } from '@/lib/vector/core/generate-embedding';
+import { vectorIndex } from '@/lib/vector/core/client';
+import type { PgVectorIndex, RangeResult } from '@/lib/vector/core/pg-vector-index';
 
 export type EntityKind = 'risk' | 'vendor' | 'task';
 
@@ -24,7 +25,7 @@ interface UpsertOptions {
    * Optional id → hash map of the embeddings currently stored for these
    * entities. Any entity whose freshly-computed `contentHash` matches its
    * stored value is skipped — both the Voyage embedding call AND the
-   * Upstash upsert. Pass an empty map (or omit) to force re-embedding.
+   * vector upsert. Pass an empty map (or omit) to force re-embedding.
    *
    * Stored hashes live on `Task/Risk/Vendor.embeddingHash` in Postgres;
    * `runLinkage` reads them up-front and writes the new hashes back after
@@ -64,19 +65,9 @@ const TASK_VECTOR_PAGE_SIZE = 1000;
 // task vectors, far beyond any real org — hitting it signals a bug, not scale.
 const TASK_VECTOR_MAX_PAGES = 500;
 
-let cachedIndex: Index | null = null;
-
-function getIndex(): Index {
-  if (cachedIndex) return cachedIndex;
-  const url = process.env.UPSTASH_VECTOR_REST_URL;
-  const token = process.env.UPSTASH_VECTOR_REST_TOKEN;
-  if (!url || !token) {
-    throw new Error(
-      'Upstash Vector is not configured (UPSTASH_VECTOR_REST_URL / UPSTASH_VECTOR_REST_TOKEN)',
-    );
-  }
-  cachedIndex = new Index({ url, token });
-  return cachedIndex;
+function getIndex(): PgVectorIndex {
+  if (!vectorIndex) throw new Error('Vector store is not configured');
+  return vectorIndex;
 }
 
 function embeddingIdPrefix(kind: EntityKind, organizationId: string): string {
@@ -126,7 +117,7 @@ export function computeEntityContentHash({
 }
 
 /**
- * Upsert per-org entity embeddings into Upstash Vector.
+ * Upsert per-org entity embeddings into the vector store (pgvector).
  *
  * NOTE: this duplicates a thin slice of `apps/api/src/vector-store/`. Consolidate
  * into a shared package as a follow-up — keeping it here avoids cross-app imports
@@ -143,7 +134,7 @@ export async function upsertEntityEmbeddings({
 
   // Skip entities whose stored hash matches the current content hash —
   // text + model + dims + department haven't changed, so the existing
-  // vector is still authoritative. Saves the Voyage embed AND the Upstash
+  // vector is still authoritative. Saves the Voyage embed AND the vector
   // upsert (the two non-trivial costs in this path).
   const withHashes = valid.map((entity) => ({
     entity,
@@ -237,7 +228,7 @@ async function fetchOrgTaskVectors(organizationId: string): Promise<OrgTaskVecto
 }
 
 /**
- * Cosine similarity mapped to Upstash's COSINE score scale, `(1 + cos) / 2`, so
+ * Cosine similarity mapped to the vector store's COSINE score scale, `(1 + cos) / 2`, so
  * scores stay in [0, 1] and are drop-in compatible with the department boost /
  * threshold in `linkSuggestions` and the reranker's `cosineScore` hint.
  */
@@ -264,7 +255,7 @@ export function cosineToUnitScore(a: number[], b: number[]): number {
  * exactly in-process, rather than issuing a metadata-filtered ANN query. A
  * filtered `query` (`organizationId AND sourceType`) collapses to near-zero
  * recall here: one org is a tiny slice of a 180k+ vector shared-namespace index,
- * so Upstash's approximate traversal exhausts its candidate budget on nearer,
+ * so Upstash's approximate traversal (the previous store) exhausts its candidate budget on nearer,
  * non-matching vectors before reaching this org's tasks — returning 0 candidates
  * even when relevant tasks exist, which starved treatment plans of every
  * suggestion (CS-681). An org holds at most low-hundreds of tasks, so exact
@@ -293,7 +284,7 @@ export async function findSimilarTasks({
 }
 
 export interface PruneOrphanTaskVectorsResult {
-  /** sourceIds of the task vectors that were deleted from Upstash. */
+  /** sourceIds of the task vectors that were deleted from the vector store. */
   deletedSourceIds: string[];
   /** How many of the org's task vectors were examined. */
   scanned: number;
@@ -331,7 +322,7 @@ export async function pruneOrphanTaskVectors({
   const prefix = embeddingIdPrefix('task', organizationId);
 
   // Enumerate the org's task vectors page by page over their shared id prefix.
-  // Upstash returns `nextCursor === ''` when the last page is drained; the page
+  // range returns `nextCursor === ''` when the last page is drained; the page
   // cap is a runaway backstop (a healthy cursor always terminates first).
   const orphans: Array<{ vectorId: string; sourceId: string }> = [];
   let scanned = 0;
@@ -409,16 +400,11 @@ export interface WaitForIndexedResult {
 }
 
 /**
- * Block until Upstash Vector has finished indexing every previously-upserted
- * vector (i.e. `info().pendingVectorCount === 0`).
+ * Block until every previously-upserted vector is searchable
+ * (i.e. `info().pendingVectorCount === 0`).
  *
- * Upstash returns 200 from `upsert` as soon as the write is durable, but the
- * HNSW index is built asynchronously. Vectors sit in `pendingVectorCount` for
- * a few hundred ms to several seconds before they become queryable. Querying
- * during that window returns empty results for the not-yet-indexed IDs even
- * though the upsert succeeded — see ENG-221 for the race we hit during
- * onboarding (6 of 11 risks got 0 cosine candidates because their queries
- * raced ahead of indexing).
+ * Kept from Upstash, whose index built asynchronously (ENG-221). pgvector writes
+ * are visible as soon as `upsert` returns, so this returns after one poll.
  *
  * Call this AFTER `upsertEntityEmbeddings` and BEFORE any query that depends
  * on the just-written vectors being searchable.

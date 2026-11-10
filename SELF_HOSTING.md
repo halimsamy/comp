@@ -35,7 +35,7 @@ For a functional deployment:
 ### Prerequisites
 
 - Docker Desktop or Docker Engine
-- External PostgreSQL 14+ with SSL
+- External PostgreSQL 14+ with SSL and the [pgvector](https://github.com/pgvector/pgvector) extension available (used for vector search)
 - [SendGrid](https://sendgrid.com) account with a verified sender domain
 
 ### Build & Run

@@ -1,18 +1,7 @@
 import 'server-only';
 
-import { Index } from '@upstash/vector';
-import { env } from '@/env.mjs';
+import { db } from '@db/server';
+import { PgVectorIndex } from './pg-vector-index';
 
-if (!env.UPSTASH_VECTOR_REST_URL || !env.UPSTASH_VECTOR_REST_TOKEN) {
-  console.warn(
-    'Upstash Vector credentials not configured. Vector search functionality will be disabled.',
-  );
-}
-
-export const vectorIndex = env.UPSTASH_VECTOR_REST_URL && env.UPSTASH_VECTOR_REST_TOKEN
-  ? new Index({
-      url: env.UPSTASH_VECTOR_REST_URL,
-      token: env.UPSTASH_VECTOR_REST_TOKEN,
-    })
-  : null;
-
+// Embeddings live in the main Postgres (pgvector), so search is always available.
+export const vectorIndex: PgVectorIndex | null = new PgVectorIndex(db);

@@ -22,7 +22,7 @@ export interface EmbeddingMetadata {
 }
 
 /**
- * Upserts an embedding into Upstash Vector
+ * Upserts an embedding into the vector store
  * @param id - Unique identifier for this embedding (e.g., "policy_pol123_chunk0")
  * @param text - The text content to embed
  * @param metadata - Metadata associated with this embedding
@@ -33,12 +33,10 @@ export async function upsertEmbedding(
   metadata: EmbeddingMetadata,
 ): Promise<void> {
   if (!vectorIndex) {
-    const errorMsg = 'Upstash Vector is not configured - check UPSTASH_VECTOR_REST_URL and UPSTASH_VECTOR_REST_TOKEN';
+    const errorMsg = 'Vector store is not configured';
     logger.error(errorMsg, {
       id,
       sourceType: metadata.sourceType,
-      hasUrl: !!process.env.UPSTASH_VECTOR_REST_URL,
-      hasToken: !!process.env.UPSTASH_VECTOR_REST_TOKEN,
     });
     throw new Error(errorMsg);
   }
@@ -85,7 +83,7 @@ export async function upsertEmbedding(
       });
     }
 
-    // Upsert into Upstash Vector
+    // Upsert into the vector store
     const upsertResult = await vectorIndex.upsert({
       id,
       vector: embedding,
@@ -126,7 +124,7 @@ export async function batchUpsertEmbeddings(
   }>,
 ): Promise<void> {
   if (!vectorIndex) {
-    throw new Error('Upstash Vector is not configured');
+    throw new Error('Vector store is not configured');
   }
 
   if (items.length === 0) {
@@ -149,7 +147,7 @@ export async function batchUpsertEmbeddings(
     // Step 2: Upsert all embeddings in parallel
     // Check vectorIndex before using it (TypeScript safety)
     if (!vectorIndex) {
-      throw new Error('Upstash Vector is not configured');
+      throw new Error('Vector store is not configured');
     }
 
     // Store reference to avoid null check issues in map

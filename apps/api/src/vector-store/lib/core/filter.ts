@@ -1,19 +1,15 @@
+import type { VectorFilter } from './pg-vector-index';
+
 /**
- * Upstash Vector filter DSL does not support bound parameters, so the
- * organizationId must be validated before interpolation. Organization IDs are
- * prefixed CUIDs (`org_` + lowercase alphanumeric), so anything containing
- * quotes, whitespace or filter operators is rejected outright.
+ * Prefixed CUID (`org_` + lowercase alphanumeric). The query is parameterized, but
+ * a malformed ID still means a caller bug, so reject it instead of returning nothing.
  */
 const ORGANIZATION_ID_PATTERN = /^org_[a-z0-9]{16,32}$/;
 
-/**
- * Builds an Upstash Vector metadata filter scoping the query to one
- * organization. Throws on any value that is not a well-formed organization ID
- * so an attacker-controlled value can never alter the filter expression.
- */
-export function organizationFilter(organizationId: string): string {
+/** Builds a vector filter scoping a query to one organization. */
+export function organizationFilter(organizationId: string): VectorFilter {
   if (!ORGANIZATION_ID_PATTERN.test(organizationId)) {
     throw new Error('Invalid organizationId for vector filter');
   }
-  return `organizationId = "${organizationId}"`;
+  return { organizationId };
 }

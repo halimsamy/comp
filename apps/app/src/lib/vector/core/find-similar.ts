@@ -20,7 +20,7 @@ export interface SimilarContentResult {
 }
 
 /**
- * Finds similar content using semantic search in Upstash Vector
+ * Finds similar content using semantic search in the vector store
  * @param question - The question or query text to search for
  * @param organizationId - Filter results to this organization only
  * @param limit - Maximum number of results to return (default: 5)
@@ -32,7 +32,7 @@ export async function findSimilarContent(
   limit: number = 5,
 ): Promise<SimilarContentResult[]> {
   if (!vectorIndex) {
-    logger.warn('Upstash Vector is not configured, returning empty results');
+    logger.warn('Vector store is not configured, returning empty results');
     return [];
   }
 
@@ -44,18 +44,16 @@ export async function findSimilarContent(
     // Generate embedding for the question
     const queryEmbedding = await generateEmbedding(question);
 
-    // Search in Upstash Vector
-    // Note: Upstash Vector doesn't support metadata filtering in the query itself,
-    // so we'll filter results after retrieval
+    // Search only this organization's vectors (filtered in SQL)
     const results = await vectorIndex.query({
       vector: queryEmbedding,
-      topK: 100, // Get more results to account for filtering
+      topK: 100, // Headroom for the score and questionnaire filters below
       includeMetadata: true,
+      filter: { organizationId },
     });
 
     // Filter by organizationId and map to our result format
-    // Also filter by minimum similarity score (cosine similarity typically ranges from -1 to 1, 
-    // but Upstash Vector uses dot product which can vary, so we use a low threshold)
+    // Scores are (1 + cosine) / 2, so 0.1 only drops near-opposite vectors
     const MIN_SIMILARITY_SCORE = 0.1; // Minimum threshold for relevance
     
     const filteredResults: SimilarContentResult[] = results

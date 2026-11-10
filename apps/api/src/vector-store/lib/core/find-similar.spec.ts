@@ -116,9 +116,9 @@ describe('findSimilarContentBatch: result cap (CS-594)', () => {
 
 describe('organizationFilter: filter injection hardening (GH-043)', () => {
   it('builds an equality filter for well-formed organization IDs', () => {
-    expect(organizationFilter('org_68d3f2f01a2b3c4d5e6f7a8b')).toBe(
-      'organizationId = "org_68d3f2f01a2b3c4d5e6f7a8b"',
-    );
+    expect(organizationFilter('org_68d3f2f01a2b3c4d5e6f7a8b')).toEqual({
+      organizationId: 'org_68d3f2f01a2b3c4d5e6f7a8b',
+    });
   });
 
   it.each([
@@ -134,14 +134,14 @@ describe('organizationFilter: filter injection hardening (GH-043)', () => {
     );
   });
 
-  it('findSimilarContent never queries Upstash with an injected filter', async () => {
+  it('findSimilarContent never queries the vector store with an injected filter', async () => {
     await expect(
       findSimilarContent('q', 'zzz" OR organizationId GLOB "*'),
     ).rejects.toThrow('Invalid organizationId for vector filter');
     expect(mockQuery).not.toHaveBeenCalled();
   });
 
-  it('findSimilarContentBatch never queries Upstash with an injected filter', async () => {
+  it('findSimilarContentBatch never queries the vector store with an injected filter', async () => {
     // Invalid tenant IDs fail before embeddings or any vector query.
     await expect(
       findSimilarContentBatch(['q'], 'zzz" OR organizationId GLOB "*'),
@@ -149,27 +149,27 @@ describe('organizationFilter: filter injection hardening (GH-043)', () => {
     expect(mockQuery).not.toHaveBeenCalled();
   });
 
-  it('interpolates only the validated value into the filter string', async () => {
+  it('passes only the validated value in the filter', async () => {
     mockQuery.mockResolvedValue([]);
     const orgId = 'org_68d3f2f01a2b3c4d5e6f7a8b';
 
     await findSimilarContent('q', orgId);
 
     expect(mockQuery).toHaveBeenCalledWith(
-      expect.objectContaining({ filter: `organizationId = "${orgId}"` }),
+      expect.objectContaining({ filter: { organizationId: orgId } }),
     );
   });
 });
 
 describe('findSimilarContent: organizationId filter injection guard (GH-103)', () => {
-  it('passes a normal organization id through to the Upstash filter unchanged', async () => {
+  it('passes a normal organization id through to the vector filter unchanged', async () => {
     mockQuery.mockResolvedValue([]);
 
     await findSimilarContent('any question', 'org_cl9ebqhxk00003b600tymydho');
 
     expect(mockQuery).toHaveBeenCalledWith(
       expect.objectContaining({
-        filter: 'organizationId = "org_cl9ebqhxk00003b600tymydho"',
+        filter: { organizationId: 'org_cl9ebqhxk00003b600tymydho' },
       }),
     );
   });
@@ -202,14 +202,14 @@ describe('findSimilarContent: organizationId filter injection guard (GH-103)', (
 });
 
 describe('findSimilarContentBatch: organizationId filter injection guard (GH-103)', () => {
-  it('passes a normal organization id through to the Upstash filter unchanged', async () => {
+  it('passes a normal organization id through to the vector filter unchanged', async () => {
     mockQuery.mockResolvedValue([]);
 
     await findSimilarContentBatch(['q1'], 'org_cl9ebqhxk00003b600tymydho');
 
     expect(mockQuery).toHaveBeenCalledWith(
       expect.objectContaining({
-        filter: 'organizationId = "org_cl9ebqhxk00003b600tymydho"',
+        filter: { organizationId: 'org_cl9ebqhxk00003b600tymydho' },
       }),
     );
   });

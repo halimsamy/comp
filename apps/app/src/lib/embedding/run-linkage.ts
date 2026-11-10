@@ -25,10 +25,9 @@ export type LinkagePhase =
   | { name: 'embedding-risks'; current: number; total: number }
   | { name: 'embedding-vendors'; current: number; total: number }
   /**
-   * Upstash Vector indexes upserted vectors asynchronously — emitted between
-   * the embedding phase and matching phase while we poll `info()` until
-   * `pendingVectorCount === 0`. Without this gate, the cosine queries can
-   * race ahead of indexing and silently return zero candidates.
+   * Emitted between the embedding phase and matching phase while we poll
+   * `info()` until `pendingVectorCount === 0` (kept from Upstash's async
+   * indexing; pgvector writes are visible immediately, so it passes at once).
    */
   | { name: 'waiting-for-index' }
   | { name: 'matching-risks'; current: number; total: number }
@@ -484,7 +483,7 @@ export async function runLinkage({
 
   // Build id → hash maps for skip-if-unchanged. Anything with a non-null
   // hash that still matches the current text gets skipped at the upsert
-  // layer — saving both the Voyage embedding call and the Upstash write.
+  // layer — saving both the Voyage embedding call and the vector write.
   const taskHashes = new Map<string, string>();
   for (const t of tasks) {
     if (t.embeddingHash !== null) taskHashes.set(t.id, t.embeddingHash);

@@ -92,7 +92,6 @@
     "@trycompai/design-system": "1.1.19",
     "@types/cheerio": "^1.0.0",
     "@types/react-syntax-highlighter": "^15.5.13",
-    "@upstash/vector": "^1.2.3",
     "better-auth": "^1.6.23",
     "cheerio": "^1.2.0",
     "react-syntax-highlighter": "^15.6.6",

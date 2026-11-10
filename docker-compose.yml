@@ -6,6 +6,33 @@ x-logging: &default-logging
     compress: 'true'
 
 services:
+  # Self-hosted replacement for Upstash Redis: Valkey (BSD-licensed Redis fork) behind
+  # SRH, which speaks the Upstash REST protocol so @upstash/redis and @upstash/ratelimit
+  # work unchanged. Point UPSTASH_REDIS_REST_URL at http://redis-http and
+  # UPSTASH_REDIS_REST_TOKEN at SRH_TOKEN in the app, portal and api env files.
+  valkey:
+    image: valkey/valkey:8-alpine
+    command: valkey-server --appendonly yes
+    volumes:
+      - valkey_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'valkey-cli', 'ping']
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    logging: *default-logging
+  redis-http:
+    image: hiett/serverless-redis-http:0.0.10 # last release (2024-05). shortcut: unmaintained community proxy, swap @upstash/* for ioredis if it breaks
+    environment:
+      SRH_MODE: env
+      SRH_TOKEN: ${SRH_TOKEN:?set SRH_TOKEN to a long random string}
+      SRH_CONNECTION_STRING: redis://valkey:6379
+    depends_on:
+      valkey:
+        condition: service_healthy
+    restart: unless-stopped
+    logging: *default-logging
   migrator:
     build:
       context: .
@@ -60,3 +87,6 @@ services:
       timeout: 10s
       retries: 3
     logging: *default-logging
+
+volumes:
+  valkey_data:

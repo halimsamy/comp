@@ -16,11 +16,9 @@ export async function syncManualAnswerToVector(
 ): Promise<{ success: boolean; error?: string; embeddingId?: string }> {
   // Check if vectorIndex is configured
   if (!vectorIndex) {
-    logger.error('❌ Upstash Vector not configured - check UPSTASH_VECTOR_REST_URL and UPSTASH_VECTOR_REST_TOKEN', {
+    logger.error('❌ the vector store not configured', {
       manualAnswerId,
       organizationId,
-      hasUrl: !!process.env.UPSTASH_VECTOR_REST_URL,
-      hasToken: !!process.env.UPSTASH_VECTOR_REST_TOKEN,
     });
     return { success: false, error: 'Vector DB not configured' };
   }

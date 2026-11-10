@@ -1,5 +1,5 @@
 const VOYAGE_URL = 'https://api.voyageai.com/v1/embeddings';
-const VOYAGE_MODEL = 'voyage-4'; // 1024 dims by default — the Upstash index must match
+const VOYAGE_MODEL = 'voyage-4'; // 1024 dims by default — the VectorEmbedding column must match
 const VOYAGE_MAX_BATCH = 1000;
 
 /** 'query' for search-time text, 'document' for text being indexed. */

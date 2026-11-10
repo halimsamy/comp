@@ -1,11 +1,7 @@
 import { vectorIndex } from './client';
-import { generateEmbedding } from './generate-embedding';
 import { logger } from '../../logger';
 
-/**
- * Counts embeddings for a specific organization and source type
- * Useful for debugging and verification
- */
+/** Counts an organization's embeddings by source type (exact). */
 export async function countEmbeddings(
   organizationId: string,
   sourceType?: 'policy' | 'context' | 'manual_answer',
@@ -15,122 +11,59 @@ export async function countEmbeddings(
   error?: string;
 }> {
   if (!vectorIndex) {
-    return {
-      total: 0,
-      bySourceType: {},
-      error: 'Vector DB not configured',
-    };
+    return { total: 0, bySourceType: {}, error: 'Vector DB not configured' };
   }
 
   try {
-    // Use organizationId as query to find all embeddings
-    const queryEmbedding = await generateEmbedding(organizationId);
-
-    const results = await vectorIndex.query({
-      vector: queryEmbedding,
-      topK: 100, // Max allowed by Upstash Vector
-      includeMetadata: true,
-    });
-
-    // Filter by organizationId
-    const orgResults = results.filter((result) => {
-      const metadata = result.metadata as any;
-      return metadata?.organizationId === organizationId;
-    });
-
-    // Count by sourceType
+    const records = await vectorIndex.list({ organizationId, sourceType });
     const bySourceType: Record<string, number> = {};
-    let total = 0;
-
-    for (const result of orgResults) {
-      const metadata = result.metadata as any;
-      const st = metadata?.sourceType || 'unknown';
-
-      if (!sourceType || st === sourceType) {
-        bySourceType[st] = (bySourceType[st] || 0) + 1;
-        total++;
-      }
+    for (const record of records) {
+      const st =
+        typeof record.metadata?.sourceType === 'string'
+          ? record.metadata.sourceType
+          : 'unknown';
+      bySourceType[st] = (bySourceType[st] ?? 0) + 1;
     }
 
     logger.info('Counted embeddings', {
       organizationId,
       sourceType: sourceType || 'all',
-      total,
+      total: records.length,
       bySourceType,
     });
-
-    return {
-      total,
-      bySourceType,
-    };
+    return { total: records.length, bySourceType };
   } catch (error) {
-    logger.error('Failed to count embeddings', {
-      organizationId,
-      sourceType,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
-    return {
-      total: 0,
-      bySourceType: {},
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    logger.error('Failed to count embeddings', { organizationId, sourceType, error: message });
+    return { total: 0, bySourceType: {}, error: message };
   }
 }
 
-/**
- * Lists all manual answer embeddings for an organization
- * Useful for debugging
- */
+/** Lists an organization's manual answer embeddings (exact). */
 export async function listManualAnswerEmbeddings(
   organizationId: string,
 ): Promise<
-  Array<{
-    id: string;
-    sourceId: string;
-    content: string;
-    updatedAt?: string;
-  }>
+  Array<{ id: string; sourceId: string; content: string; updatedAt?: string }>
 > {
   if (!vectorIndex) {
     return [];
   }
 
   try {
-    // Use organizationId as query
-    const queryEmbedding = await generateEmbedding(organizationId);
-
-    const results = await vectorIndex.query({
-      vector: queryEmbedding,
-      topK: 100,
-      includeMetadata: true,
-    });
-
-    // Filter for manual_answer type
-    const manualAnswerEmbeddings = results
-      .filter((result) => {
-        const metadata = result.metadata as any;
-        return (
-          metadata?.organizationId === organizationId &&
-          metadata?.sourceType === 'manual_answer'
-        );
-      })
-      .map((result) => {
-        const metadata = result.metadata as any;
-        return {
-          id: String(result.id),
-          sourceId: metadata?.sourceId || '',
-          content: metadata?.content || '',
-          updatedAt: metadata?.updatedAt,
-        };
-      });
-
-    logger.info('Listed manual answer embeddings', {
+    const records = await vectorIndex.list({
       organizationId,
-      count: manualAnswerEmbeddings.length,
-      ids: manualAnswerEmbeddings.map((e) => e.id),
+      sourceType: 'manual_answer',
     });
-
-    return manualAnswerEmbeddings;
+    return records.map((record) => {
+      const metadata = record.metadata ?? {};
+      return {
+        id: record.id,
+        sourceId: typeof metadata.sourceId === 'string' ? metadata.sourceId : '',
+        content: typeof metadata.content === 'string' ? metadata.content : '',
+        updatedAt:
+          typeof metadata.updatedAt === 'string' ? metadata.updatedAt : undefined,
+      };
+    });
   } catch (error) {
     logger.error('Failed to list manual answer embeddings', {
       organizationId,

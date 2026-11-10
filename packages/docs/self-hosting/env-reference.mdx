@@ -107,14 +107,12 @@ AWS S3 variables are required for file upload features (attachments, logos, ques
 | `VOYAGE_API_KEY` | app, api | runtime | conditional | Voyage AI key for embeddings (vector search, 1024-dim index) |
 | `FIRECRAWL_API_KEY` | app | runtime | conditional | Firecrawl for vendor research |
 
-### Rate Limiting & Caching (Upstash)
+### Rate Limiting & Caching (Redis over HTTP)
 
 | Name | Service(s) | Phase | Required | Notes |
 |------|-----------|-------|----------|-------|
-| `UPSTASH_REDIS_REST_URL` | app | runtime | optional | Upstash Redis URL for rate limiting |
-| `UPSTASH_REDIS_REST_TOKEN` | app | runtime | optional | Upstash Redis token |
-| `UPSTASH_VECTOR_REST_URL` | app | runtime | optional | Upstash Vector for embeddings |
-| `UPSTASH_VECTOR_REST_TOKEN` | app | runtime | optional | Upstash Vector token |
+| `UPSTASH_REDIS_REST_URL` | app, portal, api | runtime | optional | Redis REST URL for rate limiting and caches. Self-hosted: the `redis-http` (SRH + Valkey) service in `docker-compose.yml`, e.g. `http://redis-http` |
+| `UPSTASH_REDIS_REST_TOKEN` | app, portal, api | runtime | optional | Redis REST token (the `SRH_TOKEN`) |
 
 ### Analytics & Tracking
 
