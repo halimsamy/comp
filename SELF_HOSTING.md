@@ -32,6 +32,12 @@ For a functional deployment:
 - When enabled, organizations are automatically approved and bypass the payment/booking flow
 - `STRIPE_SECRET_KEY` is not required for self-hosted instances
 
+**Feature Flags (without PostHog):**
+- Feature flags normally come from PostHog. Without it, every flag is off; turn flags on for
+  everyone with `FORCE_ENABLED_FEATURE_FLAGS` (comma-separated) in `apps/app/.env`:
+  `ai-vendor-questionnaire`, `is-ai-policy-assistant-enabled`, `is-isms-enabled`,
+  `is-timeline-enabled`, `is-trust-nda-enabled`, `is-web-automations-enabled`
+
 ### Prerequisites
 
 - Docker Desktop or Docker Engine

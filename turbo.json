@@ -35,6 +35,7 @@
         "FLEET_DEVICE_PATH_WINDOWS",
         "FLEET_TOKEN",
         "FLEET_URL",
+        "FORCE_ENABLED_FEATURE_FLAGS",
         "INTERNAL_API_TOKEN",
         "LOGO_DEV",
         "LOGTAIL_SOURCE_TOKEN",

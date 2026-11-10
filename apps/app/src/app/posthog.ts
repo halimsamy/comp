@@ -46,15 +46,22 @@ export async function identify(distinctId: string, properties?: Properties) {
   });
 }
 
+/** Flags turned on for everyone via FORCE_ENABLED_FEATURE_FLAGS (comma-separated), e.g. without PostHog. */
+function forcedFeatureFlags(): Record<string, true> {
+  const keys = (process.env.FORCE_ENABLED_FEATURE_FLAGS ?? '')
+    .split(',')
+    .map((key) => key.trim())
+    .filter(Boolean);
+  return Object.fromEntries(keys.map((key) => [key, true]));
+}
+
 export async function getFeatureFlags(
   distinctId: string,
   options?: { groups?: Record<string, string> },
 ) {
   const client = await getPostHogClient();
-  if (!client) return {};
-
-  const flags = await client.getAllFlags(distinctId, {
-    groups: options?.groups,
-  });
-  return flags;
+  const flags = client
+    ? await client.getAllFlags(distinctId, { groups: options?.groups })
+    : {};
+  return { ...flags, ...forcedFeatureFlags() };
 }
