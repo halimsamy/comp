@@ -19,7 +19,6 @@ This guide covers running Comp with Docker Compose. The stack includes:
 - Docker Desktop or Docker Engine installed
 - External PostgreSQL 14+ with SSL (e.g., Neon, DigitalOcean, RDS)
 - [Resend](https://resend.com) account for transactional email
-- [Trigger.dev](https://cloud.trigger.dev) account for background workflows
 
 ## Environment File Layout
 
@@ -60,9 +59,6 @@ For a functional Docker deployment, you need:
 
     # Email
     RESEND_API_KEY="re_..."
-
-    # Workflows (required)
-    TRIGGER_SECRET_KEY="tr_..."
 
     # Revalidation
     REVALIDATION_SECRET="<random string>"
@@ -161,17 +157,21 @@ curl -s http://localhost:3000/api/health
 curl -s http://localhost:3002/
 ```
 
-## Deploy Trigger.dev Tasks
+## Run the Background Job Workers
 
-Trigger.dev runs as a hosted service. Deploy your tasks from your workstation:
+Background jobs run on pg-boss inside your PostgreSQL database, so there is no extra
+service to deploy. Run the two workers from a checkout of the repo (`bun install`), with
+the same env files as the app they belong to:
 
 ```bash
-cd apps/app
-bunx trigger.dev@latest login
-bunx trigger.dev@latest deploy
+bun run --cwd packages/email build && bun run --cwd packages/integration-platform build
+bun run --cwd apps/api worker   # uses apps/api/.env
+bun run --cwd apps/app worker   # uses apps/app/.env; needs Chrome for puppeteer tasks
 ```
 
-Set `TRIGGER_SECRET_KEY` in `apps/app/.env` from your Trigger.dev project settings.
+Keep one or more replicas of each running. Workers register the cron schedules when they
+start. The API worker can also run as a container: build `apps/api/Dockerfile.multistage`
+with `--target worker`.
 
 ## Fresh Install (Optional Clean)
 
@@ -266,7 +266,7 @@ Look for errors mentioning `process.env.*` or "Missing env var", then compare wi
 |-------|----------|
 | Using root `.env` | Docker reads per-service env files only |
 | Missing `DATABASE_URL` | Must be set in all three env files |
-| Missing `TRIGGER_SECRET_KEY` | Required in `apps/app/.env` for workflows |
+| Background jobs never run | Start both workers (`bun run worker` in `apps/api` and `apps/app`) |
 | Mismatched auth URLs | Ensure `BETTER_AUTH_URL` matches `NEXT_PUBLIC_BETTER_AUTH_URL` |
 | Build args not exported | Export `BETTER_AUTH_URL` and `BETTER_AUTH_URL_PORTAL` before build |
 

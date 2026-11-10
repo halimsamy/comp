@@ -62,10 +62,14 @@ jobs:
           src/cloud-security/remediation-batch.service.spec.ts
           src/cloud-security/remediation-batch.races.spec.ts
           src/cloud-security/remediation-batch.controller.spec.ts
+          src/cloud-security/cloud-security.service.run-status.spec.ts
+          src/job-runs
           src/vector-store/lib/core/find-similar.spec.ts
           src/trigger/vector-store/helpers/extract-content-from-file.spec.ts
           src/questionnaire/questionnaire.service.spec.ts
           src/questionnaire/questionnaire.controller.spec.ts --runInBand
+      - name: Job task ids are unique across both workers
+        run: bun run --cwd packages/jobs check-ids
       - name: Apply every migration to an empty database
         working-directory: packages/db
         run: bunx prisma migrate deploy
@@ -76,14 +80,13 @@ jobs:
         working-directory: apps/app
         run: >-
           bunx --no-install vitest run --config vitest.config.mts
-          'src/app/api/tasks/[taskId]/status/route.test.ts'
           'src/app/(app)/[orgId]/cloud-tests/actions/batch-fix.test.ts'
           'src/app/(app)/[orgId]/integrations/[slug]/actions/batch-fix.test.ts'
           src/trigger/tasks/cloud-security/remediate-batch.test.ts
           src/trigger/tasks/cloud-security/remediate-batch-helpers.test.ts
           'src/app/(app)/[orgId]/tasks/[taskId]/automation/[automationId]/actions'
           'src/app/(app)/[orgId]/tasks/[taskId]/automation/[automationId]/hooks'
-          src/actions/trigger/heal-access-token.test.ts
+          src/hooks/use-job-run.test.tsx
           src/utils/auth.permissions.test.ts
       - name: Portal policy regressions
         working-directory: apps/portal

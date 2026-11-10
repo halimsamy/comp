@@ -75,7 +75,7 @@ Want the managed version? [Get started with Comp AI Cloud](https://trycomp.ai).
 ### Built With
 
 - [Next.js](https://nextjs.org/?ref=trycomp.ai)
-- [Trigger.dev](https://trigger.dev/?ref=trycomp.ai)
+- [pg-boss](https://github.com/timgit/pg-boss)
 - [Prisma](https://prisma.io/?ref=trycomp.ai)
 - [Tailwind CSS](https://tailwindcss.com/?ref=trycomp.ai)
 - [Upstash](https://upstash.com/?ref=trycomp.ai)
@@ -211,14 +211,14 @@ Some environment variables may not load correctly from `.env`. In such cases, **
 
 ### Cloud & Auth Configuration
 
-#### 1. Trigger.dev
+#### 1. Background jobs
 
-- Create an account on [https://cloud.trigger.dev](https://cloud.trigger.dev)
-- Create a project and copy the Project ID
-- In `comp/apps/app/trigger.config.ts`, set:
-  ```ts
-  project: 'proj_****az***ywb**ob*';
-  ```
+Background jobs run on [pg-boss](https://github.com/timgit/pg-boss) in the same Postgres database, so there is no extra service to sign up for. `bun run dev` starts both job workers. To run them on their own:
+
+```sh
+bun run --cwd apps/api worker
+bun run --cwd apps/app worker
+```
 
 #### 2. Google OAuth
 

@@ -24,7 +24,7 @@ For a functional deployment:
 - **Database**: `DATABASE_URL` in all three env files
 - **Auth**: `AUTH_SECRET`, `SECRET_KEY`, `BETTER_AUTH_URL`, `NEXT_PUBLIC_BETTER_AUTH_URL` (app); `BETTER_AUTH_SECRET` (portal)
 - **Email**: `RESEND_API_KEY` in app and portal
-- **Workflows**: `TRIGGER_SECRET_KEY` in app
+- **Background jobs**: no extra keys; the job workers use `DATABASE_URL`
 - **Misc**: `REVALIDATION_SECRET`, `NEXT_PUBLIC_PORTAL_URL` in app
 
 **Self-Hosted Mode:**
@@ -37,7 +37,6 @@ For a functional deployment:
 - Docker Desktop or Docker Engine
 - External PostgreSQL 14+ with SSL
 - [Resend](https://resend.com) account for email
-- [Trigger.dev](https://cloud.trigger.dev) account for workflows
 
 ### Build & Run
 
@@ -63,15 +62,22 @@ docker compose run --rm seeder
 docker compose up -d app portal
 ```
 
-### Trigger.dev Deployment
+### Background Job Workers
 
-Deploy tasks from your workstation (not inside Docker):
+Background jobs run on pg-boss inside your PostgreSQL database (schema `pgboss`), so no
+extra service is needed. Run the two workers next to the app and API, from a checkout of
+the repo with dependencies installed (`bun install`) and the same env files as the app
+they belong to:
 
 ```bash
-cd apps/app
-bunx trigger.dev@latest login
-bunx trigger.dev@latest deploy
+bun run --cwd packages/email build && bun run --cwd packages/integration-platform build
+bun run --cwd apps/api worker   # API jobs (needs apps/api/.env)
+bun run --cwd apps/app worker   # app jobs (needs apps/app/.env; needs Chrome for puppeteer)
 ```
+
+The API worker can also run as a container: build `apps/api/Dockerfile.multistage` with
+`--target worker`. Keep at least one replica of each worker running; scheduled jobs (cron)
+are registered by the workers when they start. See `packages/jobs/README.md`.
 
 ### Troubleshooting
 

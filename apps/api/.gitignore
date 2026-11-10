@@ -67,5 +67,4 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 # Model files are copied here by db:getschema — only schema.prisma is committed
 prisma/schema/*.prisma
 !prisma/schema/schema.prisma
-trigger.config.js
 test/**/*.js

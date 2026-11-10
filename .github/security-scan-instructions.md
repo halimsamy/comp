@@ -28,7 +28,7 @@ not speculate.
 
 ## Repo hotspots
 - **SSRF:** server-side fetch to a user-controlled URL — vendor website research
-  (Trigger.dev jobs), integration/cloud connectors, webhooks. Require scheme/host
+  (background jobs), integration/cloud connectors, webhooks. Require scheme/host
   validation and blocking of internal/link-local ranges.
 - **Secrets:** no hardcoded or logged secrets/tokens; API responses must not leak
   keys; check the audit `data` JSON for secret/PII.

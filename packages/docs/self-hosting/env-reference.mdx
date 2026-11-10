@@ -24,7 +24,6 @@ These variables are required for a functional Docker deployment:
 | `NEXT_PUBLIC_BETTER_AUTH_URL` | app, portal | build | Public auth URL (same as `BETTER_AUTH_URL`) |
 | `BETTER_AUTH_SECRET` | portal | runtime | Portal-specific auth secret. Generate: `openssl rand -base64 32` |
 | `RESEND_API_KEY` | app, portal | runtime | [Resend](https://resend.com) API key for email |
-| `TRIGGER_SECRET_KEY` | app | runtime | [Trigger.dev](https://cloud.trigger.dev) project secret key |
 | `REVALIDATION_SECRET` | app | runtime | Random string for revalidation. Generate: `openssl rand -base64 16` |
 | `NEXT_PUBLIC_PORTAL_URL` | app | build | Public URL of the portal (e.g., `https://portal.yourdomain.com`) |
 
@@ -62,11 +61,19 @@ To use Microsoft sign-in, add the optional ID token claims `email`, `xms_edov`, 
 | `RESEND_API_KEY` | app, portal | runtime | required-minimal | Resend API key for transactional email |
 | `RESEND_DOMAIN` | portal | runtime | optional | Custom domain for sending emails |
 
-### Workflows (Trigger.dev)
+### Background jobs (pg-boss)
+
+Background jobs need no extra service or key: the job workers use `DATABASE_URL`. The optional `JOBS_*` variables tune them (see `packages/jobs/README.md`).
 
 | Name | Service(s) | Phase | Required | Notes |
 |------|-----------|-------|----------|-------|
-| `TRIGGER_SECRET_KEY` | app | runtime | required-minimal | Trigger.dev project secret |
+| `JOBS_DATABASE_URL` | api worker, app worker | runtime | optional | Postgres for queues and job runs. Defaults to `DATABASE_URL` |
+| `JOBS_DEFAULT_CONCURRENCY` | api worker, app worker | runtime | optional | Jobs per worker process for tasks without their own limit. Default `10` |
+
+### Revalidation
+
+| Name | Service(s) | Phase | Required | Notes |
+|------|-----------|-------|----------|-------|
 | `REVALIDATION_SECRET` | app | runtime | required-minimal | Server-side revalidation secret |
 
 ### AWS S3 Storage
@@ -151,7 +158,6 @@ BETTER_AUTH_URL="https://app.yourdomain.com"
 NEXT_PUBLIC_BETTER_AUTH_URL="https://app.yourdomain.com"
 NEXT_PUBLIC_PORTAL_URL="https://portal.yourdomain.com"
 RESEND_API_KEY="re_your_api_key"
-TRIGGER_SECRET_KEY="tr_your_secret_key"
 REVALIDATION_SECRET="random-revalidation-string"
 ```
 

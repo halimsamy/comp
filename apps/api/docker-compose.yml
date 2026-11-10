@@ -26,3 +26,12 @@ services:
     restart: unless-stopped
 
 
+  worker:
+    build:
+      context: ../..
+      dockerfile: apps/api/Dockerfile.multistage
+      target: worker
+    container_name: comp-api-worker-test
+    env_file:
+      - .env
+    restart: unless-stopped

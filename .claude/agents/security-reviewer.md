@@ -50,7 +50,7 @@ You are a senior application security engineer reviewing a **multi-tenant compli
 - Spreading unvalidated `...dto` / `...req.body` directly into `db.*.create/update` lets a caller set fields they shouldn't (status, ownerId, organizationId, flags). Require an explicit field allowlist for anything security-relevant.
 
 ### 10. DoS / resource exhaustion
-- Unbounded queries (no pagination/limit), expensive synchronous work on the request path (offload to Trigger.dev), unbounded loops over caller-supplied arrays. (This repo took prod down via an in-process bulk export.)
+- Unbounded queries (no pagination/limit), expensive synchronous work on the request path (offload to a background job in `apps/*/src/trigger/**`), unbounded loops over caller-supplied arrays. (This repo took prod down via an in-process bulk export.)
 
 ### 11. Error handling / info disclosure
 - Internal errors, stack traces, or DB/driver messages returned to the client. Use NestJS exceptions with clean messages.

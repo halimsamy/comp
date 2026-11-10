@@ -49,18 +49,17 @@ Skip toggles (rare):
 - `SKIP_WORKTREE_SETUP=1` — skip install + migrate + generate (for a "just files" worktree)
 - `SETUP_WORKTREE_WITH_BUILD=1` — also run `bun run build` (adds minutes; only when you need the built artifacts)
 
-### 3. Start the dev server — coordinate with the "active worktree" rule
+### 3. Start the dev server
 
-Trigger.dev's `trigger dev` CLI **cannot** be isolated per worktree. Running `bun run dev` in multiple worktrees stomps on task registration.
+`bun run dev` starts each app plus its background job worker (pg-boss, `bun run worker:dev`). Job queues live in the worktree's own `compdev_<slug>` database, so workers in different worktrees do not interfere.
 
-- **One active worktree** runs `bun run dev` (full stack with `trigger dev`).
-- **All other worktrees** run:
+- To skip the worker, run the server alone:
   ```sh
-  bun run --filter '@trycompai/app' dev:no-trigger    # Next.js only
-  bun run --filter '@trycompai/api' dev:no-trigger    # NestJS only
+  bun run --filter '@trycompai/app' dev:next    # Next.js only
+  bun run --filter '@trycompai/api' dev:nest    # NestJS only
   ```
-- Non-active worktrees need a different `PORT` to avoid collision — add `PORT=3001` (or `3334`, etc.) to the worktree's `.env.local`. `.env.local` is not symlinked and stays per-worktree.
-- When swapping which worktree is active, kill the old full `bun run dev` first so task registration is clean.
+- With `SKIP_WORKTREE_DB=1` the worktree shares the main `comp` DB, and its workers would pick up the main checkout's jobs. Run only the servers there.
+- Parallel worktrees need a different `PORT` to avoid collision — add `PORT=3001` (or `3334`, etc.) to the worktree's `.env.local`. `.env.local` is not symlinked and stays per-worktree.
 
 ### 4. Code the feature
 
@@ -81,13 +80,13 @@ Use the `stale-worktree-cleanup` skill when worktrees accumulate. It handles bot
 # Spin up a new worktree (does env + DB + install + migrate + generate automatically)
 git worktree add .worktrees/<slug> -b mariano/<branch-name> origin/main
 
-# Start dev — ONLY in the worktree you're actively iterating on
+# Start dev (servers + job workers)
 cd .worktrees/<slug>
 bun run dev
 
-# Start dev in a background worktree (no trigger dev, custom port via .env.local)
+# Start dev in a second worktree (custom port via .env.local)
 echo "PORT=3001" >> apps/app/.env.local
-bun run --filter '@trycompai/app' dev:no-trigger
+bun run dev
 
 # Clean up when branch is done
 # (use the stale-worktree-cleanup skill)
@@ -101,7 +100,6 @@ If you catch yourself doing any of these, stop — the hook should have handled 
 - `cp` or `ln -s` to copy `.env` files into a worktree
 - Writing a script that "creates a database for my branch"
 - Running `bun run db:migrate` in a worktree right after creating it
-- Ignoring a failing `bun run dev` in two worktrees instead of swapping to `dev:no-trigger`
 
 ## Common Mistakes
 
@@ -110,5 +108,5 @@ If you catch yourself doing any of these, stop — the hook should have handled 
 | Creating the worktree from another worktree instead of the main clone | Always `cd` to `/Users/mariano/code/comp` first |
 | Editing `.env` in a worktree and expecting it to propagate | If it's a symlink, yes; if it's a real copy (has `DATABASE_URL`), no. Check with `ls -la`. |
 | Forgetting to bump `PORT` → two dev servers collide | Put `PORT=<free-port>` in the worktree's `.env.local` |
-| Running `trigger dev` in multiple worktrees | Switch to `dev:no-trigger` in all but one |
+| Running workers in a worktree that shares the main DB (`SKIP_WORKTREE_DB=1`) | Run `dev:next` / `dev:nest` there instead |
 | Not cleaning up → orphan `compdev_*` databases piling up | Use the `stale-worktree-cleanup` skill regularly |

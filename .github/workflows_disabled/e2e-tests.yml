@@ -197,7 +197,6 @@ jobs:
           UPSTASH_REDIS_REST_URL: https://dummy.upstash.io
           UPSTASH_REDIS_REST_TOKEN: dummy-token
           RESEND_API_KEY: dummy-resend-key
-          TRIGGER_SECRET_KEY: dummy-trigger-key
 
       - name: Start server
         run: |
@@ -279,7 +278,6 @@ jobs:
           UPSTASH_REDIS_REST_URL: https://dummy.upstash.io
           UPSTASH_REDIS_REST_TOKEN: dummy-token
           RESEND_API_KEY: dummy-resend-key
-          TRIGGER_SECRET_KEY: dummy-trigger-key
 
       - name: Run E2E tests
         run: |
@@ -300,7 +298,6 @@ jobs:
           UPSTASH_REDIS_REST_URL: https://dummy.upstash.io
           UPSTASH_REDIS_REST_TOKEN: dummy-token
           RESEND_API_KEY: dummy-resend-key
-          TRIGGER_SECRET_KEY: dummy-trigger-key
 
       - name: Generate test summary
         if: always()

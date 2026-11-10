@@ -150,4 +150,7 @@ COPY --from=portal-builder /app/apps/portal/public ./apps/portal/public
 EXPOSE 3000
 CMD ["node", "apps/portal/server.js"]
 
-# (Trigger.dev hosted; no local runner stage)
+# Background jobs run in two pg-boss workers (no extra infrastructure; queues
+# live in the app database): `bun run worker` in apps/api and in apps/app. They
+# run from source under bun with the same env as their app. See
+# packages/jobs/README.md.
