@@ -17,19 +17,15 @@ vi.mock('@upstash/vector', () => ({
   })),
 }));
 
-vi.mock('@ai-sdk/openai', () => ({
-  openai: {
-    embedding: () => 'mock-embedding-model',
-  },
+vi.mock('@/lib/vector/core/generate-embedding', () => ({
+  VOYAGE_MODEL: 'voyage-4',
+  VOYAGE_DIMENSIONS: 1024,
+  voyageEmbed: vi.fn(async ({ input }: { input: string[] }) =>
+    input.map((_, i) => Array(1024).fill(i / input.length)),
+  ),
 }));
 
-vi.mock('ai', () => ({
-  embedMany: vi.fn(async ({ values }: { values: string[] }) => ({
-    embeddings: values.map((_, i) => Array(1536).fill(i / values.length)),
-  })),
-}));
-
-import { embedMany } from 'ai';
+import { voyageEmbed } from '@/lib/vector/core/generate-embedding';
 import {
   upsertEntityEmbeddings,
   findSimilarTasks,
@@ -201,7 +197,7 @@ describe('findSimilarTasks', () => {
   it('enumerates the org task vectors by prefix and ranks them in-process by cosine', async () => {
     // Query points along [1,0]; task vectors are chosen so the cosine ordering
     // is deterministic: tsk_a (identical) > tsk_b (orthogonal) > tsk_c (opposite).
-    vi.mocked(embedMany).mockResolvedValueOnce({ embeddings: [[1, 0]] } as never);
+    vi.mocked(voyageEmbed).mockResolvedValueOnce([[1, 0]]);
     taskPage([
       { id: 'task_org_1_tsk_b', vector: [0, 1], metadata: { sourceId: 'tsk_b', department: 'none' } },
       { id: 'task_org_1_tsk_a', vector: [1, 0], metadata: { sourceId: 'tsk_a', department: 'hr' } },
@@ -233,7 +229,7 @@ describe('findSimilarTasks', () => {
   });
 
   it('applies the topK cap after ranking', async () => {
-    vi.mocked(embedMany).mockResolvedValueOnce({ embeddings: [[1, 0]] } as never);
+    vi.mocked(voyageEmbed).mockResolvedValueOnce([[1, 0]]);
     taskPage([
       { id: 'task_org_1_tsk_a', vector: [1, 0], metadata: { sourceId: 'tsk_a' } },
       { id: 'task_org_1_tsk_b', vector: [0.9, 0.1], metadata: { sourceId: 'tsk_b' } },
@@ -251,7 +247,7 @@ describe('findSimilarTasks', () => {
   });
 
   it('paginates the enumeration across cursor pages', async () => {
-    vi.mocked(embedMany).mockResolvedValueOnce({ embeddings: [[1, 0]] } as never);
+    vi.mocked(voyageEmbed).mockResolvedValueOnce([[1, 0]]);
     rangeMock
       .mockResolvedValueOnce({
         nextCursor: 'cursor_2',
@@ -280,7 +276,7 @@ describe('findSimilarTasks', () => {
   });
 
   it('returns empty when the org has no task vectors', async () => {
-    vi.mocked(embedMany).mockResolvedValueOnce({ embeddings: [[1, 0]] } as never);
+    vi.mocked(voyageEmbed).mockResolvedValueOnce([[1, 0]]);
     taskPage([]);
     const results = await findSimilarTasks({ organizationId: 'org_1', queryText: 'x' });
     expect(results).toEqual([]);
@@ -290,7 +286,7 @@ describe('findSimilarTasks', () => {
     // Legacy vector with no sourceId metadata. Returning the prefixed embedding
     // id would make runLinkage drop it as "not in live scope" (taskById is keyed
     // by raw ids), silently starving suggestions. (cubic P1)
-    vi.mocked(embedMany).mockResolvedValueOnce({ embeddings: [[1, 0]] } as never);
+    vi.mocked(voyageEmbed).mockResolvedValueOnce([[1, 0]]);
     taskPage([{ id: 'task_org_1_tsk_legacy', vector: [1, 0], metadata: {} }]);
 
     const results = await findSimilarTasks({ organizationId: 'org_1', queryText: 'phishing risk' });
@@ -305,7 +301,7 @@ describe('waitForIndexed', () => {
       vectorCount: 100,
       pendingVectorCount,
       indexSize: 1024,
-      dimension: 1536,
+      dimension: 1024,
       similarityFunction: 'COSINE' as const,
       namespaces: {},
     };

@@ -261,7 +261,7 @@ async function buildSuggestions({
  * Run the LLM reranker against the cosine candidates and return a final score
  * map (0-1, scaled from the reranker's 0-10 so it slots into the existing
  * SuggestedTask `score` field). Falls back to cosine ordering if the reranker
- * call fails so a transient OpenAI outage doesn't break the suggestions UI.
+ * call fails so a transient AI provider outage doesn't break the suggestions UI.
  */
 async function rerankAndBuildScoreMap({
   source,
@@ -395,7 +395,7 @@ export async function runLinkage({
 
   // When the caller pins a specific entity, skip loading the other side
   // entirely — embedding all vendors when the user only asked about one risk
-  // is wasted OpenAI cost (and vice versa).
+  // is wasted embedding cost (and vice versa).
   const wantRisks = !vendorId;
   const wantVendors = !riskId;
 
@@ -484,7 +484,7 @@ export async function runLinkage({
 
   // Build id → hash maps for skip-if-unchanged. Anything with a non-null
   // hash that still matches the current text gets skipped at the upsert
-  // layer — saving both the OpenAI embedding call and the Upstash write.
+  // layer — saving both the Voyage embedding call and the Upstash write.
   const taskHashes = new Map<string, string>();
   for (const t of tasks) {
     if (t.embeddingHash !== null) taskHashes.set(t.id, t.embeddingHash);

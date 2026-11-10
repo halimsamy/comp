@@ -1,9 +1,12 @@
 import 'server-only';
 
 import { Index, type RangeResult } from '@upstash/vector';
-import { openai } from '@ai-sdk/openai';
-import { embedMany } from 'ai';
 import { createHash } from 'node:crypto';
+import {
+  VOYAGE_DIMENSIONS as EMBEDDING_DIMENSIONS,
+  VOYAGE_MODEL as EMBEDDING_MODEL,
+  voyageEmbed,
+} from '@/lib/vector/core/generate-embedding';
 
 export type EntityKind = 'risk' | 'vendor' | 'task';
 
@@ -20,7 +23,7 @@ interface UpsertOptions {
   /**
    * Optional id → hash map of the embeddings currently stored for these
    * entities. Any entity whose freshly-computed `contentHash` matches its
-   * stored value is skipped — both the OpenAI embedding call AND the
+   * stored value is skipped — both the Voyage embedding call AND the
    * Upstash upsert. Pass an empty map (or omit) to force re-embedding.
    *
    * Stored hashes live on `Task/Risk/Vendor.embeddingHash` in Postgres;
@@ -49,13 +52,8 @@ export interface SimilarTaskResult {
   department?: string;
 }
 
-// `text-embedding-3-large` truncated to 1536 dims via Matryoshka. The
-// truncated 1536-dim form of -3-large still outperforms -3-small on MTEB
-// while keeping the existing Upstash Vector index (which is provisioned at
-// 1536 dims) usable as-is. Bumping to the full 3072 dims would require a
-// new index + a one-time re-embed of every org.
-const EMBEDDING_MODEL = 'text-embedding-3-large';
-const EMBEDDING_DIMENSIONS = 1536;
+// Embeddings come from Voyage (voyage-4, 1024 dims). Model + dims feed the
+// content hash, so changing either forces a re-embed of every entity.
 const DEFAULT_TOP_K = 25;
 // Pagination for enumerating an org's task vectors by their shared id prefix —
 // used by both `findSimilarTasks` (exact in-process ranking) and
@@ -145,7 +143,7 @@ export async function upsertEntityEmbeddings({
 
   // Skip entities whose stored hash matches the current content hash —
   // text + model + dims + department haven't changed, so the existing
-  // vector is still authoritative. Saves the OpenAI embed AND the Upstash
+  // vector is still authoritative. Saves the Voyage embed AND the Upstash
   // upsert (the two non-trivial costs in this path).
   const withHashes = valid.map((entity) => ({
     entity,
@@ -159,10 +157,9 @@ export async function upsertEntityEmbeddings({
     return { appliedHashes: [], skippedCount };
   }
 
-  const { embeddings } = await embedMany({
-    model: openai.embedding(EMBEDDING_MODEL),
-    values: toEmbed.map(({ entity }) => entity.text),
-    providerOptions: { openai: { dimensions: EMBEDDING_DIMENSIONS } },
+  const embeddings = await voyageEmbed({
+    input: toEmbed.map(({ entity }) => entity.text),
+    inputType: 'document',
   });
 
   const index = getIndex();
@@ -280,12 +277,7 @@ export async function findSimilarTasks({
 }: FindSimilarTasksOptions): Promise<SimilarTaskResult[]> {
   if (!queryText.trim()) return [];
 
-  const { embeddings } = await embedMany({
-    model: openai.embedding(EMBEDDING_MODEL),
-    values: [queryText],
-    providerOptions: { openai: { dimensions: EMBEDDING_DIMENSIONS } },
-  });
-  const queryVector = embeddings[0];
+  const [queryVector] = await voyageEmbed({ input: [queryText], inputType: 'query' });
 
   const taskVectors = await fetchOrgTaskVectors(organizationId);
   if (taskVectors.length === 0) return [];

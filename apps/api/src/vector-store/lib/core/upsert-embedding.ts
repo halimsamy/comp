@@ -55,7 +55,7 @@ export async function upsertEmbedding(
 
   try {
     // Generate embedding
-    const embedding = await generateEmbedding(text);
+    const embedding = await generateEmbedding(text, { inputType: 'document' });
 
     // Prepare metadata
     const vectorMetadata = {
@@ -151,7 +151,7 @@ export async function batchUpsertEmbeddings(
   try {
     // Step 1: Generate all embeddings in parallel (much faster)
     const embeddings = await Promise.all(
-      validItems.map((item) => generateEmbedding(item.text)),
+      validItems.map((item) => generateEmbedding(item.text, { inputType: 'document' })),
     );
 
     // Step 2: Upsert all embeddings in parallel

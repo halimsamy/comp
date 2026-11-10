@@ -431,7 +431,7 @@ describe('runLinkage onPhase', () => {
       { id: 'tsk_a', score: 0.6, department: Departments.hr },
       { id: 'tsk_b', score: 0.9, department: Departments.hr },
     ]);
-    rerankMock.mockRejectedValueOnce(new Error('OpenAI down'));
+    rerankMock.mockRejectedValueOnce(new Error('Claude down'));
 
     const result = await runLinkage({
       organizationId: 'org_1',
