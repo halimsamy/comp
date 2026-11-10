@@ -1,0 +1,31 @@
+// Background job runs executed by @trycompai/jobs (pg-boss). pg-boss keeps its own
+// queue tables in the "pgboss" schema; this table is the run record the API and UI
+// read (status, output, progress metadata). Payloads are intentionally NOT stored.
+model JobRun {
+  id                      String    @id @default(dbgenerated("generate_prefixed_cuid('jrun'::text)"))
+  taskId                  String
+  // trigger.dev status strings: QUEUED, DELAYED, EXECUTING, COMPLETED, FAILED, CANCELED, TIMED_OUT, EXPIRED, CRASHED, SYSTEM_FAILURE
+  status                  String    @default("QUEUED")
+  output                  Json?
+  error                   Json?
+  metadata                Json      @default("{}")
+  tags                    String[]  @default([])
+  // From payload.organizationId / payload.orgId; runs without one are never readable via the API
+  organizationId          String?
+  parentRunId             String?
+  rootRunId               String?
+  bossJobId               String?
+  idempotencyKey          String?
+  idempotencyKeyExpiresAt DateTime?
+  attempt                 Int       @default(0)
+  createdAt               DateTime  @default(now())
+  startedAt               DateTime?
+  finishedAt              DateTime?
+  updatedAt               DateTime  @default(now()) @updatedAt
+
+  @@unique([taskId, idempotencyKey])
+  @@index([organizationId])
+  @@index([taskId, status])
+  @@index([status])
+  @@index([finishedAt])
+}
