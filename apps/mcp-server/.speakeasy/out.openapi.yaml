@@ -13113,8 +13113,6 @@ paths:
                 properties:
                   runId:
                     type: "string"
-                  publicAccessToken:
-                    type: "string"
       security:
         - apikey: []
       summary: "Start questionnaire parsing"
@@ -20721,12 +20719,8 @@ components:
           example: "qst_6a179d26c4ad2c1c816ee16d"
         runId:
           type: "string"
-          description: "Background run identifier for the generation job (Trigger.dev run id)."
-          example: "run_cmpotsz153eac0ultc1ya87f5"
-        publicAccessToken:
-          type: "string"
-          description: "Token for tracking the run via Trigger.dev realtime. Optional — MCP/agent clients should poll GET /v1/questionnaire/:id instead."
-          example: "pat_..."
+          description: "Background job run identifier. MCP/agent clients should poll GET /v1/questionnaire/:id instead."
+          example: "jrun_cmpotsz153eac0ultc1ya87f5"
         status:
           type: "string"
           description: "Always 'generating' on a successful trigger. Poll GET /v1/questionnaire/:id; answers are ready once answeredQuestions equals totalQuestions."
@@ -20746,7 +20740,6 @@ components:
       required:
         - "questionnaireId"
         - "runId"
-        - "publicAccessToken"
         - "status"
         - "totalQuestions"
         - "answeredQuestions"

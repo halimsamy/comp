@@ -70,8 +70,7 @@ jest.mock('../frameworks/frameworks-scores.helper', () => ({
   computeFrameworkComplianceScore: jest.fn(),
 }));
 
-jest.mock('@trigger.dev/sdk', () => ({
-  auth: { createPublicToken: jest.fn() },
+jest.mock('@trycompai/jobs', () => ({
   tasks: { trigger: jest.fn() },
 }));
 

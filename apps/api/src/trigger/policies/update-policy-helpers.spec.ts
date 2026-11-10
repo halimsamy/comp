@@ -27,7 +27,7 @@ jest.mock('@db', () => ({
   },
 }));
 
-jest.mock('@trigger.dev/sdk', () => ({
+jest.mock('@trycompai/jobs', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
 }));
 

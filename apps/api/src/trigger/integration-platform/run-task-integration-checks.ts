@@ -1,6 +1,6 @@
 import { getManifest, runAllChecks } from '@trycompai/integration-platform';
 import { db } from '@db';
-import { logger, tags, task } from '@trigger.dev/sdk';
+import { logger, tags, task } from '@trycompai/jobs';
 import { isCheckDisabledForTask } from '../../integration-platform/utils/disabled-task-checks';
 import {
   getAccessToken,
@@ -52,7 +52,7 @@ export type TaskCheckRunResult =
  */
 export const runTaskIntegrationChecks = task({
   id: 'run-task-integration-checks',
-  maxDuration: 1000 * 60 * 15, // 15 minutes per task
+  maxDuration: 60 * 15, // 15 minutes per task
   run: async (payload: {
     taskId: string;
     taskTitle: string;
@@ -81,7 +81,7 @@ export const runTaskIntegrationChecks = task({
 
     const manifest = getManifest(providerSlug);
 
-    // Dynamic (DB-backed) providers have no manifest in the Trigger.dev runtime,
+    // Dynamic (DB-backed) providers have no manifest in the job worker runtime,
     // so run their checks ON OUR SERVER (like AWS), where the dynamic-manifest
     // loader has populated the registry. Static providers keep running here.
     const isDynamic = manifest
@@ -236,7 +236,7 @@ export const runTaskIntegrationChecks = task({
       for (const checkId of effectiveCheckIds) {
         // Server-delegated providers (AWS + dynamic) run ON OUR SERVER so their
         // checks egress our VPC / resolve their DB-backed manifest there.
-        // Static providers keep executing here in the Trigger.dev runtime,
+        // Static providers keep executing here in the job worker runtime,
         // unchanged. The result shape is identical either way, so all the
         // persistence / status / email logic below is shared.
         let result: RunAllChecksResult;

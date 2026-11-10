@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { db, Prisma } from '@db';
 import { getManifest, runAllChecks } from '@trycompai/integration-platform';
-import { runs, tasks } from '@trigger.dev/sdk';
+import { runs, tasks } from '@trycompai/jobs';
 import { CredentialVaultService } from '../integration-platform/services/credential-vault.service';
 import { OAuthCredentialsService } from '../integration-platform/services/oauth-credentials.service';
 import { GCPSecurityService } from './providers/gcp-security.service';
@@ -58,6 +58,9 @@ export type ResolveAwsSessionResult =
     }
   | { ok: false; reason: 'not_configured' }
   | { ok: false; reason: 'assume_failed'; error: string };
+
+const CLOUD_SCAN_TASK_ID = 'run-cloud-security-scan';
+const scanRunTag = (connectionId: string) => `connection:${connectionId}`;
 
 export class ConnectionNotFoundError extends Error {
   constructor() {
@@ -607,7 +610,7 @@ export class CloudSecurityService {
    * IAM role — performed here in ECS, which holds the roleAssumer task role and
    * the SECURITY_HUB_ROLE_ASSUMER_ARN env.
    *
-   * The Cloud Tests CHECK path runs in the Trigger.dev runtime, which has no
+   * The Cloud Tests CHECK path runs in the job worker runtime, which has no
    * base AWS credentials or roleAssumer ARN, so it cannot assume the
    * cross-account role itself. It calls this (via the internal `resolve-session`
    * endpoint) and injects the returned temp creds into the check credentials,
@@ -808,12 +811,17 @@ export class CloudSecurityService {
       throw new Error('Connection not found or inactive');
     }
 
-    const handle = await tasks.trigger('run-cloud-security-scan', {
-      connectionId,
-      organizationId,
-      providerSlug: 'platform',
-      connectionName: connectionId,
-    });
+    const handle = await tasks.trigger(
+      CLOUD_SCAN_TASK_ID,
+      {
+        connectionId,
+        organizationId,
+        providerSlug: 'platform',
+        connectionName: connectionId,
+      },
+      // getRunStatus only reports runs carrying this tag.
+      { tags: [scanRunTag(connectionId)] },
+    );
 
     this.logger.log(`Triggered cloud security scan task`, {
       connectionId,
@@ -842,6 +850,15 @@ export class CloudSecurityService {
     }
 
     const run = await runs.retrieve(runId);
+    // Only this connection's scan runs: any other run id (another org, another task such as an
+    // evidence export, another connection) must look missing.
+    const isThisScan =
+      run.organizationId === organizationId &&
+      run.taskIdentifier === CLOUD_SCAN_TASK_ID &&
+      run.tags.includes(scanRunTag(connectionId));
+    if (!isThisScan) {
+      throw new ConnectionNotFoundError();
+    }
 
     return {
       completed: run.isCompleted,

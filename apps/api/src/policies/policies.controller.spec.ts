@@ -82,8 +82,7 @@ jest.mock('@db', () => ({
   TimelineStatus: {},
 }));
 
-jest.mock('@trigger.dev/sdk', () => ({
-  auth: { createPublicToken: jest.fn() },
+jest.mock('@trycompai/jobs', () => ({
   tasks: { trigger: jest.fn() },
 }));
 

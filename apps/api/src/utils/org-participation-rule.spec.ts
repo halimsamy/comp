@@ -29,7 +29,7 @@ describe('org-participation-rule (API mirror)', () => {
 });
 
 // Drift guard: this API-local rule is a deliberate dependency-free mirror of
-// `@trycompai/auth/participation` (files in the Trigger.dev bundle can't import
+// `@trycompai/auth/participation` (files in the job worker can't import
 // the auth package — its dist isn't built in that deploy). Fail CI if the two
 // ever diverge.
 describe('API rule stays in sync with @trycompai/auth', () => {

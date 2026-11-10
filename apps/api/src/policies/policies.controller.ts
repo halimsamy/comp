@@ -36,7 +36,7 @@ import type { Response } from 'express';
 import { anthropic } from '@ai-sdk/anthropic';
 import { streamText, convertToModelMessages, type UIMessage } from 'ai';
 import { db } from '@db';
-import { auth as triggerAuth, tasks } from '@trigger.dev/sdk';
+import { tasks } from '@trycompai/jobs';
 import type { updatePolicy } from '../trigger/policies/update-policy';
 import { AuditRead } from '../audit/skip-audit-log.decorator';
 import { AuthContext, OrganizationId } from '../auth/auth-context.decorator';
@@ -464,12 +464,8 @@ export class PoliciesController {
       memberId: member?.id,
     });
 
-    const publicAccessToken = await triggerAuth.createPublicToken({
-      scopes: { read: { runs: [handle.id] } },
-    });
-
     return {
-      data: { runId: handle.id, publicAccessToken },
+      data: { runId: handle.id },
       authType: authContext.authType,
       ...(authContext.userId && {
         authenticatedUser: {

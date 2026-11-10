@@ -7,7 +7,7 @@ import {
 import { db, TaskItemPriority, TaskItemStatus } from '@db';
 import { CreateVendorDto } from './dto/create-vendor.dto';
 import { UpdateVendorDto } from './dto/update-vendor.dto';
-import { tasks } from '@trigger.dev/sdk';
+import { tasks } from '@trycompai/jobs';
 import { Prisma } from '@db';
 import type { TriggerVendorRiskAssessmentVendorDto } from './dto/trigger-vendor-risk-assessment.dto';
 import { resolveTaskCreatorAndAssignee } from '../trigger/vendor/vendor-risk-assessment/assignee';
@@ -294,7 +294,7 @@ export class VendorsService {
 
   /**
    * Trigger a single vendor risk assessment and return run info for real-time tracking.
-   * Use this when you need the runId and publicAccessToken for client-side tracking.
+   * Use this when you need the runId for client-side tracking.
    */
   async triggerSingleVendorRiskAssessment(params: {
     organizationId: string;
@@ -302,7 +302,7 @@ export class VendorsService {
     vendorName: string;
     vendorWebsite: string | null;
     createdByUserId?: string | null;
-  }): Promise<{ runId: string; publicAccessToken: string }> {
+  }): Promise<{ runId: string }> {
     const {
       organizationId,
       vendorId,
@@ -333,10 +333,7 @@ export class VendorsService {
       runId: handle.id,
     });
 
-    return {
-      runId: handle.id,
-      publicAccessToken: handle.publicAccessToken,
-    };
+    return { runId: handle.id };
   }
 
   async triggerVendorRiskAssessments(params: {
@@ -606,7 +603,7 @@ export class VendorsService {
     vendorId: string,
     organizationId: string,
     userId?: string,
-  ): Promise<{ runId: string; publicAccessToken: string }> {
+  ): Promise<{ runId: string }> {
     const vendor = await this.findById(vendorId, organizationId);
 
     const result = await this.triggerSingleVendorRiskAssessment({

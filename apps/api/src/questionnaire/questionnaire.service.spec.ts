@@ -40,7 +40,7 @@ jest.mock('@/trigger/questionnaire/answer-question-helpers', () => ({
   generateAnswerWithRAGBatch: jest.fn(),
 }));
 
-jest.mock('@trigger.dev/sdk', () => ({
+jest.mock('@trycompai/jobs', () => ({
   tasks: {
     trigger: jest.fn(),
   },
@@ -68,7 +68,7 @@ jest.mock('./utils/questionnaire-storage', () => ({
 import { db } from '@db';
 import { syncManualAnswerToVector } from '@/vector-store/lib';
 import { answerQuestion } from '@/trigger/questionnaire/answer-question';
-import { tasks } from '@trigger.dev/sdk';
+import { tasks } from '@trycompai/jobs';
 import {
   updateAnsweredCount,
   persistQuestionnaireResult,
@@ -474,10 +474,7 @@ describe('QuestionnaireService', () => {
         s3Key: 'key',
         fileSize: 1024,
       });
-      (tasks.trigger as jest.Mock).mockResolvedValue({
-        id: 'run_123',
-        publicAccessToken: 'token_123',
-      });
+      (tasks.trigger as jest.Mock).mockResolvedValue({ id: 'jrun_123' });
 
       const result = await service.uploadAndParse({
         organizationId: 'org_1',
@@ -487,10 +484,7 @@ describe('QuestionnaireService', () => {
         source: 'internal',
       } as any);
 
-      expect(result).toEqual({
-        runId: 'run_123',
-        publicAccessToken: 'token_123',
-      });
+      expect(result).toEqual({ runId: 'jrun_123' });
       expect(uploadQuestionnaireFile).toHaveBeenCalled();
       expect(tasks.trigger).toHaveBeenCalledWith('internal-parse-questionnaire', {
         inputType: 's3',
@@ -523,10 +517,7 @@ describe('QuestionnaireService', () => {
         totalQuestions: 23,
         answeredQuestions: 0,
       });
-      (tasks.trigger as jest.Mock).mockResolvedValue({
-        id: 'run_abc',
-        publicAccessToken: 'token_abc',
-      });
+      (tasks.trigger as jest.Mock).mockResolvedValue({ id: 'jrun_abc' });
 
       const result = await service.triggerAutoAnswer('qst_1', 'org_1');
 
@@ -537,13 +528,13 @@ describe('QuestionnaireService', () => {
       expect(result).toEqual(
         expect.objectContaining({
           questionnaireId: 'qst_1',
-          runId: 'run_abc',
-          publicAccessToken: 'token_abc',
+          runId: 'jrun_abc',
           status: 'generating',
           totalQuestions: 23,
           answeredQuestions: 0,
         }),
       );
+      expect(result).not.toHaveProperty('publicAccessToken');
     });
 
     it('throws NotFound when the questionnaire does not exist', async () => {

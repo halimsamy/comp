@@ -1,5 +1,5 @@
 import { db } from '@db';
-import { logger, queue, task } from '@trigger.dev/sdk';
+import { logger, queue, task } from '@trycompai/jobs';
 import { isUserUnsubscribed } from '@trycompai/email';
 import { triggerEmail } from '../../email/trigger-email';
 import { AutomationBulkFailuresEmail } from '../../email/templates/automation-bulk-failures';
@@ -236,11 +236,11 @@ export async function sendBundledFailureEmails(params: {
 export const runOrgIntegrationChecks = task({
   id: 'run-org-integration-checks',
   queue: orgRunnerQueue,
-  // maxDuration is max COMPUTE time in SECONDS (the suspended wait during
-  // batchTriggerAndWait is checkpointed and doesn't count against it). 1h is
-  // ample for the runner's own work (collect results + send emails) and matches
-  // the sibling batchTriggerAndWait orchestrator (process-knowledge-base-documents).
-  maxDuration: 60 * 60, // 1 hour (in seconds)
+  // maxDuration is in SECONDS and, with @trycompai/jobs, INCLUDES the time spent
+  // waiting in batchTriggerAndWait (the wait polls; it is not checkpointed). The
+  // children share the default per-process concurrency across every org, so
+  // allow a long wait rather than time out and drop the bundled failure email.
+  maxDuration: 60 * 60 * 6, // 6 hours (in seconds)
   run: async (payload: {
     organizationId: string;
     organizationName: string;

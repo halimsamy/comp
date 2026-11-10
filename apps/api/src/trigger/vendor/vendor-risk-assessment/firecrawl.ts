@@ -1,4 +1,4 @@
-import { logger } from '@trigger.dev/sdk';
+import { logger } from '@trycompai/jobs';
 import { firecrawlVendorDataSchema, type FirecrawlVendorData } from './schema';
 import { extractVendorDomain, isUrlFromVendorDomain } from './url-validation';
 

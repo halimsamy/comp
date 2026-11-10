@@ -1,4 +1,4 @@
-import { metadata, task } from '@trigger.dev/sdk';
+import { metadata, task } from '@trycompai/jobs';
 import {
   BrowserInstructionTestService,
   type InstructionTestResult,

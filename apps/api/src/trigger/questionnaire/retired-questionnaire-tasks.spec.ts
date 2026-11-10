@@ -6,7 +6,7 @@ interface RetiredTask {
   run: (payload: unknown) => Promise<never>;
 }
 
-jest.mock('@trigger.dev/sdk', () => ({
+jest.mock('@trycompai/jobs', () => ({
   task: jest.fn((definition: RetiredTask) => definition),
 }));
 jest.mock('@/vector-store/lib', () => ({
@@ -20,7 +20,7 @@ import './parse-questionnaire';
 import './retired-questionnaire-tasks';
 
 const sdkMock: { task: jest.Mock<RetiredTask, [RetiredTask]> } =
-  jest.requireMock('@trigger.dev/sdk');
+  jest.requireMock('@trycompai/jobs');
 
 describe('retired public questionnaire tasks', () => {
   it.each([

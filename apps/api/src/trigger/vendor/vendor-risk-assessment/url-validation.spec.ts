@@ -4,8 +4,8 @@ import {
   validateVendorUrl,
 } from './url-validation';
 
-// Mock the logger so tests don't need @trigger.dev/sdk
-jest.mock('@trigger.dev/sdk', () => ({
+// Mock the logger so tests don't need @trycompai/jobs
+jest.mock('@trycompai/jobs', () => ({
   logger: { warn: jest.fn(), info: jest.fn(), debug: jest.fn() },
 }));
 

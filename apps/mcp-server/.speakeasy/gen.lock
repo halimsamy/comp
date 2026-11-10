@@ -7565,7 +7565,7 @@ examples:
           id: "<id>"
       responses:
         "200":
-          application/json: {"questionnaireId": "qst_6a179d26c4ad2c1c816ee16d", "runId": "run_cmpotsz153eac0ultc1ya87f5", "publicAccessToken": "pat_...", "status": "generating", "totalQuestions": 23, "answeredQuestions": 0, "message": "Generating answers for 23 questions. Poll GET /v1/questionnaire/qst_... until answeredQuestions reaches totalQuestions."}
+          application/json: {"questionnaireId": "qst_6a179d26c4ad2c1c816ee16d", "runId": "jrun_cmpotsz153eac0ultc1ya87f5", "status": "generating", "totalQuestions": 23, "answeredQuestions": 0, "message": "Generating answers for 23 questions. Poll GET /v1/questionnaire/qst_... until answeredQuestions reaches totalQuestions."}
   RolesController_getBuiltInObligations_v1:
     speakeasy-default-roles-controller-get-built-in-obligations-v1:
       parameters:

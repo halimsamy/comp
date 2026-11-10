@@ -322,15 +322,13 @@ describe('QuestionnaireController', () => {
         source: 'internal',
       };
       mockService.uploadAndParse.mockResolvedValue({
-        runId: 'run_123',
-        publicAccessToken: 'token_123',
+        runId: 'jrun_123',
       });
 
       const result = await controller.uploadAndParse(dto as any, 'org_1');
 
       expect(result).toEqual({
-        runId: 'run_123',
-        publicAccessToken: 'token_123',
+        runId: 'jrun_123',
       });
     });
 
@@ -343,8 +341,7 @@ describe('QuestionnaireController', () => {
         source: 'internal',
       };
       mockService.uploadAndParse.mockResolvedValue({
-        runId: 'run_123',
-        publicAccessToken: 'token_123',
+        runId: 'jrun_123',
       });
 
       await controller.uploadAndParse(dto as any, 'org_1');

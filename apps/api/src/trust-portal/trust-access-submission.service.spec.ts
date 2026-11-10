@@ -8,7 +8,7 @@ import { TrustAccessService } from './trust-access.service';
 import { enqueueTrustAccessSubmission } from './trust-access-submission';
 import { Logger } from '@nestjs/common';
 
-jest.mock('@trigger.dev/sdk', () => ({ tasks: { trigger: jest.fn() } }));
+jest.mock('@trycompai/jobs', () => ({ tasks: { trigger: jest.fn() } }));
 jest.mock('@db', () => ({
   db: {
     trust: { findFirst: jest.fn(), findUnique: jest.fn(), upsert: jest.fn() },
@@ -30,7 +30,7 @@ const mockDb = jest.requireMock<{
   };
 }>('@db').db;
 const mockTrigger = jest.requireMock<{ tasks: { trigger: jest.Mock } }>(
-  '@trigger.dev/sdk',
+  '@trycompai/jobs',
 ).tasks.trigger;
 const submission = { name: 'Jane', email: 'Jane@example.com' };
 

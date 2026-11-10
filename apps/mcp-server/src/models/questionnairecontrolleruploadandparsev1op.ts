@@ -9,12 +9,10 @@ import * as z from "zod";
  */
 export type QuestionnaireControllerUploadAndParseV1Response = {
   runId?: string | undefined;
-  publicAccessToken?: string | undefined;
 };
 
 export const QuestionnaireControllerUploadAndParseV1Response$zodSchema:
   z.ZodType<QuestionnaireControllerUploadAndParseV1Response> = z.object({
-    publicAccessToken: z.string().optional(),
     runId: z.string().optional(),
   }).describe(
     "Upload file and trigger async parsing. Returns runId for realtime tracking.",

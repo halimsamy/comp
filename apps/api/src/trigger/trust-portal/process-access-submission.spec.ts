@@ -1,6 +1,6 @@
 import './process-access-submission';
 
-jest.mock('@trigger.dev/sdk', () => ({
+jest.mock('@trycompai/jobs', () => ({
   tasks: { trigger: jest.fn() },
   queue: jest.fn((options: unknown) => options),
   schemaTask: jest.fn((options: unknown) => options),
@@ -13,7 +13,7 @@ jest.mock('../../trust-portal/trust-access-submission.processor', () => ({
 }));
 
 const mockSdk = jest.requireMock<{ schemaTask: jest.Mock; queue: jest.Mock }>(
-  '@trigger.dev/sdk',
+  '@trycompai/jobs',
 );
 const mockProcessor = jest.requireMock<{
   processTrustAccessSubmissionPayload: jest.Mock;

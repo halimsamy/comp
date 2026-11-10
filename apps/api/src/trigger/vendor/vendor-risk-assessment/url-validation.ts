@@ -1,4 +1,4 @@
-import { logger } from '@trigger.dev/sdk';
+import { logger } from '@trycompai/jobs';
 import { getDomain } from 'tldts';
 
 // Well-known trust portal domains that vendors use to host their security pages

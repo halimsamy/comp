@@ -1,4 +1,4 @@
-import { metadata, schemaTask } from '@trigger.dev/sdk';
+import { metadata, schemaTask } from '@trycompai/jobs';
 import { z } from 'zod';
 import { PassThrough } from 'node:stream';
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
@@ -68,12 +68,13 @@ export const exportOrganizationEvidenceTask = schemaTask({
   // Runs on an isolated worker; 8 GB / 4 vCPU gives ample headroom for jsPDF +
   // zlib across the largest orgs now that the ZIP streams to S3 (never buffered).
   machine: { preset: 'large-1x' },
-  // concurrencyLimit 1 + a per-org concurrencyKey (passed at trigger time) means
-  // at most one export runs per org at a time; different orgs still run in parallel.
+  // concurrencyLimit 1 makes this a pg-boss singleton queue; the per-org concurrencyKey
+  // passed at trigger time becomes its singletonKey, so at most one export runs per org
+  // at a time while different orgs still run in parallel.
   queue: { name: 'evidence-export', concurrencyLimit: 1 },
   // maxDuration is max compute time in SECONDS. Orgs with high automation
   // volume + large outputs were exceeding the old 30-minute budget, so
-  // Trigger.dev killed the run (retry maxAttempts: 0) — a non-COMPLETED
+  // the job runner killed the run (retry maxAttempts: 0) — a non-COMPLETED
   // terminal state the browser reports as a failed export with no download
   // link. Give the single-threaded stream-to-S3 pass up to an hour to finish.
   maxDuration: 60 * 60,

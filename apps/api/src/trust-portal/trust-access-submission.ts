@@ -1,5 +1,5 @@
 import { createHash } from 'crypto';
-import { tasks } from '@trigger.dev/sdk';
+import { tasks } from '@trycompai/jobs';
 import {
   BadRequestException,
   Logger,

@@ -25,9 +25,8 @@ jest.mock('@db', () => ({
   },
 }));
 
-jest.mock('@trigger.dev/sdk', () => ({
+jest.mock('@trycompai/jobs', () => ({
   tasks: { trigger: jest.fn() },
-  auth: { createPublicToken: jest.fn() },
 }));
 
 jest.mock('@/vector-store/lib', () => ({
@@ -58,7 +57,7 @@ jest.mock(
 );
 
 import { db } from '@db';
-import { tasks, auth } from '@trigger.dev/sdk';
+import { tasks } from '@trycompai/jobs';
 import { syncManualAnswerToVector } from '@/vector-store/lib';
 import {
   uploadToS3,
@@ -309,8 +308,7 @@ describe('KnowledgeBaseService', () => {
         id: 'd1',
         s3Key: 'key',
       });
-      (tasks.trigger as jest.Mock).mockResolvedValue({ id: 'run_1' });
-      (auth.createPublicToken as jest.Mock).mockResolvedValue('token_1');
+      (tasks.trigger as jest.Mock).mockResolvedValue({ id: 'jrun_1' });
       (deleteFromS3 as jest.Mock).mockResolvedValue(true);
       (mockDb.knowledgeBaseDocument.delete as jest.Mock).mockResolvedValue({});
 
@@ -319,7 +317,8 @@ describe('KnowledgeBaseService', () => {
         organizationId: 'org_1',
       });
 
-      expect(result.success).toBe(true);
+      expect(result).toEqual({ success: true, vectorDeletionRunId: 'jrun_1' });
+      expect(result).not.toHaveProperty('publicAccessToken');
       expect(deleteFromS3).toHaveBeenCalledWith('key');
       expect(mockDb.knowledgeBaseDocument.delete).toHaveBeenCalledWith({
         where: { id: 'd1' },
@@ -415,30 +414,6 @@ describe('KnowledgeBaseService', () => {
 
       expect(result).toEqual({ success: true });
       expect(tasks.trigger).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('createRunReadToken', () => {
-    it('should create and return public token', async () => {
-      (auth.createPublicToken as jest.Mock).mockResolvedValue('token_123');
-
-      const result = await service.createRunReadToken('run_1');
-
-      expect(result).toBe('token_123');
-      expect(auth.createPublicToken).toHaveBeenCalledWith({
-        scopes: { read: { runs: ['run_1'] } },
-        expirationTime: '1hr',
-      });
-    });
-
-    it('should return undefined when token creation fails', async () => {
-      (auth.createPublicToken as jest.Mock).mockRejectedValue(
-        new Error('Token error'),
-      );
-
-      const result = await service.createRunReadToken('run_1');
-
-      expect(result).toBeUndefined();
     });
   });
 });

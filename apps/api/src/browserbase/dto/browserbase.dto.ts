@@ -99,12 +99,9 @@ export class LoginRecommendationDto {
 
 export class AnalyzeLoginResponseDto {
   @ApiProperty({
-    description: 'Trigger.dev run id for the background analysis',
+    description: 'Job run id for the background analysis',
   })
   runId: string;
-
-  @ApiProperty({ description: 'Public access token to subscribe to the run' })
-  publicAccessToken: string;
 }
 
 export class LoginAnalysisResponseDto {
@@ -224,12 +221,9 @@ export class SignInAuthProfileDto {
 
 export class SignInAuthProfileResponseDto {
   @ApiProperty({
-    description: 'Trigger.dev run id for the background automated sign-in',
+    description: 'Job run id for the background automated sign-in',
   })
   runId: string;
-
-  @ApiProperty({ description: 'Public access token to subscribe to the run' })
-  publicAccessToken: string;
 
   @ApiProperty({
     description: 'Browserbase session id the sign-in runs on (for take-over)',
@@ -737,11 +731,8 @@ export class TestInstructionDto {
 }
 
 export class TestInstructionResponseDto {
-  @ApiProperty({ description: 'Trigger.dev run id to subscribe to' })
+  @ApiProperty({ description: 'Job run id to poll' })
   runId: string;
-
-  @ApiProperty({ description: 'Public token for realtime subscription' })
-  publicAccessToken: string;
 
   @ApiProperty({ description: 'Browserbase session id backing the live view' })
   sessionId: string;

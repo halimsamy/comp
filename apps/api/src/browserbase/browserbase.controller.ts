@@ -68,8 +68,12 @@ export class BrowserbaseController {
   @ApiResponse({ status: 201, type: AnalyzeLoginResponseDto })
   async analyzeLogin(
     @Body() dto: AnalyzeLoginDto,
+    @OrganizationId() organizationId: string,
   ): Promise<AnalyzeLoginResponseDto> {
-    return this.browserbaseService.analyzeLogin(dto.url);
+    return this.browserbaseService.analyzeLogin({
+      url: dto.url,
+      organizationId,
+    });
   }
 
   // ===== Organization Context =====
@@ -481,7 +485,7 @@ export class BrowserbaseController {
     @Param('automationId') automationId: string,
     @Body() body: ExecuteAutomationSessionDto,
     @OrganizationId() organizationId: string,
-  ): Promise<{ runId: string; publicAccessToken: string }> {
+  ): Promise<{ runId: string }> {
     // The session is client-supplied — confirm it belongs to this org first.
     await this.browserbaseService.assertSessionOwnedByOrg(
       organizationId,

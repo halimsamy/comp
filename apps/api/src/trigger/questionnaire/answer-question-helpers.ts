@@ -4,7 +4,7 @@ import {
 } from '@/vector-store/lib';
 import type { SimilarContentResult } from '@/vector-store/lib';
 import { anthropic } from '@ai-sdk/anthropic';
-import { logger } from '@trigger.dev/sdk';
+import { logger } from '@trycompai/jobs';
 import { generateText } from 'ai';
 import {
   deduplicateSources,

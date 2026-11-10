@@ -1,5 +1,5 @@
 import { render } from '@react-email/render';
-import { idempotencyKeys, tasks } from '@trigger.dev/sdk';
+import { idempotencyKeys, tasks } from '@trycompai/jobs';
 import type { ReactElement } from 'react';
 import type { EmailChannel, sendEmailTask } from '../trigger/email/send-email';
 import type { EmailAttachment } from './resend';

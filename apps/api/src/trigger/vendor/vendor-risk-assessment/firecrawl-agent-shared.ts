@@ -1,5 +1,5 @@
 import Firecrawl from '@mendable/firecrawl-js';
-import { logger } from '@trigger.dev/sdk';
+import { logger } from '@trycompai/jobs';
 import { extractVendorDomain } from './url-validation';
 
 export function normalizeUrl(url: string | null | undefined): string | null {

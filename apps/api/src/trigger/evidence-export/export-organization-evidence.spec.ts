@@ -1,11 +1,11 @@
 import { EventEmitter } from 'node:events';
 
 // Mock module boundaries so importing the task does not connect to Postgres,
-// the Trigger SDK, S3, or pull in jsPDF. We only exercise streamArchiveToS3 —
+// the jobs SDK, S3, or pull in jsPDF. We only exercise streamArchiveToS3 —
 // the concurrent populate+upload orchestration and its error propagation.
 jest.mock('@db', () => ({ db: { organization: { findUnique: jest.fn() } } }));
 
-jest.mock('@trigger.dev/sdk', () => ({
+jest.mock('@trycompai/jobs', () => ({
   metadata: { set: jest.fn(), get: jest.fn() },
   schemaTask: (config: unknown) => config,
 }));
@@ -78,9 +78,9 @@ describe('exportOrganizationEvidenceTask config', () => {
     maxDuration: number;
   };
 
-  it('allows large orgs at least an hour before Trigger.dev kills the run', () => {
+  it('allows large orgs at least an hour before the job runner kills the run', () => {
     // Regression: orgs with high automation volume + large outputs exceeded the
-    // old 30-minute (60 * 30 = 1800s) budget, so Trigger.dev killed the run
+    // old 30-minute (60 * 30 = 1800s) budget, so the job runner killed the run
     // (retry maxAttempts: 0), leaving it in a non-COMPLETED terminal state that
     // the browser surfaces as a failed export with no download link. The task
     // must be allowed at least an hour to finish streaming the ZIP to S3.

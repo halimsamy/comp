@@ -1,4 +1,4 @@
-import { logger, queue, schemaTask } from '@trigger.dev/sdk';
+import { logger, queue, schemaTask } from '@trycompai/jobs';
 import { z } from 'zod';
 import { resend } from '../../email/resend';
 import { generateUnsubscribeToken } from '@trycompai/email';

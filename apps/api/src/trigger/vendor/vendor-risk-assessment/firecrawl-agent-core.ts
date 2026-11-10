@@ -1,5 +1,5 @@
 // apps/api/src/trigger/vendor/vendor-risk-assessment/firecrawl-agent-core.ts
-import { logger } from '@trigger.dev/sdk';
+import { logger } from '@trycompai/jobs';
 import { vendorRiskAssessmentAgentSchema } from './agent-schema';
 import type {
   VendorRiskAssessmentCertification,

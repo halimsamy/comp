@@ -65,7 +65,7 @@ export class RemediationBatchController {
   @ApiOperation({
     summary: 'Update a remediation batch',
     description:
-      'Updates a batch in your organization. A Trigger.dev run can only be bound if its task, payload, and organization match the batch.',
+      'Updates a batch in your organization. A job run can only be bound if its task, tags, and organization match the batch.',
   })
   async updateBatch(
     @Param('batchId') batchId: string,
@@ -83,7 +83,7 @@ export class RemediationBatchController {
   @ApiOperation({
     summary: 'Cancel a remediation batch',
     description:
-      'Cancels the validated Trigger.dev run already bound to a batch in your organization. Use to stop pending cloud remediation.',
+      'Cancels the validated job run already bound to a batch in your organization. Use to stop pending cloud remediation.',
   })
   async cancelBatch(
     @Param('batchId') batchId: string,

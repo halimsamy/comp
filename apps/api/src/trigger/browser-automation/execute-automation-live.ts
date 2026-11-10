@@ -1,4 +1,4 @@
-import { metadata, task } from '@trigger.dev/sdk';
+import { metadata, task } from '@trycompai/jobs';
 import { BrowserbaseService } from '../../browserbase/browserbase.service';
 
 const browserbaseService = new BrowserbaseService();

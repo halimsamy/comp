@@ -1,6 +1,6 @@
 import { setupFirecrawlClient } from './firecrawl-agent-shared';
 
-jest.mock('@trigger.dev/sdk', () => ({
+jest.mock('@trycompai/jobs', () => ({
   logger: { warn: jest.fn(), info: jest.fn(), debug: jest.fn() },
 }));
 

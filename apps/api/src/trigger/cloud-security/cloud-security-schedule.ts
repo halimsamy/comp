@@ -1,6 +1,6 @@
 import { getManifest } from '@trycompai/integration-platform';
 import { db } from '@db';
-import { logger, schedules } from '@trigger.dev/sdk';
+import { logger, schedules } from '@trycompai/jobs';
 import { runCloudSecurityScan } from './run-cloud-security-scan';
 
 /**
@@ -16,7 +16,7 @@ import { runCloudSecurityScan } from './run-cloud-security-scan';
 export const cloudSecuritySchedule = schedules.task({
   id: 'cloud-security-schedule',
   cron: '0 5 * * *', // 5:00 AM UTC daily (same as legacy)
-  maxDuration: 1000 * 60 * 30, // 30 minutes for orchestration
+  maxDuration: 60 * 30, // 30 minutes for orchestration
   run: async (payload) => {
     logger.info('Starting daily cloud security scan orchestrator', {
       scheduledAt: payload.timestamp,

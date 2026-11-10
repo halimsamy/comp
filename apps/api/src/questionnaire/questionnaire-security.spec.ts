@@ -48,7 +48,7 @@ import { HybridAuthGuard } from '../auth/hybrid-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
 import type { AnswerSingleQuestionDto } from './dto/answer-single-question.dto';
 
-describe('questionnaire API authorization replaces public Trigger tokens', () => {
+describe('questionnaire API authorization uses session auth for job runs', () => {
   const organizationId = 'org_aaaaaaaaaaaaaaaaaaaaaaaa';
   const victimId = 'org_bbbbbbbbbbbbbbbbbbbbbbbb';
   const service = {
@@ -77,8 +77,7 @@ describe('questionnaire API authorization replaces public Trigger tokens', () =>
       sources: [],
     });
     service.uploadAndParse.mockResolvedValue({
-      runId: 'run',
-      publicAccessToken: 'read-only-run-token',
+      runId: 'jrun_1',
     });
     const module = await Test.createTestingModule({
       controllers: [QuestionnaireController],

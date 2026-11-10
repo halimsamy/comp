@@ -111,7 +111,7 @@ describe('AdminVendorsController', () => {
 
   describe('triggerAssessment', () => {
     it('should trigger assessment for a vendor', async () => {
-      const response = { runId: 'run_1', publicAccessToken: 'tok_1' };
+      const response = { runId: 'jrun_1' };
       mockService.triggerAssessment.mockResolvedValue(response);
 
       const result = await controller.triggerAssessment('org_1', 'vnd_1', {

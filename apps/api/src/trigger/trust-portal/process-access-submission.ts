@@ -1,10 +1,11 @@
-import { queue, schemaTask } from '@trigger.dev/sdk';
+import { queue, schemaTask } from '@trycompai/jobs';
 import { TrustEmailService } from '../../trust-portal/email.service';
 import { trustAccessSubmissionSchema } from '../../trust-portal/trust-access-submission';
 import { processTrustAccessSubmissionPayload } from '../../trust-portal/trust-access-submission.processor';
 
-// concurrencyKey partitions this queue by portal + email. Both operations for
-// one recipient run serially, so retries/submissions cannot create duplicates.
+// concurrencyLimit 1 makes this a pg-boss singleton queue keyed by the recipient
+// concurrencyKey: one active submission per recipient cluster-wide, so retries and
+// submissions for one recipient cannot create duplicates.
 const accessSubmissionQueue = queue({
   name: 'trust-portal-access-submissions',
   concurrencyLimit: 1,

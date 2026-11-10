@@ -1,5 +1,5 @@
 import { syncOrganizationEmbeddings } from '@/vector-store/lib';
-import { logger, metadata } from '@trigger.dev/sdk';
+import { logger, metadata } from '@trycompai/jobs';
 import { generateAnswerWithRAG } from './answer-question-helpers';
 
 export interface AnswerQuestionPayload {
@@ -24,7 +24,7 @@ export interface AnswerQuestionResult {
 
 export interface AnswerQuestionOptions {
   /**
-   * Whether to push updates to Trigger.dev metadata.
+   * Whether to push updates to job run metadata.
    * Disable when running outside of a Trigger task (e.g. server actions).
    */
   useMetadata?: boolean;

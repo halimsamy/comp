@@ -1,7 +1,7 @@
 // Mocks must be declared before any SUT import so guards' transitive deps
 // (Prisma, better-auth) don't instantiate in Jest.
 const mockTrigger = jest.fn();
-jest.mock('@trigger.dev/sdk', () => ({
+jest.mock('@trycompai/jobs', () => ({
   tasks: { trigger: mockTrigger },
 }));
 
@@ -232,10 +232,7 @@ describe('AuditorEvidenceExportController', () => {
   let controller: AuditorEvidenceExportController;
 
   beforeEach(async () => {
-    mockTrigger.mockReset().mockResolvedValue({
-      id: 'run_123',
-      publicAccessToken: 'tok_abc',
-    });
+    mockTrigger.mockReset().mockResolvedValue({ id: 'jrun_123' });
 
     const moduleRef = await Test.createTestingModule({
       controllers: [AuditorEvidenceExportController],
@@ -249,7 +246,7 @@ describe('AuditorEvidenceExportController', () => {
     controller = moduleRef.get(AuditorEvidenceExportController);
   });
 
-  it('triggers a background task and returns runId + token', async () => {
+  it('triggers a background task and returns only the runId', async () => {
     const result = await controller.exportAllEvidence('org_1', 'true');
 
     expect(mockTrigger).toHaveBeenCalledWith(
@@ -261,10 +258,7 @@ describe('AuditorEvidenceExportController', () => {
         idempotencyKeyTTL: '30m',
       },
     );
-    expect(result).toEqual({
-      runId: 'run_123',
-      publicAccessToken: 'tok_abc',
-    });
+    expect(result).toEqual({ runId: 'jrun_123' });
   });
 
   it('serializes per-org and dedupes on org + includeJson (includeJson=false)', async () => {

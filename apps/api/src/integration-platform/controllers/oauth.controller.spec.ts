@@ -52,14 +52,14 @@ jest.mock('@trycompai/integration-platform', () => ({
   getManifest: jest.fn(),
 }));
 
-jest.mock('@trigger.dev/sdk', () => ({
+jest.mock('@trycompai/jobs', () => ({
   tasks: {
     trigger: jest.fn(),
   },
 }));
 
 import { getManifest } from '@trycompai/integration-platform';
-import { tasks } from '@trigger.dev/sdk';
+import { tasks } from '@trycompai/jobs';
 
 const mockedGetManifest = getManifest as jest.MockedFunction<
   typeof getManifest

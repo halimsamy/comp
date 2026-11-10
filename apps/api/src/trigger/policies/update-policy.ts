@@ -1,4 +1,4 @@
-import { logger, metadata, queue, schemaTask, tags } from '@trigger.dev/sdk';
+import { logger, metadata, queue, schemaTask, tags } from '@trycompai/jobs';
 import { z } from 'zod';
 import { processPolicyUpdate } from './update-policy-helpers';
 
@@ -29,8 +29,8 @@ export const updatePolicy = schemaTask({
         // FRAME-20: frameworks now carry a family pointer; keep this payload
         // schema in step with the FrameworkEditorFramework shape it's typed as.
         familyId: z.string().nullable().default(null),
-        createdAt: z.date(),
-        updatedAt: z.date(),
+        createdAt: z.coerce.date(),
+        updatedAt: z.coerce.date(),
       }),
     ),
     memberId: z.string().optional(),

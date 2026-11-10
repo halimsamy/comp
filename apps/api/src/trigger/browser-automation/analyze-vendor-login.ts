@@ -1,4 +1,4 @@
-import { task } from '@trigger.dev/sdk';
+import { task } from '@trycompai/jobs';
 import { BrowserLoginAnalyzerService } from '../../browserbase/browser-login-analyzer.service';
 import type { LoginAnalysis } from '../../browserbase/browser-login-analysis';
 
@@ -18,7 +18,11 @@ export const analyzeVendorLogin = task({
   // Analysis already degrades to a manual fallback on failure, so a blind retry
   // just wastes a browser session.
   retry: { maxAttempts: 1 },
-  run: async (payload: { url: string }): Promise<LoginAnalysis> => {
+  // organizationId scopes the run for GET /v1/job-runs/:runId (JobRun.organizationId).
+  run: async (payload: {
+    url: string;
+    organizationId: string;
+  }): Promise<LoginAnalysis> => {
     return analyzer.analyzeLogin(payload.url);
   },
 });

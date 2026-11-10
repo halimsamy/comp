@@ -22,7 +22,7 @@ jest.mock('@db', () => ({
   Prisma: {},
 }));
 
-jest.mock('@trigger.dev/sdk', () => ({
+jest.mock('@trycompai/jobs', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
   schedules: { task: (config: unknown) => config },
 }));

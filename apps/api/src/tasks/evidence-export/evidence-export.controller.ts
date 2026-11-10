@@ -17,7 +17,7 @@ import {
   ApiSecurity,
   ApiTags,
 } from '@nestjs/swagger';
-import { tasks } from '@trigger.dev/sdk';
+import { tasks } from '@trycompai/jobs';
 import type { Request, Response } from 'express';
 import type { Archiver } from 'archiver';
 import { AuditRead } from '../../audit/skip-audit-log.decorator';
@@ -208,7 +208,7 @@ export class EvidenceExportController {
 
 /**
  * Auditor-only controller for bulk evidence export.
- * The heavy work runs in a Trigger.dev background task to avoid OOM in the API.
+ * The heavy work runs in a background job to avoid OOM in the API.
  */
 @ApiTags('Evidence Export (Auditor)')
 @Controller({ path: 'evidence-export', version: '1' })
@@ -249,9 +249,9 @@ export class AuditorEvidenceExportController {
       'export-organization-evidence',
       { organizationId, includeJson: includeJsonBool },
       {
-        // Serialize exports per org (the task queue's concurrencyLimit is 1, and
-        // concurrencyKey gives each org its own lane) so a burst of clicks can
-        // never run multiple heavy exports for the same org at once.
+        // With the task queue's concurrencyLimit of 1, this key serializes exports
+        // per org (a burst of clicks never runs two heavy exports for one org)
+        // while other orgs' exports run in parallel.
         concurrencyKey: organizationId,
         // Collapse rapid duplicate triggers (double-click / retry) for the same
         // org + options into a single run for the TTL window.
@@ -260,10 +260,7 @@ export class AuditorEvidenceExportController {
       },
     );
 
-    return {
-      runId: handle.id,
-      publicAccessToken: handle.publicAccessToken,
-    };
+    return { runId: handle.id };
   }
 }
 

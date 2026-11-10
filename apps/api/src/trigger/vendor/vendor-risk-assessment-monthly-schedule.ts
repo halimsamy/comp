@@ -1,5 +1,5 @@
 import { db } from '@db';
-import { logger, schedules } from '@trigger.dev/sdk';
+import { logger, schedules } from '@trycompai/jobs';
 import { vendorRiskAssessmentTask } from './vendor-risk-assessment-task';
 
 /**
@@ -9,7 +9,7 @@ import { vendorRiskAssessmentTask } from './vendor-risk-assessment-task';
 export const vendorRiskAssessmentMonthlySchedule = schedules.task({
   id: 'vendor-risk-assessment-monthly-schedule',
   cron: '0 2 1 * *', // 1st of each month at 2:00 AM UTC
-  maxDuration: 1000 * 60 * 60, // 1 hour (for batch processing)
+  maxDuration: 60 * 60, // 1 hour (for batch processing)
   run: async (payload) => {
     logger.info('Monthly vendor risk assessment refresh started', {
       scheduledAt: payload.timestamp,

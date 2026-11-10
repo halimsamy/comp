@@ -1,6 +1,6 @@
 import { getManifest } from '@trycompai/integration-platform';
 import { db, TaskAutomationStatus, TaskFrequency } from '@db';
-import { logger, schedules } from '@trigger.dev/sdk';
+import { logger, schedules } from '@trycompai/jobs';
 import {
   runOrgIntegrationChecks,
   type OrgTaskCheck,
@@ -39,10 +39,10 @@ export interface ProviderCheck {
 
 /**
  * Resolve a connection's checks from EITHER the static code manifest (the 8
- * built-in integrations, present in the Trigger.dev registry) OR the dynamic
+ * built-in integrations, present in the job worker registry) OR the dynamic
  * (DB-backed) check map for that provider slug.
  *
- * Dynamic integrations are absent from the Trigger.dev manifest registry, so
+ * Dynamic integrations are absent from the job worker manifest registry, so
  * `getManifest` returns undefined for them here and they were silently skipped —
  * the entire reason scheduled checks never ran for them. Falling back to the DB
  * map lets the orchestrator discover their due tasks too. Static manifests win
@@ -129,7 +129,7 @@ export function groupTasksByOrg({
 export const integrationChecksSchedule = schedules.task({
   id: 'integration-checks-schedule',
   cron: '0 6 * * *', // Daily at 6:00 AM UTC
-  maxDuration: 1000 * 60 * 60, // 1 hour
+  maxDuration: 60 * 60, // 1 hour
   run: async (payload) => {
     logger.info('Starting daily integration checks orchestrator', {
       scheduledAt: payload.timestamp,
@@ -162,7 +162,7 @@ export const integrationChecksSchedule = schedules.task({
       }
     }
 
-    // Dynamic (DB-backed) integrations are NOT in the Trigger.dev manifest
+    // Dynamic (DB-backed) integrations are NOT in the job worker's manifest
     // registry, so getManifest() returns undefined for them below. Load their
     // enabled check → task mappings straight from the DB so this orchestrator
     // can discover their due tasks too (their checks are then run on the API

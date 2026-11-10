@@ -6,8 +6,8 @@ import {
   type TaskItemEntityType,
 } from '@db';
 import type { Prisma } from '@db';
-import type { Task } from '@trigger.dev/sdk';
-import { logger, metadata, queue, schemaTask, tags } from '@trigger.dev/sdk';
+import type { Task } from '@trycompai/jobs';
+import { logger, metadata, queue, schemaTask, tags } from '@trycompai/jobs';
 import { z } from 'zod';
 
 import { resolveTaskCreatorAndAssignee } from './vendor-risk-assessment/assignee';
@@ -357,7 +357,7 @@ export const vendorRiskAssessmentTask: Task<
   },
   // 30 minutes total: Firecrawl Agent can take up to 25 min on slow SPA
   // trust centers (Ubiquiti), and deep-scrape + DB writes need room too.
-  maxDuration: 1000 * 60 * 30,
+  maxDuration: 60 * 30,
   run: async (payload) => {
     await tags.add([`org:${payload.organizationId}`]);
 
@@ -1145,7 +1145,7 @@ export const vendorRiskAssessmentTask: Task<
         });
       }
 
-      throw error; // Re-throw so trigger.dev still records the failure and retries
+      throw error; // Re-throw so the job runner still records the failure and retries
     }
   },
 });

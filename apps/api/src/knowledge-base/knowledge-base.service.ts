@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { db } from '@db';
-import { tasks, auth } from '@trigger.dev/sdk';
+import { tasks } from '@trycompai/jobs';
 import { syncManualAnswerToVector } from '@/vector-store/lib';
 import { UploadDocumentDto } from './dto/upload-document.dto';
 import { UploadsService } from '../uploads/uploads.service';
@@ -148,11 +148,6 @@ export class KnowledgeBaseService {
       dto.organizationId,
     );
 
-    // Create public access token for the deletion run
-    const publicAccessToken = vectorDeletionRunId
-      ? await this.createRunReadToken(vectorDeletionRunId)
-      : undefined;
-
     // Delete from S3 (non-blocking)
     const s3Deleted = await deleteFromS3(document.s3Key);
     if (!s3Deleted) {
@@ -169,7 +164,6 @@ export class KnowledgeBaseService {
     return {
       success: true,
       vectorDeletionRunId,
-      publicAccessToken,
     };
   }
 
@@ -194,43 +188,14 @@ export class KnowledgeBaseService {
       runId = handle.id;
     }
 
-    // Create public access token for the run
-    const publicAccessToken = runId
-      ? await this.createRunReadToken(runId)
-      : undefined;
-
     return {
       success: true,
       runId,
-      publicAccessToken,
       message:
         dto.documentIds.length > 1
           ? `Processing ${dto.documentIds.length} documents in parallel...`
           : 'Processing document...',
     };
-  }
-
-  /**
-   * Creates a public access token for reading a specific run
-   */
-  async createRunReadToken(runId: string): Promise<string | undefined> {
-    try {
-      const token = await auth.createPublicToken({
-        scopes: {
-          read: {
-            runs: [runId],
-          },
-        },
-        expirationTime: '1hr',
-      });
-      return token;
-    } catch (error) {
-      this.logger.warn('Failed to create run read token', {
-        runId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
-      return undefined;
-    }
   }
 
   async listManualAnswers(organizationId: string) {

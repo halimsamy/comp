@@ -1,5 +1,5 @@
 import { db } from '@db';
-import { logger, schedules } from '@trigger.dev/sdk';
+import { logger, schedules } from '@trycompai/jobs';
 import { parseRoles } from '../../people/utils/role-authorization';
 import { TrustEmailService } from '../../trust-portal/email.service';
 

@@ -5,7 +5,7 @@ import type {
   FrameworkEditorPolicyTemplate,
   Policy,
 } from '@db';
-import { logger } from '@trigger.dev/sdk';
+import { logger } from '@trycompai/jobs';
 import { processTemplate } from './process-policy-template';
 import { refineCueLines } from './refine-cue-lines';
 

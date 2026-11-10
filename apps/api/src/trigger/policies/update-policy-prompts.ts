@@ -2,7 +2,7 @@ import type {
   FrameworkEditorFramework,
   FrameworkEditorPolicyTemplate,
 } from '@db';
-import { logger } from '@trigger.dev/sdk';
+import { logger } from '@trycompai/jobs';
 
 export const generatePrompt = ({
   policyTemplate,

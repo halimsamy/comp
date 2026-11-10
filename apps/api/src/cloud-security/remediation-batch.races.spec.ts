@@ -11,12 +11,7 @@ jest.mock('@db', () => ({
     },
   },
 }));
-jest.mock('@trigger.dev/sdk', () => ({
-  auth: {
-    withAuth: jest.fn((_config: unknown, action: () => Promise<unknown>) =>
-      action(),
-    ),
-  },
+jest.mock('@trycompai/jobs', () => ({
   runs: { retrieve: jest.fn(), cancel: jest.fn() },
 }));
 jest.mock('./cloud-security-audit', () => ({
@@ -55,7 +50,7 @@ const db = jest.requireMock<{
 }>('@db').db;
 const sdk = jest.requireMock<{
   runs: { retrieve: jest.Mock; cancel: jest.Mock };
-}>('@trigger.dev/sdk');
+}>('@trycompai/jobs');
 const params = { batchId: 'rmb_own', organizationId: 'org_own' };
 
 describe('Remediation batch mutation interleavings', () => {
@@ -64,7 +59,6 @@ describe('Remediation batch mutation interleavings', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    process.env.TRIGGER_APP_SECRET_KEY = 'test_app_project_key';
     stored = {
       id: 'rmb_own',
       organizationId: 'org_own',
@@ -108,17 +102,10 @@ describe('Remediation batch mutation interleavings', () => {
     );
     sdk.runs.retrieve.mockResolvedValue({
       taskIdentifier: 'remediate-batch',
-      tags: ['org_own'],
-      payload: {
-        batchId: 'rmb_own',
-        organizationId: 'org_own',
-        connectionId: 'conn_own',
-      },
+      organizationId: 'org_own',
+      tags: ['org_own', 'batch:rmb_own', 'connection:conn_own'],
     });
     sdk.runs.cancel.mockResolvedValue({ id: 'run_own' });
-  });
-  afterEach(() => {
-    delete process.env.TRIGGER_APP_SECRET_KEY;
   });
 
   it('does not restore running when cancellation commits during run validation', async () => {
@@ -126,12 +113,8 @@ describe('Remediation batch mutation interleavings', () => {
       stored.status = 'cancelled';
       return Promise.resolve({
         taskIdentifier: 'remediate-batch',
-        tags: ['org_own'],
-        payload: {
-          batchId: 'rmb_own',
-          organizationId: 'org_own',
-          connectionId: 'conn_own',
-        },
+        organizationId: 'org_own',
+        tags: ['org_own', 'batch:rmb_own', 'connection:conn_own'],
       });
     });
     await expect(

@@ -3,7 +3,7 @@ import { db } from '@db';
 import { getSignedUrl } from '../app/s3';
 import { TrustAccessService } from './trust-access.service';
 
-jest.mock('@trigger.dev/sdk', () => ({ tasks: { trigger: jest.fn() } }));
+jest.mock('@trycompai/jobs', () => ({ tasks: { trigger: jest.fn() } }));
 
 jest.mock('@db', () => ({
   db: {

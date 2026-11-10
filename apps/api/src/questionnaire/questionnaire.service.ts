@@ -8,7 +8,7 @@ import { UploadsService } from '../uploads/uploads.service';
 import type { AnswerQuestionResult } from '@/trigger/questionnaire/answer-question';
 import { answerQuestion } from '@/trigger/questionnaire/answer-question';
 import { generateAnswerWithRAGBatch } from '@/trigger/questionnaire/answer-question-helpers';
-import { tasks } from '@trigger.dev/sdk';
+import { tasks } from '@trycompai/jobs';
 import type { internalParseQuestionnaireTask } from '@/trigger/questionnaire/internal-parse-questionnaire';
 import type { autoAnswerQuestionnaireTask } from '@/trigger/questionnaire/auto-answer-questionnaire';
 import { TriggerAutoAnswerResponseDto } from './dto/trigger-auto-answer-response.dto';
@@ -228,7 +228,7 @@ export class QuestionnaireService {
 
   async uploadAndParse(
     dto: UploadAndParseDto,
-  ): Promise<{ runId: string; publicAccessToken: string }> {
+  ): Promise<{ runId: string }> {
     // Accept either base64 fileData (UI/direct callers) or an s3Key from a
     // presigned upload (AI/MCP clients). When an s3Key is given we fetch the
     // bytes server-side so the binary never travels through the request/LLM.
@@ -260,7 +260,7 @@ export class QuestionnaireService {
       throw new Error('Failed to upload questionnaire file to S3');
     }
 
-    // Trigger async processing via Trigger.dev
+    // Trigger async processing via the job queue
     const handle = await tasks.trigger<typeof internalParseQuestionnaireTask>(
       'internal-parse-questionnaire',
       {
@@ -279,10 +279,7 @@ export class QuestionnaireService {
       fileName: dto.fileName,
     });
 
-    return {
-      runId: handle.id,
-      publicAccessToken: handle.publicAccessToken,
-    };
+    return { runId: handle.id };
   }
 
   /**
@@ -325,7 +322,6 @@ export class QuestionnaireService {
     return {
       questionnaireId,
       runId: handle.id,
-      publicAccessToken: handle.publicAccessToken,
       status: 'generating',
       totalQuestions: questionnaire.totalQuestions,
       answeredQuestions: questionnaire.answeredQuestions,

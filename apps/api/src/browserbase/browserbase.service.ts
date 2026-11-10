@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { TaskFrequency } from '@db';
-import { tasks } from '@trigger.dev/sdk';
+import { tasks } from '@trycompai/jobs';
 import {
   BrowserAutomationCrudService,
   type BrowserAutomationStepInput,
@@ -47,22 +47,22 @@ export class BrowserbaseService {
   private readonly automationDrafts = new BrowserAutomationDraftService();
 
   /**
-   * Kicks off login analysis as a background Trigger.dev run (browser + AI, which
+   * Kicks off login analysis as a background job run (browser + AI, which
    * can outlast an HTTP/browser timeout) and returns a handle the client
    * subscribes to for the result.
    */
-  async analyzeLogin(url: string): Promise<{
-    runId: string;
-    publicAccessToken: string;
-  }> {
-    const handle = await tasks.trigger('analyze-vendor-login', { url });
-    return { runId: handle.id, publicAccessToken: handle.publicAccessToken };
+  async analyzeLogin(input: {
+    url: string;
+    organizationId: string;
+  }): Promise<{ runId: string }> {
+    const handle = await tasks.trigger('analyze-vendor-login', input);
+    return { runId: handle.id };
   }
 
   /**
    * Kicks off a live test of an instruction the user hasn't saved yet. Creates
    * the session up front (so the client shows it as a live view), then runs the
-   * instruction as a background Trigger.dev task that streams its steps. Nothing
+   * instruction as a background job that streams its steps. Nothing
    * is persisted — this only proves the instruction out before it's saved.
    */
   async testInstruction(input: {
@@ -74,7 +74,6 @@ export class BrowserbaseService {
     evaluationCriteria?: string;
   }): Promise<{
     runId: string;
-    publicAccessToken: string;
     sessionId: string;
     liveViewUrl: string;
   }> {
@@ -97,7 +96,6 @@ export class BrowserbaseService {
       });
       return {
         runId: handle.id,
-        publicAccessToken: handle.publicAccessToken,
         sessionId,
         liveViewUrl,
       };
@@ -181,7 +179,7 @@ export class BrowserbaseService {
    * Kicks off the connect flow's first automated sign-in. Creates the browser
    * session up front (so the client can show it as a live view — the user
    * watches the auto-fill and takes over in place if it can't finish), then runs
-   * the sign-in as a background Trigger.dev task on that session (browser + AI,
+   * the sign-in as a background job on that session (browser + AI,
    * which can outlast an HTTP/browser timeout).
    */
   async signInAuthProfile(input: {
@@ -193,7 +191,6 @@ export class BrowserbaseService {
     usernameLabel?: string;
   }): Promise<{
     runId: string;
-    publicAccessToken: string;
     sessionId: string;
     liveViewUrl: string;
   }> {
@@ -221,7 +218,6 @@ export class BrowserbaseService {
       });
       return {
         runId: handle.id,
-        publicAccessToken: handle.publicAccessToken,
         sessionId,
         liveViewUrl,
       };
@@ -482,9 +478,9 @@ export class BrowserbaseService {
     runId: string;
     sessionId: string;
     organizationId: string;
-  }): Promise<{ runId: string; publicAccessToken: string }> {
+  }): Promise<{ runId: string }> {
     const handle = await tasks.trigger('execute-automation-live', input);
-    return { runId: handle.id, publicAccessToken: handle.publicAccessToken };
+    return { runId: handle.id };
   }
 
   async runBrowserAutomation(automationId: string, organizationId: string) {

@@ -27,12 +27,9 @@ jest.mock('@db', () => ({
   },
 }));
 
-jest.mock('@trigger.dev/sdk', () => ({
-  auth: {
-    createPublicToken: jest.fn().mockResolvedValue('mock-public-access-token'),
-  },
+jest.mock('@trycompai/jobs', () => ({
   tasks: {
-    trigger: jest.fn().mockResolvedValue({ id: 'run_123' }),
+    trigger: jest.fn().mockResolvedValue({ id: 'jrun_123' }),
   },
 }));
 
@@ -147,12 +144,7 @@ describe('AdminPoliciesController', () => {
     it('should trigger policy regeneration', async () => {
       const result = await controller.regenerate('org_1', 'pol_1');
 
-      expect(result).toEqual({
-        data: {
-          runId: 'run_123',
-          publicAccessToken: 'mock-public-access-token',
-        },
-      });
+      expect(result).toEqual({ data: { runId: 'jrun_123' } });
     });
   });
 });

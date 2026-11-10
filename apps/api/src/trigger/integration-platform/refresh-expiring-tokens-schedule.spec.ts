@@ -2,13 +2,20 @@ import { db } from '@db';
 import { requestValidCredentials } from './ensure-valid-credentials';
 import { refreshExpiringTokensSchedule } from './refresh-expiring-tokens-schedule';
 
+// The jobs mock below makes schedules.task return its config, so `run` is callable.
+const runSchedule = (
+  refreshExpiringTokensSchedule as unknown as {
+    run: (payload: { timestamp: Date }) => Promise<{ refreshed: number }>;
+  }
+).run;
+
 jest.mock('@db', () => ({
   db: {
     integrationConnection: { findMany: jest.fn() },
   },
 }));
 
-jest.mock('@trigger.dev/sdk', () => ({
+jest.mock('@trycompai/jobs', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
   schedules: {
     task: (config: unknown) => config,
@@ -24,11 +31,15 @@ describe('refreshExpiringTokensSchedule', () => {
   const lookaheadMs = 24 * 60 * 60 * 1000;
 
   beforeEach(() => {
-    jest.spyOn(Date, 'now').mockReturnValue(nowMs);
+    // The task reads `new Date()` too, so pin the system clock, not just Date.now.
+    jest.useFakeTimers({ now: nowMs });
+    process.env.API_URL = 'http://api.test';
     (requestValidCredentials as jest.Mock).mockResolvedValue({ success: true });
   });
 
   afterEach(() => {
+    jest.useRealTimers();
+    delete process.env.API_URL;
     jest.restoreAllMocks();
     jest.clearAllMocks();
   });
@@ -58,10 +69,7 @@ describe('refreshExpiringTokensSchedule', () => {
       connectionWithLatestExpiringSoon,
     ]);
 
-    const result = await refreshExpiringTokensSchedule.run({
-      timestamp: new Date(nowMs).toISOString(),
-      lastTimestamp: null,
-    } as any);
+    const result = await runSchedule({ timestamp: new Date(nowMs) });
 
     expect(result.refreshed).toBe(1);
     expect(requestValidCredentials).toHaveBeenCalledTimes(1);
@@ -86,10 +94,7 @@ describe('refreshExpiringTokensSchedule', () => {
       connectionLatestValid,
     ]);
 
-    const result = await refreshExpiringTokensSchedule.run({
-      timestamp: new Date(nowMs).toISOString(),
-      lastTimestamp: null,
-    } as any);
+    const result = await runSchedule({ timestamp: new Date(nowMs) });
 
     expect(result.refreshed).toBe(0);
     expect(requestValidCredentials).not.toHaveBeenCalled();

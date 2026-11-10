@@ -1,5 +1,5 @@
 import { db } from '@db';
-import { logger, metadata, tags, task } from '@trigger.dev/sdk';
+import { logger, metadata, tags, task } from '@trycompai/jobs';
 import { extractContentFromFile } from '@/questionnaire/utils/content-extractor';
 import {
   parseQuestionsAndAnswers,

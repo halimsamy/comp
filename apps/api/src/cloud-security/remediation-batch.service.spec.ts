@@ -14,12 +14,7 @@ jest.mock('@db', () => ({
     $transaction: jest.fn(),
   },
 }));
-jest.mock('@trigger.dev/sdk', () => ({
-  auth: {
-    withAuth: jest.fn((_config: unknown, action: () => Promise<unknown>) =>
-      action(),
-    ),
-  },
+jest.mock('@trycompai/jobs', () => ({
   runs: { retrieve: jest.fn(), cancel: jest.fn() },
 }));
 jest.mock('./cloud-security-audit', () => ({
@@ -39,9 +34,8 @@ type MockDb = {
 };
 const db = jest.requireMock<{ db: MockDb }>('@db').db;
 const sdk = jest.requireMock<{
-  auth: { withAuth: jest.Mock };
   runs: { retrieve: jest.Mock; cancel: jest.Mock };
-}>('@trigger.dev/sdk');
+}>('@trycompai/jobs');
 
 const batch = {
   id: 'rmb_own',
@@ -56,12 +50,8 @@ const batch = {
 };
 const run = {
   taskIdentifier: 'remediate-batch',
-  tags: ['org_own'],
-  payload: {
-    batchId: 'rmb_own',
-    organizationId: 'org_own',
-    connectionId: 'conn_own',
-  },
+  organizationId: 'org_own',
+  tags: ['org_own', 'batch:rmb_own', 'connection:conn_own'],
 };
 const createInput = {
   organizationId: 'org_own',
@@ -77,7 +67,6 @@ describe('RemediationBatchService tenant isolation', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    process.env.TRIGGER_APP_SECRET_KEY = 'test_app_project_key';
     db.$transaction.mockImplementation((action: (tx: MockDb) => unknown) =>
       action(db),
     );
@@ -91,10 +80,6 @@ describe('RemediationBatchService tenant isolation', () => {
     db.remediationBatch.updateMany.mockResolvedValue({ count: 1 });
     sdk.runs.retrieve.mockResolvedValue(run);
     sdk.runs.cancel.mockResolvedValue({ id: 'run_own' });
-  });
-
-  afterEach(() => {
-    delete process.env.TRIGGER_APP_SECRET_KEY;
   });
 
   it('creates a batch only after checking its connection and all findings in the authenticated organization', async () => {
@@ -153,7 +138,7 @@ describe('RemediationBatchService tenant isolation', () => {
     expect(db.remediationBatch.create).not.toHaveBeenCalled();
   });
 
-  it('binds only a real run with matching task, payload, and organization tags', async () => {
+  it('binds only a real run with matching task, organization, and batch tags', async () => {
     db.remediationBatch.findFirst.mockResolvedValue({
       ...batch,
       triggerRunId: null,
@@ -163,10 +148,7 @@ describe('RemediationBatchService tenant isolation', () => {
       organizationId: 'org_own',
       body: { triggerRunId: 'run_own', status: 'running' },
     });
-    expect(sdk.auth.withAuth).toHaveBeenCalledWith(
-      { accessToken: 'test_app_project_key' },
-      expect.any(Function),
-    );
+    expect(sdk.runs.retrieve).toHaveBeenCalledWith('run_own');
     expect(db.remediationBatch.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
@@ -181,10 +163,10 @@ describe('RemediationBatchService tenant isolation', () => {
 
   it.each([
     { ...run, taskIdentifier: 'other-task' },
-    { ...run, tags: ['org_foreign'] },
-    { ...run, payload: { ...run.payload, batchId: 'rmb_foreign' } },
-    { ...run, payload: { ...run.payload, organizationId: 'org_foreign' } },
-    { ...run, payload: { ...run.payload, connectionId: 'conn_foreign' } },
+    { ...run, organizationId: 'org_foreign' },
+    { ...run, tags: ['org_own', 'batch:rmb_foreign', 'connection:conn_own'] },
+    { ...run, tags: ['org_own', 'batch:rmb_own', 'connection:conn_foreign'] },
+    { ...run, tags: ['org_own'] },
   ])('refuses forged run binding: %p', async (foreignRun) => {
     db.remediationBatch.findFirst.mockResolvedValue({
       ...batch,
@@ -254,18 +236,6 @@ describe('RemediationBatchService tenant isolation', () => {
       }),
     ).rejects.toThrow(NotFoundException);
     expect(sdk.runs.retrieve).not.toHaveBeenCalled();
-    expect(sdk.runs.cancel).not.toHaveBeenCalled();
-  });
-
-  it('fails closed when the app-project key is missing', async () => {
-    delete process.env.TRIGGER_APP_SECRET_KEY;
-    await expect(
-      service.cancel({
-        batchId: 'rmb_own',
-        organizationId: 'org_own',
-        runId: 'run_own',
-      }),
-    ).rejects.toThrow('TRIGGER_APP_SECRET_KEY');
     expect(sdk.runs.cancel).not.toHaveBeenCalled();
   });
 

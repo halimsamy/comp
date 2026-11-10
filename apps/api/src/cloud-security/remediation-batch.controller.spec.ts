@@ -12,7 +12,7 @@ jest.mock('@trycompai/auth', () => ({
   BUILT_IN_ROLE_PERMISSIONS: {},
 }));
 jest.mock('@db', () => ({ db: {} }));
-jest.mock('@trigger.dev/sdk', () => ({ auth: {}, runs: {} }));
+jest.mock('@trycompai/jobs', () => ({ runs: {} }));
 
 describe('RemediationBatchController permissions and validation', () => {
   let app: INestApplication<Server>;

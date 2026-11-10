@@ -37,7 +37,7 @@ jest.mock('@trycompai/integration-platform', () => ({
   getManifest: jest.fn(),
 }));
 
-jest.mock('@trigger.dev/sdk', () => ({
+jest.mock('@trycompai/jobs', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
   schedules: {
     task: (config: unknown) => config,

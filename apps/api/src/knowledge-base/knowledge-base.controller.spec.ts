@@ -32,7 +32,6 @@ describe('KnowledgeBaseController', () => {
     getViewUrl: jest.fn(),
     deleteDocument: jest.fn(),
     processDocuments: jest.fn(),
-    createRunReadToken: jest.fn(),
     deleteManualAnswer: jest.fn(),
     deleteAllManualAnswers: jest.fn(),
   };

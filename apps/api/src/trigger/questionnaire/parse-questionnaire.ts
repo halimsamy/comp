@@ -1,4 +1,4 @@
-import { task } from '@trigger.dev/sdk';
+import { task } from '@trycompai/jobs';
 
 // Keep this task ID deployed as a tombstone: existing public tokens may still
 // grant it even after the token endpoint is disabled.

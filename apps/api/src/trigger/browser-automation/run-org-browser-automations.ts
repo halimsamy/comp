@@ -1,4 +1,4 @@
-import { logger, queue, task } from '@trigger.dev/sdk';
+import { logger, queue, task } from '@trycompai/jobs';
 import { runBrowserAutomation } from './run-browser-automation';
 import {
   sendBundledFailureEmails,
@@ -107,9 +107,8 @@ export function collectFailedBrowserTasks(
 export const runOrgBrowserAutomations = task({
   id: 'run-org-browser-automations',
   queue: orgRunnerQueue,
-  // maxDuration is max COMPUTE time in SECONDS; the suspended wait during
-  // batchTriggerAndWait is checkpointed and doesn't count against it. 1h matches
-  // the sibling integration runner.
+  // maxDuration is in SECONDS and includes the batchTriggerAndWait wait (the
+  // parent polls its children). 1h matches the sibling integration runner.
   maxDuration: 60 * 60,
   run: async (payload: {
     organizationId: string;

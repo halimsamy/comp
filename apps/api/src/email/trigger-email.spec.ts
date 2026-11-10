@@ -10,7 +10,7 @@ const mockCreateKey = jest.fn((key: string, options: { scope: 'global' }) =>
 jest.mock('@react-email/render', () => ({
   render: (...args: unknown[]) => mockRender(...args),
 }));
-jest.mock('@trigger.dev/sdk', () => ({
+jest.mock('@trycompai/jobs', () => ({
   tasks: { trigger: (...args: unknown[]) => mockTrigger(...args) },
   idempotencyKeys: {
     create: (key: string, options: { scope: 'global' }) =>

@@ -3,10 +3,9 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
-  ServiceUnavailableException,
 } from '@nestjs/common';
 import { db } from '@db';
-import { auth, runs } from '@trigger.dev/sdk';
+import { runs } from '@trycompai/jobs';
 import { z } from 'zod';
 import { logCloudSecurityActivity } from './cloud-security-audit';
 import {
@@ -14,11 +13,6 @@ import {
   UpdateRemediationBatchDto,
 } from './dto/remediation-batch.dto';
 
-const runPayloadSchema = z.object({
-  batchId: z.string(),
-  organizationId: z.string(),
-  connectionId: z.string(),
-});
 const findingsSchema = z.array(
   z
     .object({
@@ -143,7 +137,7 @@ export class RemediationBatchService {
     }
     if (batch.status === 'done' || batch.status === 'cancelled') return batch;
     await this.validateRun({ batch, runId });
-    await this.withAppProject(() => runs.cancel(runId));
+    await runs.cancel(runId);
     const updated = await db.remediationBatch.updateMany({
       where: {
         id: batch.id,
@@ -211,27 +205,15 @@ export class RemediationBatchService {
     batch: { id: string; organizationId: string; connectionId: string };
     runId: string;
   }) {
-    const run = await this.withAppProject(() => runs.retrieve(params.runId));
-    const payload = runPayloadSchema.safeParse(run.payload);
+    // Payloads are not stored; the trigger site binds the run via tags.
+    const run = await runs.retrieve(params.runId);
     if (
       run.taskIdentifier !== 'remediate-batch' ||
-      !run.tags.includes(params.batch.organizationId) ||
-      !payload.success ||
-      payload.data.batchId !== params.batch.id ||
-      payload.data.organizationId !== params.batch.organizationId ||
-      payload.data.connectionId !== params.batch.connectionId
+      run.organizationId !== params.batch.organizationId ||
+      !run.tags.includes(`batch:${params.batch.id}`) ||
+      !run.tags.includes(`connection:${params.batch.connectionId}`)
     ) {
       throw new NotFoundException('Run not found');
     }
-  }
-
-  private withAppProject<T>(action: () => Promise<T>) {
-    const accessToken = process.env.TRIGGER_APP_SECRET_KEY;
-    if (!accessToken) {
-      throw new ServiceUnavailableException(
-        'TRIGGER_APP_SECRET_KEY must be configured for the apps/app Trigger.dev project',
-      );
-    }
-    return auth.withAuth({ accessToken }, action);
   }
 }

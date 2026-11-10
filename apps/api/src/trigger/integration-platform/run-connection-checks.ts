@@ -1,6 +1,6 @@
 import { getManifest, runAllChecks } from '@trycompai/integration-platform';
 import { db } from '@db';
-import { logger, tags, task } from '@trigger.dev/sdk';
+import { logger, tags, task } from '@trycompai/jobs';
 import {
   getAccessToken,
   requestValidCredentials,
@@ -21,7 +21,7 @@ import {
  */
 export const runConnectionChecks = task({
   id: 'run-connection-checks',
-  maxDuration: 1000 * 60 * 15, // 15 minutes
+  maxDuration: 60 * 15, // 15 minutes
   retry: {
     maxAttempts: 3,
     factor: 2,
@@ -44,7 +44,7 @@ export const runConnectionChecks = task({
 
     const manifest = getManifest(providerSlug);
 
-    // Dynamic (DB-backed) providers have no manifest in the Trigger.dev runtime,
+    // Dynamic (DB-backed) providers have no manifest in the job worker runtime,
     // so run their checks ON OUR SERVER (like AWS), where the dynamic-manifest
     // loader has populated the registry. Static providers keep running here.
     const isDynamic = manifest
@@ -204,7 +204,7 @@ export const runConnectionChecks = task({
     try {
       // Server-delegated providers (AWS + dynamic) run ON OUR SERVER so their
       // checks egress our VPC / resolve their DB-backed manifest there. Static
-      // providers keep running here in the Trigger.dev runtime, unchanged. Same
+      // providers keep running here in the job worker runtime, unchanged. Same
       // result shape either way, so the persistence below is shared.
       let result: RunAllChecksResult;
       if (runOnServer) {

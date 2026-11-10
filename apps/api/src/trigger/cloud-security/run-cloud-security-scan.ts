@@ -1,5 +1,5 @@
 import { db } from '@db';
-import { logger, tags, task } from '@trigger.dev/sdk';
+import { logger, tags, task } from '@trycompai/jobs';
 
 /**
  * Trigger task that runs a cloud security scan for a single connection.
@@ -10,7 +10,7 @@ import { logger, tags, task } from '@trigger.dev/sdk';
  */
 export const runCloudSecurityScan = task({
   id: 'run-cloud-security-scan',
-  maxDuration: 1000 * 60 * 15, // 15 minutes (scans can take time for multiple regions)
+  maxDuration: 60 * 15, // 15 minutes (scans can take time for multiple regions)
   run: async (payload: {
     connectionId: string;
     organizationId: string;

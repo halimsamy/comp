@@ -9,7 +9,7 @@ jest.mock('@db', () => ({
     member: { findMany: jest.fn() },
   },
 }));
-jest.mock('@trigger.dev/sdk', () => ({ tasks: { trigger: jest.fn() } }));
+jest.mock('@trycompai/jobs', () => ({ tasks: { trigger: jest.fn() } }));
 jest.mock('./trust-access-url', () => ({
   buildTrustPortalAccessUrl: jest.fn(),
 }));

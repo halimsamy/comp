@@ -1,4 +1,4 @@
-import { task } from '@trigger.dev/sdk';
+import { task } from '@trycompai/jobs';
 
 // Retain these IDs as rejecting tasks so previously minted public tokens do
 // not reach organization data after this worker version is deployed.

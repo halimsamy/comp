@@ -74,7 +74,6 @@ export class InternalVendorAutomationController {
     return {
       success: true,
       runId: result.runId,
-      publicAccessToken: result.publicAccessToken,
     };
   }
 }

@@ -304,7 +304,6 @@ export class QuestionnaireController {
       type: 'object',
       properties: {
         runId: { type: 'string' },
-        publicAccessToken: { type: 'string' },
       },
     },
   })
