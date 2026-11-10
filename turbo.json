@@ -3,7 +3,6 @@
     "globalDependencies": ["**/.env"],
     "concurrency": "15",
     "globalEnv": [
-        "AI_GATEWAY_API_KEY",
         "ANTHROPIC_API_KEY",
         "APP_AWS_ACCESS_KEY_ID",
         "APP_AWS_BUCKET_NAME",
@@ -36,7 +35,6 @@
         "FLEET_DEVICE_PATH_WINDOWS",
         "FLEET_TOKEN",
         "FLEET_URL",
-        "GROQ_API_KEY",
         "INTERNAL_API_TOKEN",
         "LOGO_DEV",
         "LOGTAIL_SOURCE_TOKEN",
@@ -44,7 +42,6 @@
         "NEXT_PUBLIC_SENTRY_DSN",
         "NODE_ENV",
         "NOVU_API_KEY",
-        "OPENAI_API_KEY",
         "QA_SECRET",
         "QUESTIONNAIRE_AUTOFILL_FILE_API_SECRET",
         "RESEND_API_KEY",
@@ -68,6 +65,7 @@
         "UPSTASH_REDIS_REST_URL",
         "UPSTASH_VECTOR_REST_TOKEN",
         "UPSTASH_VECTOR_REST_URL",
+        "VOYAGE_API_KEY",
         "ZAPIER_HUBSPOT_WEBHOOK_URL"
     ],
     "ui": "tui",

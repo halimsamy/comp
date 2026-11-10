@@ -1,7 +1,7 @@
 import { env } from '@/env.mjs';
 import { serverApi } from '@/lib/api-server';
 import { auth } from '@/utils/auth';
-import { openai } from '@ai-sdk/openai';
+import { anthropic } from '@ai-sdk/anthropic';
 import { generateObject } from 'ai';
 import { headers } from 'next/headers';
 import { NextResponse } from 'next/server';
@@ -84,7 +84,7 @@ interface AuthMeResponse {
 }
 
 export async function POST(req: Request) {
-  if (!env.OPENAI_API_KEY) {
+  if (!env.ANTHROPIC_API_KEY) {
     return NextResponse.json({ error: 'AI analysis is not configured.' }, { status: 500 });
   }
 
@@ -185,7 +185,9 @@ For each requirement, determine if the exercise documentation adequately address
 
   try {
     const { object } = await generateObject({
-      model: openai('gpt-4o-mini'),
+      model: anthropic('claude-opus-5-5'),
+      // low effort keeps this cheap check inside maxDuration
+      providerOptions: { anthropic: { effort: 'low' } },
       schema: analysisResultSchema,
       system: systemPrompt,
       prompt: userPrompt,

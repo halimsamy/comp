@@ -19,7 +19,7 @@ import {
   ApiSecurity,
   ApiTags,
 } from '@nestjs/swagger';
-import { openai } from '@ai-sdk/openai';
+import { anthropic } from '@ai-sdk/anthropic';
 import {
   streamText,
   convertToModelMessages,
@@ -39,7 +39,6 @@ import { AssistantChatService } from './assistant-chat.service';
 import { buildTools } from './assistant-chat-tools';
 import type { AssistantChatMessage } from './assistant-chat.types';
 import { RolesService } from '../roles/roles.service';
-import { ASSISTANT_OPENAI_PROVIDER_OPTIONS } from './openai-options';
 import { getAITelemetry } from '../inference-tracing';
 import { resolveAssistantChatContext } from './assistant-chat-context';
 
@@ -80,7 +79,7 @@ export class AssistantChatController {
   ) {
     // @Res() bypasses NestJS exception filters, so we must handle errors manually
     try {
-      if (!process.env.OPENAI_API_KEY) {
+      if (!process.env.ANTHROPIC_API_KEY) {
         res
           .status(HttpStatus.SERVICE_UNAVAILABLE)
           .json({ message: 'AI service not configured' });
@@ -119,11 +118,10 @@ Important:
 `;
 
       const result = streamText({
-        model: openai('gpt-5'),
+        model: anthropic('claude-opus-5-5'),
         system: systemPrompt,
         messages: await convertToModelMessages(messages),
         tools,
-        providerOptions: ASSISTANT_OPENAI_PROVIDER_OPTIONS,
         stopWhen: stepCountIs(5),
         experimental_telemetry: getAITelemetry('grc-assistant'),
       });

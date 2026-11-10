@@ -28,11 +28,11 @@ import {
 } from './azure-ai-remediation.prompt';
 import { normalizeFixPlan } from './plan-normalizer';
 
-const MODEL = anthropic('claude-opus-4-8');
+const MODEL = anthropic('claude-opus-5-5');
 // Cheaper, faster model for the manual-steps fallback. The output is pure
 // natural language with no SDK-call shape to validate, so the strongest
 // model is overkill — we just need clear instructions.
-const FALLBACK_MODEL = anthropic('claude-sonnet-4-6');
+const FALLBACK_MODEL = anthropic('claude-opus-5-5');
 const REMEDIATION_ROLE_NAME = 'CompAI-Remediator';
 
 export interface FindingContext {
@@ -85,7 +85,7 @@ export class AiRemediationService {
 
   /** Single fix-plan generation pass (generate → enrich → normalize). */
   private async requestFixPlan(finding: FindingContext): Promise<FixPlan> {
-    // NOTE: claude-opus-4-8 rejects the `temperature` parameter
+    // NOTE: claude-opus-5-5 rejects the `temperature` parameter
     // ("temperature is deprecated for this model" → 400), which previously
     // made every plan generation throw and silently fall back to manual
     // remediation steps. Do not re-add `temperature` to MODEL calls.
@@ -438,7 +438,6 @@ WHY IT FAILED:
 ${params.failureReason}
 
 Produce 3-8 ordered steps. Each step is a single concrete action the customer can perform in AWS Console or CLI. Reference the EXACT resource (${params.finding.resourceType} ${params.finding.resourceId}) and the EXACT region from evidence when relevant. End with a verification step so the customer knows they fixed it.`,
-        temperature: 0.2,
       });
 
       this.logger.log(
@@ -496,7 +495,7 @@ Produce 3-8 ordered steps. Each step is a single concrete action the customer ca
   private async requestGcpFixPlan(
     finding: FindingContext,
   ): Promise<GcpFixPlan> {
-    // MODEL (claude-opus-4-8) rejects `temperature` — do not re-add it.
+    // MODEL (claude-opus-5-5) rejects `temperature` — do not re-add it.
     const { object } = await generateObject({
       model: MODEL,
       schema: gcpFixPlanSchema,
@@ -581,7 +580,7 @@ Generate the complete fix plan with EXACT JSON values from the real GCP state.`,
   private async requestAzureFixPlan(
     finding: FindingContext,
   ): Promise<AzureFixPlan> {
-    // MODEL (claude-opus-4-8) rejects `temperature` — do not re-add it.
+    // MODEL (claude-opus-5-5) rejects `temperature` — do not re-add it.
     const { object } = await generateObject({
       model: MODEL,
       schema: azureFixPlanSchema,

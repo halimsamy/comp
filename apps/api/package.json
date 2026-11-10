@@ -5,9 +5,7 @@
     "author": "",
     "dependencies": {
         "@1password/sdk": "0.4.0",
-        "@ai-sdk/anthropic": "^3.0.75",
-        "@ai-sdk/groq": "^3.0.38",
-        "@ai-sdk/openai": "^3.0.62",
+        "@ai-sdk/anthropic": "^3.0.140",
         "@aws-sdk/client-acm": "^3.948.0",
         "@aws-sdk/client-api-gateway": "^3.948.0",
         "@aws-sdk/client-apigatewayv2": "^3.948.0",

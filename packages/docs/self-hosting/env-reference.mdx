@@ -90,9 +90,8 @@ AWS S3 variables are required for file upload features (attachments, logos, ques
 
 | Name | Service(s) | Phase | Required | Notes |
 |------|-----------|-------|----------|-------|
-| `OPENAI_API_KEY` | app | runtime | conditional | OpenAI API key for AI features |
-| `ANTHROPIC_API_KEY` | app | runtime | optional | Anthropic API key (alternative models) |
-| `GROQ_API_KEY` | app | runtime | optional | Groq API key for dashboard chat |
+| `ANTHROPIC_API_KEY` | app, api | runtime | conditional | Claude API key for all AI features |
+| `VOYAGE_API_KEY` | app, api | runtime | conditional | Voyage AI key for embeddings (vector search, 1024-dim index) |
 | `FIRECRAWL_API_KEY` | app | runtime | conditional | Firecrawl for vendor research |
 
 ### Rate Limiting & Caching (Upstash)

@@ -191,7 +191,7 @@ You MUST produce the policy by starting from the <current_policy> text above and
     })) as Array<UIMessage>;
 
     const result = streamText({
-      model: anthropic('claude-sonnet-4-6'),
+      model: anthropic('claude-opus-5-5'),
       system: systemPrompt,
       messages: await convertToModelMessages(cleanedMessages),
       toolChoice: 'auto',

@@ -3,11 +3,10 @@ import AdmZip from 'adm-zip';
 import ExcelJS from 'exceljs';
 import { PDFDocument } from 'pdf-lib';
 import { generateText } from 'ai';
+import { anthropic } from '@ai-sdk/anthropic';
 
 // Mock AI dependencies
-jest.mock('@ai-sdk/openai', () => ({ openai: jest.fn() }));
 jest.mock('@ai-sdk/anthropic', () => ({ anthropic: jest.fn() }));
-jest.mock('@ai-sdk/groq', () => ({ createGroq: jest.fn(() => jest.fn()) }));
 jest.mock('ai', () => ({
   generateText: jest.fn(),
   generateObject: jest.fn(),
@@ -113,7 +112,7 @@ describe('content-extractor: extractContentFromFile', () => {
     expect(result).toContain('What is 2+2?,4');
   });
 
-  it('should fall back to OpenAI when Claude PDF extraction is overloaded', async () => {
+  it('should fall back to another Claude model when PDF extraction is overloaded', async () => {
     const pdf = await PDFDocument.create();
     pdf.addPage();
     const bytes = await pdf.save();
@@ -129,6 +128,8 @@ describe('content-extractor: extractContentFromFile', () => {
 
     expect(result).toBe('Extracted PDF text');
     expect(mockGenerateText).toHaveBeenCalledTimes(2);
+    expect(anthropic).toHaveBeenNthCalledWith(1, 'claude-opus-5-5');
+    expect(anthropic).toHaveBeenNthCalledWith(2, 'claude-opus-5-5');
   });
 
   it('should reject legacy XLS files with a clear message', async () => {

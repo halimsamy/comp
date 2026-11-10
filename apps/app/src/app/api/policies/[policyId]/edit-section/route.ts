@@ -33,7 +33,7 @@ export async function POST(req: Request) {
     }
 
     const result = await generateText({
-      model: anthropic('claude-sonnet-4-6'),
+      model: anthropic('claude-opus-5-5'),
       // A single section is small; cap output so a runaway generation can't hang
       // the 30s request, and so we get a clean stop rather than a truncated edit.
       maxOutputTokens: 4000,

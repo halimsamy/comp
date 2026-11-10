@@ -38,7 +38,7 @@ model CheckDefinition {
   /// Why this check matters from a security / risk perspective.
   whyItMatters String
 
-  /// e.g. "claude-haiku-4-5" — flip the constant in code to invalidate all.
+  /// e.g. "claude-opus-5-5" — flip the constant in code to invalidate all.
   modelVersion String
   generatedAt  DateTime @default(now())
 

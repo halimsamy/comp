@@ -20,7 +20,7 @@ vi.mock('@db/server', () => ({
 vi.mock('@/lib/permissions.server', () => ({
   resolveUserPermissions: mocks.resolvePermissions,
 }));
-vi.mock('@ai-sdk/groq', () => ({ groq: () => 'mock-model' }));
+vi.mock('@ai-sdk/anthropic', () => ({ anthropic: () => 'mock-model' }));
 vi.mock('ai', () => ({
   generateObject: mocks.generateObject,
   NoObjectGeneratedError: { isInstance: () => false },

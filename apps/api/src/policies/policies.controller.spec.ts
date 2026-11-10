@@ -87,8 +87,8 @@ jest.mock('@trigger.dev/sdk', () => ({
   tasks: { trigger: jest.fn() },
 }));
 
-jest.mock('@ai-sdk/openai', () => ({
-  openai: jest.fn(),
+jest.mock('@ai-sdk/anthropic', () => ({
+  anthropic: jest.fn(),
 }));
 
 jest.mock('ai', () => ({

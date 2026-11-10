@@ -48,7 +48,6 @@ jest.mock('ai', () => ({
   NoObjectGeneratedError: { isInstance: jest.fn(() => false) },
 }));
 
-jest.mock('@ai-sdk/openai', () => ({ openai: jest.fn(() => 'openai-model') }));
 jest.mock('@ai-sdk/anthropic', () => ({
   anthropic: jest.fn(() => 'anthropic-model'),
 }));

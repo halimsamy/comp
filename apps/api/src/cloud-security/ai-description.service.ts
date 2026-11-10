@@ -14,7 +14,7 @@ import {
  * Haiku 4.5 — cheap, fast, plenty good for descriptive text. Locked here
  * so cache invalidation can detect model upgrades via `modelVersion`.
  */
-export const DESCRIPTION_MODEL_VERSION = 'claude-haiku-4-5';
+export const DESCRIPTION_MODEL_VERSION = 'claude-opus-5-5';
 const MODEL = anthropic(DESCRIPTION_MODEL_VERSION);
 
 @Injectable()
@@ -34,10 +34,9 @@ export class AiDescriptionService {
         schema: checkDescriptionSchema,
         system: CHECK_DESCRIPTION_SYSTEM_PROMPT,
         prompt: buildCheckDescriptionPrompt(input),
-        temperature: 0,
       });
 
-      // Server-side backstop: if Haiku slipped past the prompt and emitted
+      // Server-side backstop: if the model slipped past the prompt and emitted
       // a compliance control number or URL, refuse to cache it. Callers
       // get null and the UI falls back to existing content.
       const violation = findForbiddenContent(object);

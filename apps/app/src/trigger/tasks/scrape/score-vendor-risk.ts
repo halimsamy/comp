@@ -1,4 +1,4 @@
-import { openai } from '@ai-sdk/openai';
+import { anthropic } from '@ai-sdk/anthropic';
 import { Impact, Likelihood } from '@db';
 import { db } from '@db/server';
 import { logger, schemaTask } from '@trigger.dev/sdk';
@@ -104,7 +104,7 @@ export const scoreVendorRisk = schemaTask({
       .join('\n');
 
     const { object } = await generateObject({
-      model: openai('gpt-4.1-mini'),
+      model: anthropic('claude-opus-5-5'),
       schema: ScoreSchema,
       system: [
         'You are scoring inherent vendor risk for a customer that has just listed this vendor as part of their compliance program. Your job is to assign Likelihood and Impact buckets based on the researched data below.',

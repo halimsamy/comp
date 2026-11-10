@@ -3,7 +3,7 @@
 import { hasPermission } from '@/lib/permissions';
 import { resolveUserPermissions } from '@/lib/permissions.server';
 import { auth } from '@/utils/auth';
-import { groq } from '@ai-sdk/groq';
+import { anthropic } from '@ai-sdk/anthropic';
 import { db } from '@db/server';
 import { generateObject, NoObjectGeneratedError } from 'ai';
 import { headers } from 'next/headers';
@@ -103,7 +103,7 @@ export async function generateAutomationSuggestions(
 
     // Generate AI suggestions
     const { object } = await generateObject({
-      model: groq('meta-llama/llama-4-scout-17b-16e-instruct'),
+      model: anthropic('claude-opus-5-5'),
       schema: SuggestionsSchema,
       system: AUTOMATION_SUGGESTIONS_SYSTEM_PROMPT,
       prompt: getAutomationSuggestionsPrompt(taskDescription, vendorList, contextInfo),

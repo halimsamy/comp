@@ -1,9 +1,7 @@
 import { loadXlsxWorkbook } from '@/utils/load-xlsx';
 import { logger } from '@/vector-store/logger';
 import { anthropic } from '@ai-sdk/anthropic';
-import { openai } from '@ai-sdk/openai';
 import { generateText } from 'ai';
-import ExcelJS from 'exceljs';
 import mammoth from 'mammoth';
 
 const htmlEntityMap = {
@@ -58,7 +56,6 @@ export async function extractContentFromFile(
 
       const workbook = await loadXlsxWorkbook(fileBuffer);
 
-      // Process sheets sequentially
       const sheets: string[] = [];
 
       for (const worksheet of workbook.worksheets) {
@@ -105,7 +102,6 @@ export async function extractContentFromFile(
   if (fileType === 'text/csv' || fileType === 'text/comma-separated-values') {
     try {
       const text = fileBuffer.toString('utf-8');
-      // Convert CSV to readable format
       const lines = text.split('\n').filter((line) => line.trim() !== '');
       return lines.join('\n');
     } catch (error) {
@@ -140,16 +136,13 @@ export async function extractContentFromFile(
         fileSizeMB,
       });
 
-      // Extract text from DOCX using mammoth
       const result = await mammoth.extractRawText({ buffer: fileBuffer });
       const text = result.value;
 
-      // Also extract formatted text (includes formatting information)
       const formattedResult = await mammoth.convertToHtml({
         buffer: fileBuffer,
       });
 
-      // Use formatted HTML if available, otherwise use plain text
       const extractedText = formattedResult.value || text;
 
       const extractionTime = ((Date.now() - docxStartTime) / 1000).toFixed(2);
@@ -159,7 +152,6 @@ export async function extractContentFromFile(
         extractionTimeSeconds: extractionTime,
       });
 
-      // Convert HTML to plain text if needed (remove HTML tags)
       if (formattedResult.value) {
         // Simple HTML tag removal - keep text content and decode entities safely
         const plainText = decodeBasicHtmlEntities(
@@ -205,7 +197,7 @@ export async function extractContentFromFile(
 
     try {
       const { text } = await generateText({
-        model: anthropic('claude-sonnet-4-6'),
+        model: anthropic('claude-opus-5-5'),
         messages: [
           {
             role: 'user',
@@ -246,7 +238,7 @@ export async function extractContentFromFile(
     }
   }
 
-  // Handle images using OpenAI vision API
+  // Handle images using Claude vision
   const isImage = fileType.startsWith('image/');
 
   if (isImage) {
@@ -261,7 +253,7 @@ export async function extractContentFromFile(
 
     try {
       const { text } = await generateText({
-        model: openai('gpt-4o-mini'),
+        model: anthropic('claude-opus-5-5'),
         messages: [
           {
             role: 'user',

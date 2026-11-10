@@ -3,17 +3,14 @@ import {
   findSimilarContentBatch,
 } from '@/vector-store/lib';
 import type { SimilarContentResult } from '@/vector-store/lib';
-import { openai } from '@ai-sdk/openai';
+import { anthropic } from '@ai-sdk/anthropic';
 import { logger } from '@trigger.dev/sdk';
 import { generateText } from 'ai';
 import {
   deduplicateSources,
   type Source,
 } from '@/questionnaire/utils/deduplicate-sources';
-import {
-  ANSWER_MODEL,
-  ANSWER_SYSTEM_PROMPT,
-} from '@/questionnaire/utils/constants';
+import { ANSWER_SYSTEM_PROMPT } from '@/questionnaire/utils/constants';
 
 export interface AnswerWithSources {
   answer: string | null;
@@ -96,7 +93,7 @@ async function generateAnswerWithLLM(
   context: string,
 ): Promise<string> {
   const { text } = await generateText({
-    model: openai(ANSWER_MODEL),
+    model: anthropic('claude-opus-5-5'),
     system: ANSWER_SYSTEM_PROMPT,
     prompt: `Based on the following context from our organization's policies and documentation, answer this question:
 
