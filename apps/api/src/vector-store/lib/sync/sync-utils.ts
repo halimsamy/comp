@@ -1,4 +1,5 @@
 import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { s3EndpointOptions } from '@/app/s3-endpoint';
 import { extractContentFromFile } from '@/trigger/vector-store/helpers/extract-content-from-file';
 import { vectorIndex } from '../core/client';
 import { batchUpsertEmbeddings } from '../core/upsert-embedding';
@@ -55,6 +56,7 @@ export function createKnowledgeBaseS3Client(): S3Client {
       accessKeyId,
       secretAccessKey,
     },
+    ...s3EndpointOptions(),
   });
 }
 

@@ -59,8 +59,31 @@ docker compose run --rm migrator
 docker compose run --rm seeder
 
 # 5. Start
-docker compose up -d app portal
+docker compose up -d s3 s3-init app portal
 ```
+
+### File Storage
+
+Files (attachments, policy PDFs, logos, questionnaires) live in the bundled S3-compatible
+store, SeaweedFS (`s3` service, data in the `s3_data` volume); `s3-init` creates the
+buckets listed in `S3_BUCKETS`. Export `S3_ACCESS_KEY` and `S3_SECRET_KEY` before
+`docker compose up`, then set in the app, portal and api env files:
+
+```bash
+APP_AWS_ENDPOINT=https://files.yourdomain.com   # proxied (TLS) to port 8333
+APP_AWS_REGION=us-east-1
+APP_AWS_ACCESS_KEY_ID=$S3_ACCESS_KEY
+APP_AWS_SECRET_ACCESS_KEY=$S3_SECRET_KEY
+APP_AWS_BUCKET_NAME=comp-attachments
+APP_AWS_QUESTIONNAIRE_UPLOAD_BUCKET=comp-questionnaires
+APP_AWS_KNOWLEDGE_BASE_BUCKET=comp-knowledge-base
+APP_AWS_ORG_ASSETS_BUCKET=comp-org-assets
+FLEET_AGENT_BUCKET_NAME=comp-device-agent   # api only
+```
+
+Browsers upload and download through presigned URLs signed for `APP_AWS_ENDPOINT`, so it
+must be one URL that both the containers and your users' browsers can reach. Leave
+`APP_AWS_ENDPOINT` empty to use AWS S3 instead.
 
 ### Background Job Workers
 

@@ -8,6 +8,7 @@ import {
 import { getSignedUrl as _getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Logger } from '@nestjs/common';
 import '../config/load-env';
+import { s3EndpointOptions } from './s3-endpoint';
 
 /**
  * Re-export getSignedUrl with a type workaround for duplicate @smithy/types.
@@ -26,7 +27,6 @@ const logger = new Logger('S3');
 const APP_AWS_REGION = process.env.APP_AWS_REGION;
 const APP_AWS_ACCESS_KEY_ID = process.env.APP_AWS_ACCESS_KEY_ID;
 const APP_AWS_SECRET_ACCESS_KEY = process.env.APP_AWS_SECRET_ACCESS_KEY;
-const APP_AWS_ENDPOINT = process.env.APP_AWS_ENDPOINT;
 
 export const BUCKET_NAME = process.env.APP_AWS_BUCKET_NAME;
 export const APP_AWS_QUESTIONNAIRE_UPLOAD_BUCKET =
@@ -53,13 +53,12 @@ try {
   }
 
   s3ClientInstance = new S3Client({
-    endpoint: APP_AWS_ENDPOINT || undefined,
     region: APP_AWS_REGION,
     credentials: {
       accessKeyId: APP_AWS_ACCESS_KEY_ID,
       secretAccessKey: APP_AWS_SECRET_ACCESS_KEY,
     },
-    forcePathStyle: !!APP_AWS_ENDPOINT,
+    ...s3EndpointOptions(),
   });
 } catch (error) {
   logger.error(

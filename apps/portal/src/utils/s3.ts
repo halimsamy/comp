@@ -38,6 +38,10 @@ export const s3Client = new S3Client({
     secretAccessKey: APP_AWS_SECRET_ACCESS_KEY!,
   },
   forcePathStyle: !!APP_AWS_ENDPOINT,
+  // Self-hosted S3 (SeaweedFS) rejects the empty-body CRC32 the SDK signs into presigned PUT URLs.
+  ...(APP_AWS_ENDPOINT
+    ? { requestChecksumCalculation: 'WHEN_REQUIRED' as const, responseChecksumValidation: 'WHEN_REQUIRED' as const }
+    : {}),
 });
 
 // Ensure BUCKET_NAME is exported and non-null checked if needed elsewhere explicitly

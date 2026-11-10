@@ -4,6 +4,7 @@ import {
   NotFoundException,
   Logger,
 } from '@nestjs/common';
+import { s3EndpointOptions } from '@/app/s3-endpoint';
 import {
   S3Client,
   GetObjectCommand,
@@ -79,6 +80,7 @@ export class DeviceAgentService {
         accessKeyId: process.env.APP_AWS_ACCESS_KEY_ID!,
         secretAccessKey: process.env.APP_AWS_SECRET_ACCESS_KEY!,
       },
+      ...s3EndpointOptions(),
     });
   }
 

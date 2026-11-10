@@ -527,15 +527,14 @@ export class PoliciesController {
     }
 
     // Generate signed URL
-    const { S3Client, GetObjectCommand } = await import('@aws-sdk/client-s3');
-    const { getSignedUrl } = await import('../app/s3.js');
+    const { GetObjectCommand } = await import('@aws-sdk/client-s3');
+    const { getSignedUrl, s3Client: s3 } = await import('../app/s3.js');
     const bucketName = process.env.APP_AWS_BUCKET_NAME;
 
-    if (!bucketName) {
+    if (!bucketName || !s3) {
       return { url: null };
     }
 
-    const s3 = new S3Client({ region: process.env.AWS_REGION || 'us-east-1' });
     // Force inline PDF rendering regardless of the object's stored Content-Type.
     // Files uploaded via presigned URLs can land with the wrong type (e.g. the
     // uploader's HTTP client defaults to application/x-www-form-urlencoded),
@@ -643,13 +642,12 @@ export class PoliciesController {
       );
     }
 
-    const { S3Client, PutObjectCommand, DeleteObjectCommand } =
+    const { PutObjectCommand, DeleteObjectCommand } =
       await import('@aws-sdk/client-s3');
+    const { s3Client: s3 } = await import('../app/s3.js');
     const bucketName = process.env.APP_AWS_BUCKET_NAME;
-    if (!bucketName)
+    if (!bucketName || !s3)
       throw new BadRequestException('File storage is not configured');
-
-    const s3 = new S3Client({ region: process.env.AWS_REGION || 'us-east-1' });
 
     const policy = await db.policy.findFirst({
       where: { id, organizationId, archivedAt: null },
@@ -826,13 +824,11 @@ export class PoliciesController {
     @AuthContext() authContext: AuthContextType,
     @Query('versionId') versionId?: string,
   ) {
-    const { S3Client, DeleteObjectCommand } =
-      await import('@aws-sdk/client-s3');
+    const { DeleteObjectCommand } = await import('@aws-sdk/client-s3');
+    const { s3Client: s3 } = await import('../app/s3.js');
     const bucketName = process.env.APP_AWS_BUCKET_NAME;
-    if (!bucketName)
+    if (!bucketName || !s3)
       throw new BadRequestException('File storage is not configured');
-
-    const s3 = new S3Client({ region: process.env.AWS_REGION || 'us-east-1' });
 
     const policy = await db.policy.findFirst({
       where: { id, organizationId, archivedAt: null },
@@ -939,12 +935,11 @@ export class PoliciesController {
     }
     if (!pdfUrl) return { url: null };
 
-    const { S3Client, GetObjectCommand } = await import('@aws-sdk/client-s3');
-    const { getSignedUrl } = await import('../app/s3.js');
+    const { GetObjectCommand } = await import('@aws-sdk/client-s3');
+    const { getSignedUrl, s3Client: s3 } = await import('../app/s3.js');
     const bucketName = process.env.APP_AWS_BUCKET_NAME;
-    if (!bucketName) return { url: null };
+    if (!bucketName || !s3) return { url: null };
 
-    const s3 = new S3Client({ region: process.env.AWS_REGION || 'us-east-1' });
     // Force inline PDF rendering regardless of the object's stored Content-Type
     // so the browser previews the document instead of downloading it.
     const url = await getSignedUrl(

@@ -1,4 +1,5 @@
 import { metadata, schemaTask } from '@trycompai/jobs';
+import { s3EndpointOptions } from '@/app/s3-endpoint';
 import { z } from 'zod';
 import { PassThrough } from 'node:stream';
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
@@ -51,9 +52,7 @@ function createS3Client(): S3Client {
   return new S3Client({
     region,
     credentials: { accessKeyId, secretAccessKey },
-    ...(process.env.APP_AWS_ENDPOINT
-      ? { endpoint: process.env.APP_AWS_ENDPOINT, forcePathStyle: true }
-      : {}),
+    ...s3EndpointOptions(),
   });
 }
 

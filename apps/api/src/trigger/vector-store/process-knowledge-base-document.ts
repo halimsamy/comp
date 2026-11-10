@@ -1,4 +1,5 @@
 import { logger, tags, task } from '@trycompai/jobs';
+import { s3EndpointOptions } from '@/app/s3-endpoint';
 import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { db } from '@db';
 import { batchUpsertEmbeddings } from '@/vector-store/lib/core/upsert-embedding';
@@ -27,6 +28,7 @@ function createS3Client(): S3Client {
       accessKeyId,
       secretAccessKey,
     },
+    ...s3EndpointOptions(),
   });
 }
 

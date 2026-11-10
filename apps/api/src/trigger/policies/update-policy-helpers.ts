@@ -1,4 +1,5 @@
 import { DeleteObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { s3EndpointOptions } from '@/app/s3-endpoint';
 import { db, Prisma, PolicyStatus } from '@db';
 import type {
   FrameworkEditorFramework,
@@ -96,9 +97,7 @@ async function deleteDetachedPdfObjects(keys: string[]): Promise<void> {
   const s3 = new S3Client({
     region: process.env.APP_AWS_REGION || 'us-east-1',
     credentials: { accessKeyId, secretAccessKey },
-    ...(process.env.APP_AWS_ENDPOINT
-      ? { endpoint: process.env.APP_AWS_ENDPOINT, forcePathStyle: true }
-      : {}),
+    ...s3EndpointOptions(),
   });
   for (const key of keys) {
     try {

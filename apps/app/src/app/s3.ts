@@ -26,6 +26,10 @@ try {
       secretAccessKey: APP_AWS_SECRET_ACCESS_KEY,
     },
     forcePathStyle: !!APP_AWS_ENDPOINT,
+    // Self-hosted S3 (SeaweedFS) rejects the empty-body CRC32 the SDK signs into presigned PUT URLs.
+    ...(APP_AWS_ENDPOINT
+      ? { requestChecksumCalculation: 'WHEN_REQUIRED' as const, responseChecksumValidation: 'WHEN_REQUIRED' as const }
+      : {}),
   });
 } catch (error) {
   console.error('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');

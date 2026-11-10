@@ -1,4 +1,5 @@
 import { extractS3KeyFromUrl } from '@/app/s3';
+import { s3EndpointOptions } from '@/app/s3-endpoint';
 import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { db } from '@db';
 import { logger } from '@trycompai/jobs';
@@ -122,6 +123,7 @@ function createS3Client(): S3Client {
       accessKeyId,
       secretAccessKey,
     },
+    ...s3EndpointOptions(),
   });
 }
 
