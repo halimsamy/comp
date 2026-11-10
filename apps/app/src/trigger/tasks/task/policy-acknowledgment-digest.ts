@@ -1,5 +1,5 @@
 import { db } from '@db/server';
-import { logger, schedules } from '@trigger.dev/sdk';
+import { logger, schedules } from '@trycompai/jobs';
 
 import {
   PolicyAcknowledgmentDigestEmail,
@@ -37,7 +37,7 @@ export const policyAcknowledgmentDigest = schedules.task({
   id: 'policy-acknowledgment-digest',
   machine: 'large-1x',
   cron: '0 14 * * 2', // Weekly on Tuesdays at 14:00 UTC
-  maxDuration: 1000 * 60 * 15, // 15 minutes
+  maxDuration: 60 * 15, // 15 minutes
   run: async () => {
     const inactivityCutoff = new Date();
     inactivityCutoff.setDate(inactivityCutoff.getDate() - ORG_INACTIVITY_DAYS);

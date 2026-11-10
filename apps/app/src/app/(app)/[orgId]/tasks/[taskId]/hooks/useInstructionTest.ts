@@ -6,7 +6,6 @@ import { toast } from 'sonner';
 
 export interface InstructionTestHandle {
   runId: string;
-  publicAccessToken: string;
   /** Session the test runs on — shown as a live view to watch. */
   sessionId: string;
   liveViewUrl: string;

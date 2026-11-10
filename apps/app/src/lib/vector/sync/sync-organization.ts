@@ -402,7 +402,7 @@ async function performSync(organizationId: string): Promise<void> {
     });
 
     // Step 7: Sync Knowledge Base documents
-    // Note: Documents are processed via Trigger.dev tasks, but we sync completed documents here
+    // Note: Documents are processed via background jobs, but we sync completed documents here
     // and trigger processing for pending/failed documents
     const knowledgeBaseDocuments = await db.knowledgeBaseDocument.findMany({
       where: { organizationId },
@@ -429,7 +429,7 @@ async function performSync(organizationId: string): Promise<void> {
     // for (const document of knowledgeBaseDocuments) {
     //   if (document.processingStatus === 'pending' || document.processingStatus === 'failed') {
     //     try {
-    //       // Trigger Trigger.dev task to process document
+    //       // Trigger background job to process document
     //       await tasks.trigger<typeof processKnowledgeBaseDocumentTask>(
     //         'process-knowledge-base-document',
     //         {

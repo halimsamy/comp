@@ -7,7 +7,7 @@ const { post, realtime, toastError } = vi.hoisted(() => ({
   toastError: vi.fn(),
 }));
 vi.mock('@/lib/api-client', () => ({ api: { post } }));
-vi.mock('@trigger.dev/react-hooks', () => ({ useRealtimeRun: realtime }));
+vi.mock('@/hooks/use-job-run', () => ({ useJobRun: realtime, isJobRunFinished: () => false }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: toastError } }));
 
 import { useQuestionnaireParse } from './useQuestionnaireParse';
@@ -37,7 +37,7 @@ describe('questionnaire parsing through the authenticated API', () => {
 
   it('starts an authorized upload and observes only its returned run', async () => {
     post.mockResolvedValue({
-      data: { runId: 'authorized-run', publicAccessToken: 'run-read-token' },
+      data: { runId: 'authorized-run' },
     });
     const { result } = renderHook(() => useQuestionnaireParse(props));
     await act(async () => result.current.uploadFileAction.execute(input));
@@ -47,10 +47,7 @@ describe('questionnaire parsing through the authenticated API', () => {
       source: 'internal',
     });
     await waitFor(() =>
-      expect(realtime).toHaveBeenCalledWith('authorized-run', {
-        accessToken: 'run-read-token',
-        enabled: true,
-      }),
+      expect(realtime).toHaveBeenCalledWith('authorized-run', { enabled: true }),
     );
   });
 
@@ -61,6 +58,6 @@ describe('questionnaire parsing through the authenticated API', () => {
 
     expect(toastError).toHaveBeenCalledWith('Access denied');
     expect(props.setIsParseProcessStarted).toHaveBeenCalledWith(false);
-    expect(realtime).toHaveBeenLastCalledWith('', { accessToken: undefined, enabled: false });
+    expect(realtime).toHaveBeenLastCalledWith(null, { enabled: false });
   });
 });

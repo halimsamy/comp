@@ -3,7 +3,7 @@
 import { Button } from '@trycompai/ui/button';
 import { Card, CardContent } from '@trycompai/ui/card';
 import type { Onboarding } from '@db';
-import { useRun } from '@trigger.dev/react-hooks';
+import { useJobRun } from '@/hooks/use-job-run';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   AlertTriangle,
@@ -68,7 +68,7 @@ export const OnboardingTracker = ({ onboarding }: { onboarding: Onboarding }) =>
     animationDelay: `${-(Date.now() % 1000)}ms`,
   }), []);
 
-  const { run, error } = useRun(triggerJobId || '', {
+  const { run, error } = useJobRun(triggerJobId, {
     refreshInterval: 1000,
   });
 

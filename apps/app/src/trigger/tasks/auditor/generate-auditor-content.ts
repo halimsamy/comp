@@ -1,7 +1,7 @@
 import { getOrganizationContext } from '@/trigger/tasks/onboarding/onboard-organization-helpers';
 import { anthropic } from '@ai-sdk/anthropic';
 import { db } from '@db/server';
-import { logger, metadata, schemaTask, tags } from '@trigger.dev/sdk';
+import { logger, metadata, schemaTask, tags } from '@trycompai/jobs';
 import { generateText } from 'ai';
 import { z } from 'zod';
 import {
@@ -135,7 +135,7 @@ export const generateAuditorContentTask = schemaTask({
   schema: z.object({
     organizationId: z.string(),
   }),
-  maxDuration: 1000 * 60 * 15, // 15 minutes
+  maxDuration: 60 * 15, // 15 minutes
   retry: {
     maxAttempts: 3,
   },

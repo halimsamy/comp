@@ -187,7 +187,6 @@ export function CloudTestsSection({
   const [activeBatch, setActiveBatch] = useState<{
     batchId: string;
     triggerRunId: string;
-    accessToken: string;
     findings: Array<{ id: string; title: string; status: string; error?: string }>;
   } | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());

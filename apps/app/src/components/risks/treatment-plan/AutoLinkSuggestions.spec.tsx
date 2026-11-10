@@ -6,9 +6,10 @@ import { AutoLinkSuggestions, type LinkedTask } from './AutoLinkSuggestions';
 vi.mock('sonner', () => ({ toast: { info: vi.fn(), success: vi.fn(), error: vi.fn() } }));
 
 const realtimeRunMock = vi.fn();
-vi.mock('@trigger.dev/react-hooks', () => ({
-  useRealtimeRun: (runId: string, opts: { accessToken?: string; enabled?: boolean }) =>
+vi.mock('@/hooks/use-job-run', () => ({
+  useJobRun: (runId: string | null | undefined, opts?: { enabled?: boolean }) =>
     realtimeRunMock(runId, opts),
+  isJobRunFinished: () => false,
 }));
 
 afterEach(() => {
@@ -27,7 +28,7 @@ function defaultProps() {
     orgId: 'org_1',
     canUpdate: true,
     tasks: [] as LinkedTask[],
-    onSuggest: vi.fn().mockResolvedValue({ runId: 'r1', publicAccessToken: 't1' }),
+    onSuggest: vi.fn().mockResolvedValue({ runId: 'r1' }),
     onApply: vi.fn().mockResolvedValue(undefined),
     onAfterApply: vi.fn().mockResolvedValue(undefined),
     onUnlinkTask: vi.fn().mockResolvedValue(undefined),

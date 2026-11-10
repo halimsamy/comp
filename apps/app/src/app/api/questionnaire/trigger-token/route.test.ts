@@ -1,10 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { createToken, getSession } = vi.hoisted(() => ({
-  createToken: vi.fn(),
+const { getSession } = vi.hoisted(() => ({
   getSession: vi.fn(),
 }));
-vi.mock('@trigger.dev/sdk', () => ({ auth: { createTriggerPublicToken: createToken } }));
 vi.mock('@/utils/auth', () => ({ auth: { api: { getSession } } }));
 
 import { POST } from './route';
@@ -28,7 +26,6 @@ describe('retired questionnaire token endpoint', () => {
 
       expect(response.status).toBe(410);
       expect(await response.json()).not.toHaveProperty('token');
-      expect(createToken).not.toHaveBeenCalled();
     },
   );
 });

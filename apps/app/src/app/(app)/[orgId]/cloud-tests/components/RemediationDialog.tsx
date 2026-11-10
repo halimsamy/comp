@@ -9,7 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@trycompai/ui/dialog';
-import { useRealtimeRun } from '@trigger.dev/react-hooks';
+import { useJobRun } from '@/hooks/use-job-run';
 import { AlertTriangle, ListOrdered, Loader2, RotateCcw } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -322,23 +322,34 @@ export function RemediationDialog({
   const [permissionError, setPermissionError] = useState<{ missingActions: string[]; fixScript?: string } | null>(null);
   const [acknowledgment, setAcknowledgment] = useState<string | null>(null);
 
-  // Trigger.dev state for preview (async)
+  // Background run for preview (async)
   const [previewRunId, setPreviewRunId] = useState<string | null>(null);
-  const [previewAccessToken, setPreviewAccessToken] = useState<string | null>(null);
 
-  // Trigger.dev state for execute (async)
+  // Background run for execute (async)
   const [executeRunId, setExecuteRunId] = useState<string | null>(null);
-  const [executeAccessToken, setExecuteAccessToken] = useState<string | null>(null);
 
-  const { run: previewRun } = useRealtimeRun(previewRunId ?? '', {
-    accessToken: previewAccessToken ?? undefined,
-    enabled: Boolean(previewRunId && previewAccessToken),
+  const { run: previewRun, error: previewRunError } = useJobRun(previewRunId, {
+    enabled: Boolean(previewRunId),
   });
 
-  const { run: executeRun } = useRealtimeRun(executeRunId ?? '', {
-    accessToken: executeAccessToken ?? undefined,
-    enabled: Boolean(executeRunId && executeAccessToken),
+  const { run: executeRun, error: executeRunError } = useJobRun(executeRunId, {
+    enabled: Boolean(executeRunId),
   });
+
+  // A run that can't be read (e.g. 404) must not leave a spinner running.
+  useEffect(() => {
+    if (!previewRunError || !previewRunId) return;
+    setError('Failed to load preview');
+    setIsLoadingPreview(false);
+    setPreviewRunId(null);
+  }, [previewRunError, previewRunId]);
+
+  useEffect(() => {
+    if (!executeRunError || !executeRunId) return;
+    setError('Remediation failed');
+    setIsExecuting(false);
+    setExecuteRunId(null);
+  }, [executeRunError, executeRunId]);
 
   // Ref to store permissions across rechecks (avoids stale closure in useCallback)
   const permissionsRef = useRef<string[] | undefined>(undefined);
@@ -356,12 +367,10 @@ export function RemediationDialog({
       }
       setIsLoadingPreview(false);
       setPreviewRunId(null);
-      setPreviewAccessToken(null);
     } else if (progress.phase === 'failed') {
       setError(progress.error || 'Failed to load preview');
       setIsLoadingPreview(false);
       setPreviewRunId(null);
-      setPreviewAccessToken(null);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [previewRun?.metadata]);
@@ -382,7 +391,6 @@ export function RemediationDialog({
         onOpenChange(false);
         setSucceeded(false);
         setExecuteRunId(null);
-        setExecuteAccessToken(null);
       }, 4000);
     } else if (progress.phase === 'manual') {
       // Auto-fix gave up but the API returned real manual steps.
@@ -403,12 +411,10 @@ export function RemediationDialog({
         rollbackSupported: false,
       });
       setExecuteRunId(null);
-      setExecuteAccessToken(null);
     } else if (progress.phase === 'failed') {
       setIsExecuting(false);
       setError(progress.error || 'Remediation failed');
       setExecuteRunId(null);
-      setExecuteAccessToken(null);
     } else if (progress.phase === 'needs_permissions') {
       setIsExecuting(false);
       setError(progress.error || 'Missing permissions');
@@ -416,7 +422,6 @@ export function RemediationDialog({
         setPermissionError(progress.permissionError);
       }
       setExecuteRunId(null);
-      setExecuteAccessToken(null);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [executeRun?.metadata]);
@@ -440,7 +445,6 @@ export function RemediationDialog({
       }
       // Task started — preview effect handles the rest
       setPreviewRunId(result.data.runId);
-      setPreviewAccessToken(result.data.accessToken);
     } catch {
       setError('Failed to load preview');
       setIsLoadingPreview(false);
@@ -453,9 +457,7 @@ export function RemediationDialog({
     setPermissionError(null);
     setAcknowledgment(null);
     setPreviewRunId(null);
-    setPreviewAccessToken(null);
     setExecuteRunId(null);
-    setExecuteAccessToken(null);
     setSucceeded(false);
 
     // Guided-only: skip API call, use local data
@@ -496,7 +498,6 @@ export function RemediationDialog({
       }
       // Task started — execute effect handles the rest
       setExecuteRunId(result.data.runId);
-      setExecuteAccessToken(result.data.accessToken);
     } catch {
       setError('Failed to start fix');
       setIsExecuting(false);

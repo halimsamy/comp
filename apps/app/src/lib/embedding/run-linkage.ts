@@ -16,8 +16,8 @@ import {
 /**
  * Phase emitted by `runLinkage` via the optional `onPhase` callback.
  *
- * Consumed by the trigger.dev wrapper to mirror progress into run metadata so
- * the frontend can render a live progress indicator via `useRealtimeRun`.
+ * Consumed by the job task wrapper to mirror progress into run metadata so
+ * the frontend can render a live progress indicator via `useJobRun`.
  */
 export type LinkagePhase =
   | { name: 'starting' }
@@ -55,7 +55,7 @@ export interface RunLinkageInput {
    */
   suggestionsOnly?: boolean;
   /**
-   * Optional progress callback. The trigger.dev wrapper passes this and writes
+   * Optional progress callback. The job task wrapper passes this and writes
    * each phase to `metadata.set(...)` so the UI can subscribe via realtime.
    * Pure callers (e.g. tests, server-side scripts) can omit it.
    */

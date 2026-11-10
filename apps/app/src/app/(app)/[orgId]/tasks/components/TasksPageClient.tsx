@@ -2,7 +2,6 @@
 
 import { UpdateOrganizationEvidenceApproval } from '@/components/forms/organization/update-organization-evidence-approval';
 import { triggerBulkEvidenceExport } from '@/lib/evidence-download';
-import { useRealtimeRun } from '@trigger.dev/react-hooks';
 import type { Member, Task, User } from '@db';
 import {
   Button,
@@ -20,9 +19,10 @@ import {
   TabsTrigger,
 } from '@trycompai/design-system';
 import { Add, ArrowDown } from '@trycompai/design-system/icons';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { useTasks } from '../hooks/useTasks';
+import { useJobRun } from '@/hooks/use-job-run';
 import { usePermissions } from '@/hooks/use-permissions';
 import type { FrameworkInstanceForTasks } from '../types';
 import { CreateTaskSheet } from './CreateTaskSheet';
@@ -72,24 +72,19 @@ export function TasksPageClient({
   const [includeRawJson, setIncludeRawJson] = useState(false);
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const [mainTab, setMainTab] = useState('evidence-list');
-  const [exportRun, setExportRun] = useState<{
-    runId: string;
-    accessToken: string;
-  } | null>(null);
+  const [exportRunId, setExportRunId] = useState<string | null>(null);
   const [isTriggering, setIsTriggering] = useState(false);
 
-  // Subscribe for the onComplete side effect (download / error toast); the
-  // returned run isn't rendered here, so we don't destructure it.
-  useRealtimeRun(exportRun?.runId ?? '', {
-    accessToken: exportRun?.accessToken,
-    enabled: !!exportRun,
-    onComplete: (run, err) => {
-      // useRealtimeRun fires onComplete on any terminal state (and surfaces
-      // subscription errors via `err`), so treat anything that isn't a clean
-      // COMPLETED run as a failure.
-      if (err || run.status !== 'COMPLETED') {
+  // Poll for the onComplete side effect (download / error toast); the
+  // returned run isn't rendered here.
+  const { error: exportRunError } = useJobRun<{ downloadUrl?: string }>(exportRunId, {
+    enabled: !!exportRunId,
+    onComplete: (run) => {
+      // useJobRun fires onComplete on any terminal state, so treat anything
+      // that isn't a clean COMPLETED run as a failure.
+      if (run.status !== 'COMPLETED') {
         toast.error('Evidence export failed. Please try again.');
-        setExportRun(null);
+        setExportRunId(null);
         return;
       }
       const downloadUrl =
@@ -106,12 +101,19 @@ export function TasksPageClient({
       } else {
         toast.error('Export completed but download link was not available.');
       }
-      setExportRun(null);
+      setExportRunId(null);
       setIsPopoverOpen(false);
     },
   });
 
-  const isDownloadingAll = isTriggering || !!exportRun;
+  // The run can no longer be read (e.g. 404): stop showing progress.
+  useEffect(() => {
+    if (!exportRunError || !exportRunId) return;
+    toast.error('Evidence export failed. Please try again.');
+    setExportRunId(null);
+  }, [exportRunError, exportRunId]);
+
+  const isDownloadingAll = isTriggering || !!exportRunId;
 
   const handleDownloadAllEvidence = async () => {
     setIsTriggering(true);
@@ -119,10 +121,7 @@ export function TasksPageClient({
       const result = await triggerBulkEvidenceExport({
         includeJson: includeRawJson,
       });
-      setExportRun({
-        runId: result.runId,
-        accessToken: result.publicAccessToken,
-      });
+      setExportRunId(result.runId);
       toast.info('Evidence export started. You\'ll be notified when it\'s ready.');
     } catch (err) {
       const noEvidence =

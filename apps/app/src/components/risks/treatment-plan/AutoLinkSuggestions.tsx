@@ -30,7 +30,7 @@ export interface AutoLinkSuggestionsProps {
   tasks: LinkedTask[];
   canUpdate: boolean;
   /** Triggers the AI scan; returns a runId + token for realtime subscription. */
-  onSuggest: () => Promise<{ runId: string; publicAccessToken: string }>;
+  onSuggest: () => Promise<{ runId: string }>;
   /** Persists the user-confirmed selection. `replace` is true for re-assess. */
   onApply: (params: { taskIds: string[]; replace: boolean }) => Promise<void>;
   /** Called after apply succeeds — typically the parent's onRegenerate. */
@@ -51,9 +51,9 @@ export interface AutoLinkSuggestionsProps {
    * Resumes an in-flight or completed-but-unreviewed AI scan after a page
    * reload. Parent fetches `GET /auto-link/active`. When this returns a run,
    * the component jumps straight into the loading state and re-subscribes to
-   * the trigger.dev run via `useRealtimeRun`.
+   * the job run via `useJobRun`.
    */
-  onResume?: () => Promise<{ runId: string; publicAccessToken: string } | null>;
+  onResume?: () => Promise<{ runId: string } | null>;
   /**
    * Clears the persisted runId server-side. Called when the user clicks
    * Discard so the next reload doesn't re-resume a discarded run.
@@ -112,7 +112,6 @@ export function AutoLinkSuggestions({
         return {
           kind: 'loading',
           runId: active.runId,
-          publicAccessToken: active.publicAccessToken,
           mode: 'fresh',
         };
       });
@@ -125,8 +124,8 @@ export function AutoLinkSuggestions({
   const handleSuggest = async (mode: Mode) => {
     setSubmitting(true);
     try {
-      const { runId, publicAccessToken } = await onSuggest();
-      setState({ kind: 'loading', runId, publicAccessToken, mode });
+      const { runId } = await onSuggest();
+      setState({ kind: 'loading', runId, mode });
     } catch {
       toast.error('Suggest failed. Try again.');
     } finally {
@@ -238,7 +237,6 @@ export function AutoLinkSuggestions({
     return (
       <LoadingState
         runId={state.runId}
-        accessToken={state.publicAccessToken}
         onReady={handleSuggestionsReady}
         onFailed={handleSuggestionsFailed}
       />

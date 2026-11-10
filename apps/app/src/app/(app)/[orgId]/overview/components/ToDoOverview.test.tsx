@@ -16,8 +16,9 @@ vi.mock('@/hooks/use-permissions', () => ({
   }),
 }));
 
-vi.mock('@trigger.dev/react-hooks', () => ({
-  useRealtimeRun: () => ({ run: null }),
+vi.mock('@/hooks/use-job-run', () => ({
+  useJobRun: () => ({ run: undefined, error: undefined, isLoading: false }),
+  isJobRunFinished: () => false,
 }));
 
 vi.mock('sonner', () => ({

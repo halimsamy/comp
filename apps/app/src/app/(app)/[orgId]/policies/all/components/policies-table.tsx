@@ -1,6 +1,5 @@
 'use client';
 
-import { useRealtimeRun } from '@trigger.dev/react-hooks';
 import { Download, Loader2 } from 'lucide-react';
 import * as React from 'react';
 import { toast } from 'sonner';
@@ -9,6 +8,7 @@ import { DataTable } from '@/components/data-table/data-table';
 import { DataTableToolbar } from '@/components/data-table/data-table-toolbar';
 import { CreatePolicySheet } from '@/components/sheets/create-policy-sheet';
 import { useDataTable } from '@/hooks/use-data-table';
+import { useJobRun } from '@/hooks/use-job-run';
 import { apiClient } from '@/lib/api-client';
 import { Button } from '@trycompai/ui/button';
 import type { Policy } from '@db';
@@ -31,7 +31,7 @@ export function PoliciesTable({ promises, onboardingRunId }: PoliciesTableProps)
   const orgId = params.orgId as string;
 
   const shouldSubscribeToRun = Boolean(onboardingRunId);
-  const { run } = useRealtimeRun(shouldSubscribeToRun ? onboardingRunId! : '', {
+  const { run } = useJobRun(onboardingRunId, {
     enabled: shouldSubscribeToRun,
   });
 

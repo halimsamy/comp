@@ -26,7 +26,6 @@ import type { KBDocument } from '../../../components/types';
 
 interface ActiveRun {
   runId: string;
-  token: string;
   documentIds: string[];
 }
 
@@ -72,9 +71,7 @@ export function AdditionalDocumentsSection({
 
   const { isProcessing, isDeleting } = useDocumentProcessing({
     processingRunId: activeProcessingRun?.runId || null,
-    processingToken: activeProcessingRun?.token || null,
     deletionRunId: activeDeletionRun?.runId || null,
-    deletionToken: activeDeletionRun?.token || null,
     onProcessingComplete: handleProcessingComplete,
     onDeletionComplete: handleDeletionComplete,
   });
@@ -137,10 +134,9 @@ export function AdditionalDocumentsSection({
       if (uploadedDocumentIds.length > 0) {
         try {
           const processResult = await processDocuments(uploadedDocumentIds);
-          if (processResult.success && processResult.runId && processResult.publicAccessToken) {
+          if (processResult.success && processResult.runId) {
             setActiveProcessingRun({
               runId: processResult.runId,
-              token: processResult.publicAccessToken,
               documentIds: uploadedDocumentIds,
             });
             toast.success(processResult.message || 'Processing documents...');
@@ -199,10 +195,9 @@ export function AdditionalDocumentsSection({
 
     try {
       const result = await deleteDocument(documentToDelete.id);
-      if (result.vectorDeletionRunId && result.publicAccessToken) {
+      if (result.vectorDeletionRunId) {
         setActiveDeletionRun({
           runId: result.vectorDeletionRunId,
-          token: result.publicAccessToken,
           documentIds: [documentToDelete.id],
         });
       }

@@ -1,7 +1,7 @@
 import { requireApiPermission } from '@/lib/permissions.server';
 import type { linkRisksAndVendorsToWork } from '@/trigger/tasks/onboarding/link-risks-and-vendors-to-work';
 import { db } from '@db/server';
-import { auth as triggerAuth, tasks } from '@trigger.dev/sdk';
+import { tasks } from '@trycompai/jobs';
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
@@ -11,7 +11,7 @@ import { NextRequest, NextResponse } from 'next/server';
  * top-K embedding-similar tasks. Destructive — clears user's manual unlinks.
  * Frontend confirms before calling.
  *
- * Returns { runId, publicAccessToken } so the UI can subscribe via useRealtimeRun.
+ * Returns { runId } so the UI can poll the run via useJobRun.
  */
 export async function POST(
   req: NextRequest,
@@ -45,12 +45,7 @@ export async function POST(
       { tags: [organizationId] },
     );
 
-    const publicAccessToken = await triggerAuth.createPublicToken({
-      scopes: { read: { runs: [handle.id] } },
-      expirationTime: '15m',
-    });
-
-    return NextResponse.json({ runId: handle.id, publicAccessToken });
+    return NextResponse.json({ runId: handle.id });
   } catch (error) {
     console.error('Error triggering vendor relink:', error);
     return NextResponse.json({ error: 'Failed to trigger relink' }, { status: 500 });

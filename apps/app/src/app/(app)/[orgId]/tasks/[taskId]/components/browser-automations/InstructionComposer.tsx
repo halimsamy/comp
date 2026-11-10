@@ -2,7 +2,7 @@
 
 import { Button } from '@trycompai/design-system';
 import { Add, Close, Play } from '@trycompai/design-system/icons';
-import { useRealtimeRun } from '@trigger.dev/react-hooks';
+import { useJobRun } from '@/hooks/use-job-run';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import type {
@@ -139,7 +139,7 @@ export function InstructionComposer({
   const [activeIndex, setActiveIndex] = useState(0);
 
   const [phase, setPhase] = useState<TestPhase>('idle');
-  const [testRun, setTestRun] = useState<{ runId: string; accessToken: string } | null>(null);
+  const [testRun, setTestRun] = useState<{ runId: string } | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [liveViewUrl, setLiveViewUrl] = useState<string | null>(null);
   const [timeline, setTimeline] = useState<SignInStep[]>([]);
@@ -171,8 +171,7 @@ export function InstructionComposer({
   });
   const canSave = steps.every((step) => step.instruction.trim());
 
-  const { run: runState, error: runError } = useRealtimeRun(testRun?.runId ?? '', {
-    accessToken: testRun?.accessToken,
+  const { run: runState, error: runError } = useJobRun(testRun?.runId, {
     enabled: !!testRun,
   });
 
@@ -335,7 +334,7 @@ export function InstructionComposer({
     }
     setSessionId(handle.sessionId);
     setLiveViewUrl(handle.liveViewUrl);
-    setTestRun({ runId: handle.runId, accessToken: handle.publicAccessToken });
+    setTestRun({ runId: handle.runId });
   }, [activeStep, activeConnection.url, sessionId, closeTestSession, startTest, taskId]);
 
   const handleSave = useCallback(async () => {

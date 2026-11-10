@@ -91,15 +91,10 @@ const PROVIDER_FIELDS: Partial<Record<'aws' | 'gcp' | 'azure', ProviderFieldWith
   ],
 };
 
-type TriggerInfo = {
-  taskId?: string;
-  publicAccessToken?: string;
-};
-
 interface EmptyStateProps {
   onBack?: () => void;
   connectedProviders?: string[];
-  onConnected?: (trigger?: TriggerInfo) => void;
+  onConnected?: () => void;
   initialProvider?: CloudProvider;
 }
 

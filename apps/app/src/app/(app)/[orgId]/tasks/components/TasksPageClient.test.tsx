@@ -42,25 +42,23 @@ vi.mock('@/lib/evidence-download', () => ({
     mockTriggerBulkEvidenceExport(args),
 }));
 
-// Capture useRealtimeRun's onComplete so tests can simulate a finished run.
+// Capture useJobRun's onComplete so tests can simulate a finished run.
 const mockRealtime: {
-  onComplete?: (
-    run: {
-      status?: string;
-      output?: { downloadUrl?: string } | null;
-      metadata?: Record<string, unknown>;
-    },
-    err?: Error,
-  ) => void;
+  onComplete?: (run: {
+    status?: string;
+    output?: { downloadUrl?: string } | null;
+    metadata?: Record<string, unknown>;
+  }) => void;
 } = {};
-vi.mock('@trigger.dev/react-hooks', () => ({
-  useRealtimeRun: (
-    _runId: string,
+vi.mock('@/hooks/use-job-run', () => ({
+  useJobRun: (
+    _runId: string | null,
     options: { onComplete?: typeof mockRealtime.onComplete },
   ) => {
     mockRealtime.onComplete = options.onComplete;
-    return { run: undefined };
+    return { run: undefined, error: undefined, isLoading: false };
   },
+  isJobRunFinished: () => false,
 }));
 
 const mockToastSuccess = vi.fn();
@@ -206,10 +204,7 @@ describe('TasksPageClient evidence export', () => {
     vi.clearAllMocks();
     mockRealtime.onComplete = undefined;
     setMockPermissions({});
-    mockTriggerBulkEvidenceExport.mockResolvedValue({
-      runId: 'run_1',
-      publicAccessToken: 'tok_1',
-    });
+    mockTriggerBulkEvidenceExport.mockResolvedValue({ runId: 'jrun_1' });
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
   });
 

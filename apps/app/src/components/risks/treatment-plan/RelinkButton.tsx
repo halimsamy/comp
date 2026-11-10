@@ -15,21 +15,21 @@ import {
   Text,
 } from '@trycompai/design-system';
 import { MagicWandFilled } from '@trycompai/design-system/icons';
-import { useRealtimeRun } from '@trigger.dev/react-hooks';
+import { useJobRun } from '@/hooks/use-job-run';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 interface RelinkButtonProps {
   disabled?: boolean;
   /** Triggers the relink and returns realtime handle. */
-  onRelink: () => Promise<{ runId: string; publicAccessToken: string }>;
+  onRelink: () => Promise<{ runId: string }>;
   /** Called after the run completes with non-zero links — typically chains regen. */
   onAfterLink?: () => Promise<void>;
 }
 
 type RunState =
   | { kind: 'idle' }
-  | { kind: 'running'; runId: string; publicAccessToken: string };
+  | { kind: 'running'; runId: string };
 
 // Duplicated from AutoLinkButton (~50 lines) — small enough to keep inline.
 const PHASE_LABEL: Record<string, string> = {
@@ -50,8 +50,8 @@ export function RelinkButton({ disabled, onRelink, onAfterLink }: RelinkButtonPr
   const handleConfirm = async () => {
     setSubmitting(true);
     try {
-      const { runId, publicAccessToken } = await onRelink();
-      setState({ kind: 'running', runId, publicAccessToken });
+      const { runId } = await onRelink();
+      setState({ kind: 'running', runId });
     } catch {
       toast.error('Re-assess failed. Try again.');
     } finally {
@@ -63,7 +63,6 @@ export function RelinkButton({ disabled, onRelink, onAfterLink }: RelinkButtonPr
     return (
       <RunProgress
         runId={state.runId}
-        accessToken={state.publicAccessToken}
         onComplete={async (linked) => {
           if (linked === 0) {
             toast.info('No matching tasks found after re-assess.');
@@ -124,16 +123,12 @@ export function RelinkButton({ disabled, onRelink, onAfterLink }: RelinkButtonPr
 
 interface RunProgressProps {
   runId: string;
-  accessToken: string;
   onComplete: (linked: number) => void;
   onFailed: () => void;
 }
 
-function RunProgress({ runId, accessToken, onComplete, onFailed }: RunProgressProps) {
-  const { run } = useRealtimeRun<typeof linkRisksAndVendorsToWork>(runId, {
-    accessToken,
-    enabled: true,
-  });
+function RunProgress({ runId, onComplete, onFailed }: RunProgressProps) {
+  const { run, error } = useJobRun<typeof linkRisksAndVendorsToWork>(runId);
 
   const meta = (run?.metadata ?? {}) as Record<string, unknown>;
   const phase = typeof meta.phase === 'string' ? meta.phase : 'starting';
@@ -148,6 +143,11 @@ function RunProgress({ runId, accessToken, onComplete, onFailed }: RunProgressPr
   const riskLinks = typeof run?.output?.riskLinks === 'number' ? run.output.riskLinks : 0;
   const vendorLinks = typeof run?.output?.vendorLinks === 'number' ? run.output.vendorLinks : 0;
   useEffect(() => {
+    // The run can't be read (e.g. 404): fail instead of spinning forever.
+    if (error) {
+      onFailed();
+      return;
+    }
     if (!status) return;
     if (status === 'COMPLETED') {
       onComplete(riskLinks + vendorLinks);
@@ -163,7 +163,7 @@ function RunProgress({ runId, accessToken, onComplete, onFailed }: RunProgressPr
     ) {
       onFailed();
     }
-  }, [status, riskLinks, vendorLinks, onComplete, onFailed]);
+  }, [status, error, riskLinks, vendorLinks, onComplete, onFailed]);
 
   const showProgress = phase !== 'done' && phase in PHASE_LABEL;
   const label = showProgress ? PHASE_LABEL[phase] : PHASE_LABEL.starting;

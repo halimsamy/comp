@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => {
     }),
   };
 });
-vi.mock('@trigger.dev/sdk', () => ({ task: mocks.task, logger: { info: vi.fn() } }));
+vi.mock('@trycompai/jobs', () => ({ task: mocks.task, logger: { info: vi.fn() } }));
 vi.mock('@db/server', () => ({
   db: {
     remediationBatch: { findUnique: mocks.findUnique, update: mocks.update },

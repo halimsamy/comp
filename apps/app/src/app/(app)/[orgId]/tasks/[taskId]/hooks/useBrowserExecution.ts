@@ -1,7 +1,7 @@
 'use client';
 
+import { useJobRun } from '@/hooks/use-job-run';
 import { apiClient } from '@/lib/api-client';
-import { useRealtimeRun } from '@trigger.dev/react-hooks';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { FAILED_RUN_STATUSES } from '../components/browser-automations/connect-flow-constants';
@@ -13,29 +13,23 @@ interface UseBrowserExecutionOptions {
   onComplete: () => void | Promise<void>;
 }
 
-/** Realtime handle for the background run the live view subscribes to. */
-interface LiveHandle {
-  runId: string;
-  accessToken: string;
-}
-
 export function useBrowserExecution({ onNeedsReauth, onComplete }: UseBrowserExecutionOptions) {
   const [runningAutomationId, setRunningAutomationId] = useState<string | null>(null);
   const [liveViewUrl, setLiveViewUrl] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isExecuting, setIsExecuting] = useState(false);
-  const [liveHandle, setLiveHandle] = useState<LiveHandle | null>(null);
+  // The background run the live view polls.
+  const [liveRunId, setLiveRunId] = useState<string | null>(null);
   // The automation currently running (ref = stable for the finalize closure),
   // and the last one that finished — so the list can auto-expand its results.
   // A fresh object each time means re-running the same automation still fires.
   const runningAutomationIdRef = useRef<string | null>(null);
   const [lastCompleted, setLastCompleted] = useState<{ id: string } | null>(null);
 
-  // Same realtime mechanism the composer's Test panel uses: the background run
+  // Same polling mechanism the composer's Test panel uses: the background run
   // publishes its step timeline to `runSteps`, which we surface to the live view.
-  const { run: runState, error: runError } = useRealtimeRun(liveHandle?.runId ?? '', {
-    accessToken: liveHandle?.accessToken,
-    enabled: !!liveHandle,
+  const { run: runState, error: runError } = useJobRun(liveRunId, {
+    enabled: !!liveRunId,
   });
 
   const steps = (runState?.metadata?.runSteps as SignInStep[] | undefined) ?? [];
@@ -68,7 +62,7 @@ export function useBrowserExecution({ onNeedsReauth, onComplete }: UseBrowserExe
     setIsExecuting(false);
     setRunningAutomationId(null);
     runningAutomationIdRef.current = null;
-    setLiveHandle(null);
+    setLiveRunId(null);
   }, []);
 
   const runAutomation = useCallback(
@@ -100,17 +94,14 @@ export function useBrowserExecution({ onNeedsReauth, onComplete }: UseBrowserExe
 
         // Step 2: kick off the run as a background task and subscribe to it for
         // live steps + the final result (instead of blocking on one response).
-        const execRes = await apiClient.post<{ runId: string; publicAccessToken: string }>(
+        const execRes = await apiClient.post<{ runId: string }>(
           `/v1/browserbase/automations/${automationId}/execute-live`,
           { runId: startRes.data.runId, sessionId: startedSessionId },
         );
         if (execRes.error || !execRes.data?.runId) {
           throw new Error(execRes.error || 'Failed to start the run');
         }
-        setLiveHandle({
-          runId: execRes.data.runId,
-          accessToken: execRes.data.publicAccessToken,
-        });
+        setLiveRunId(execRes.data.runId);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Failed to run automation');
         reset();
@@ -121,11 +112,11 @@ export function useBrowserExecution({ onNeedsReauth, onComplete }: UseBrowserExe
     [onNeedsReauth, onComplete, reset, closeSession],
   );
 
-  // Finalize when the background run reaches a terminal state (realtime has no
-  // onError/onComplete — watch run.status + error, per the composer pattern).
+  // Finalize when the background run reaches a terminal state (watch
+  // run.status + error, per the composer pattern).
   useEffect(() => {
-    if (!liveHandle) return;
-    if (runState && runState.id !== liveHandle.runId) return;
+    if (!liveRunId) return;
+    if (runState && runState.id !== liveRunId) return;
 
     const finalize = (ok: boolean, message?: string) => {
       if (ok) toast.success('Automation completed successfully');
@@ -159,7 +150,7 @@ export function useBrowserExecution({ onNeedsReauth, onComplete }: UseBrowserExe
           : 'The run could not complete.',
       );
     }
-  }, [liveHandle, runState, runError, sessionId, closeSession, reset, onComplete]);
+  }, [liveRunId, runState, runError, sessionId, closeSession, reset, onComplete]);
 
   const cancelExecution = useCallback(async () => {
     if (sessionId) void closeSession(sessionId);

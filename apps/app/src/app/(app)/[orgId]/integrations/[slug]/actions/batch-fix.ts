@@ -3,7 +3,7 @@
 import { serverApi } from '@/lib/api-server';
 import { classifyExecuteResult } from '@/trigger/tasks/cloud-security/execute-result';
 import { classifyRetryPreview } from '@/trigger/tasks/cloud-security/retry-preview';
-import { auth, runs, tasks } from '@trigger.dev/sdk';
+import { runs, tasks } from '@trycompai/jobs';
 import { z } from 'zod';
 
 const batchResponseSchema = z.object({
@@ -24,11 +24,6 @@ const batchResponseSchema = z.object({
       .default([]),
   }),
 });
-const runPayloadSchema = z.object({
-  batchId: z.string(),
-  organizationId: z.string(),
-  connectionId: z.string(),
-});
 
 interface BatchFixInput {
   organizationId: string;
@@ -38,7 +33,7 @@ interface BatchFixInput {
 
 export async function startBatchFix(
   input: BatchFixInput,
-): Promise<{ data?: { batchId: string; runId: string; accessToken: string }; error?: string }> {
+): Promise<{ data?: { batchId: string; runId: string }; error?: string }> {
   try {
     // Step 1: Create batch record in DB via API
     const api = serverApi;
@@ -68,7 +63,8 @@ export async function startBatchFix(
         organizationId: batch.organizationId,
         connectionId: batch.connectionId,
       },
-      { tags: [batch.organizationId] },
+      // The batch/connection tags bind the run to this batch (payloads are not stored).
+      { tags: [batch.organizationId, `batch:${batchId}`, `connection:${batch.connectionId}`] },
     );
 
     // Step 3: Store triggerRunId on the batch
@@ -81,13 +77,7 @@ export async function startBatchFix(
       return { error: binding.error };
     }
 
-    // Step 4: Create public access token for real-time progress
-    const accessToken = await auth.createPublicToken({
-      scopes: { read: { runs: [handle.id] } },
-      expirationTime: '15m',
-    });
-
-    return { data: { batchId, runId: handle.id, accessToken } };
+    return { data: { batchId, runId: handle.id } };
   } catch (err) {
     console.error('Failed to start batch fix:', err);
     return { error: err instanceof Error ? err.message : 'Failed to start batch fix' };
@@ -102,11 +92,10 @@ export async function cancelBatchFix(runId: string, batchId: string): Promise<vo
   if (response.error) throw new Error(response.error);
 }
 
-/** Check for an active batch on page load — returns batch + access token if found. */
+/** Check for an active batch on page load — returns the batch and its run id if found. */
 export async function getActiveBatch(connectionId: string): Promise<{
   batchId: string;
   triggerRunId: string;
-  accessToken: string;
   findings: Array<{ id: string; title: string; status: string; error?: string }>;
 } | null> {
   try {
@@ -122,22 +111,14 @@ export async function getActiveBatch(connectionId: string): Promise<{
     // Verify the trigger run is actually still active
     try {
       const run = await runs.retrieve(batch.triggerRunId);
-      const payload = runPayloadSchema.safeParse(run.payload);
       if (
         run.taskIdentifier !== 'remediate-batch' ||
-        !run.tags.includes(batch.organizationId) ||
-        !payload.success ||
-        payload.data.batchId !== batch.id ||
-        payload.data.organizationId !== batch.organizationId ||
-        payload.data.connectionId !== batch.connectionId
+        run.organizationId !== batch.organizationId ||
+        !run.tags.includes(`batch:${batch.id}`) ||
+        !run.tags.includes(`connection:${batch.connectionId}`)
       )
         return null;
-      if (
-        run.status === 'COMPLETED' ||
-        run.status === 'FAILED' ||
-        run.status === 'CANCELED' ||
-        run.status === 'SYSTEM_FAILURE'
-      ) {
+      if (run.isCompleted) {
         // Run is done — mark batch as done in DB so it doesn't show up again
         await serverApi.patch(`/v1/cloud-security/remediation/batch/${batch.id}`, {
           status: 'done',
@@ -152,15 +133,9 @@ export async function getActiveBatch(connectionId: string): Promise<{
       return null;
     }
 
-    const accessToken = await auth.createPublicToken({
-      scopes: { read: { runs: [batch.triggerRunId] } },
-      expirationTime: '15m',
-    });
-
     return {
       batchId: batch.id,
       triggerRunId: batch.triggerRunId,
-      accessToken,
       findings: batch.findings,
     };
   } catch {

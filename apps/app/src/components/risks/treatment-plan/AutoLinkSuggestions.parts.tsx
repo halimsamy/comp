@@ -2,7 +2,7 @@
 
 import { Button } from '@trycompai/design-system';
 import { MagicWandFilled } from '@trycompai/design-system/icons';
-import { useRealtimeRun } from '@trigger.dev/react-hooks';
+import { useJobRun } from '@/hooks/use-job-run';
 import { useEffect, useMemo, useRef } from 'react';
 import { ControlsSection, TasksSection } from './AutoLinkSuggestions.sections';
 import {
@@ -228,16 +228,14 @@ function describeStatus(
 
 export function LoadingState({
   runId,
-  accessToken,
   onReady,
   onFailed,
 }: {
   runId: string;
-  accessToken: string;
   onReady: (s: { tasks: SuggestedTask[]; controls: SuggestedControl[] }) => void;
   onFailed: (reason: string) => void;
 }) {
-  const { run } = useRealtimeRun(runId, { accessToken, enabled: true });
+  const { run, error } = useJobRun(runId);
   const status = run?.status;
   const output = run?.output as
     | { suggestions?: { tasks?: SuggestedTask[]; controls?: SuggestedControl[] } }
@@ -260,6 +258,11 @@ export function LoadingState({
   onFailedRef.current = onFailed;
 
   useEffect(() => {
+    // The run can't be read (e.g. 404): fail instead of spinning forever.
+    if (error) {
+      onFailedRef.current('The AI scan could not be found.');
+      return;
+    }
     if (!status) return;
     if (status === 'COMPLETED') {
       const sugg = outputRef.current?.suggestions;
@@ -280,7 +283,7 @@ export function LoadingState({
       };
       onFailedRef.current(reasons[status] ?? 'The AI scan failed.');
     }
-  }, [status]);
+  }, [status, error]);
 
   // Treat unknown / pre-subscribe state as in-flight so the spinner stays up
   // until the realtime stream catches up.

@@ -3,7 +3,7 @@ import type { PolicyContext } from '@/trigger/tasks/onboarding/onboard-organizat
 import { serverApi } from '@/lib/api-server';
 import { requireApiPermission } from '@/lib/permissions.server';
 import { db } from '@db/server';
-import { tasks as triggerTasks } from '@trigger.dev/sdk';
+import { tasks as triggerTasks } from '@trycompai/jobs';
 import { NextRequest, NextResponse } from 'next/server';
 
 interface PoliciesApiResponse {

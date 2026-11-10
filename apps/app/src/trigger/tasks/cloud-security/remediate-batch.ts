@@ -1,5 +1,5 @@
 import { db } from '@db/server';
-import { logger, task } from '@trigger.dev/sdk';
+import { logger, task } from '@trycompai/jobs';
 import { postCloudSecurityApi } from './api-response';
 import {
   type BatchProgress,

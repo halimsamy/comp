@@ -21,9 +21,6 @@ vi.mock('@/app/s3', () => ({
   s3Client: null,
   APP_AWS_ORG_ASSETS_BUCKET: null,
 }));
-vi.mock('@/components/trigger-token-provider', () => ({
-  TriggerTokenProvider: ({ children }: { children: React.ReactNode }) => children,
-}));
 vi.mock('@/lib/api-server', () => ({
   serverApi: {
     get: vi.fn().mockResolvedValue({ data: { organizations: [] }, status: 200 }),

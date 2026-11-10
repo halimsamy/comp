@@ -1,6 +1,6 @@
 import { researchJobCore } from '@/trigger/lib/research';
 import { db } from '@db/server';
-import { logger, queue, schemaTask, tasks } from '@trigger.dev/sdk';
+import { logger, queue, schemaTask, tasks } from '@trycompai/jobs';
 import { z } from 'zod';
 import type { scoreVendorRisk } from './score-vendor-risk';
 
@@ -64,7 +64,7 @@ export const researchVendor = schemaTask({
       })
       .optional(),
   }),
-  maxDuration: 1000 * 60 * 10, // 10 minutes total task duration
+  maxDuration: 60 * 10, // 10 minutes total task duration
   run: async (payload, { ctx }) => {
     const queueScoring = async () => {
       if (!payload.scoreContext) return;

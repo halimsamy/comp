@@ -2,10 +2,10 @@
 
 import { Button } from '@trycompai/design-system';
 import { Edit, Renew } from '@trycompai/design-system/icons';
-import { useRealtimeRun } from '@trigger.dev/react-hooks';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { useJobRun } from '@/hooks/use-job-run';
 import { cn } from '@/lib/utils';
 
 interface DescriptionEditorProps {
@@ -14,7 +14,7 @@ interface DescriptionEditorProps {
   onRegenerate?: () => Promise<void>;
   regenerating?: boolean;
   disabled?: boolean;
-  regenRun?: { runId: string; publicAccessToken: string } | null;
+  regenRun?: { runId: string } | null;
   onRegenSettled?: (result: { success: boolean; reason?: string }) => void;
 }
 
@@ -193,17 +193,19 @@ function RegenProgress({
   onSettled,
   fallbackHeadline,
 }: {
-  regenRun: { runId: string; publicAccessToken: string } | null;
+  regenRun: { runId: string } | null;
   onSettled?: (result: { success: boolean; reason?: string }) => void;
   fallbackHeadline: string;
 }) {
-  const { run } = useRealtimeRun(regenRun?.runId ?? '', {
-    accessToken: regenRun?.publicAccessToken ?? '',
-    enabled: !!regenRun,
-  });
+  const { run, error } = useJobRun(regenRun?.runId, { enabled: !!regenRun });
   const status = run?.status;
 
   useEffect(() => {
+    // The run can't be read (e.g. 404): settle instead of spinning forever.
+    if (error) {
+      onSettled?.({ success: false, reason: 'The AI run could not be found.' });
+      return;
+    }
     if (!status) return;
     if (status === 'COMPLETED') {
       onSettled?.({ success: true });
@@ -220,7 +222,7 @@ function RegenProgress({
       };
       onSettled?.({ success: false, reason: reasons[status] ?? 'The AI run failed.' });
     }
-  }, [status, onSettled]);
+  }, [status, error, onSettled]);
 
   const { headline, sub } = regenRun
     ? regenStatusCopy(status)

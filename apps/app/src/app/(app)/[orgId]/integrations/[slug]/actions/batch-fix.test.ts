@@ -5,15 +5,13 @@ const mocks = vi.hoisted(() => ({
   patch: vi.fn(),
   get: vi.fn(),
   trigger: vi.fn(),
-  createPublicToken: vi.fn(),
   cancel: vi.fn(),
   retrieve: vi.fn(),
 }));
 vi.mock('@/lib/api-server', () => ({
   serverApi: { post: mocks.post, patch: mocks.patch, get: mocks.get },
 }));
-vi.mock('@trigger.dev/sdk', () => ({
-  auth: { createPublicToken: mocks.createPublicToken },
+vi.mock('@trycompai/jobs', () => ({
   runs: { cancel: mocks.cancel, retrieve: mocks.retrieve },
   tasks: { trigger: mocks.trigger },
 }));
@@ -38,14 +36,12 @@ describe('startBatchFix', () => {
     mocks.post.mockResolvedValue({ data: { data: batch }, status: 200 });
     mocks.patch.mockResolvedValue({ data: { data: batch }, status: 200 });
     mocks.trigger.mockResolvedValue({ id: 'run_1' });
-    mocks.createPublicToken.mockResolvedValue('token');
   });
 
   it('rejects caller organization mismatches instead of allowing caller-controlled run ownership', async () => {
     const result = await startBatchFix({ ...input, organizationId: 'org_victim' });
     expect(result.error).toBe('Batch ownership mismatch');
     expect(mocks.trigger).not.toHaveBeenCalled();
-    expect(mocks.createPublicToken).not.toHaveBeenCalled();
   });
 
   it('fails without triggering when the batch response carries no organization', async () => {
@@ -58,7 +54,7 @@ describe('startBatchFix', () => {
     expect(mocks.trigger).not.toHaveBeenCalled();
   });
 
-  it('triggers with API-authorized organization and connection, binds the run, and expires its token', async () => {
+  it('triggers with API-authorized organization and connection, and binds the run without an access token', async () => {
     const result = await startBatchFix(input);
     expect(mocks.trigger).toHaveBeenCalledWith(
       'remediate-batch',
@@ -67,15 +63,11 @@ describe('startBatchFix', () => {
         organizationId: 'org_auth',
         connectionId: 'icn_1',
       },
-      { tags: ['org_auth'] },
+      { tags: ['org_auth', 'batch:rbt_1', 'connection:icn_1'] },
     );
     expect(mocks.patch).toHaveBeenCalledWith('/v1/cloud-security/remediation/batch/rbt_1', {
       triggerRunId: 'run_1',
     });
-    expect(mocks.createPublicToken).toHaveBeenCalledWith({
-      scopes: { read: { runs: ['run_1'] } },
-      expirationTime: '15m',
-    });
-    expect(result.data?.runId).toBe('run_1');
+    expect(result.data).toEqual({ batchId: 'rbt_1', runId: 'run_1' });
   });
 });

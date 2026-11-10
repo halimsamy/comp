@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useRealtimeRun } from '@trigger.dev/react-hooks';
+import { isJobRunFinished, useJobRun } from '@/hooks/use-job-run';
 import {
   startBatchFix,
   cancelBatchFix,
@@ -47,13 +47,12 @@ interface BatchRemediationDialogProps {
   connectionId: string;
   organizationId: string;
   onComplete?: () => void;
-  /** Called when the trigger run starts — parent uses this to enable the floating pill. */
-  onRunStarted?: (info: { batchId: string; triggerRunId: string; accessToken: string }) => void;
+  /** Called when the background run starts — parent uses this to enable the floating pill. */
+  onRunStarted?: (info: { batchId: string; triggerRunId: string }) => void;
   /** Resume an active batch (loaded on page mount). */
   activeBatch?: {
     batchId: string;
     triggerRunId: string;
-    accessToken: string;
     findings: Array<{ id: string; title: string; status: string; error?: string }>;
   } | null;
 }
@@ -319,7 +318,6 @@ export function BatchRemediationDialog({
   const [acknowledged, setAcknowledged] = useState(false);
   const [batchId, setBatchId] = useState<string | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const [cancelling, setCancelling] = useState(false);
 
@@ -328,22 +326,18 @@ export function BatchRemediationDialog({
     if (activeBatch && open) {
       setBatchId(activeBatch.batchId);
       setRunId(activeBatch.triggerRunId);
-      setAccessToken(activeBatch.accessToken);
     }
   }, [activeBatch, open]);
 
-  // Real-time task progress
-  const { run } = useRealtimeRun(runId ?? '', {
-    accessToken: accessToken ?? undefined,
-    enabled: Boolean(runId && accessToken),
-  });
+  // Task progress (polls the job run)
+  const { run, error: runError } = useJobRun(runId, { enabled: Boolean(runId) });
 
   const progress = (run?.metadata as { progress?: BatchProgress } | undefined)
     ?.progress ?? null;
 
-  // Detect if the trigger run itself is finished (cancelled, failed, completed)
-  const runStatus = run?.status;
-  const runFinished = runStatus === 'COMPLETED' || runStatus === 'FAILED' || runStatus === 'CANCELED' || runStatus === 'SYSTEM_FAILURE';
+  // Detect if the run itself is finished (cancelled, failed, completed). A run
+  // that can't be read (e.g. an old id returning 404) counts as not active.
+  const runFinished = isJobRunFinished(run?.status) || Boolean(runError);
 
   const isRunning = Boolean(runId) && !runFinished && (!progress || progress.phase === 'running' || progress.phase === 'retrying');
   const isWaitingPerms = progress?.phase === 'waiting_for_permissions';
@@ -357,7 +351,6 @@ export function BatchRemediationDialog({
       setAcknowledged(false);
       setBatchId(null);
       setRunId(null);
-      setAccessToken(null);
       setCancelling(false);
     }
   }, [open, findings, activeBatch]);
@@ -426,11 +419,9 @@ export function BatchRemediationDialog({
 
     setBatchId(result.data.batchId);
     setRunId(result.data.runId);
-    setAccessToken(result.data.accessToken);
     onRunStarted?.({
       batchId: result.data.batchId,
       triggerRunId: result.data.runId,
-      accessToken: result.data.accessToken,
     });
   };
 
@@ -465,11 +456,9 @@ export function BatchRemediationDialog({
 
     setBatchId(result.data.batchId);
     setRunId(result.data.runId);
-    setAccessToken(result.data.accessToken);
     onRunStarted?.({
       batchId: result.data.batchId,
       triggerRunId: result.data.runId,
-      accessToken: result.data.accessToken,
     });
   };
 

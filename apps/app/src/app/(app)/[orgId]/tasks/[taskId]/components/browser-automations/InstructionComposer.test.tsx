@@ -8,8 +8,9 @@ vi.mock('../../hooks/useInstructionTest', () => ({
   useInstructionTest: () => ({ startTest, closeTestSession, isStarting: false }),
 }));
 
-vi.mock('@trigger.dev/react-hooks', () => ({
-  useRealtimeRun: () => ({ run: undefined, error: undefined }),
+vi.mock('@/hooks/use-job-run', () => ({
+  useJobRun: () => ({ run: undefined, error: undefined, isLoading: false }),
+  isJobRunFinished: () => false,
 }));
 
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn(), info: vi.fn() } }));
@@ -39,8 +40,7 @@ describe('InstructionComposer', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     startTest.mockResolvedValue({
-      runId: 'run_1',
-      publicAccessToken: 'tok',
+      runId: 'jrun_1',
       sessionId: 'sess_1',
       liveViewUrl: 'https://live/view',
     });

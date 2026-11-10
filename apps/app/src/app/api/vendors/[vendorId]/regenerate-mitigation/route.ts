@@ -2,7 +2,7 @@ import { generateVendorMitigation } from '@/trigger/tasks/onboarding/generate-ve
 import type { PolicyContext } from '@/trigger/tasks/onboarding/onboard-organization-helpers';
 import { serverApi } from '@/lib/api-server';
 import { requireApiPermission } from '@/lib/permissions.server';
-import { auth as triggerAuth, tasks } from '@trigger.dev/sdk';
+import { tasks } from '@trycompai/jobs';
 import { NextRequest, NextResponse } from 'next/server';
 
 interface PeopleApiResponse {
@@ -76,22 +76,7 @@ export async function POST(
       { tags: [organizationId] },
     );
 
-    // See risks/regenerate-mitigation: don't fail the request when only the
-    // token mint fails, since the run is already in flight. (Cubic #29.)
-    let publicAccessToken: string | null = null;
-    try {
-      publicAccessToken = await triggerAuth.createPublicToken({
-        scopes: { read: { runs: [handle.id] } },
-        expirationTime: '15m',
-      });
-    } catch (mintErr) {
-      console.error(
-        '[regenerate-mitigation] vendor run triggered but token mint failed; client must resume via /active',
-        { runId: handle.id, mintErr },
-      );
-    }
-
-    return NextResponse.json({ runId: handle.id, publicAccessToken });
+    return NextResponse.json({ runId: handle.id });
   } catch (error) {
     console.error('Error regenerating vendor mitigation:', error);
     return NextResponse.json({ error: 'Failed to regenerate mitigation' }, { status: 500 });

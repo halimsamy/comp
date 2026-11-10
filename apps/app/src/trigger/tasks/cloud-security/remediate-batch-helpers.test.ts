@@ -31,7 +31,7 @@ vi.mock('@db/server', () => {
   };
 });
 
-vi.mock('@trigger.dev/sdk', () => ({
+vi.mock('@trycompai/jobs', () => ({
   metadata: { set: vi.fn() },
 }));
 

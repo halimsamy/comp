@@ -1,15 +1,14 @@
 import { requireApiPermission } from '@/lib/permissions.server';
 import type { linkRisksAndVendorsToWork } from '@/trigger/tasks/onboarding/link-risks-and-vendors-to-work';
 import { db } from '@db/server';
-import { auth as triggerAuth, tasks } from '@trigger.dev/sdk';
+import { tasks } from '@trycompai/jobs';
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
  * POST /api/risks/[riskId]/auto-link
  *
  * Triggers the linkage task in `suggestionsOnly` mode for one risk and returns
- * a public-access token so the frontend can subscribe via `useRealtimeRun`,
- * display live progress, and read `run.output.suggestions` once complete.
+ * the run id so the frontend can poll it via `useJobRun`, display live progress, and read `run.output.suggestions` once complete.
  *
  * No DB writes happen here — the user reviews the suggestions in the UI and
  * the apply endpoint (`/auto-link/apply`) persists their final selection.
@@ -56,12 +55,7 @@ export async function POST(
       },
     });
 
-    const publicAccessToken = await triggerAuth.createPublicToken({
-      scopes: { read: { runs: [handle.id] } },
-      expirationTime: '15m',
-    });
-
-    return NextResponse.json({ runId: handle.id, publicAccessToken });
+    return NextResponse.json({ runId: handle.id });
   } catch (error) {
     console.error('Error triggering risk auto-link:', error);
     return NextResponse.json({ error: 'Failed to trigger auto-link' }, { status: 500 });

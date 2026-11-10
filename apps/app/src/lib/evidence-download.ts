@@ -46,13 +46,13 @@ export async function downloadTaskEvidenceZip({
 
 /**
  * Trigger bulk evidence export as a background job.
- * Returns a run ID and access token for tracking progress via Trigger.dev realtime.
+ * Returns a run ID for tracking progress with useJobRun.
  */
 export async function triggerBulkEvidenceExport({
   includeJson = false,
 }: {
   includeJson?: boolean;
-}): Promise<{ runId: string; publicAccessToken: string }> {
+}): Promise<{ runId: string }> {
   const baseUrl = env.NEXT_PUBLIC_API_URL || 'http://localhost:3333';
   const endpoint = `/v1/evidence-export/all?includeJson=${includeJson}`;
 

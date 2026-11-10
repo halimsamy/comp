@@ -14,8 +14,8 @@ import {
   Text,
 } from '@trycompai/design-system';
 import { ArrowDown } from '@trycompai/design-system/icons';
-import { useRealtimeRun } from '@trigger.dev/react-hooks';
-import { useCallback, useState } from 'react';
+import { useJobRun } from '@/hooks/use-job-run';
+import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 interface ExportEvidenceButtonProps {
@@ -25,7 +25,7 @@ interface ExportEvidenceButtonProps {
 type ExportState =
   | { phase: 'idle' }
   | { phase: 'triggering' }
-  | { phase: 'running'; runId: string; accessToken: string };
+  | { phase: 'running'; runId: string };
 
 export function ExportEvidenceButton({
   organizationName,
@@ -39,10 +39,10 @@ export function ExportEvidenceButton({
   const handleTrigger = async () => {
     setExportState({ phase: 'triggering' });
     try {
-      const { runId, publicAccessToken } = await triggerBulkEvidenceExport({
+      const { runId } = await triggerBulkEvidenceExport({
         includeJson,
       });
-      setExportState({ phase: 'running', runId, accessToken: publicAccessToken });
+      setExportState({ phase: 'running', runId });
     } catch (err) {
       toast.error('Failed to start evidence export. Please try again.');
       console.error('Evidence export trigger error:', err);
@@ -51,18 +51,14 @@ export function ExportEvidenceButton({
   };
 
   const handleComplete = useCallback(
-    (
-      run: {
-        status?: string;
-        output?: { downloadUrl?: string } | null;
-        metadata?: Record<string, unknown>;
-      },
-      err?: Error,
-    ) => {
-      // useRealtimeRun fires onComplete on any terminal state (and surfaces
-      // subscription errors via `err`), so treat anything that isn't a clean
-      // COMPLETED run as a failure.
-      if (err || (run.status && run.status !== 'COMPLETED')) {
+    (run: {
+      status?: string;
+      output?: { downloadUrl?: string } | null;
+      metadata?: Record<string, unknown>;
+    }) => {
+      // useJobRun fires onComplete on any terminal state, so treat anything
+      // that isn't a clean COMPLETED run as a failure.
+      if (run.status && run.status !== 'COMPLETED') {
         toast.error('Evidence export failed. Please try again.');
         setExportState({ phase: 'idle' });
         return;
@@ -94,15 +90,20 @@ export function ExportEvidenceButton({
   // sheet) so the export keeps streaming — and still auto-downloads on
   // completion — even after the user dismisses the sheet, which the copy below
   // explicitly invites them to do.
-  const { run } = useRealtimeRun(
-    exportState.phase === 'running' ? exportState.runId : '',
+  const { run, error: runError } = useJobRun<{ downloadUrl?: string }>(
+    exportState.phase === 'running' ? exportState.runId : null,
     {
-      accessToken:
-        exportState.phase === 'running' ? exportState.accessToken : undefined,
       enabled: exportState.phase === 'running',
       onComplete: handleComplete,
     },
   );
+
+  // The run can no longer be read (e.g. 404): stop showing progress.
+  useEffect(() => {
+    if (!runError || exportState.phase !== 'running') return;
+    toast.error('Evidence export failed. Please try again.');
+    setExportState({ phase: 'idle' });
+  }, [runError, exportState.phase]);
 
   const meta = run?.metadata as
     | {

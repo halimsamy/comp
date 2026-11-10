@@ -1,4 +1,4 @@
-import { logger, metadata, task } from '@trigger.dev/sdk';
+import { logger, metadata, task } from '@trycompai/jobs';
 import {
   runLinkage,
   type LinkagePhase,
@@ -6,8 +6,8 @@ import {
 } from '@/lib/embedding/run-linkage';
 
 /**
- * Wraps `runLinkage` and mirrors progress phases into trigger.dev run metadata
- * so the frontend (subscribed via `useRealtimeRun` with a public-access token)
+ * Wraps `runLinkage` and mirrors progress phases into job run metadata
+ * so the frontend (polling it via `useJobRun`)
  * can render a live progress indicator across embedding + matching phases.
  *
  * Metadata schema (read by the UI as `run.metadata as Record<string, unknown>`):
@@ -52,7 +52,7 @@ export const linkRisksAndVendorsToWork = task({
 
       // Structured per-phase logs. We log once at phase start (current=0 or
       // first sighting) and once at phase completion (current === total) so
-      // the trigger.dev console reads as a clean timeline rather than a
+      // the job run reads as a clean timeline rather than a
       // per-tick stream.
       const isStart = !phaseStartedAt[phase.name];
       const hasProgress = 'current' in phase && 'total' in phase;

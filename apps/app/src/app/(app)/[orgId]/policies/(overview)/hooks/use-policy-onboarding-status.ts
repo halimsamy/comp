@@ -1,6 +1,6 @@
 'use client';
 
-import { useRealtimeRun } from '@trigger.dev/react-hooks';
+import { useJobRun } from '@/hooks/use-job-run';
 import { useMemo } from 'react';
 import type { PolicyTailoringStatus } from '../../all/components/policy-tailoring-context';
 
@@ -10,7 +10,7 @@ export interface PolicyOnboardingItemInfo {
 }
 
 /**
- * Subscribe to the onboarding trigger.dev run and derive per-policy tailoring
+ * Poll the onboarding job run and derive per-policy tailoring
  * status plus overall progress. Mirrors use-onboarding-status in risk/ and
  * vendors/ but handles the `policies` → `policy_<id>_status` singular
  * conversion correctly (the shared hook's `itemType.slice(0, -1)` would
@@ -20,7 +20,7 @@ export function usePolicyOnboardingStatus(
   onboardingRunId: string | null | undefined,
 ) {
   const shouldSubscribe = Boolean(onboardingRunId);
-  const { run } = useRealtimeRun(shouldSubscribe ? onboardingRunId! : '', {
+  const { run } = useJobRun(onboardingRunId, {
     enabled: shouldSubscribe,
   });
 

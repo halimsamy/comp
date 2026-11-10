@@ -1,5 +1,5 @@
 import { render } from '@react-email/render';
-import { logger } from '@trigger.dev/sdk';
+import { logger } from '@trycompai/jobs';
 import type { ReactElement } from 'react';
 
 const getApiBaseUrl = () =>

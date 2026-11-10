@@ -1,13 +1,13 @@
 import { isOrgParticipant } from '@/lib/org-participation-rule';
 import { db } from '@db/server';
 import { Novu } from '@novu/api';
-import { logger, schedules } from '@trigger.dev/sdk';
+import { logger, schedules } from '@trycompai/jobs';
 
 export const policySchedule = schedules.task({
   id: 'policy-schedule',
   machine: 'large-1x',
   cron: '0 */12 * * *', // Every 12 hours
-  maxDuration: 1000 * 60 * 10, // 10 minutes
+  maxDuration: 60 * 10, // 10 minutes
   run: async () => {
     const now = new Date();
 

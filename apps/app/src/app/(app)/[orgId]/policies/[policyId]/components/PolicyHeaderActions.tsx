@@ -21,13 +21,13 @@ import {
 import { Icons } from '@trycompai/ui/icons';
 import type { Member, Policy, PolicyVersion, User } from '@db';
 import type { JSONContent } from '@tiptap/react';
-import { useRealtimeRun } from '@trigger.dev/react-hooks';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { auditLogsKey } from '../hooks/useAuditLogs';
 import { usePolicy, policyKey } from '../hooks/usePolicy';
 import { policyVersionsKey } from '../hooks/usePolicyVersions';
+import { isJobRunFinished, useJobRun } from '@/hooks/use-job-run';
 import { usePermissions } from '@/hooks/use-permissions';
 
 type PolicyWithVersion = Policy & {
@@ -59,17 +59,11 @@ export function PolicyHeaderActions({
   });
 
   // Real-time task tracking
-  const [runInfo, setRunInfo] = useState<{
-    runId: string;
-    accessToken: string;
-  } | null>(null);
+  const [runId, setRunId] = useState<string | null>(null);
   const toastIdRef = useRef<string | number | null>(null);
 
-  // Subscribe to run status when we have a runId
-  const { run } = useRealtimeRun(runInfo?.runId ?? '', {
-    accessToken: runInfo?.accessToken ?? '',
-    enabled: !!runInfo?.runId && !!runInfo?.accessToken,
-  });
+  // Poll run status when we have a runId
+  const { run, error: runError } = useJobRun(runId, { enabled: !!runId });
 
   const revalidateAll = () => {
     if (!policy) return;
@@ -80,6 +74,16 @@ export function PolicyHeaderActions({
 
   // Handle run completion
   useEffect(() => {
+    if (runError && runId) {
+      if (toastIdRef.current) {
+        toast.dismiss(toastIdRef.current);
+      }
+      toast.error('Policy regeneration failed');
+      setIsRegenerating(false);
+      setRunId(null);
+      toastIdRef.current = null;
+      return;
+    }
     if (!run) return;
 
     if (run.status === 'COMPLETED') {
@@ -88,19 +92,19 @@ export function PolicyHeaderActions({
       }
       toast.success('New draft version created for review');
       setIsRegenerating(false);
-      setRunInfo(null);
+      setRunId(null);
       toastIdRef.current = null;
       revalidateAll();
-    } else if (run.status === 'FAILED' || run.status === 'CRASHED' || run.status === 'CANCELED') {
+    } else if (isJobRunFinished(run.status)) {
       if (toastIdRef.current) {
         toast.dismiss(toastIdRef.current);
       }
       toast.error('Policy regeneration failed');
       setIsRegenerating(false);
-      setRunInfo(null);
+      setRunId(null);
       toastIdRef.current = null;
     }
-  }, [run]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [run, runError]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleRegenerate = async () => {
     if (!policy) return;
@@ -110,12 +114,12 @@ export function PolicyHeaderActions({
     try {
       const response = await regeneratePolicy();
 
-      const { runId, publicAccessToken } = response.data?.data ?? {};
-      if (runId && publicAccessToken) {
+      const newRunId = response.data?.data?.runId;
+      if (newRunId) {
         const toastId = toast.loading('Regenerating policy content...');
         toastIdRef.current = toastId;
 
-        setRunInfo({ runId, accessToken: publicAccessToken });
+        setRunId(newRunId);
       }
     } catch {
       toast.error('Failed to trigger policy regeneration');

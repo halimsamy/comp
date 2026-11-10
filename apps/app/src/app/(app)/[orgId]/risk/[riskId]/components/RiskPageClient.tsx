@@ -100,7 +100,6 @@ export function RiskPageClient({
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [regenRun, setRegenRun] = useState<{
     runId: string;
-    publicAccessToken: string;
   } | null>(null);
 
   const risk = useMemo(() => {
@@ -175,7 +174,7 @@ export function RiskPageClient({
     setIsRegenerating(true);
     try {
       const handle = await regenerateMitigation(riskId);
-      // Hand control to the realtime subscription in DescriptionEditor.
+      // Hand control to the job-run polling in DescriptionEditor.
       // It calls back via onRegenSettled when the run terminates, at which
       // point we clear isRegenerating + refetch the risk for the new prose.
       setRegenRun(handle);

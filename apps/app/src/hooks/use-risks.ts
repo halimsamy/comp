@@ -190,7 +190,7 @@ export function useRisk(
     riskId ? `/v1/risks/${riskId}` : null,
     {
       ...restOptions,
-      // Enable polling for real-time updates (when trigger.dev tasks complete)
+      // Enable polling for real-time updates (when background jobs complete)
       refreshInterval: restOptions.refreshInterval ?? DEFAULT_POLLING_INTERVAL,
       // Continue polling even when window is not focused
       refreshWhenHidden: false,
@@ -256,7 +256,7 @@ export function useRiskActions() {
   const regenerateMitigation = useCallback(
     async (
       riskId: string,
-    ): Promise<{ runId: string; publicAccessToken: string }> => {
+    ): Promise<{ runId: string }> => {
       const response = await fetch(`/api/risks/${riskId}/regenerate-mitigation`, {
         method: 'POST',
         credentials: 'include',
@@ -275,7 +275,7 @@ export function useRiskActions() {
    * user to review before applying. Kept for any direct callers.
    */
   const autoLinkRisk = useCallback(
-    async (riskId: string): Promise<{ runId: string; publicAccessToken: string }> => {
+    async (riskId: string): Promise<{ runId: string }> => {
       const response = await fetch(`/api/risks/${riskId}/auto-link`, {
         method: 'POST',
         credentials: 'include',
@@ -295,7 +295,7 @@ export function useRiskActions() {
    * compatibility but no longer used by the treatment-plan UI.
    */
   const relinkRisk = useCallback(
-    async (riskId: string): Promise<{ runId: string; publicAccessToken: string }> => {
+    async (riskId: string): Promise<{ runId: string }> => {
       const response = await fetch(`/api/risks/${riskId}/relink`, {
         method: 'POST',
         credentials: 'include',
@@ -311,11 +311,11 @@ export function useRiskActions() {
 
   /**
    * Triggers an AI scan that returns suggestions WITHOUT persisting any link.
-   * The realtime run output contains `suggestions: { tasks, controls }` for the
+   * The job run output contains `suggestions: { tasks, controls }` for the
    * UI to render in a review-before-apply card.
    */
   const suggestRiskLinks = useCallback(
-    async (riskId: string): Promise<{ runId: string; publicAccessToken: string }> => {
+    async (riskId: string): Promise<{ runId: string }> => {
       const response = await fetch(`/api/risks/${riskId}/auto-link`, {
         method: 'POST',
         credentials: 'include',
@@ -354,15 +354,15 @@ export function useRiskActions() {
   );
 
   /**
-   * Returns the active auto-link run for a risk (and a fresh access token) so
+   * Returns the active auto-link run for a risk so
    * the UI can resume an in-flight scan after a page reload, or `null` when
    * no run is in flight. The runId is persisted on the Risk row by the auto-
-   * link route; this hook just fetches and re-mints the token.
+   * link route; this hook just fetches it.
    */
   const fetchActiveRiskAutoLinkRun = useCallback(
     async (
       riskId: string,
-    ): Promise<{ runId: string; publicAccessToken: string } | null> => {
+    ): Promise<{ runId: string } | null> => {
       const response = await fetch(`/api/risks/${riskId}/auto-link/active`, {
         credentials: 'include',
       });
@@ -370,10 +370,10 @@ export function useRiskActions() {
         return null;
       }
       const body = (await response.json()) as
-        | { runId: string; publicAccessToken: string }
+        | { runId: string }
         | { runId: null };
       if (!body.runId) return null;
-      return { runId: body.runId, publicAccessToken: body.publicAccessToken };
+      return { runId: body.runId };
     },
     [],
   );

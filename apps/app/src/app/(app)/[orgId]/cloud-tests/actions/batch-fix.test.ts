@@ -5,15 +5,13 @@ const mocks = vi.hoisted(() => ({
   patch: vi.fn(),
   get: vi.fn(),
   trigger: vi.fn(),
-  createPublicToken: vi.fn(),
   cancel: vi.fn(),
   retrieve: vi.fn(),
 }));
 vi.mock('@/lib/api-server', () => ({
   serverApi: { post: mocks.post, patch: mocks.patch, get: mocks.get },
 }));
-vi.mock('@trigger.dev/sdk', () => ({
-  auth: { createPublicToken: mocks.createPublicToken },
+vi.mock('@trycompai/jobs', () => ({
   tasks: { trigger: mocks.trigger },
   runs: { retrieve: mocks.retrieve, cancel: mocks.cancel },
 }));
@@ -35,9 +33,10 @@ const batch = {
 };
 const run = {
   taskIdentifier: 'remediate-batch',
-  tags: ['org_own'],
-  payload: { batchId: 'rmb_own', organizationId: 'org_own', connectionId: 'conn_own' },
+  organizationId: 'org_own',
+  tags: ['org_own', 'batch:rmb_own', 'connection:conn_own'],
   status: 'EXECUTING',
+  isCompleted: false,
 };
 
 describe.each([
@@ -50,7 +49,6 @@ describe.each([
     mocks.patch.mockResolvedValue({ status: 200, data: { data: batch } });
     mocks.get.mockResolvedValue({ status: 200, data: { data: batch } });
     mocks.trigger.mockResolvedValue({ id: 'run_own' });
-    mocks.createPublicToken.mockResolvedValue('public_token');
     mocks.retrieve.mockResolvedValue(run);
     mocks.cancel.mockResolvedValue({ id: 'run_own' });
   });
@@ -61,8 +59,9 @@ describe.each([
     expect(mocks.trigger).toHaveBeenCalledWith(
       'remediate-batch',
       { batchId: 'rmb_own', organizationId: 'org_own', connectionId: 'conn_own' },
-      { tags: ['org_own'] },
+      { tags: ['org_own', 'batch:rmb_own', 'connection:conn_own'] },
     );
+    expect(result.data).not.toHaveProperty('accessToken');
   });
   it('binds a fast completed run without asking to restart its batch', async () => {
     mocks.patch.mockResolvedValue({ status: 200, data: { data: { ...batch, status: 'done' } } });
@@ -91,12 +90,12 @@ describe.each([
     expect(mocks.trigger).not.toHaveBeenCalled();
   });
 
-  it('does not mint a token when API run binding fails and cancels only its new run', async () => {
+  it('cancels only its new run when API run binding fails', async () => {
     mocks.patch.mockResolvedValue({ status: 403, error: 'Forbidden' });
     const result = await actions.startBatchFix(input);
     expect(result.error).toBe('Forbidden');
+    expect(result.data).toBeUndefined();
     expect(mocks.cancel).toHaveBeenCalledWith('run_own');
-    expect(mocks.createPublicToken).not.toHaveBeenCalled();
   });
 
   it('delegates cancellation to the authorized API batch endpoint', async () => {
@@ -116,16 +115,24 @@ describe.each([
   it('resumes only a correctly bound run', async () => {
     const result = await actions.getActiveBatch('conn_own');
     expect(result?.triggerRunId).toBe('run_own');
-    expect(mocks.createPublicToken).toHaveBeenCalled();
+    expect(result).not.toHaveProperty('accessToken');
+  });
+
+  it('marks the batch done when its run already finished', async () => {
+    mocks.retrieve.mockResolvedValue({ ...run, status: 'COMPLETED', isCompleted: true });
+    expect(await actions.getActiveBatch('conn_own')).toBeNull();
+    expect(mocks.patch).toHaveBeenCalledWith('/v1/cloud-security/remediation/batch/rmb_own', {
+      status: 'done',
+    });
   });
 
   it.each([
     { ...run, taskIdentifier: 'other-task' },
-    { ...run, tags: ['org_foreign'] },
-    { ...run, payload: { ...run.payload, batchId: 'rmb_foreign' } },
-  ])('does not mint tokens for forged legacy bindings: %p', async (forged) => {
+    { ...run, organizationId: 'org_foreign' },
+    { ...run, tags: ['org_own', 'batch:rmb_foreign', 'connection:conn_own'] },
+    { ...run, tags: ['org_own', 'batch:rmb_own', 'connection:conn_foreign'] },
+  ])('does not resume forged bindings: %p', async (forged) => {
     mocks.retrieve.mockResolvedValue(forged);
     expect(await actions.getActiveBatch('conn_own')).toBeNull();
-    expect(mocks.createPublicToken).not.toHaveBeenCalled();
   });
 });

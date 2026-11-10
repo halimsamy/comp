@@ -1,6 +1,6 @@
 'use client';
 
-import { useRealtimeRun } from '@trigger.dev/react-hooks';
+import { useJobRun } from '@/hooks/use-job-run';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import type { LoginAnalysis } from '../../hooks/types';
@@ -66,16 +66,9 @@ export function ConnectVendorLoginFlow({
   const [analysis, setAnalysis] = useState<LoginAnalysis | null>(
     persisted?.analysis ?? null,
   );
-  // Never resumed — a live analysis-run token is dead after a reload, so a
-  // refresh restarts analysis from the (persisted) URL instead.
-  const [analyzeRun, setAnalyzeRun] = useState<{
-    runId: string;
-    accessToken: string;
-  } | null>(null);
-  const [signinRun, setSigninRun] = useState<{
-    runId: string;
-    accessToken: string;
-  } | null>(null);
+  // Never resumed — a refresh restarts analysis from the (persisted) URL instead.
+  const [analyzeRun, setAnalyzeRun] = useState<{ runId: string } | null>(null);
+  const [signinRun, setSigninRun] = useState<{ runId: string } | null>(null);
   const [takeoverVariant, setTakeoverVariant] = useState<LiveSigninVariant>('finish');
   // How the blocked verification wants the user to verify (code / passkey /
   // passkey-only), so the take-over panel gives exact guidance.
@@ -123,10 +116,9 @@ export function ConnectVendorLoginFlow({
 
   // Analysis (browser + AI) runs as a background task. Watching run/error also
   // handles resume, where the run may already be complete on subscribe.
-  const { run: analyzeRunState, error: analyzeError } = useRealtimeRun(
-    analyzeRun?.runId ?? '',
-    { accessToken: analyzeRun?.accessToken, enabled: !!analyzeRun },
-  );
+  const { run: analyzeRunState, error: analyzeError } = useJobRun(analyzeRun?.runId, {
+    enabled: !!analyzeRun,
+  });
 
   useEffect(() => {
     if (!analyzeRun) return;
@@ -156,10 +148,9 @@ export function ConnectVendorLoginFlow({
 
   // The automated sign-in runs as a background task on a session we show the
   // user (they watch it) and hand over on any failure.
-  const { run: signinRunState, error: signinError } = useRealtimeRun(
-    signinRun?.runId ?? '',
-    { accessToken: signinRun?.accessToken, enabled: !!signinRun },
-  );
+  const { run: signinRunState, error: signinError } = useJobRun(signinRun?.runId, {
+    enabled: !!signinRun,
+  });
 
   useEffect(() => {
     if (!signinRun) return;
@@ -284,7 +275,7 @@ export function ConnectVendorLoginFlow({
         liveViewUrl: handle.liveViewUrl,
         profileId: handle.profileId,
       });
-      setSigninRun({ runId: handle.runId, accessToken: handle.publicAccessToken });
+      setSigninRun({ runId: handle.runId });
     });
   }, [reconnect, startSignin, endSession, setSigninLiveView, context]);
 
@@ -297,7 +288,7 @@ export function ConnectVendorLoginFlow({
       setStep('error');
       return;
     }
-    setAnalyzeRun({ runId: handle.runId, accessToken: handle.publicAccessToken });
+    setAnalyzeRun({ runId: handle.runId });
   }, [startAnalysis, urlInput]);
 
   const { startAuth } = context;
@@ -324,7 +315,7 @@ export function ConnectVendorLoginFlow({
       liveViewUrl: handle.liveViewUrl,
       profileId: handle.profileId,
     });
-    setSigninRun({ runId: handle.runId, accessToken: handle.publicAccessToken });
+    setSigninRun({ runId: handle.runId });
   }, [startSignin, url, handleStartLiveSignin, endSession, setSigninLiveView]);
 
   const handleChoose = useCallback(
@@ -366,7 +357,7 @@ export function ConnectVendorLoginFlow({
         liveViewUrl: handle.liveViewUrl,
         profileId: handle.profileId,
       });
-      setSigninRun({ runId: handle.runId, accessToken: handle.publicAccessToken });
+      setSigninRun({ runId: handle.runId });
       setStep('signing-in');
     },
     [startSignin, url, handleStartLiveSignin, endSession, setSigninLiveView],

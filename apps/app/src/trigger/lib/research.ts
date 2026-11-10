@@ -1,5 +1,5 @@
 import { env } from '@/env.mjs';
-import { logger } from '@trigger.dev/sdk';
+import { logger } from '@trycompai/jobs';
 import { z, ZodSchema } from 'zod';
 
 export const initialResponseSchema = z.object({

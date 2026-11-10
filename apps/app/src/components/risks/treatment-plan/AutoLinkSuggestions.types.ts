@@ -28,7 +28,7 @@ export type Mode = 'fresh' | 'reassess';
 export type State =
   | { kind: 'linked' }
   | { kind: 'empty' }
-  | { kind: 'loading'; runId: string; publicAccessToken: string; mode: Mode }
+  | { kind: 'loading'; runId: string; mode: Mode }
   | {
       kind: 'suggestions';
       mode: Mode;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useRealtimeRun } from '@trigger.dev/react-hooks';
+import { useJobRun } from '@/hooks/use-job-run';
 import { useMemo } from 'react';
 
 export type OnboardingItemStatus = 'pending' | 'processing' | 'created' | 'assessing' | 'completed';
@@ -15,7 +15,7 @@ export function useOnboardingStatus(
   itemType: 'risks' | 'vendors',
 ) {
   const shouldSubscribe = Boolean(onboardingRunId);
-  const { run } = useRealtimeRun(shouldSubscribe ? onboardingRunId! : '', {
+  const { run } = useJobRun(onboardingRunId, {
     enabled: shouldSubscribe,
   });
 

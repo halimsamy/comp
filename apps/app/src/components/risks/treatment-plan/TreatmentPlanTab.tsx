@@ -42,11 +42,11 @@ interface TreatmentPlanTabProps {
   onRegenerate: () => Promise<void>;
   regenerating: boolean;
   /**
-   * Active trigger.dev run handle for an in-flight regeneration. The
-   * description editor subscribes via `useRealtimeRun` to render live
+   * Active job run handle for an in-flight regeneration. The
+   * description editor polls it via `useJobRun` to render live
    * progress until the run terminates.
    */
-  regenRun?: { runId: string; publicAccessToken: string } | null;
+  regenRun?: { runId: string } | null;
   /** Called when the regeneration run terminates (success or failure). */
   onRegenSettled?: (result: { success: boolean; reason?: string }) => void;
   /**
@@ -54,7 +54,7 @@ interface TreatmentPlanTabProps {
    * The component reads `run.output.suggestions` once status === COMPLETED.
    * When omitted, the legacy fall-through renders only LinkedWork.
    */
-  onSuggest?: () => Promise<{ runId: string; publicAccessToken: string }>;
+  onSuggest?: () => Promise<{ runId: string }>;
   /**
    * Persists the user-confirmed selection.
    * `replace: true` for re-assess (sync semantics — connect ONLY these).
@@ -67,18 +67,18 @@ interface TreatmentPlanTabProps {
    * Resume an in-flight or completed-but-unreviewed AI scan. Returns null when
    * no run is persisted server-side. Used to recover progress after a reload.
    */
-  onResumeAutoLink?: () => Promise<{ runId: string; publicAccessToken: string } | null>;
+  onResumeAutoLink?: () => Promise<{ runId: string } | null>;
   /** Clears the persisted runId server-side (called from Discard). */
   onDiscardAutoLinkRun?: () => Promise<void>;
   /**
    * @deprecated Use `onSuggest` + `onApply` instead. The previous immediate-
    * apply auto-link flow is replaced by review-before-apply.
    */
-  onAutoLink?: () => Promise<{ runId: string; publicAccessToken: string }>;
+  onAutoLink?: () => Promise<{ runId: string }>;
   /**
    * @deprecated Use `onSuggest` + `onApply({ replace: true })` instead.
    */
-  onRelink?: () => Promise<{ runId: string; publicAccessToken: string }>;
+  onRelink?: () => Promise<{ runId: string }>;
 }
 
 export function TreatmentPlanTab({

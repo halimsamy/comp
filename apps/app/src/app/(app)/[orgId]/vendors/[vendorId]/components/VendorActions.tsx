@@ -23,7 +23,7 @@ import { toast } from 'sonner';
 interface VendorActionsProps {
   vendorId: string;
   onOpenEditSheet: () => void;
-  onAssessmentTriggered?: (runId: string, publicAccessToken: string) => void;
+  onAssessmentTriggered?: (runId: string) => void;
 }
 
 export function VendorActions({
@@ -65,8 +65,8 @@ export function VendorActions({
       toast.success('Assessment regeneration triggered. This may take a moment.');
       refreshVendor();
       // Notify parent with run info for real-time tracking
-      if (result.runId && result.publicAccessToken) {
-        onAssessmentTriggered?.(result.runId, result.publicAccessToken);
+      if (result.runId) {
+        onAssessmentTriggered?.(result.runId);
       }
     } catch {
       toast.error('Failed to trigger risk assessment regeneration');

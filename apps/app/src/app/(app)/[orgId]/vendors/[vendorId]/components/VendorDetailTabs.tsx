@@ -11,6 +11,7 @@ import { usePaginatedAuditLogs } from '@/hooks/use-audit-logs';
 import { TaskItems } from '@/components/task-items/TaskItems';
 import { useTaskItems, useTaskItemActions } from '@/hooks/use-task-items';
 import { useVendor, useVendorActions, type VendorResponse } from '@/hooks/use-vendors';
+import { useJobRun } from '@/hooks/use-job-run';
 import { usePermissions } from '@/hooks/use-permissions';
 import { SecondaryFields } from './secondary-fields/secondary-fields';
 import { VendorResearchBadges, VendorResearchLinks } from './VendorResearchSection';
@@ -22,7 +23,6 @@ import { TreatmentPlanTab } from '@/components/risks/treatment-plan/TreatmentPla
 import type { Member, RiskTreatmentType, User, Vendor } from '@db';
 import { CommentEntityType } from '@db';
 import type { Prisma } from '@db';
-import { useRealtimeRun } from '@trigger.dev/react-hooks';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   Breadcrumb,
@@ -96,16 +96,12 @@ export function VendorDetailTabs({
   const { updateTaskItem } = useTaskItemActions();
 
   const [assessmentRunId, setAssessmentRunId] = useState<string | null>(null);
-  const [assessmentToken, setAssessmentToken] = useState<string | null>(null);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleValue, setTitleValue] = useState('');
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [descriptionValue, setDescriptionValue] = useState('');
   const [isMitigationLoading, setIsMitigationLoading] = useState(false);
-  const [regenRun, setRegenRun] = useState<{
-    runId: string;
-    publicAccessToken: string;
-  } | null>(null);
+  const [regenRun, setRegenRun] = useState<{ runId: string } | null>(null);
   const [isAssessmentLoading, setIsAssessmentLoading] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   // URL-backed tab state — bookmarks the active tab in `?tab=...` so a
@@ -141,23 +137,28 @@ export function VendorDetailTabs({
     } as VendorWithRiskAssessment;
   }, [swrVendor, initialVendor]);
 
-  // Realtime run tracking
-  const { run: assessmentRun } = useRealtimeRun(assessmentRunId ?? '', {
-    accessToken: assessmentToken ?? undefined,
-    enabled: Boolean(assessmentRunId && assessmentToken),
+  // Run tracking (polls the job run)
+  const { run: assessmentRun, error: assessmentRunError } = useJobRun(assessmentRunId, {
+    enabled: Boolean(assessmentRunId),
   });
 
-  const handleAssessmentTriggered = useCallback((runId: string, token: string) => {
+  const handleAssessmentTriggered = useCallback((runId: string) => {
     setAssessmentRunId(runId);
-    setAssessmentToken(token);
   }, []);
+
+  // The run can't be read (e.g. 404): stop tracking instead of spinning.
+  useEffect(() => {
+    if (!assessmentRunError) return;
+    setAssessmentRunId(null);
+    setIsRegenerating(false);
+  }, [assessmentRunError]);
 
   const isRealtimeRunActive = useMemo(() => {
     if (!assessmentRun) return false;
     return ['EXECUTING', 'QUEUED', 'PENDING', 'WAITING'].includes(assessmentRun.status);
   }, [assessmentRun]);
 
-  // Extract research progress from trigger.dev run metadata
+  // Extract research progress from the job run metadata
   const researchMetadata = useMemo(() => {
     if (!assessmentRun?.metadata) return null;
     const meta = assessmentRun.metadata as Record<string, unknown>;
@@ -195,14 +196,12 @@ export function VendorDetailTabs({
       void refreshVendor();
       void refreshTaskItems();
       setAssessmentRunId(null);
-      setAssessmentToken(null);
       setIsRegenerating(false);
     } else if (isFailureRunStatus(assessmentRun.status)) {
       toast.error('Risk assessment failed. Please try again.');
       void refreshVendor();
       void refreshTaskItems();
       setAssessmentRunId(null);
-      setAssessmentToken(null);
       setIsRegenerating(false);
     }
   }, [assessmentRun?.status, refreshVendor, refreshTaskItems]);
@@ -344,10 +343,10 @@ export function VendorDetailTabs({
     try {
       const result = await triggerAssessment(vendorId);
       toast.success('Assessment regeneration triggered.');
-      if (result.runId && result.publicAccessToken) {
+      if (result.runId) {
         setIsRegenerating(true);
         void setActiveTab('risk-assessment');
-        handleAssessmentTriggered(result.runId, result.publicAccessToken);
+        handleAssessmentTriggered(result.runId);
       }
       refreshVendor();
     } catch {

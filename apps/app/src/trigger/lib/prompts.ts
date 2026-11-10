@@ -1,5 +1,5 @@
 import { FrameworkEditorFramework, FrameworkEditorPolicyTemplate } from '@db';
-import { logger } from '@trigger.dev/sdk';
+import { logger } from '@trycompai/jobs';
 
 const FRAMEWORK_MATCHERS: Array<{ flag: string; test: (name: string) => boolean }> = [
   { flag: 'soc2', test: (n) => /soc\s*2/i.test(n) || n.includes('soc') },

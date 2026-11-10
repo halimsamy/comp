@@ -1,7 +1,6 @@
 import { getFeatureFlags } from '@/app/posthog';
 import { APP_AWS_ORG_ASSETS_BUCKET, s3Client } from '@/app/s3';
 import { OrgInternalProvider } from '@/components/org-internal-context';
-import { TriggerTokenProvider } from '@/components/trigger-token-provider';
 import { serverApi } from '@/lib/api-server';
 import { canAccessApp, canAccessAuditorView, parseRolesString } from '@/lib/permissions';
 import { resolveCustomRolePermissions, resolveUserPermissions } from '@/lib/permissions.server';
@@ -31,7 +30,6 @@ export default async function Layout({
 
   const cookieStore = await cookies();
   const isCollapsed = cookieStore.get('sidebar-collapsed')?.value === 'true';
-  const publicAccessToken = cookieStore.get('publicAccessToken')?.value || undefined;
 
   // Get headers once to avoid multiple async calls
   const requestHeaders = await headers();
@@ -179,10 +177,7 @@ export default async function Layout({
   };
 
   return (
-    <TriggerTokenProvider
-      triggerJobId={onboarding?.triggerJobId || undefined}
-      initialToken={publicAccessToken || undefined}
-    >
+    <>
       <OrganizationIdentifier orgId={organization.id} orgName={organization.name} />
       <ServerFeatureFlagsProvider flags={featureFlags}>
         <OrgInternalProvider isInternal={organization.isInternal}>
@@ -208,6 +203,6 @@ export default async function Layout({
         </OrgInternalProvider>
       </ServerFeatureFlagsProvider>
       <HotKeys />
-    </TriggerTokenProvider>
+    </>
   );
 }

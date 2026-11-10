@@ -8,9 +8,9 @@ import { createFleetLabelForOrg } from '@/trigger/tasks/device/create-fleet-labe
 import { onboardOrganization as onboardOrganizationTask } from '@/trigger/tasks/onboarding/onboard-organization';
 import { auth } from '@/utils/auth';
 import { db } from '@db/server';
-import { tasks } from '@trigger.dev/sdk';
+import { tasks } from '@trycompai/jobs';
 import { revalidatePath } from 'next/cache';
-import { cookies, headers } from 'next/headers';
+import { headers } from 'next/headers';
 import { z } from 'zod';
 
 // Schema for the remaining fields (steps 4-12)
@@ -209,9 +209,6 @@ export const completeOnboarding = authActionClientWithoutOrg
         data: { triggerJobId: handle.id },
       });
 
-      // Set cookie for job tracking
-      (await cookies()).set('publicAccessToken', handle.publicAccessToken);
-
       // Create Fleet Label
       await tasks.trigger<typeof createFleetLabelForOrg>(
         'create-fleet-label-for-org',
@@ -231,7 +228,6 @@ export const completeOnboarding = authActionClientWithoutOrg
       return {
         success: true,
         handle: handle.id,
-        publicAccessToken: handle.publicAccessToken,
         organizationId: parsedInput.organizationId,
         redirectUrl: `/${parsedInput.organizationId}/`,
       };

@@ -26,14 +26,12 @@ interface UploadResponse {
 interface ProcessResponse {
   success: boolean;
   runId?: string;
-  publicAccessToken?: string;
   message?: string;
 }
 
 interface DeleteResponse {
   success: boolean;
   vectorDeletionRunId?: string;
-  publicAccessToken?: string;
 }
 
 interface DownloadResponse {

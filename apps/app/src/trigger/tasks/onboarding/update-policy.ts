@@ -1,11 +1,11 @@
-import { logger, metadata, queue, schemaTask } from '@trigger.dev/sdk';
+import { logger, metadata, queue, schemaTask } from '@trycompai/jobs';
 import { z } from 'zod';
 import { processPolicyUpdate } from './update-policies-helpers';
 
-export const updatePolicyQueue = queue({ name: 'update-policy', concurrencyLimit: 15 });
+export const updatePolicyQueue = queue({ name: 'onboarding-update-policy', concurrencyLimit: 15 });
 
 export const updatePolicy = schemaTask({
-  id: 'update-policy',
+  id: 'onboarding-update-policy',
   maxDuration: 600, // 10 minutes.
   queue: updatePolicyQueue,
   retry: {

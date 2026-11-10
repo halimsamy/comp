@@ -5,7 +5,7 @@
 import { isOrgParticipant } from '@/lib/org-participation-rule';
 import type { PolicyVisibility } from '@db';
 
-// Inlined from @trycompai/auth to avoid pulling that package into the Trigger.dev bundle.
+// Inlined from @trycompai/auth to avoid pulling that package into the job worker.
 // Keep in sync with packages/auth/src/permissions.ts BUILT_IN_ROLE_OBLIGATIONS.
 const BUILT_IN_ROLE_OBLIGATIONS: Record<string, { compliance?: boolean }> = {
   owner: { compliance: true },
@@ -29,7 +29,7 @@ export interface ComplianceFilterDb {
  * Filter members to only those with the compliance obligation.
  * Inlined equivalent of apps/app/src/lib/compliance.ts#filterComplianceMembers
  * so this file has no transitive dependency on @trycompai/auth (which cannot
- * be bundled by the Trigger.dev deploy pipeline).
+ * be bundled by the job worker).
  */
 export async function filterDigestMembersByCompliance<T extends DigestMember>(
   db: ComplianceFilterDb,

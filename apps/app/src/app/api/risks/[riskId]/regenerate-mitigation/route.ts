@@ -2,7 +2,7 @@ import { generateRiskMitigation } from '@/trigger/tasks/onboarding/generate-risk
 import type { PolicyContext } from '@/trigger/tasks/onboarding/onboard-organization-helpers';
 import { serverApi } from '@/lib/api-server';
 import { requireApiPermission } from '@/lib/permissions.server';
-import { auth as triggerAuth, tasks } from '@trigger.dev/sdk';
+import { tasks } from '@trycompai/jobs';
 import { NextRequest, NextResponse } from 'next/server';
 
 interface PeopleApiResponse {
@@ -76,25 +76,7 @@ export async function POST(
       { tags: [organizationId] },
     );
 
-    // The run is now in flight server-side. Mint a 15-min public token so
-    // the UI can subscribe via useRealtimeRun. If the mint fails, do NOT
-    // throw — that would let a client retry start a duplicate run. Return
-    // the runId with a null token; the UI's `/active` endpoint can mint a
-    // fresh token on the next render. (Cubic finding #29 on PR #2671.)
-    let publicAccessToken: string | null = null;
-    try {
-      publicAccessToken = await triggerAuth.createPublicToken({
-        scopes: { read: { runs: [handle.id] } },
-        expirationTime: '15m',
-      });
-    } catch (mintErr) {
-      console.error(
-        '[regenerate-mitigation] run triggered but token mint failed; client must resume via /active',
-        { runId: handle.id, mintErr },
-      );
-    }
-
-    return NextResponse.json({ runId: handle.id, publicAccessToken });
+    return NextResponse.json({ runId: handle.id });
   } catch (error) {
     console.error('Error regenerating risk mitigation:', error);
     return NextResponse.json({ error: 'Failed to regenerate mitigation' }, { status: 500 });

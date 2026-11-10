@@ -2,7 +2,7 @@
 
 import { Button, Stack, Text } from '@trycompai/design-system';
 import { Link as LinkIcon } from '@trycompai/design-system/icons';
-import { useRealtimeRun } from '@trigger.dev/react-hooks';
+import { useJobRun } from '@/hooks/use-job-run';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -10,13 +10,13 @@ interface AutoLinkButtonProps {
   /** Whether the entity already has a saved treatment-plan description. */
   hasDescription: boolean;
   disabled?: boolean;
-  onAutoLink: () => Promise<{ runId: string; publicAccessToken: string }>;
+  onAutoLink: () => Promise<{ runId: string }>;
   onAfterLink?: () => Promise<void>;
 }
 
 type RunState =
   | { kind: 'idle' }
-  | { kind: 'running'; runId: string; publicAccessToken: string };
+  | { kind: 'running'; runId: string };
 
 const PHASE_LABEL: Record<string, string> = {
   starting: 'Starting…',
@@ -41,8 +41,8 @@ export function AutoLinkButton({
   const handleClick = async () => {
     setSubmitting(true);
     try {
-      const { runId, publicAccessToken } = await onAutoLink();
-      setState({ kind: 'running', runId, publicAccessToken });
+      const { runId } = await onAutoLink();
+      setState({ kind: 'running', runId });
     } catch {
       toast.error('Auto-link failed. Try again or link manually.');
     } finally {
@@ -54,7 +54,6 @@ export function AutoLinkButton({
     return (
       <RunProgress
         runId={state.runId}
-        accessToken={state.publicAccessToken}
         hasDescription={hasDescription}
         onComplete={async (linked) => {
           if (linked === 0) {
@@ -108,14 +107,13 @@ export function AutoLinkButton({
 
 interface RunProgressProps {
   runId: string;
-  accessToken: string;
   hasDescription: boolean;
   onComplete: (linked: number) => void;
   onFailed: () => void;
 }
 
-function RunProgress({ runId, accessToken, onComplete, onFailed }: RunProgressProps) {
-  const { run } = useRealtimeRun(runId, { accessToken, enabled: true });
+function RunProgress({ runId, onComplete, onFailed }: RunProgressProps) {
+  const { run, error } = useJobRun(runId);
 
   const meta = (run?.metadata ?? {}) as Record<string, unknown>;
   const phase = typeof meta.phase === 'string' ? meta.phase : 'starting';
@@ -124,6 +122,11 @@ function RunProgress({ runId, accessToken, onComplete, onFailed }: RunProgressPr
 
   const status = run?.status;
   useEffect(() => {
+    // The run can't be read (e.g. 404): fail instead of spinning forever.
+    if (error) {
+      onFailed();
+      return;
+    }
     if (!status) return;
     if (status === 'COMPLETED') {
       const riskLinks = typeof meta.riskLinks === 'number' ? meta.riskLinks : 0;
@@ -141,7 +144,7 @@ function RunProgress({ runId, accessToken, onComplete, onFailed }: RunProgressPr
     ) {
       onFailed();
     }
-  }, [status]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [status, error]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Show progress phases (skip 'done' — onComplete handles transition).
   const showProgress = phase !== 'done' && phase in PHASE_LABEL;

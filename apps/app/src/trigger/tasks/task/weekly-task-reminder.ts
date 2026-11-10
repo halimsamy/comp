@@ -1,6 +1,6 @@
 import { isOrgParticipant } from '@/lib/org-participation-rule';
 import { db } from '@db/server';
-import { logger, schedules } from '@trigger.dev/sdk';
+import { logger, schedules } from '@trycompai/jobs';
 import { sendWeeklyTaskDigestEmailTask } from '../email/weekly-task-digest-email';
 
 const ORG_INACTIVITY_DAYS = 90;
@@ -8,7 +8,7 @@ const ORG_INACTIVITY_DAYS = 90;
 export const weeklyTaskReminder = schedules.task({
   id: 'weekly-task-reminder',
   cron: '0 9 * * 1', // Every Monday at 9:00 AM UTC
-  maxDuration: 1000 * 60 * 10, // 10 minutes
+  maxDuration: 60 * 10, // 10 minutes
   run: async () => {
     logger.info('Starting weekly task reminder job');
 
@@ -121,7 +121,7 @@ export const weeklyTaskReminder = schedules.task({
     }
 
     // Batch trigger all emails with concurrency control
-    // Trigger.dev has a limit of 500 items per batchTrigger
+    // Keep each batchTrigger call to 500 items
     if (emailPayloads.length > 0) {
       const BATCH_SIZE = 500;
       const batches = [];

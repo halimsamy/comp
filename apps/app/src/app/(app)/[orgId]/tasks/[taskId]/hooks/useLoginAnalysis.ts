@@ -6,12 +6,11 @@ import { toast } from 'sonner';
 
 export interface AnalysisRunHandle {
   runId: string;
-  publicAccessToken: string;
 }
 
 /**
- * Kicks off vendor login analysis as a background Trigger.dev run and returns a
- * handle to subscribe to. The browser + AI work runs off the request path, so it
+ * Kicks off vendor login analysis as a background job and returns a
+ * handle to poll. The browser + AI work runs off the request path, so it
  * can't be cut short by an HTTP or browser timeout. Returns null on failure.
  */
 export function useLoginAnalysis() {

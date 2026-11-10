@@ -158,7 +158,7 @@ export function useVendor(
     vendorId ? `/v1/vendors/${vendorId}` : null,
     {
       ...restOptions,
-      // Enable polling for real-time updates (when trigger.dev tasks complete)
+      // Enable polling for real-time updates (when background jobs complete)
       refreshInterval: restOptions.refreshInterval ?? DEFAULT_POLLING_INTERVAL,
       // Continue polling even when window is not focused
       refreshWhenHidden: false,
@@ -188,7 +188,6 @@ export function useVendor(
 interface TriggerAssessmentResponse {
   success: boolean;
   runId: string;
-  publicAccessToken: string;
 }
 
 export function useVendorActions() {
@@ -244,7 +243,7 @@ export function useVendorActions() {
   const regenerateMitigation = useCallback(
     async (
       vendorId: string,
-    ): Promise<{ runId: string; publicAccessToken: string }> => {
+    ): Promise<{ runId: string }> => {
       const response = await fetch(`/api/vendors/${vendorId}/regenerate-mitigation`, {
         method: 'POST',
         credentials: 'include',
@@ -262,7 +261,7 @@ export function useVendorActions() {
    * @deprecated Prefer `suggestVendorLinks` (review-before-apply flow).
    */
   const autoLinkVendor = useCallback(
-    async (vendorId: string): Promise<{ runId: string; publicAccessToken: string }> => {
+    async (vendorId: string): Promise<{ runId: string }> => {
       const response = await fetch(`/api/vendors/${vendorId}/auto-link`, {
         method: 'POST',
         credentials: 'include',
@@ -281,7 +280,7 @@ export function useVendorActions() {
    * with `replace: true`.
    */
   const relinkVendor = useCallback(
-    async (vendorId: string): Promise<{ runId: string; publicAccessToken: string }> => {
+    async (vendorId: string): Promise<{ runId: string }> => {
       const response = await fetch(`/api/vendors/${vendorId}/relink`, {
         method: 'POST',
         credentials: 'include',
@@ -299,7 +298,7 @@ export function useVendorActions() {
    * Triggers an AI scan that returns suggestions WITHOUT persisting any link.
    */
   const suggestVendorLinks = useCallback(
-    async (vendorId: string): Promise<{ runId: string; publicAccessToken: string }> => {
+    async (vendorId: string): Promise<{ runId: string }> => {
       const response = await fetch(`/api/vendors/${vendorId}/auto-link`, {
         method: 'POST',
         credentials: 'include',
@@ -340,16 +339,16 @@ export function useVendorActions() {
   const fetchActiveVendorAutoLinkRun = useCallback(
     async (
       vendorId: string,
-    ): Promise<{ runId: string; publicAccessToken: string } | null> => {
+    ): Promise<{ runId: string } | null> => {
       const response = await fetch(`/api/vendors/${vendorId}/auto-link/active`, {
         credentials: 'include',
       });
       if (!response.ok) return null;
       const body = (await response.json()) as
-        | { runId: string; publicAccessToken: string }
+        | { runId: string }
         | { runId: null };
       if (!body.runId) return null;
-      return { runId: body.runId, publicAccessToken: body.publicAccessToken };
+      return { runId: body.runId };
     },
     [],
   );

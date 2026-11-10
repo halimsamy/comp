@@ -1,5 +1,5 @@
 import { Prisma, db } from '@db/server';
-import { metadata } from '@trigger.dev/sdk';
+import { metadata } from '@trycompai/jobs';
 import { postCloudSecurityApi } from './api-response';
 import { classifyExecuteResult } from './execute-result';
 

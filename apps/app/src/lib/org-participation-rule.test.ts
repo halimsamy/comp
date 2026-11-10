@@ -33,7 +33,7 @@ describe('isOrgParticipant', () => {
 
 // Drift guard: this app-local rule is a deliberate dependency-free mirror of
 // `@trycompai/auth/participation` (the app can't import the auth index from
-// Trigger.dev-bundled files). Fail CI if the two ever diverge.
+// job worker files). Fail CI if the two ever diverge.
 describe('org-participation rule stays in sync with @trycompai/auth', () => {
   const roles: Array<string | null | undefined> = [
     'admin',

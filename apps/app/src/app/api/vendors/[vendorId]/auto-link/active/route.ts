@@ -1,6 +1,6 @@
 import { requireApiPermission } from '@/lib/permissions.server';
 import { db } from '@db/server';
-import { auth as triggerAuth } from '@trigger.dev/sdk';
+import { runs } from '@trycompai/jobs';
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
  */
 
 /**
- * Decide whether a `createPublicToken` failure means the run is permanently
+ * Decide whether a `runs.retrieve` failure means the run is permanently
  * gone (drop the runId) or just transient (keep it, surface a 502). See the
  * risk counterpart and Cubic findings #4/#5 on PR #2671.
  */
@@ -46,11 +46,9 @@ export async function GET(
     }
 
     try {
-      const publicAccessToken = await triggerAuth.createPublicToken({
-        scopes: { read: { runs: [vendor.autoLinkRunId] } },
-        expirationTime: '15m',
-      });
-      return NextResponse.json({ runId: vendor.autoLinkRunId, publicAccessToken });
+      // Confirms the run still exists; the UI then polls GET /v1/job-runs/:runId.
+      await runs.retrieve(vendor.autoLinkRunId);
+      return NextResponse.json({ runId: vendor.autoLinkRunId });
     } catch (err) {
       if (isRunGoneError(err)) {
         console.warn('[auto-link/active] run gone, clearing stored runId', err);
@@ -60,9 +58,9 @@ export async function GET(
         });
         return NextResponse.json({ runId: null });
       }
-      console.error('[auto-link/active] transient token mint failure', err);
+      console.error('[auto-link/active] transient run lookup failure', err);
       return NextResponse.json(
-        { error: 'Failed to mint access token; try again' },
+        { error: 'Failed to read run; try again' },
         { status: 502 },
       );
     }

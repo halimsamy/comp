@@ -1,7 +1,7 @@
 import { anthropic } from '@ai-sdk/anthropic';
 import { Impact, Likelihood } from '@db';
 import { db } from '@db/server';
-import { logger, schemaTask } from '@trigger.dev/sdk';
+import { logger, schemaTask } from '@trycompai/jobs';
 import { generateObject } from 'ai';
 import { z } from 'zod';
 

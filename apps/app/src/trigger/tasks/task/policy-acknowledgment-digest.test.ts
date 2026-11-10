@@ -26,7 +26,7 @@ vi.mock('@trycompai/email/lib/check-unsubscribe', () => ({
   getUnsubscribedEmails: vi.fn(),
 }));
 
-vi.mock('@trigger.dev/sdk', () => ({
+vi.mock('@trycompai/jobs', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
   schedules: {
     task: (config: { run: (payload: unknown) => Promise<unknown> }) => config,

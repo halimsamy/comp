@@ -1,6 +1,6 @@
 'use server';
 
-import { auth as triggerAuth, tasks } from '@trigger.dev/sdk';
+import { tasks } from '@trycompai/jobs';
 import { auth } from '@/utils/auth';
 import { headers } from 'next/headers';
 
@@ -13,7 +13,7 @@ interface PreviewInput {
 
 export async function startPreview(
   input: PreviewInput,
-): Promise<{ data?: { runId: string; accessToken: string }; error?: string }> {
+): Promise<{ data?: { runId: string }; error?: string }> {
   try {
     const session = await auth.api.getSession({
       headers: await headers(),
@@ -41,11 +41,7 @@ export async function startPreview(
       { tags: [organizationId] },
     );
 
-    const accessToken = await triggerAuth.createPublicToken({
-      scopes: { read: { runs: [handle.id] } },
-    });
-
-    return { data: { runId: handle.id, accessToken } };
+    return { data: { runId: handle.id } };
   } catch (err) {
     console.error('Failed to start preview:', err);
     return { error: err instanceof Error ? err.message : 'Failed to load preview' };
@@ -61,7 +57,7 @@ interface SingleFixInput {
 
 export async function startSingleFix(
   input: SingleFixInput,
-): Promise<{ data?: { runId: string; accessToken: string }; error?: string }> {
+): Promise<{ data?: { runId: string }; error?: string }> {
   try {
     const session = await auth.api.getSession({
       headers: await headers(),
@@ -89,11 +85,7 @@ export async function startSingleFix(
       { tags: [organizationId] },
     );
 
-    const accessToken = await triggerAuth.createPublicToken({
-      scopes: { read: { runs: [handle.id] } },
-    });
-
-    return { data: { runId: handle.id, accessToken } };
+    return { data: { runId: handle.id } };
   } catch (err) {
     console.error('Failed to start single fix:', err);
     return { error: err instanceof Error ? err.message : 'Failed to start fix' };

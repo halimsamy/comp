@@ -1,18 +1,18 @@
 import { requireApiPermission } from '@/lib/permissions.server';
 import { db } from '@db/server';
-import { auth as triggerAuth } from '@trigger.dev/sdk';
+import { runs } from '@trycompai/jobs';
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
- * Decide whether a `createPublicToken` failure is the "run was purged"
+ * Decide whether a `runs.retrieve` failure is the "run is gone"
  * terminal case (drop the stored runId — the run is permanently gone) or
  * something transient (a network blip, rate limit, auth issue) where we
  * should keep the runId so the next attempt can recover.
  *
- * Trigger.dev surfaces purged/missing runs as 404 with a "not found" body.
- * Anything else — including unauthorized, timeouts, 5xx — gets treated as
- * transient and bubbles up as a 502 from the route. See Cubic finding
- * #4/#5 on PR #2671.
+ * `runs.retrieve` throws "Run <id> not found" for missing runs (including
+ * run ids from before the job-queue migration). Anything else — e.g. a database error — gets
+ * treated as transient and bubbles up as a 502 from the route. See Cubic
+ * finding #4/#5 on PR #2671.
  */
 function isRunGoneError(err: unknown): boolean {
   if (!err) return false;
@@ -28,11 +28,11 @@ function isRunGoneError(err: unknown): boolean {
  *
  * Resumes an in-flight or completed-but-unreviewed AI suggestion run after a
  * page reload. The runId is persisted on the Risk row by `/auto-link`; this
- * endpoint mints a fresh public-access token (the previous one expires after
- * 15 minutes) so the UI can re-subscribe via `useRealtimeRun`.
+ * endpoint checks the run still exists so the UI can resume polling it via
+ * `useJobRun`.
  *
  * Returns `{ runId: null }` when no active run exists. Also returns null when
- * the trigger.dev run has been purged (TTL elapsed) — the caller treats both
+ * the stored run no longer exists — the caller treats both
  * the same: drop the stale runId and start fresh on the next user action.
  *
  * DELETE on the same path discards the active run (user clicked Discard).
@@ -61,14 +61,12 @@ export async function GET(
     }
 
     try {
-      const publicAccessToken = await triggerAuth.createPublicToken({
-        scopes: { read: { runs: [risk.autoLinkRunId] } },
-        expirationTime: '15m',
-      });
-      return NextResponse.json({ runId: risk.autoLinkRunId, publicAccessToken });
+      // Confirms the run still exists; the UI then polls GET /v1/job-runs/:runId.
+      await runs.retrieve(risk.autoLinkRunId);
+      return NextResponse.json({ runId: risk.autoLinkRunId });
     } catch (err) {
       if (isRunGoneError(err)) {
-        // Run was purged by trigger.dev (retention TTL or never existed).
+        // Run no longer exists (e.g. a run id from before the job-queue migration).
         // Drop the stale id so the next /auto-link call starts cleanly.
         console.warn('[auto-link/active] run gone, clearing stored runId', err);
         await db.risk.update({
@@ -79,9 +77,9 @@ export async function GET(
       }
       // Transient failure (network, 5xx, rate limit). Keep the runId so a
       // retry can recover; the UI treats 502 as "try again later".
-      console.error('[auto-link/active] transient token mint failure', err);
+      console.error('[auto-link/active] transient run lookup failure', err);
       return NextResponse.json(
-        { error: 'Failed to mint access token; try again' },
+        { error: 'Failed to read run; try again' },
         { status: 502 },
       );
     }

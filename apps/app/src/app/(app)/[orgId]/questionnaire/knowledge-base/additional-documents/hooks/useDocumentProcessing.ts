@@ -1,28 +1,22 @@
 'use client';
 
-import { useRealtimeRun } from '@trigger.dev/react-hooks';
+import { useJobRun } from '@/hooks/use-job-run';
 import { useCallback, useEffect, useRef } from 'react';
 
 interface UseDocumentProcessingOptions {
   processingRunId?: string | null;
-  processingToken?: string | null;
   deletionRunId?: string | null;
-  deletionToken?: string | null;
   onProcessingComplete?: () => void;
   onDeletionComplete?: () => void;
 }
 
 /**
- * Hook to track document processing and deletion runs using Trigger.dev realtime
- *
- * The tokens should be obtained from the API response (e.g., from processDocuments or deleteDocument endpoints)
- * which return `publicAccessToken` along with the `runId`.
+ * Hook to track document processing and deletion runs by polling their job runs.
+ * The run ids come from the API response (e.g. processDocuments or deleteDocument).
  */
 export function useDocumentProcessing({
   processingRunId,
-  processingToken,
   deletionRunId,
-  deletionToken,
   onProcessingComplete,
   onDeletionComplete,
 }: UseDocumentProcessingOptions) {
@@ -49,16 +43,14 @@ export function useDocumentProcessing({
   }, []);
 
   // Track processing run
-  const { run: processingRun } = useRealtimeRun(processingRunId || '', {
-    accessToken: processingToken || undefined,
-    enabled: !!processingRunId && !!processingToken,
+  const { run: processingRun } = useJobRun(processingRunId, {
+    enabled: !!processingRunId,
     onComplete: handleProcessingComplete,
   });
 
   // Track deletion run
-  const { run: deletionRun } = useRealtimeRun(deletionRunId || '', {
-    accessToken: deletionToken || undefined,
-    enabled: !!deletionRunId && !!deletionToken,
+  const { run: deletionRun } = useJobRun(deletionRunId, {
+    enabled: !!deletionRunId,
     onComplete: handleDeletionComplete,
   });
 

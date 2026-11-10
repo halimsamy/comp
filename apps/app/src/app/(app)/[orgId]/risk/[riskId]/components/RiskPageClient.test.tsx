@@ -43,8 +43,7 @@ vi.mock('@/hooks/use-risks', () => ({
   useRiskActions: () => ({
     updateRisk: vi.fn(),
     regenerateMitigation: vi.fn().mockResolvedValue({
-      runId: 'run_test',
-      publicAccessToken: 'tok_test',
+      runId: 'jrun_test',
     }),
     suggestRiskLinks: vi.fn(),
     applyRiskLinks: vi.fn(),

@@ -36,6 +36,10 @@ vi.mock('../hooks/useAuditLogs', () => ({
   auditLogsKey: vi.fn(),
 }));
 
+vi.mock('@/hooks/use-audit-logs', () => ({
+  useAuditLogs: () => ({ logs: [] }),
+}));
+
 // Mock useSWRConfig
 vi.mock('swr', () => ({
   useSWRConfig: () => ({
@@ -43,9 +47,10 @@ vi.mock('swr', () => ({
   }),
 }));
 
-// Mock useRealtimeRun from trigger.dev
-vi.mock('@trigger.dev/react-hooks', () => ({
-  useRealtimeRun: () => ({ run: null }),
+// Mock the job-run polling hook
+vi.mock('@/hooks/use-job-run', () => ({
+  useJobRun: () => ({ run: undefined, error: undefined, isLoading: false }),
+  isJobRunFinished: () => false,
 }));
 
 // Mock pdf-generator

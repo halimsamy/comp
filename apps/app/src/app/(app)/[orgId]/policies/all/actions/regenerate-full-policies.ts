@@ -2,7 +2,7 @@
 
 import { authActionClient } from '@/actions/safe-action';
 import { generateFullPolicies } from '@/trigger/tasks/onboarding/generate-full-policies';
-import { tasks } from '@trigger.dev/sdk';
+import { tasks } from '@trycompai/jobs';
 import { z } from 'zod';
 
 export const regenerateFullPoliciesAction = authActionClient

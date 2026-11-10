@@ -5,9 +5,10 @@ import { AutoLinkButton } from './AutoLinkButton';
 vi.mock('sonner', () => ({ toast: { info: vi.fn(), success: vi.fn(), error: vi.fn() } }));
 
 const realtimeRunMock = vi.fn();
-vi.mock('@trigger.dev/react-hooks', () => ({
-  useRealtimeRun: (runId: string, opts: { accessToken?: string; enabled?: boolean }) =>
+vi.mock('@/hooks/use-job-run', () => ({
+  useJobRun: (runId: string | null | undefined, opts?: { enabled?: boolean }) =>
     realtimeRunMock(runId, opts),
+  isJobRunFinished: () => false,
 }));
 
 afterEach(() => {
@@ -20,7 +21,7 @@ describe('AutoLinkButton', () => {
     render(
       <AutoLinkButton
         hasDescription={false}
-        onAutoLink={vi.fn().mockResolvedValue({ runId: 'r1', publicAccessToken: 't1' })}
+        onAutoLink={vi.fn().mockResolvedValue({ runId: 'r1' })}
       />,
     );
     expect(
@@ -33,7 +34,7 @@ describe('AutoLinkButton', () => {
     render(
       <AutoLinkButton
         hasDescription
-        onAutoLink={vi.fn().mockResolvedValue({ runId: 'r1', publicAccessToken: 't1' })}
+        onAutoLink={vi.fn().mockResolvedValue({ runId: 'r1' })}
       />,
     );
     expect(
@@ -45,7 +46,7 @@ describe('AutoLinkButton', () => {
     realtimeRunMock.mockReturnValue({
       run: { status: 'EXECUTING', metadata: { phase: 'embedding-tasks', current: 5, total: 10 } },
     });
-    const onAutoLink = vi.fn().mockResolvedValue({ runId: 'r1', publicAccessToken: 't1' });
+    const onAutoLink = vi.fn().mockResolvedValue({ runId: 'r1' });
     render(<AutoLinkButton hasDescription onAutoLink={onAutoLink} />);
     fireEvent.click(screen.getByRole('button'));
     await waitFor(() => {
@@ -59,7 +60,7 @@ describe('AutoLinkButton', () => {
     realtimeRunMock.mockReturnValue({
       run: { status: 'COMPLETED', metadata: { phase: 'done', riskLinks: 3, vendorLinks: 0 } },
     });
-    const onAutoLink = vi.fn().mockResolvedValue({ runId: 'r1', publicAccessToken: 't1' });
+    const onAutoLink = vi.fn().mockResolvedValue({ runId: 'r1' });
     const onAfterLink = vi.fn().mockResolvedValue(undefined);
     render(<AutoLinkButton hasDescription onAutoLink={onAutoLink} onAfterLink={onAfterLink} />);
     fireEvent.click(screen.getByRole('button'));
@@ -72,7 +73,7 @@ describe('AutoLinkButton', () => {
     realtimeRunMock.mockReturnValue({
       run: { status: 'COMPLETED', metadata: { phase: 'done', riskLinks: 0, vendorLinks: 0 } },
     });
-    const onAutoLink = vi.fn().mockResolvedValue({ runId: 'r1', publicAccessToken: 't1' });
+    const onAutoLink = vi.fn().mockResolvedValue({ runId: 'r1' });
     const onAfterLink = vi.fn();
     render(<AutoLinkButton hasDescription onAutoLink={onAutoLink} onAfterLink={onAfterLink} />);
     fireEvent.click(screen.getByRole('button'));
@@ -87,11 +88,23 @@ describe('AutoLinkButton', () => {
     realtimeRunMock.mockReturnValue({
       run: { status: 'FAILED', metadata: {} },
     });
-    const onAutoLink = vi.fn().mockResolvedValue({ runId: 'r1', publicAccessToken: 't1' });
+    const onAutoLink = vi.fn().mockResolvedValue({ runId: 'r1' });
     render(<AutoLinkButton hasDescription onAutoLink={onAutoLink} />);
     fireEvent.click(screen.getByRole('button'));
     await waitFor(() => {
       expect(screen.getByRole('button')).toBeInTheDocument();
     });
+  });
+
+  it('toasts error and returns to idle when the run cannot be read', async () => {
+    const { toast } = await import('sonner');
+    realtimeRunMock.mockReturnValue({ run: undefined, error: new Error('Run not found') });
+    const onAutoLink = vi.fn().mockResolvedValue({ runId: 'r1' });
+    render(<AutoLinkButton hasDescription onAutoLink={onAutoLink} />);
+    fireEvent.click(screen.getByRole('button'));
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith('Auto-link failed. Try again or link manually.');
+    });
+    expect(screen.getByRole('button')).toBeInTheDocument();
   });
 });

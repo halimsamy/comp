@@ -12,7 +12,7 @@ import {
   VendorStatus,
 } from '@db';
 import { db } from '@db/server';
-import { logger, metadata, tasks } from '@trigger.dev/sdk';
+import { logger, metadata, tasks } from '@trycompai/jobs';
 import { generateObject, jsonSchema } from 'ai';
 const ONBOARDING_MODEL = 'claude-opus-5-5' as const;
 import axios from 'axios';
@@ -1318,7 +1318,7 @@ export async function triggerPolicyUpdates(
     });
 
     await tasks.batchTrigger<typeof updatePolicy>(
-      'update-policy',
+      'onboarding-update-policy',
       policies.map((policy) => ({
         payload: {
           organizationId,
@@ -1351,7 +1351,7 @@ export async function createVendors(
     organizationId,
   );
 
-  // Trigger Risk Assessment task items in the API Trigger.dev project (batch, idempotent).
+  // Trigger Risk Assessment task items on the API worker (batch, idempotent).
   // We prefer triggering only for newly created vendors, but if for any reason this list is empty
   // (e.g. reruns, existing vendors), we still trigger for all created vendors — the API task is
   // idempotent and will quickly dedupe if the task already exists.

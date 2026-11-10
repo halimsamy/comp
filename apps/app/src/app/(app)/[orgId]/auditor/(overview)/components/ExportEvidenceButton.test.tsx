@@ -2,27 +2,26 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Capture the options passed to useRealtimeRun so tests can invoke onComplete
-// directly (simulating a Trigger.dev run reaching a terminal state).
+// Capture the options passed to useJobRun so tests can invoke onComplete
+// directly (simulating a job run reaching a terminal state).
 const mockRealtime: {
-  onComplete?: (
-    run: {
-      status?: string;
-      output?: { downloadUrl?: string } | null;
-      metadata?: Record<string, unknown>;
-    },
-    err?: Error,
-  ) => void;
+  onComplete?: (run: {
+    status?: string;
+    output?: { downloadUrl?: string } | null;
+    metadata?: Record<string, unknown>;
+  }) => void;
+  error?: Error;
 } = {};
 
-vi.mock('@trigger.dev/react-hooks', () => ({
-  useRealtimeRun: (
-    _runId: string,
+vi.mock('@/hooks/use-job-run', () => ({
+  useJobRun: (
+    _runId: string | null,
     options: { onComplete?: typeof mockRealtime.onComplete },
   ) => {
     mockRealtime.onComplete = options.onComplete;
-    return { run: undefined };
+    return { run: undefined, error: mockRealtime.error, isLoading: false };
   },
+  isJobRunFinished: () => false,
 }));
 
 const mockTriggerBulkEvidenceExport = vi.fn();
@@ -116,10 +115,8 @@ describe('ExportEvidenceButton', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRealtime.onComplete = undefined;
-    mockTriggerBulkEvidenceExport.mockResolvedValue({
-      runId: 'run_1',
-      publicAccessToken: 'tok_1',
-    });
+    mockRealtime.error = undefined;
+    mockTriggerBulkEvidenceExport.mockResolvedValue({ runId: 'jrun_1' });
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
   });
 
@@ -215,20 +212,19 @@ describe('ExportEvidenceButton', () => {
     expect(mockToastSuccess).not.toHaveBeenCalled();
   });
 
-  it('toasts a failure error when onComplete reports an error', async () => {
-    render(<ExportEvidenceButton organizationName="Acme" />);
+  it('toasts a failure error and stops the spinner when the run cannot be read', async () => {
+    const { rerender } = render(<ExportEvidenceButton organizationName="Acme" />);
     await startExport();
 
-    act(() => {
-      mockRealtime.onComplete?.(
-        { status: 'COMPLETED', output: { downloadUrl: 'https://example.com/x.zip' } },
-        new Error('subscription failed'),
-      );
-    });
+    mockRealtime.error = new Error('Run not found');
+    rerender(<ExportEvidenceButton organizationName="Acme" />);
 
-    expect(mockToastError).toHaveBeenCalledWith(
-      'Evidence export failed. Please try again.',
+    await waitFor(() =>
+      expect(mockToastError).toHaveBeenCalledWith(
+        'Evidence export failed. Please try again.',
+      ),
     );
+    expect(screen.queryByText('Starting export...')).not.toBeInTheDocument();
     expect(mockToastSuccess).not.toHaveBeenCalled();
   });
 });

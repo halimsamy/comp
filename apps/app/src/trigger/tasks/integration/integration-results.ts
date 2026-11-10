@@ -1,7 +1,7 @@
 import { decrypt } from '@trycompai/app/src/lib/encryption';
 import { type DecryptFunction, getIntegrationHandler } from '@trycompai/integrations';
 import { db } from '@db/server';
-import { logger, schemaTask } from '@trigger.dev/sdk';
+import { logger, schemaTask } from '@trycompai/jobs';
 import { z } from 'zod';
 
 const getAwsRegion = (details: unknown): string | null => {
@@ -34,7 +34,7 @@ export const sendIntegrationResults = schemaTask({
       }),
     }),
   }),
-  maxDuration: 1000 * 60 * 10, // 10 minutes
+  maxDuration: 60 * 10, // 10 minutes
   run: async (payload) => {
     const { integration } = payload;
 

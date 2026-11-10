@@ -1,5 +1,5 @@
 import { Prisma, RiskStatus, db } from '@db/server';
-import { logger, metadata, queue, tags, task, tasks } from '@trigger.dev/sdk';
+import { logger, metadata, queue, tags, task, tasks } from '@trycompai/jobs';
 import axios from 'axios';
 import {
   createRiskMitigationComment,

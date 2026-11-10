@@ -21,7 +21,6 @@ export interface AutoSigninCredentials {
 
 export interface AutoSigninHandle {
   runId: string;
-  publicAccessToken: string;
   profileId: string;
   /** Session the sign-in runs on — shown as a live view to watch / take over. */
   sessionId: string;
@@ -30,8 +29,8 @@ export interface AutoSigninHandle {
 
 /**
  * Password path of the connect flow: resolve the profile, store the login, then
- * kick off the automated first sign-in as a background Trigger.dev run. Returns
- * a handle to subscribe to (plus the profileId, so a fallback live sign-in can
+ * kick off the automated first sign-in as a background job. Returns
+ * a handle to poll (plus the profileId, so a fallback live sign-in can
  * target the same profile). Returns null on failure.
  */
 export function useAutoSignin() {
@@ -96,7 +95,6 @@ export function useAutoSignin() {
 
         const signinRes = await apiClient.post<{
           runId: string;
-          publicAccessToken: string;
           sessionId: string;
           liveViewUrl: string;
         }>(`/v1/browserbase/profiles/${profileId}/sign-in`, { url, mode, usernameLabel });
@@ -107,7 +105,6 @@ export function useAutoSignin() {
 
         return {
           runId: signinRes.data.runId,
-          publicAccessToken: signinRes.data.publicAccessToken,
           profileId,
           sessionId: signinRes.data.sessionId,
           liveViewUrl: signinRes.data.liveViewUrl,
