@@ -18,6 +18,8 @@ export interface SqlClient {
 
 export interface VectorFilter {
   organizationId: string;
+  /** Only rows whose metadata.sourceType is one of these. */
+  sourceTypes?: readonly string[];
 }
 
 /** Exact metadata match; organizationId is required so no call can span tenants. */
@@ -78,13 +80,17 @@ const toSqlVector = (vector: number[]): string => {
 };
 
 const columns = (includeVectors: boolean | undefined) =>
-  includeVectors ? `"id", "metadata", "embedding"::text AS "embedding"` : `"id", "metadata"`;
+  includeVectors
+    ? `"id", "metadata", "embedding"::text AS "embedding"`
+    : `"id", "metadata"`;
 
 const toRecord = (row: Row, includeVectors: boolean): VectorRecord => ({
   id: row.id,
   score: row.distance === undefined ? 1 : 1 - Number(row.distance) / 2,
   metadata: row.metadata ?? undefined,
-  ...(includeVectors && row.embedding ? { vector: JSON.parse(row.embedding) as number[] } : {}),
+  ...(includeVectors && row.embedding
+    ? { vector: JSON.parse(row.embedding) as number[] }
+    : {}),
 });
 
 export class PgVectorIndex {
@@ -127,11 +133,18 @@ export class PgVectorIndex {
     includeVectors?: boolean;
     filter?: VectorFilter;
   }): Promise<VectorRecord[]> {
-    const values: unknown[] = [toSqlVector(params.vector), Math.max(1, Math.floor(params.topK))];
+    const values: unknown[] = [
+      toSqlVector(params.vector),
+      Math.max(1, Math.floor(params.topK)),
+    ];
     let where = '';
     if (params.filter) {
       values.push(params.filter.organizationId);
       where = `WHERE "organizationId" = $3`;
+      if (params.filter.sourceTypes) {
+        values.push(params.filter.sourceTypes);
+        where += ` AND "metadata"->>'sourceType' = ANY($4::text[])`;
+      }
     }
     const rows = await this.db.$queryRawUnsafe<Row[]>(
       `SELECT ${columns(params.includeVectors)}, "embedding" <=> $1::vector AS "distance"
@@ -190,9 +203,14 @@ export class PgVectorIndex {
       params.prefix ?? '',
       limit,
     );
-    const vectors = rows.map((row) => toRecord(row, Boolean(params.includeVectors)));
+    const vectors = rows.map((row) =>
+      toRecord(row, Boolean(params.includeVectors)),
+    );
     const last = rows.at(-1);
-    return { vectors, nextCursor: rows.length === limit && last ? last.id : '' };
+    return {
+      vectors,
+      nextCursor: rows.length === limit && last ? last.id : '',
+    };
   }
 
   /** Every row matching the metadata filter, exactly (no similarity search, no top-K cap). */

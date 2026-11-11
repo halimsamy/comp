@@ -6,17 +6,26 @@ import {
 } from './generate-embedding';
 import { logger } from '../../logger';
 
+/**
+ * Sources that answer questions about the organization. The same table also holds
+ * task/risk/vendor vectors used for linkage suggestions; those are never searched here.
+ */
+export const KNOWLEDGE_SOURCE_TYPES = [
+  'policy',
+  'context',
+  'document_hub',
+  'attachment',
+  'manual_answer',
+  'knowledge_base_document',
+] as const;
+
+export type KnowledgeSourceType = (typeof KNOWLEDGE_SOURCE_TYPES)[number];
+
 export interface SimilarContentResult {
   id: string;
   score: number;
   content: string;
-  sourceType:
-    | 'policy'
-    | 'context'
-    | 'document_hub'
-    | 'attachment'
-    | 'manual_answer'
-    | 'knowledge_base_document';
+  sourceType: KnowledgeSourceType;
   sourceId: string;
   policyName?: string;
   contextQuestion?: string;
@@ -58,6 +67,7 @@ export function assertSafeOrganizationId(organizationId: string): void {
 export async function findSimilarContent(
   question: string,
   organizationId: string,
+  options: { sourceTypes?: readonly KnowledgeSourceType[] } = {},
 ): Promise<SimilarContentResult[]> {
   if (!vectorIndex) {
     logger.warn('Vector store is not configured, returning empty results');
@@ -80,7 +90,10 @@ export async function findSimilarContent(
       vector: queryEmbedding,
       topK: MAX_TOP_K,
       includeMetadata: true,
-      filter: organizationFilter(organizationId),
+      filter: {
+        ...organizationFilter(organizationId),
+        sourceTypes: options.sourceTypes ?? KNOWLEDGE_SOURCE_TYPES,
+      },
     });
 
     // Filter by minimum similarity score, then keep only the highest-scoring
@@ -190,7 +203,10 @@ export async function findSimilarContentBatch(
             vector: embedding,
             topK: MAX_TOP_K,
             includeMetadata: true,
-            filter: organizationFilter(organizationId),
+            filter: {
+              ...organizationFilter(organizationId),
+              sourceTypes: KNOWLEDGE_SOURCE_TYPES,
+            },
           });
           return { index, results };
         } catch (error) {

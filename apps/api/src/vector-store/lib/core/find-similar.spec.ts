@@ -156,8 +156,36 @@ describe('organizationFilter: filter injection hardening (GH-043)', () => {
     await findSimilarContent('q', orgId);
 
     expect(mockQuery).toHaveBeenCalledWith(
-      expect.objectContaining({ filter: { organizationId: orgId } }),
+      expect.objectContaining({
+        filter: expect.objectContaining({ organizationId: orgId }),
+      }),
     );
+  });
+
+  it('searches only knowledge sources, never task/risk/vendor linkage vectors', async () => {
+    mockQuery.mockResolvedValue([]);
+    const orgId = 'org_68d3f2f01a2b3c4d5e6f7a8b';
+
+    await findSimilarContent('q', orgId);
+    await findSimilarContentBatch(['q'], orgId);
+
+    for (const [args] of mockQuery.mock.calls) {
+      expect(args.filter.sourceTypes).toEqual(
+        expect.arrayContaining(['policy', 'context', 'manual_answer', 'knowledge_base_document']),
+      );
+      expect(args.filter.sourceTypes).not.toEqual(
+        expect.arrayContaining(['task']),
+      );
+    }
+  });
+
+  it('narrows the search to the requested source types', async () => {
+    mockQuery.mockResolvedValue([]);
+    const orgId = 'org_68d3f2f01a2b3c4d5e6f7a8b';
+
+    await findSimilarContent('q', orgId, { sourceTypes: ['context'] });
+
+    expect(mockQuery.mock.calls[0]![0].filter.sourceTypes).toEqual(['context']);
   });
 });
 
@@ -169,7 +197,9 @@ describe('findSimilarContent: organizationId filter injection guard (GH-103)', (
 
     expect(mockQuery).toHaveBeenCalledWith(
       expect.objectContaining({
-        filter: { organizationId: 'org_cl9ebqhxk00003b600tymydho' },
+        filter: expect.objectContaining({
+          organizationId: 'org_cl9ebqhxk00003b600tymydho',
+        }),
       }),
     );
   });
@@ -209,7 +239,9 @@ describe('findSimilarContentBatch: organizationId filter injection guard (GH-103
 
     expect(mockQuery).toHaveBeenCalledWith(
       expect.objectContaining({
-        filter: { organizationId: 'org_cl9ebqhxk00003b600tymydho' },
+        filter: expect.objectContaining({
+          organizationId: 'org_cl9ebqhxk00003b600tymydho',
+        }),
       }),
     );
   });

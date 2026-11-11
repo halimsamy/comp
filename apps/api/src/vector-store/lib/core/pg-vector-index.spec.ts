@@ -31,6 +31,20 @@ describe('PgVectorIndex', () => {
     expect(params).toEqual(['[1,0]', 5, 'org_1" OR 1=1']);
   });
 
+  it('restricts query results to the given source types with a bound array parameter', async () => {
+    const { db, index } = makeDb();
+
+    await index.query({
+      vector: [1, 0],
+      topK: 5,
+      filter: { organizationId: 'org_1', sourceTypes: ['context', 'policy'] },
+    });
+
+    const [sql, ...params] = db.$queryRawUnsafe.mock.calls[0]!;
+    expect(sql).toContain(`"metadata"->>'sourceType' = ANY($4::text[])`);
+    expect(params).toEqual(['[1,0]', 5, 'org_1', ['context', 'policy']]);
+  });
+
   it('upserts every item in one statement and keeps organizationId in its own column', async () => {
     const { db, index } = makeDb();
     await index.upsert([
