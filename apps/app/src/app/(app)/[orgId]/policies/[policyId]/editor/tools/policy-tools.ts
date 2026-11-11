@@ -1,6 +1,7 @@
 import { env } from '@/env.mjs';
 import { type InferUITools, tool } from 'ai';
 import { z } from 'zod';
+import { buildListEvidenceTool } from './list-evidence-tool';
 
 interface PolicyToolsOptions {
   currentPolicyId: string;
@@ -152,25 +153,8 @@ export function getPolicyTools({ currentPolicyId, cookieHeader }: PolicyToolsOpt
       },
     }),
 
-    listEvidence: tool({
-      description:
-        'List evidence submissions in the organization. Returns form type, status, submission date, and submitter info. Useful for referencing compliance evidence when editing policies.',
-      inputSchema: z.object({
-        formType: z
-          .string()
-          .optional()
-          .describe(
-            'Optional filter by form type: board-meeting, it-leadership-meeting, risk-committee-meeting, meeting, access-request, whistleblower-report, penetration-test, rbac-matrix, infrastructure-inventory, employee-performance-evaluation, network-diagram, tabletop-exercise',
-          ),
-      }),
-      execute: async ({ formType }) => {
-        const params = formType ? `?formType=${formType}` : '';
-        const result = await apiCall<{ data: Array<Record<string, unknown>>; count: number }>({
-          endpoint: `/v1/evidence${params}`,
-          cookieHeader,
-        });
-        return { evidence: result.data, count: result.count };
-      },
+    listEvidence: buildListEvidenceTool({
+      apiCall: <T,>(endpoint: string) => apiCall<T>({ endpoint, cookieHeader }),
     }),
   };
 }

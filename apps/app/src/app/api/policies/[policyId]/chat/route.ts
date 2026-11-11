@@ -101,7 +101,7 @@ You have access to tools that let you look up real organizational data. Use them
 - getVendor: Get full details for a specific vendor (contacts, risk assessment, compliance). Use after listVendors to get specifics.
 - listPolicies: List all other policies in the organization. Use for cross-referencing or ensuring consistency.
 - getPolicy: Get the full content of another policy. Use when the user wants to align language or reference another policy.
-- listEvidence: List evidence submissions (meeting minutes, access requests, pen tests, etc.). Use when referencing compliance evidence.
+- listEvidence: Without formType, see which evidence forms have submissions; with formType, read the latest submissions in full (infrastructure inventory, RBAC matrix, meeting minutes, access requests, pen test summary, etc.). Use when referencing compliance evidence.
 
 When incorporating organizational data into the policy, use the real names, categories, and details from the tools rather than generic placeholders.
 
