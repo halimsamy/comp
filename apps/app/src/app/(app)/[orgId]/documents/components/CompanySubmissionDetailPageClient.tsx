@@ -16,12 +16,6 @@ import {
   Field,
   FieldLabel,
   Section,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
   Text,
   Textarea,
 } from '@trycompai/design-system';
@@ -38,6 +32,8 @@ import {
   normalizeMatrixRows,
   renderSubmissionValue,
 } from './submission-utils';
+import { matrixCsvFilename } from './matrix-csv';
+import { SubmissionMatrixField } from './SubmissionMatrixField';
 
 type EvidenceSubmissionRow = {
   id: string;
@@ -295,48 +291,21 @@ export function CompanySubmissionDetailPageClient({
                   </div>
                 </div>
               )}
-            {matrixFields.map((field) => {
-              const rows = normalizeMatrixRows(submission.data[field.key]);
-              return (
-                <div key={field.key} className="grid grid-cols-1 gap-2 p-4 lg:grid-cols-3">
-                  <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    {field.label}
-                  </div>
-                  <div className="lg:col-span-2 text-sm">
-                    {rows.length === 0 ? (
-                      <Text size="sm" variant="muted">
-                        —
-                      </Text>
-                    ) : (
-                      <Table variant="bordered">
-                        <TableHeader>
-                          <TableRow>
-                            {field.columns.map((column) => (
-                              <TableHead key={`${field.key}-header-${column.key}`}>
-                                {column.label}
-                              </TableHead>
-                            ))}
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {rows.map((row, rowIndex) => (
-                            <TableRow key={`${field.key}-row-${rowIndex}`}>
-                              {field.columns.map((column) => (
-                                <TableCell key={`${field.key}-row-${rowIndex}-${column.key}`}>
-                                  <div className="whitespace-pre-wrap">
-                                    {row[column.key] || '—'}
-                                  </div>
-                                </TableCell>
-                              ))}
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+            {matrixFields.map((field) => (
+              <SubmissionMatrixField
+                key={field.key}
+                label={field.label}
+                columns={field.columns}
+                rows={normalizeMatrixRows(submission.data[field.key])}
+                fileName={matrixCsvFilename({
+                  formType,
+                  submittedOn:
+                    typeof submission.data.submissionDate === 'string'
+                      ? submission.data.submissionDate
+                      : submission.submittedAt,
+                })}
+              />
+            ))}
           </div>
         </div>
 
