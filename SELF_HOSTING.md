@@ -1,36 +1,57 @@
-## Self-hosting Comp (Apps + Portal)
+## Self-hosting Comp
 
-This file is a brief overview for Docker-based self-hosting.
+`docker-compose.yml` runs the whole stack on one machine:
 
-**For the detailed, up-to-date guide, see:**
+| Service | What | Listens on |
+|---------|------|------------|
+| `postgres` | PostgreSQL 17 + pgvector (data, vector search, job queues) | 127.0.0.1:5432 |
+| `valkey`, `redis-http` | Valkey behind an Upstash-compatible REST proxy (rate limits, caches) | 127.0.0.1:8079 |
+| `s3`, `s3-init` | SeaweedFS S3-compatible file storage, bucket creation | 127.0.0.1:8333 |
+| `api`, `api-worker` | NestJS API and its background job worker | 127.0.0.1:3333 |
+| `app`, `app-worker` | Main app and its background job worker | 127.0.0.1:3000 |
+| `portal` | Employee portal | 127.0.0.1:3002 |
+| `migrator`, `seeder` | One-off: database migrations, framework/template seed data | — |
 
-- [Docker Self-Hosting Guide](https://trycomp.ai/docs/self-hosting/docker)
-- [Environment Reference](https://trycomp.ai/docs/self-hosting/env-reference)
+Everything listens on 127.0.0.1 only. Put a TLS reverse proxy (Caddy, nginx) on the same
+machine in front of four public URLs: app, portal, API and file storage. They can be four
+hostnames or one hostname on four ports (login cookies are shared across ports). Users'
+browsers talk to all four directly, and the services call the public URLs server-side too.
 
-### Quick Summary
+### Prerequisites
 
-Docker uses **separate env files** (not a root `.env`):
+- Docker Engine with the compose plugin, and roughly 8 GB RAM plus swap for the image builds
+- A TLS reverse proxy and DNS for the four URLs
+- [SendGrid](https://sendgrid.com) account with a verified sender domain
+- Anthropic (Claude) and Voyage AI API keys
 
-| File | Services |
-|------|----------|
-| `packages/db/.env` | migrator, seeder |
-| `apps/app/.env` | app |
+### Configuration
+
+| File | Used by |
+|------|---------|
+| `.env` (repo root) | compose itself: `APP_URL`, `PORTAL_URL`, `API_URL`, `POSTGRES_PASSWORD`, `SRH_TOKEN`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `COMP_CA_CERT` |
+| `apps/api/.env` | api, api-worker, migrator, seeder |
+| `apps/app/.env` | app, app-worker |
 | `apps/portal/.env` | portal |
 
-### Minimal Required Environment
+Start from the `.env.example` files. Key settings:
 
-For a functional deployment:
-
-- **Database**: `DATABASE_URL` in all three env files
-- **Auth**: `AUTH_SECRET`, `SECRET_KEY`, `BETTER_AUTH_URL`, `NEXT_PUBLIC_BETTER_AUTH_URL` (app); `BETTER_AUTH_SECRET` (portal)
-- **Email**: `SENDGRID_API_KEY` and `EMAIL_FROM_SYSTEM` / `EMAIL_FROM_DEFAULT` in api (sent by the api job worker)
-- **Background jobs**: no extra keys; the job workers use `DATABASE_URL`
-- **Misc**: `REVALIDATION_SECRET`, `NEXT_PUBLIC_PORTAL_URL` in app
-
-**Self-Hosted Mode:**
-- Set `NEXT_PUBLIC_SELF_HOSTED=true` in `apps/app/.env` to mark the instance as self-hosted
-- When enabled, organizations are automatically approved and bypass the payment/booking flow
-- `STRIPE_SECRET_KEY` is not required for self-hosted instances
+- **URLs**: `APP_URL`/`PORTAL_URL`/`API_URL` in the root `.env` are baked into the app and
+  portal images at build time; rebuild after changing them. In the api env: `BASE_URL` (API
+  URL), `BETTER_AUTH_URL` and `NEXT_PUBLIC_APP_URL` (app URL), `AUTH_TRUSTED_ORIGINS`
+  (app and portal URLs).
+- **Database**: `DATABASE_URL=postgresql://comp:$POSTGRES_PASSWORD@localhost:5432/comp` in all
+  three env files (`localhost` connections skip TLS; any other host requires TLS).
+- **Secrets**: the same `SECRET_KEY`, `ENCRYPTION_KEY`, `UNSUBSCRIBE_SECRET`,
+  `INTERNAL_API_TOKEN`, `SERVICE_TOKEN_TRIGGER` and `SERVICE_TOKEN_PORTAL` wherever they
+  appear; `AUTH_SECRET` (app, portal) and `BETTER_AUTH_SECRET` (portal) = `SECRET_KEY`.
+- **Redis**: `UPSTASH_REDIS_REST_URL=http://127.0.0.1:8079`, `UPSTASH_REDIS_REST_TOKEN=$SRH_TOKEN`.
+- **Email**: `SENDGRID_API_KEY` and `EMAIL_FROM_*` in the api env (sent by the api worker).
+- **Self-hosted mode**: the app image is built with `NEXT_PUBLIC_SELF_HOSTED=true`, so every
+  organization is approved without billing; set `SELF_HOSTED=true` in the api env too.
+- **Pentests**: the api won't boot without `MACED_API_KEY`; if you don't use the pentest
+  product, set a placeholder with the right prefix, e.g. `mc_dev_unused`.
+- **Private CA**: if the proxy's certificate comes from a private CA, set `COMP_CA_CERT` to
+  its root certificate so server-side calls to the public URLs verify.
 
 **Feature Flags (without PostHog):**
 - Feature flags normally come from PostHog. Without it, every flag is off; turn flags on for
@@ -38,45 +59,13 @@ For a functional deployment:
   `ai-vendor-questionnaire`, `is-ai-policy-assistant-enabled`, `is-isms-enabled`,
   `is-timeline-enabled`, `is-trust-nda-enabled`, `is-web-automations-enabled`
 
-### Prerequisites
-
-- Docker Desktop or Docker Engine
-- External PostgreSQL 14+ with SSL and the [pgvector](https://github.com/pgvector/pgvector) extension available (used for vector search)
-- [SendGrid](https://sendgrid.com) account with a verified sender domain
-
-### Build & Run
-
-```bash
-# 1. Create env files from examples
-cp packages/db/.env.example packages/db/.env
-cp apps/app/.env.example apps/app/.env
-cp apps/portal/.env.example apps/portal/.env
-# Edit each with your production values
-
-# 2. Export build args
-export BETTER_AUTH_URL="https://app.yourdomain.com"
-export BETTER_AUTH_URL_PORTAL="https://portal.yourdomain.com"
-
-# 3. Build
-docker compose build --no-cache
-
-# 4. Migrate & seed
-docker compose run --rm migrator
-docker compose run --rm seeder
-
-# 5. Start
-docker compose up -d s3 s3-init app portal
-```
-
 ### File Storage
 
-Files (attachments, policy PDFs, logos, questionnaires) live in the bundled S3-compatible
-store, SeaweedFS (`s3` service, data in the `s3_data` volume); `s3-init` creates the
-buckets listed in `S3_BUCKETS`. Export `S3_ACCESS_KEY` and `S3_SECRET_KEY` before
-`docker compose up`, then set in the app, portal and api env files:
+Files (attachments, policy PDFs, logos, questionnaires) live in SeaweedFS (`s3_data`
+volume). Set in the app, portal and api env files:
 
 ```bash
-APP_AWS_ENDPOINT=https://files.yourdomain.com   # proxied (TLS) to port 8333
+APP_AWS_ENDPOINT=https://files.yourdomain.com   # the file-storage URL, proxied to 127.0.0.1:8333
 APP_AWS_REGION=us-east-1
 APP_AWS_ACCESS_KEY_ID=$S3_ACCESS_KEY
 APP_AWS_SECRET_ACCESS_KEY=$S3_SECRET_KEY
@@ -87,36 +76,44 @@ APP_AWS_ORG_ASSETS_BUCKET=comp-org-assets
 FLEET_AGENT_BUCKET_NAME=comp-device-agent   # api only
 ```
 
-Browsers upload and download through presigned URLs signed for `APP_AWS_ENDPOINT`, so it
-must be one URL that both the containers and your users' browsers can reach. Leave
-`APP_AWS_ENDPOINT` empty to use AWS S3 instead.
+Browsers upload and download through presigned URLs signed for `APP_AWS_ENDPOINT`; the
+proxy must pass the `Host` header through unchanged. Leave `APP_AWS_ENDPOINT` empty to use
+AWS S3 instead.
 
-### Background Job Workers
-
-Background jobs run on pg-boss inside your PostgreSQL database (schema `pgboss`), so no
-extra service is needed. Run the two workers next to the app and API, from a checkout of
-the repo with dependencies installed (`bun install`) and the same env files as the app
-they belong to:
+### Build & Run
 
 ```bash
-bun run --cwd packages/email build && bun run --cwd packages/integration-platform build
-bun run --cwd apps/api worker   # API jobs (needs apps/api/.env)
-bun run --cwd apps/app worker   # app jobs (needs apps/app/.env; needs Chrome for puppeteer)
+# 1. Build (one at a time keeps memory use down)
+for s in api api-worker app app-worker portal; do docker compose build $s; done
+
+# 2. Infrastructure, then migrate & seed
+docker compose up -d postgres valkey redis-http s3 s3-init
+docker compose run --rm migrator
+docker compose run --rm seeder
+
+# 3. Start
+docker compose up -d
 ```
 
-The API worker can also run as a container: build `apps/api/Dockerfile.multistage` with
-`--target worker`. Keep at least one replica of each worker running; scheduled jobs (cron)
-are registered by the workers when they start. See `packages/jobs/README.md`.
+To upgrade: `git pull`, rebuild, run the migrator, `docker compose up -d`.
+
+Background jobs run on pg-boss inside PostgreSQL (schema `pgboss`); `api-worker` and
+`app-worker` process them and register scheduled jobs when they start. See
+`packages/jobs/README.md`.
+
+### Backups
+
+Back up the `postgres_data` and `s3_data` volumes, e.g. nightly
+`docker compose exec -T postgres pg_dump -U comp -Fc comp > comp-$(date +%F).dump` plus a copy
+of the SeaweedFS data, and keep the env files somewhere safe: without `ENCRYPTION_KEY` the
+stored integration credentials cannot be decrypted.
 
 ### Troubleshooting
 
-View logs to debug missing env vars:
-
 ```bash
-docker compose logs app
-docker compose logs portal
+docker compose ps
+docker compose logs -f api app
 ```
 
-The Dockerfile sets `SKIP_ENV_VALIDATION=true` at build time, so missing variables only cause errors at runtime.
-
-See the [full troubleshooting guide](https://trycomp.ai/docs/self-hosting/docker#troubleshooting) for common issues.
+The images are built with `SKIP_ENV_VALIDATION=true`, so missing variables only cause
+errors at runtime.

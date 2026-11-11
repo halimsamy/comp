@@ -9,15 +9,20 @@ WORKDIR /app
 # later stages expect; Bun >= 1.3 otherwise defaults to isolated installs)
 COPY package.json bun.lock bunfig.toml ./
 
-# Copy package.json files for all packages (exclude local db; use published @trycompai/db)
-COPY packages/kv/package.json ./packages/kv/
-COPY packages/ui/package.json ./packages/ui/
+# Copy package.json files for every workspace package the app and portal depend on
+COPY packages/analytics/package.json ./packages/analytics/
+COPY packages/auth/package.json ./packages/auth/
+COPY packages/billing/package.json ./packages/billing/
+COPY packages/company/package.json ./packages/company/
+COPY packages/db/package.json ./packages/db/
 COPY packages/email/package.json ./packages/email/
 COPY packages/integration-platform/package.json ./packages/integration-platform/
 COPY packages/integrations/package.json ./packages/integrations/
-COPY packages/utils/package.json ./packages/utils/
+COPY packages/jobs/package.json ./packages/jobs/
+COPY packages/kv/package.json ./packages/kv/
 COPY packages/tsconfig/package.json ./packages/tsconfig/
-COPY packages/analytics/package.json ./packages/analytics/
+COPY packages/ui/package.json ./packages/ui/
+COPY packages/utils/package.json ./packages/utils/
 
 # Copy app package.json files
 COPY apps/app/package.json ./apps/app/
@@ -72,6 +77,15 @@ COPY --from=deps /app/node_modules ./node_modules
 RUN cd packages/db && node scripts/combine-schemas.js \
                    && node scripts/generate-prisma-client-js.js
 
+# Compile the workspace packages the app imports from their dist/ exports
+RUN cd packages/db && bun run build \
+  && cd ../auth && bun run build \
+  && cd ../integration-platform && bun run build \
+  && cd ../email && bun run build \
+  && cd ../company && bun run build \
+  && cd ../billing && bun run build \
+  && cd ../jobs && bun run build
+
 # Ensure Next build has required public env at build-time
 ARG NEXT_PUBLIC_BETTER_AUTH_URL
 ARG NEXT_PUBLIC_PORTAL_URL
@@ -79,7 +93,9 @@ ARG NEXT_PUBLIC_POSTHOG_KEY
 ARG NEXT_PUBLIC_POSTHOG_HOST
 ARG NEXT_PUBLIC_IS_DUB_ENABLED
 ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_SELF_HOSTED
 ENV NEXT_PUBLIC_BETTER_AUTH_URL=$NEXT_PUBLIC_BETTER_AUTH_URL \
+    NEXT_PUBLIC_SELF_HOSTED=$NEXT_PUBLIC_SELF_HOSTED \
     NEXT_PUBLIC_PORTAL_URL=$NEXT_PUBLIC_PORTAL_URL \
     NEXT_PUBLIC_POSTHOG_KEY=$NEXT_PUBLIC_POSTHOG_KEY \
     NEXT_PUBLIC_POSTHOG_HOST=$NEXT_PUBLIC_POSTHOG_HOST \
@@ -123,11 +139,19 @@ COPY --from=deps /app/node_modules ./node_modules
 
 # Pre-combine schemas for portal build
 RUN cd packages/db && node scripts/combine-schemas.js
-RUN cp packages/db/dist/schema.prisma apps/portal/prisma/schema.prisma
+# build:docker generates from prisma/schema/, which only holds the generator in git
+RUN cd apps/portal && bun run db:getschema
+
+# Compile the workspace packages the portal imports from their dist/ exports
+RUN cd packages/db && bun run build \
+  && cd ../auth && bun run build \
+  && cd ../company && bun run build
 
 # Ensure Next build has required public env at build-time
 ARG NEXT_PUBLIC_BETTER_AUTH_URL
+ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_BETTER_AUTH_URL=$NEXT_PUBLIC_BETTER_AUTH_URL \
+    NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \
     NEXT_TELEMETRY_DISABLED=1 NODE_ENV=production \
     NEXT_OUTPUT_STANDALONE=true \
     NODE_OPTIONS=--max_old_space_size=6144
@@ -150,7 +174,13 @@ COPY --from=portal-builder /app/apps/portal/public ./apps/portal/public
 EXPOSE 3000
 CMD ["node", "apps/portal/server.js"]
 
-# Background jobs run in two pg-boss workers (no extra infrastructure; queues
-# live in the app database): `bun run worker` in apps/api and in apps/app. They
-# run from source under bun with the same env as their app. See
-# packages/jobs/README.md.
+# =============================================================================
+# STAGE 7: App background job worker (pg-boss via @trycompai/jobs)
+# Runs apps/app/src/worker.ts from source under bun with the app's env. The API
+# worker is the `worker` target of apps/api/Dockerfile.multistage.
+# See packages/jobs/README.md.
+# =============================================================================
+FROM app-builder AS app-worker
+
+WORKDIR /app/apps/app
+CMD ["bun", "src/worker.ts"]

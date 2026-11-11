@@ -174,7 +174,10 @@ async function bootstrap(): Promise<void> {
     },
   });
 
-  const server = await app.listen(port);
+  // HOST=127.0.0.1 keeps the API behind a reverse proxy on the same machine.
+  const server = process.env.HOST
+    ? await app.listen(port, process.env.HOST)
+    : await app.listen(port);
   const address = server.address();
   const actualPort = typeof address === 'string' ? port : address?.port || port;
   const actualUrl = `http://localhost:${actualPort}`;

@@ -1,3 +1,7 @@
+# Full self-hosted stack. Infrastructure runs on the compose network and publishes
+# only to 127.0.0.1; app, portal, api and the two job workers use host networking,
+# listen on 127.0.0.1 and sit behind a TLS reverse proxy on the same machine (see
+# SELF_HOSTING.md). Variables like ${APP_URL} come from the root .env file.
 x-logging: &default-logging
   driver: json-file
   options:
@@ -5,11 +9,45 @@ x-logging: &default-logging
     max-file: '5'
     compress: 'true'
 
+x-host-service: &host-service
+  network_mode: host
+  restart: unless-stopped
+  logging: *default-logging
+  volumes:
+    # CA that signed the reverse proxy's certificate, so server-side calls to the
+    # public URLs verify. Point COMP_CA_CERT at a public CA bundle if you use one.
+    - ${COMP_CA_CERT:-/etc/ssl/certs/ca-certificates.crt}:/etc/comp/ca.crt:ro
+
+x-app-build-args: &app-build-args
+  NEXT_PUBLIC_BETTER_AUTH_URL: ${APP_URL:?set APP_URL}
+  NEXT_PUBLIC_API_URL: ${API_URL:?set API_URL}
+  NEXT_PUBLIC_PORTAL_URL: ${PORTAL_URL:?set PORTAL_URL}
+  # Auto-approves every organization (no billing/booking flow).
+  NEXT_PUBLIC_SELF_HOSTED: 'true'
+
 services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: comp
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: comp
+    ports:
+      - '127.0.0.1:5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U comp -d comp']
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    logging: *default-logging
+
   # Self-hosted replacement for Upstash Redis: Valkey (BSD-licensed Redis fork) behind
   # SRH, which speaks the Upstash REST protocol so @upstash/redis and @upstash/ratelimit
-  # work unchanged. Point UPSTASH_REDIS_REST_URL at http://redis-http and
-  # UPSTASH_REDIS_REST_TOKEN at SRH_TOKEN in the app, portal and api env files.
+  # work unchanged. Set UPSTASH_REDIS_REST_URL=http://127.0.0.1:8079 and
+  # UPSTASH_REDIS_REST_TOKEN=$SRH_TOKEN in the app, portal and api env files.
   valkey:
     image: valkey/valkey:8-alpine
     command: valkey-server --appendonly yes
@@ -28,17 +66,20 @@ services:
       SRH_MODE: env
       SRH_TOKEN: ${SRH_TOKEN:?set SRH_TOKEN to a long random string}
       SRH_CONNECTION_STRING: redis://valkey:6379
+    ports:
+      - '127.0.0.1:8079:80'
     depends_on:
       valkey:
         condition: service_healthy
     restart: unless-stopped
     logging: *default-logging
+
   # Self-hosted S3-compatible object storage (SeaweedFS) replacing AWS S3. Set in the
   # app, portal and api env files: APP_AWS_ENDPOINT, APP_AWS_ACCESS_KEY_ID=$S3_ACCESS_KEY,
   # APP_AWS_SECRET_ACCESS_KEY=$S3_SECRET_KEY, APP_AWS_REGION=us-east-1, and the bucket
   # names from S3_BUCKETS. Browsers upload/download via presigned URLs signed for
-  # APP_AWS_ENDPOINT, so it must be one URL that both these containers and users'
-  # browsers reach, e.g. https://files.example.com proxied (TLS) to port 8333.
+  # APP_AWS_ENDPOINT, so it must be one URL that both these services and users'
+  # browsers reach, e.g. https://files.example.com proxied (TLS) to 127.0.0.1:8333.
   s3:
     image: chrislusf/seaweedfs:4.50
     command: server -dir=/data -volume.max=0 -s3
@@ -46,7 +87,7 @@ services:
       AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:?set S3_ACCESS_KEY}
       AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:?set S3_SECRET_KEY to a long random string}
     ports:
-      - '8333:8333'
+      - '127.0.0.1:8333:8333'
     volumes:
       - s3_data:/data
     restart: unless-stopped
@@ -69,61 +110,120 @@ services:
       s3:
         condition: service_healthy
     logging: *default-logging
+
+  # One-off jobs, run with `docker compose run --rm migrator` / `seeder`. They use the
+  # API worker image, which carries packages/db with its migrations and seed data.
   migrator:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: migrator
+    image: comp-api-worker
+    network_mode: host
     env_file:
-      - packages/db/.env
+      - apps/api/.env
+    working_dir: /app/packages/db
+    command: bunx prisma migrate deploy
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: 'no'
     logging: *default-logging
+    profiles: ['tools']
   seeder:
+    image: comp-api-worker
+    network_mode: host
+    env_file:
+      - apps/api/.env
+    working_dir: /app/packages/db
+    command: bun prisma/seed/seed.ts
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: 'no'
+    logging: *default-logging
+    profiles: ['tools']
+
+  api:
+    <<: *host-service
+    image: comp-api
     build:
       context: .
-      dockerfile: Dockerfile
-      target: migrator
+      dockerfile: apps/api/Dockerfile.multistage
+      target: production
     env_file:
-      - packages/db/.env
-    command: sh -lc "bunx prisma generate --schema=node_modules/@trycompai/db/dist/schema.prisma && bun packages/db/prisma/seed/seed.js"
-    logging: *default-logging
+      - apps/api/.env
+    environment:
+      HOST: 127.0.0.1
+      PORT: 3333
+      NODE_EXTRA_CA_CERTS: /etc/comp/ca.crt
+    depends_on:
+      postgres:
+        condition: service_healthy
+  api-worker:
+    <<: *host-service
+    image: comp-api-worker
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile.multistage
+      target: worker
+    env_file:
+      - apps/api/.env
+    environment:
+      NODE_EXTRA_CA_CERTS: /etc/comp/ca.crt
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   app:
+    <<: *host-service
+    image: comp-app
     build:
       context: .
       dockerfile: Dockerfile
       target: app
-      args:
-        NEXT_PUBLIC_BETTER_AUTH_URL: ${BETTER_AUTH_URL}
-    ports:
-      - '3000:3000'
+      args: *app-build-args
     env_file:
       - apps/app/.env
-    restart: unless-stopped
+    environment:
+      HOSTNAME: 127.0.0.1
+      PORT: 3000
+      NODE_EXTRA_CA_CERTS: /etc/comp/ca.crt
     healthcheck:
-      test: ['CMD-SHELL', 'curl -f http://localhost:3000/api/health || exit 1']
+      test: ['CMD-SHELL', 'wget -q -O /dev/null http://127.0.0.1:3000/api/health || exit 1']
       interval: 30s
       timeout: 10s
       retries: 3
-    command: sh -lc "node apps/app/server.js"
-    logging: *default-logging
+  app-worker:
+    <<: *host-service
+    image: comp-app-worker
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: app-worker
+      args: *app-build-args
+    env_file:
+      - apps/app/.env
+    environment:
+      NODE_EXTRA_CA_CERTS: /etc/comp/ca.crt
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   portal:
+    <<: *host-service
+    image: comp-portal
     build:
       context: .
       dockerfile: Dockerfile
       target: portal
       args:
-        NEXT_PUBLIC_BETTER_AUTH_URL: ${BETTER_AUTH_URL_PORTAL}
-    ports:
-      - '3002:3000'
+        NEXT_PUBLIC_BETTER_AUTH_URL: ${PORTAL_URL:?set PORTAL_URL}
+        NEXT_PUBLIC_API_URL: ${API_URL:?set API_URL}
     env_file:
       - apps/portal/.env
-    restart: unless-stopped
-    healthcheck:
-      test: ['CMD-SHELL', 'curl -f http://localhost:3000/ || exit 1']
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    logging: *default-logging
+    environment:
+      HOSTNAME: 127.0.0.1
+      PORT: 3002
+      NODE_EXTRA_CA_CERTS: /etc/comp/ca.crt
 
 volumes:
+  postgres_data:
   valkey_data:
   s3_data:
