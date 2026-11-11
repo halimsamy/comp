@@ -54,6 +54,16 @@ describe('Middleware', () => {
       expect(response.headers.get('x-pathname')).toBe('/org_123/dashboard');
     });
 
+    it('should accept the secure local session cookie (self-hosted over HTTPS)', async () => {
+      const request = await createMockRequest('/org_123/dashboard', {
+        headers: { cookie: '__Secure-local.session_token=mock_session_token' },
+      });
+
+      const response = await proxy(request);
+
+      expect(response.status).toBe(200);
+    });
+
     it('should allow org routes to continue to the layout for access checks', async () => {
       // Arrange
       setupAuthMocks();
