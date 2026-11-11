@@ -7,6 +7,7 @@ export {
 export {
   findSimilarContent,
   findSimilarContentBatch,
+  type KnowledgeSourceType,
   type SimilarContentResult,
 } from './core/find-similar';
 export {

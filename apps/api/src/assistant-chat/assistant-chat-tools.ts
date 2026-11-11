@@ -1,7 +1,32 @@
 import { db, Departments, RiskCategory, RiskStatus } from '@db';
 import { z } from 'zod';
+import {
+  findSimilarContent,
+  type KnowledgeSourceType,
+  type SimilarContentResult,
+} from '../vector-store/lib';
 
 type Permissions = Record<string, string[]>;
+
+// The permission that already gates each knowledge source elsewhere in the app
+// (context hub = evidence, questionnaire knowledge base = questionnaire).
+const KNOWLEDGE_SOURCE_PERMISSION: Record<
+  KnowledgeSourceType,
+  [string, string]
+> = {
+  policy: ['policy', 'read'],
+  context: ['evidence', 'read'],
+  document_hub: ['evidence', 'read'],
+  attachment: ['evidence', 'read'],
+  manual_answer: ['questionnaire', 'read'],
+  knowledge_base_document: ['questionnaire', 'read'],
+};
+
+const knowledgeTitle = (result: SimilarContentResult) =>
+  result.contextQuestion ??
+  result.policyName ??
+  result.manualAnswerQuestion ??
+  result.documentName;
 
 interface ToolContext {
   organizationId: string;
@@ -51,6 +76,40 @@ export function buildTools(ctx: ToolContext) {
     }),
   };
 
+  // Semantic search over the org's knowledge, limited to sources this user may read
+  const readableSources = (
+    Object.keys(KNOWLEDGE_SOURCE_PERMISSION) as KnowledgeSourceType[]
+  ).filter((source) =>
+    hasPermission(ctx.permissions, ...KNOWLEDGE_SOURCE_PERMISSION[source]),
+  );
+  if (readableSources.length > 0) {
+    tools.searchOrganizationKnowledge = {
+      description:
+        "Semantic search over the organization's own knowledge: company context (infrastructure, security practices, onboarding answers), published policies, saved questionnaire answers and knowledge base documents. Use it for any question about how this company operates.",
+      inputSchema: z.object({
+        query: z
+          .string()
+          .min(1)
+          .describe('What to look up, in natural language'),
+      }),
+      execute: async ({ query }: { query: string }) => {
+        const results = await findSimilarContent(query, ctx.organizationId, {
+          sourceTypes: readableSources,
+        });
+        return results.length === 0
+          ? { results: [], message: 'No matching organization knowledge found' }
+          : {
+              results: results.map((result) => ({
+                source: result.sourceType,
+                title: knowledgeTitle(result),
+                content: result.content,
+                relevance: Number(result.score.toFixed(2)),
+              })),
+            };
+      },
+    };
+  }
+
   // Policy tools — require policy:read
   if (hasPermission(ctx.permissions, 'policy', 'read')) {
     tools.getPolicies = {
@@ -60,7 +119,12 @@ export function buildTools(ctx: ToolContext) {
       }),
       execute: async ({ status }: { status?: 'draft' | 'published' }) => {
         const policies = await db.policy.findMany({
-          where: { organizationId: ctx.organizationId, isArchived: false, archivedAt: null, status },
+          where: {
+            organizationId: ctx.organizationId,
+            isArchived: false,
+            archivedAt: null,
+            status,
+          },
           select: { id: true, name: true, description: true, department: true },
         });
         return policies.length === 0
