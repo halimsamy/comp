@@ -111,4 +111,27 @@ describe('completeInvitation', () => {
       data: { status: 'accepted' },
     });
   });
+
+  it('reactivates a removed member with the invited roles', async () => {
+    mocks.invitationFindFirst.mockResolvedValue({
+      id: 'inv_1',
+      organizationId: 'org_1',
+      role: 'admin,employee',
+      organization: { id: 'org_1', name: 'Org' },
+    });
+    mocks.memberFindFirst.mockResolvedValue({
+      id: 'mem_1',
+      role: 'employee',
+      deactivated: true,
+      isActive: false,
+    });
+
+    await callWith({ emailVerified: true });
+
+    expect(mocks.memberUpdate).toHaveBeenCalledWith({
+      where: { id: 'mem_1' },
+      data: { deactivated: false, isActive: true, role: 'admin,employee' },
+    });
+    expect(mocks.memberCreate).not.toHaveBeenCalled();
+  });
 });

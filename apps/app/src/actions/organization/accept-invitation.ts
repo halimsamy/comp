@@ -88,11 +88,13 @@ export const completeInvitation = authActionClientWithoutOrg
           //   roles. Previously this branch left an active member's role
           //   untouched, so promoting e.g. an employee to admin via an invite
           //   never granted app access and the user hit "Access Denied".
-          if (existingMembership.deactivated) {
+          // Removing a member sets deactivated AND isActive=false; auth requires both.
+          if (existingMembership.deactivated || !existingMembership.isActive) {
             await db.member.update({
               where: { id: existingMembership.id },
               data: {
                 deactivated: false,
+                isActive: true,
                 role: invitation.role,
               },
             });
