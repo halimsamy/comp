@@ -1,7 +1,7 @@
 'use client';
 
 import { usePermissions } from '@/hooks/use-permissions';
-import { downloadFrameworkEvidenceZip } from '@/lib/evidence-download';
+import { startFrameworkEvidenceDownload } from '@/lib/evidence-download';
 import { Button } from '@trycompai/design-system';
 import { Download, Edit, OverflowMenuVertical, TrashCan } from '@trycompai/design-system/icons';
 import {
@@ -28,7 +28,6 @@ export function FrameworkActionsMenu({
 }) {
   const { hasPermission } = usePermissions();
   const [open, setOpen] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
 
   const canDelete = hasPermission('framework', 'delete');
   // The ZIP bundles policies and evidence, so the API requires read on both.
@@ -36,19 +35,12 @@ export function FrameworkActionsMenu({
 
   if (!canEdit && !canDelete && !canExport) return null;
 
-  const handleExport = async () => {
+  const handleExport = () => {
     setOpen(false);
-    setIsExporting(true);
-    const toastId = toast.loading('Preparing evidence export…');
-    try {
-      await downloadFrameworkEvidenceZip({ frameworkInstanceId, frameworkName });
-      toast.success('Evidence export downloaded', { id: toastId });
-    } catch (error) {
-      console.error('Framework evidence export failed:', error);
-      toast.error('Failed to export evidence. Please try again.', { id: toastId });
-    } finally {
-      setIsExporting(false);
-    }
+    startFrameworkEvidenceDownload({ frameworkInstanceId });
+    toast.info(
+      `Exporting ${frameworkName} evidence. The ZIP downloads as it is built; large frameworks take a few minutes.`,
+    );
   };
 
   return (
@@ -71,7 +63,7 @@ export function FrameworkActionsMenu({
           </DropdownMenuItem>
         )}
         {canExport && (
-          <DropdownMenuItem onClick={handleExport} disabled={isExporting}>
+          <DropdownMenuItem onClick={handleExport}>
             <Download size={16} className="mr-2" />
             Export all evidences
           </DropdownMenuItem>

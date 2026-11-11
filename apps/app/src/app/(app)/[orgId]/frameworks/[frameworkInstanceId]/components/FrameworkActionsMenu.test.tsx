@@ -5,18 +5,18 @@ import {
   mockHasPermission,
   setMockPermissions,
 } from '@/test-utils/mocks/permissions';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockDownload = vi.fn();
-const mockToast = vi.hoisted(() => ({ loading: vi.fn(() => 'toast-1'), success: vi.fn(), error: vi.fn() }));
+const mockToast = vi.hoisted(() => ({ info: vi.fn() }));
 
 vi.mock('@/hooks/use-permissions', () => ({
   usePermissions: () => ({ permissions: {}, hasPermission: mockHasPermission }),
 }));
 vi.mock('@/lib/evidence-download', () => ({
-  downloadFrameworkEvidenceZip: (...args: unknown[]) => mockDownload(...args),
+  startFrameworkEvidenceDownload: (...args: unknown[]) => mockDownload(...args),
 }));
 vi.mock('sonner', () => ({ toast: mockToast }));
 vi.mock('@trycompai/design-system', () => ({
@@ -67,28 +67,14 @@ describe('FrameworkActionsMenu', () => {
     expect(menuItems()).toEqual(['Export all evidences', 'Delete Framework']);
   });
 
-  it('downloads the framework evidence ZIP', async () => {
+  it('starts the framework evidence ZIP download', () => {
     setMockPermissions(ADMIN_PERMISSIONS);
-    mockDownload.mockResolvedValue(undefined);
     renderMenu();
 
     fireEvent.click(screen.getByRole('menuitem', { name: 'Export all evidences' }));
 
-    expect(mockDownload).toHaveBeenCalledWith({
-      frameworkInstanceId: 'frm_1',
-      frameworkName: 'PCI DSS Level 1',
-    });
-    await waitFor(() => expect(mockToast.success).toHaveBeenCalled());
-  });
-
-  it('reports a failed export', async () => {
-    setMockPermissions(ADMIN_PERMISSIONS);
-    mockDownload.mockRejectedValue(new Error('boom'));
-    renderMenu();
-
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Export all evidences' }));
-
-    await waitFor(() => expect(mockToast.error).toHaveBeenCalled());
+    expect(mockDownload).toHaveBeenCalledWith({ frameworkInstanceId: 'frm_1' });
+    expect(mockToast.info).toHaveBeenCalledWith(expect.stringContaining('PCI DSS Level 1'));
   });
 
   it('lets auditors export but not delete', () => {

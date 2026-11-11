@@ -45,22 +45,23 @@ export async function downloadTaskEvidenceZip({
 }
 
 /**
- * Download a framework's evidence as a ZIP with one folder per requirement
+ * Start a native browser download of a framework's evidence ZIP (one folder per
+ * requirement). The ZIP can be several GB, so it must stream to disk rather than
+ * go through fetch() + Blob in memory; the session cookie is same-site, so a
+ * top-level GET carries it.
  */
-export async function downloadFrameworkEvidenceZip({
+export function startFrameworkEvidenceDownload({
   frameworkInstanceId,
-  frameworkName,
 }: {
   frameworkInstanceId: string;
-  frameworkName?: string;
-}): Promise<void> {
+}): void {
   const baseUrl = env.NEXT_PUBLIC_API_URL || 'http://localhost:3333';
-  const endpoint = `/v1/evidence-export/frameworks/${frameworkInstanceId}`;
-
-  await downloadFile(baseUrl + endpoint, {
-    fallbackBaseName: frameworkName ? `${frameworkName}-evidence` : 'framework-evidence',
-    fallbackExtension: 'zip',
-  });
+  const link = document.createElement('a');
+  link.href = `${baseUrl}/v1/evidence-export/frameworks/${frameworkInstanceId}`;
+  link.rel = 'noopener';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }
 
 /**
