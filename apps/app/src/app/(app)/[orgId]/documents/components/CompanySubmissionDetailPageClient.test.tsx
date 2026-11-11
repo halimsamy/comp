@@ -55,6 +55,12 @@ vi.mock('@trycompai/design-system', () => ({
   EmptyTitle: ({ children }: any) => <h3>{children}</h3>,
   Field: ({ children }: any) => <div>{children}</div>,
   FieldLabel: ({ children }: any) => <label>{children}</label>,
+  PageHeader: ({ title, actions }: any) => (
+    <header>
+      <h1>{title}</h1>
+      {actions}
+    </header>
+  ),
   Section: ({ children }: any) => <section>{children}</section>,
   Table: ({ children }: any) => <table>{children}</table>,
   TableBody: ({ children }: any) => <tbody>{children}</tbody>,
@@ -68,6 +74,7 @@ vi.mock('@trycompai/design-system', () => ({
 
 vi.mock('@trycompai/design-system/icons', () => ({
   Document: () => <span data-testid="document-icon" />,
+  Download: () => <span data-testid="download-icon" />,
 }));
 
 // ─── Mock submission-utils ───────────────────────────────────
@@ -288,7 +295,7 @@ describe('CompanySubmissionDetailPageClient', () => {
     beforeEach(() => {
       setMockPermissions(ADMIN_PERMISSIONS);
       mockSwrData = makeSubmissionData({
-        formType: 'security-awareness-training',
+        formType: 'penetration-test',
       });
     });
 
@@ -296,7 +303,7 @@ describe('CompanySubmissionDetailPageClient', () => {
       render(
         <CompanySubmissionDetailPageClient
           organizationId="org-1"
-          formType="security-awareness-training"
+          formType="penetration-test"
           submissionId="sub-1"
         />,
       );

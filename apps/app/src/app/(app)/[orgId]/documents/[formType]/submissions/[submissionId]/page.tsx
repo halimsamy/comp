@@ -1,5 +1,5 @@
 import { CompanySubmissionDetailPageClient } from '@/app/(app)/[orgId]/documents/components/CompanySubmissionDetailPageClient';
-import { Breadcrumb, PageHeader, PageLayout } from '@trycompai/design-system';
+import { Breadcrumb, PageLayout } from '@trycompai/design-system';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { evidenceFormDefinitions, evidenceFormTypeSchema } from '../../../forms';
@@ -36,7 +36,6 @@ export default async function CompanySubmissionDetailPage({
           { label: 'Submission Details', isCurrent: true },
         ]}
       />
-      <PageHeader title={`${formDefinition.title} Submission`} />
       <CompanySubmissionDetailPageClient
         organizationId={orgId}
         formType={parsedFormType}
