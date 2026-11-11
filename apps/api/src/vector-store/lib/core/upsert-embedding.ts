@@ -34,8 +34,7 @@ export async function upsertEmbedding(
   metadata: EmbeddingMetadata,
 ): Promise<void> {
   if (!vectorIndex) {
-    const errorMsg =
-      'Vector store is not configured';
+    const errorMsg = 'Vector store is not configured';
     logger.error(errorMsg, {
       id,
       sourceType: metadata.sourceType,
@@ -60,7 +59,8 @@ export async function upsertEmbedding(
       organizationId: metadata.organizationId,
       sourceType: metadata.sourceType,
       sourceId: metadata.sourceId,
-      content: text.substring(0, 1000), // Store first 1000 chars for reference
+      // Whole chunk: search results feed this text to the LLM (questionnaires, chat)
+      content: text,
       ...(metadata.policyName && { policyName: metadata.policyName }),
       ...(metadata.contextQuestion && {
         contextQuestion: metadata.contextQuestion,
@@ -149,7 +149,9 @@ export async function batchUpsertEmbeddings(
   try {
     // Step 1: Generate all embeddings in parallel (much faster)
     const embeddings = await Promise.all(
-      validItems.map((item) => generateEmbedding(item.text, { inputType: 'document' })),
+      validItems.map((item) =>
+        generateEmbedding(item.text, { inputType: 'document' }),
+      ),
     );
 
     // Step 2: Upsert all embeddings in parallel
@@ -171,7 +173,7 @@ export async function batchUpsertEmbeddings(
             organizationId: item.metadata.organizationId,
             sourceType: item.metadata.sourceType,
             sourceId: item.metadata.sourceId,
-            content: item.text.substring(0, 1000), // Store first 1000 chars for reference
+            content: item.text,
             ...(item.metadata.policyName && {
               policyName: item.metadata.policyName,
             }),
