@@ -2,6 +2,29 @@ import { logger, metadata, queue, schemaTask } from '@trycompai/jobs';
 import { z } from 'zod';
 import { processPolicyUpdate } from './update-policies-helpers';
 
+// Job payloads are stored as JSON, so dates arrive as ISO strings.
+export const updatePolicyPayloadSchema = z.object({
+  organizationId: z.string(),
+  policyId: z.string(),
+  contextHub: z.string(),
+  frameworks: z.array(
+    z.object({
+      id: z.string(),
+      name: z.string(),
+      version: z.string(),
+      description: z.string(),
+      visible: z.boolean(),
+      organizationId: z.string().nullable().default(null),
+      // FRAME-20: frameworks now carry a family pointer; keep this payload
+      // schema in step with the FrameworkEditorFramework shape it's typed as.
+      familyId: z.string().nullable().default(null),
+      createdAt: z.coerce.date(),
+      updatedAt: z.coerce.date(),
+    }),
+  ),
+  memberId: z.string().optional(),
+});
+
 export const updatePolicyQueue = queue({ name: 'onboarding-update-policy', concurrencyLimit: 15 });
 
 export const updatePolicy = schemaTask({
@@ -11,27 +34,7 @@ export const updatePolicy = schemaTask({
   retry: {
     maxAttempts: 5,
   },
-  schema: z.object({
-    organizationId: z.string(),
-    policyId: z.string(),
-    contextHub: z.string(),
-    frameworks: z.array(
-      z.object({
-        id: z.string(),
-        name: z.string(),
-        version: z.string(),
-        description: z.string(),
-        visible: z.boolean(),
-        organizationId: z.string().nullable().default(null),
-        // FRAME-20: frameworks now carry a family pointer; keep this payload
-        // schema in step with the FrameworkEditorFramework shape it's typed as.
-        familyId: z.string().nullable().default(null),
-        createdAt: z.date(),
-        updatedAt: z.date(),
-      }),
-    ),
-    memberId: z.string().optional(),
-  }),
+  schema: updatePolicyPayloadSchema,
   run: async (params) => {
     try {
       logger.info(`Starting policy update for policy ${params.policyId}`);
