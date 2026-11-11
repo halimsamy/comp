@@ -110,6 +110,9 @@ ENV NODE_EXTRA_CA_CERTS=/usr/local/share/aws-rds-ca-bundle.pem
 # Copy built NestJS app
 COPY --from=builder --chown=nestjs:nestjs /app/apps/api/dist ./dist
 
+# SOA template, read from src/ at runtime (soa/utils/transform-iso-config.ts)
+COPY --from=builder --chown=nestjs:nestjs /app/apps/api/src/soa/seedJson ./src/soa/seedJson
+
 # Copy prisma schema (for reference only — client is already generated in node_modules)
 COPY --from=builder --chown=nestjs:nestjs /app/apps/api/prisma ./prisma
 
