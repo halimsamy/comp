@@ -7,6 +7,7 @@ import {
   type KnowledgeSourceType,
   type SimilarContentResult,
 } from '../vector-store/lib';
+import { buildEvidenceTool } from './assistant-chat-evidence-tool';
 
 const logger = new Logger('AssistantChatTools');
 
@@ -36,6 +37,7 @@ interface ToolContext {
   organizationId: string;
   userId: string;
   permissions: Permissions;
+  roles: string[];
 }
 
 function hasPermission(
@@ -122,6 +124,9 @@ export function buildTools(ctx: ToolContext) {
       },
     };
   }
+
+  const evidenceTool = buildEvidenceTool(ctx);
+  if (evidenceTool) tools.getEvidenceSubmissions = evidenceTool;
 
   // Policy tools — require policy:read
   if (hasPermission(ctx.permissions, 'policy', 'read')) {

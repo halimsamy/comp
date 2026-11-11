@@ -55,6 +55,7 @@ describe('resolveAssistantChatContext', () => {
 
     expect(result.organizationId).toBe('org_active');
     expect(result.userId).toBe('usr_1');
+    expect(result.roles).toEqual(['admin']);
     expect(mockedDb.member.findFirst).not.toHaveBeenCalled();
     expect(rolesService.resolvePermissions).toHaveBeenCalledWith('org_active', [
       'admin',
@@ -74,7 +75,7 @@ describe('resolveAssistantChatContext', () => {
   });
 
   it('scopes to a different requested org after verifying active membership + app access', async () => {
-    mockedDb.member.findFirst.mockResolvedValue({ role: 'admin' });
+    mockedDb.member.findFirst.mockResolvedValue({ role: 'auditor,employee' });
 
     const result = await resolveAssistantChatContext({
       auth: makeAuth(),
@@ -92,9 +93,12 @@ describe('resolveAssistantChatContext', () => {
       select: { role: true },
     });
     expect(rolesService.resolvePermissions).toHaveBeenCalledWith('org_other', [
-      'admin',
+      'auditor',
+      'employee',
     ]);
     expect(result.organizationId).toBe('org_other');
+    // Roles come from the requested org's membership, not the session's active org
+    expect(result.roles).toEqual(['auditor', 'employee']);
   });
 
   it('rejects a requested org the user is not a member of', async () => {

@@ -86,15 +86,13 @@ export class AssistantChatController {
         return;
       }
 
-      const { organizationId, userId, permissions } = await this.resolveContext(
-        auth,
-        req,
-      );
+      const { organizationId, userId, permissions, roles } =
+        await this.resolveContext(auth, req);
 
       const body = req.body as { messages?: UIMessage[] };
       const messages = body?.messages ?? [];
 
-      const tools = buildTools({ organizationId, userId, permissions });
+      const tools = buildTools({ organizationId, userId, permissions, roles });
 
       const nowIso = new Date().toISOString();
 

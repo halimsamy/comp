@@ -45,4 +45,4 @@ export const assistantChatRedisClient: Pick<Redis, 'get' | 'set' | 'del'> =
         url: process.env.UPSTASH_REDIS_REST_URL!,
         token: process.env.UPSTASH_REDIS_REST_TOKEN!,
       })
-    : (new InMemoryRedis() as unknown as Pick<Redis, 'get' | 'set' | 'del'>);
+    : new InMemoryRedis();

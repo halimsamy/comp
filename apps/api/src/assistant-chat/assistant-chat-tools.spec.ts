@@ -19,7 +19,12 @@ const mockSearch = findSimilarContent as jest.Mock;
 const mockSync = syncOrganizationEmbeddings as jest.Mock;
 
 const makeTools = (permissions: Record<string, string[]>) =>
-  buildTools({ organizationId: 'org_1', userId: 'usr_1', permissions });
+  buildTools({
+    organizationId: 'org_1',
+    userId: 'usr_1',
+    permissions,
+    roles: [],
+  });
 
 beforeEach(() => {
   jest.clearAllMocks();

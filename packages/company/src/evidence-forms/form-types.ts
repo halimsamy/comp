@@ -18,6 +18,12 @@ export const evidenceFormTypeSchema = z.enum([
 
 export type EvidenceFormType = z.infer<typeof evidenceFormTypeSchema>;
 
+/** Evidence forms AI assistants may read. Whistleblower reports and performance reviews are confidential HR data. */
+export const AI_READABLE_EVIDENCE_FORM_TYPES = evidenceFormTypeSchema.exclude([
+  'whistleblower-report',
+  'employee-performance-evaluation',
+]).options;
+
 export const meetingSubTypes = [
   { label: 'Board Meeting', value: 'board-meeting' as const },
   { label: 'IT Leadership Meeting', value: 'it-leadership-meeting' as const },

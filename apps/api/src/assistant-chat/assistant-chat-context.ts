@@ -12,6 +12,7 @@ export interface AssistantChatContext {
   organizationId: string;
   userId: string;
   permissions: Record<string, string[]>;
+  roles: string[];
 }
 
 function readRequestedOrgId(req: Request): string | undefined {
@@ -55,11 +56,12 @@ export async function resolveAssistantChatContext({
     if (!auth.organizationId) {
       throw new BadRequestException('Organization ID is required');
     }
+    const roles = auth.userRoles ?? [];
     const permissions = await rolesService.resolvePermissions(
       auth.organizationId,
-      auth.userRoles ?? [],
+      roles,
     );
-    return { organizationId: auth.organizationId, userId, permissions };
+    return { organizationId: auth.organizationId, userId, permissions, roles };
   }
 
   const member = await db.member.findFirst({
@@ -72,10 +74,8 @@ export async function resolveAssistantChatContext({
     );
   }
 
-  const permissions = await rolesService.resolvePermissions(
-    requested,
-    member.role ? member.role.split(',') : [],
-  );
+  const roles = member.role ? member.role.split(',') : [];
+  const permissions = await rolesService.resolvePermissions(requested, roles);
   if (!permissions.app?.includes('read')) {
     throw new ForbiddenException(
       'Your role does not have app access in the requested organization.',
@@ -86,5 +86,5 @@ export async function resolveAssistantChatContext({
     `Assistant chat scoped to requested org ${requested} ` +
       `(session active org: ${auth.organizationId}) for user ${userId}`,
   );
-  return { organizationId: requested, userId, permissions };
+  return { organizationId: requested, userId, permissions, roles };
 }
