@@ -1,10 +1,14 @@
 import { db, Departments, RiskCategory, RiskStatus } from '@db';
+import { Logger } from '@nestjs/common';
 import { z } from 'zod';
 import {
   findSimilarContent,
+  syncOrganizationEmbeddings,
   type KnowledgeSourceType,
   type SimilarContentResult,
 } from '../vector-store/lib';
+
+const logger = new Logger('AssistantChatTools');
 
 type Permissions = Record<string, string[]>;
 
@@ -93,6 +97,15 @@ export function buildTools(ctx: ToolContext) {
           .describe('What to look up, in natural language'),
       }),
       execute: async ({ query }: { query: string }) => {
+        // Context and policy edits aren't embedded on save; refresh first like the
+        // questionnaire flow does. Incremental, so unchanged entries cost no embedding call.
+        try {
+          await syncOrganizationEmbeddings(ctx.organizationId);
+        } catch (error) {
+          logger.warn(
+            `Knowledge sync failed, searching existing embeddings: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
         const results = await findSimilarContent(query, ctx.organizationId, {
           sourceTypes: readableSources,
         });

@@ -6,18 +6,24 @@ jest.mock('@db', () => ({
 }));
 jest.mock('../vector-store/lib', () => ({
   findSimilarContent: jest.fn(),
+  syncOrganizationEmbeddings: jest.fn(),
 }));
 
-import { findSimilarContent } from '../vector-store/lib';
+import {
+  findSimilarContent,
+  syncOrganizationEmbeddings,
+} from '../vector-store/lib';
 import { buildTools } from './assistant-chat-tools';
 
 const mockSearch = findSimilarContent as jest.Mock;
+const mockSync = syncOrganizationEmbeddings as jest.Mock;
 
 const makeTools = (permissions: Record<string, string[]>) =>
   buildTools({ organizationId: 'org_1', userId: 'usr_1', permissions });
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mockSync.mockResolvedValue(undefined);
 });
 
 describe('searchOrganizationKnowledge', () => {
@@ -98,5 +104,37 @@ describe('searchOrganizationKnowledge', () => {
       results: [],
       message: 'No matching organization knowledge found',
     });
+  });
+
+  it('syncs changed context and policies before searching', async () => {
+    const order: string[] = [];
+    mockSync.mockImplementation(() => {
+      order.push('sync');
+      return Promise.resolve();
+    });
+    mockSearch.mockImplementation(() => {
+      order.push('search');
+      return Promise.resolve([]);
+    });
+    const tools = makeTools({ evidence: ['read'] });
+
+    await tools.searchOrganizationKnowledge.execute({ query: 'backups' });
+
+    expect(mockSync).toHaveBeenCalledWith('org_1');
+    expect(order).toEqual(['sync', 'search']);
+  });
+
+  it('still searches existing embeddings when the sync fails', async () => {
+    mockSync.mockRejectedValue(new Error('voyage down'));
+    mockSearch.mockResolvedValue([]);
+    const tools = makeTools({ evidence: ['read'] });
+
+    await expect(
+      tools.searchOrganizationKnowledge.execute({ query: 'backups' }),
+    ).resolves.toEqual({
+      results: [],
+      message: 'No matching organization knowledge found',
+    });
+    expect(mockSearch).toHaveBeenCalled();
   });
 });
