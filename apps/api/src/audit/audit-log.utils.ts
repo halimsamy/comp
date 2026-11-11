@@ -97,6 +97,8 @@ export function extractDownloadDescription(
     return 'Exported task evidence';
   if (/\/evidence-export\/all\/?$/.test(pathWithoutQuery))
     return 'Exported all organization evidence';
+  if (/\/evidence-export\/frameworks\/[^/]+\/?$/.test(pathWithoutQuery))
+    return 'Exported framework evidence';
 
   return null;
 }

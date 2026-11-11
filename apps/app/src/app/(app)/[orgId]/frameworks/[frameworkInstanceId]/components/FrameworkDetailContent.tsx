@@ -6,7 +6,6 @@ import { getFrameworkAggregatePercent } from '@/lib/control-compliance';
 import type { FrameworkUpdateStatus } from '@/types/framework-versioning';
 import { useFeatureFlag } from '@trycompai/analytics';
 import {
-  Button,
   PageHeader,
   PageHeaderDescription,
   PageLayout,
@@ -15,18 +14,12 @@ import {
   TabsList,
   TabsTrigger,
 } from '@trycompai/design-system';
-import { Edit, OverflowMenuVertical, TrashCan } from '@trycompai/design-system/icons';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@trycompai/ui/dropdown-menu';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useCallback, useMemo, useState } from 'react';
 import { AddCustomRequirementSheet } from './AddCustomRequirementSheet';
 import { EditCustomFrameworkSheet } from './EditCustomFrameworkSheet';
+import { FrameworkActionsMenu } from './FrameworkActionsMenu';
 import { FrameworkControls } from './FrameworkControls';
 import { FrameworkControlsGrouped } from './FrameworkControlsGrouped';
 import { FrameworkDeleteDialog } from './FrameworkDeleteDialog';
@@ -60,7 +53,6 @@ export function FrameworkDetailContent({
   const complianceTimelineEnabled = useFeatureFlag('is-timeline-enabled');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editSheetOpen, setEditSheetOpen] = useState(false);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
 
   const { data, mutate } = useFrameworkInstance<any>(frameworkInstanceId, {
     fallbackData: initialFramework,
@@ -127,7 +119,6 @@ export function FrameworkDetailContent({
   const controlsCount = frameworkInstanceWithControls.controls.length;
   const requirementsCount = requirementDefinitions.length;
 
-  const canDeleteFramework = hasPermission('framework', 'delete');
   // Only org-authored custom frameworks have editable name/description; platform
   // frameworks inherit theirs from the shared global template.
   const canEditCustomFramework =
@@ -151,40 +142,13 @@ export function FrameworkDetailContent({
               <>
                 <LinkRequirementSheet frameworkInstanceId={frameworkInstanceId} />
                 <AddCustomRequirementSheet frameworkInstanceId={frameworkInstanceId} />
-                {(canEditCustomFramework || canDeleteFramework) && (
-                  <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
-                    <DropdownMenuTrigger asChild>
-                      <Button size="sm" variant="ghost">
-                        <OverflowMenuVertical size={16} />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      {canEditCustomFramework && (
-                        <DropdownMenuItem
-                          onClick={() => {
-                            setDropdownOpen(false);
-                            setEditSheetOpen(true);
-                          }}
-                        >
-                          <Edit size={16} className="mr-2" />
-                          Edit Framework
-                        </DropdownMenuItem>
-                      )}
-                      {canDeleteFramework && (
-                        <DropdownMenuItem
-                          onClick={() => {
-                            setDropdownOpen(false);
-                            setDeleteDialogOpen(true);
-                          }}
-                          className="text-destructive focus:text-destructive"
-                        >
-                          <TrashCan size={16} className="mr-2" />
-                          Delete Framework
-                        </DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
+                <FrameworkActionsMenu
+                  frameworkInstanceId={frameworkInstanceId}
+                  frameworkName={frameworkName}
+                  canEdit={canEditCustomFramework}
+                  onEdit={() => setEditSheetOpen(true)}
+                  onDelete={() => setDeleteDialogOpen(true)}
+                />
               </>
             }
             tabs={

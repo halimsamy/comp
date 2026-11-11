@@ -45,6 +45,25 @@ export async function downloadTaskEvidenceZip({
 }
 
 /**
+ * Download a framework's evidence as a ZIP with one folder per requirement
+ */
+export async function downloadFrameworkEvidenceZip({
+  frameworkInstanceId,
+  frameworkName,
+}: {
+  frameworkInstanceId: string;
+  frameworkName?: string;
+}): Promise<void> {
+  const baseUrl = env.NEXT_PUBLIC_API_URL || 'http://localhost:3333';
+  const endpoint = `/v1/evidence-export/frameworks/${frameworkInstanceId}`;
+
+  await downloadFile(baseUrl + endpoint, {
+    fallbackBaseName: frameworkName ? `${frameworkName}-evidence` : 'framework-evidence',
+    fallbackExtension: 'zip',
+  });
+}
+
+/**
  * Trigger bulk evidence export as a background job.
  * Returns a run ID for tracking progress with useJobRun.
  */

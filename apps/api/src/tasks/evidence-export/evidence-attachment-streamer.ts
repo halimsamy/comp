@@ -18,6 +18,9 @@ export type TaskAttachment = Pick<
   'id' | 'name' | 'url' | 'type' | 'createdAt'
 >;
 
+/** Any S3 object to copy into the archive (`url` is the S3 key). */
+export type ArchivableFile = Pick<TaskAttachment, 'id' | 'name' | 'url'>;
+
 /**
  * Fetch attachments uploaded directly to a task.
  * Task-items hold vendor/risk attachments (per `TaskItemEntityType`), so they're
@@ -85,7 +88,7 @@ export function createFilenameTracker(): (rawName: string) => string {
  */
 export async function appendAttachmentToArchive(params: {
   archive: Archiver;
-  attachment: TaskAttachment;
+  attachment: ArchivableFile;
   folderPath: string;
   uniqueName: (rawName: string) => string;
 }): Promise<void> {
@@ -160,7 +163,7 @@ function isS3MissingObjectError(error: unknown): boolean {
 }
 
 function buildMissingPlaceholder(
-  attachment: TaskAttachment,
+  attachment: ArchivableFile,
   reason: string,
 ): string {
   return [
