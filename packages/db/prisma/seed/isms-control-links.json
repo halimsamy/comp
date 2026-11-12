@@ -1,0 +1,42 @@
+[
+  {
+    "frameworkId": "frk_681ecc34e85064efdbb76993",
+    "controlTemplateId": "frk_ct_69e639b96ad6c5e729676acb",
+    "documentType": "management_review"
+  },
+  {
+    "frameworkId": "frk_681ecc34e85064efdbb76993",
+    "controlTemplateId": "frk_ct_69e639b96ad6c5e729676acb",
+    "documentType": "monitoring"
+  },
+  {
+    "frameworkId": "frk_681ecc34e85064efdbb76993",
+    "controlTemplateId": "frk_ct_69e639b9148c96a37c8936fc",
+    "documentType": "interested_parties_requirements"
+  },
+  {
+    "frameworkId": "frk_681ecc34e85064efdbb76993",
+    "controlTemplateId": "frk_ct_683f41e775f4ca03d8f6bae2",
+    "documentType": "roles_and_responsibilities"
+  },
+  {
+    "frameworkId": "frk_681ecc34e85064efdbb76993",
+    "controlTemplateId": "frk_ct_683f41e775f4ca03d8f6bae2",
+    "documentType": "leadership_commitment"
+  },
+  {
+    "frameworkId": "frk_681ecc34e85064efdbb76993",
+    "controlTemplateId": "frk_ct_683f4036b541126388e2989a",
+    "documentType": "roles_and_responsibilities"
+  },
+  {
+    "frameworkId": "frk_681ecc34e85064efdbb76993",
+    "controlTemplateId": "frk_ct_683f484fc7b5506ab97c26af",
+    "documentType": "risk_assessment_methodology"
+  },
+  {
+    "frameworkId": "frk_681ecc34e85064efdbb76993",
+    "controlTemplateId": "frk_ct_683f484fc7b5506ab97c26af",
+    "documentType": "risk_treatment_plan"
+  }
+]

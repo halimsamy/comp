@@ -3,6 +3,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { frameworkEditorModelSchemas } from './frameworkEditorSchemas';
+import { seedFrameworkScopedEditorLinks } from './framework-scoped-links';
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
@@ -362,6 +363,7 @@ async function main() {
     await seedJsonFiles('primitives');
     await seedIsmsDocumentTemplates();
     await seedJsonFiles('relations');
+    await seedFrameworkScopedEditorLinks(prisma);
     // Build v1.0.0 FrameworkVersion snapshots for any framework without one.
     // On a fresh `migrate reset`, the backfill data migration runs against empty
     // tables and is a no-op; seed then creates the framework rows. Without this

@@ -29,7 +29,9 @@
     "description": "Implement Cryptographic Key Lifecycle Management",
     "createdAt": "2025-06-04 16:28:25.083",
     "updatedAt": "2025-06-04 19:41:06.998",
-    "documentTypes": []
+    "documentTypes": [
+      "cryptographic_inventory"
+    ]
   },
   {
     "id": "frk_ct_6840705b6dcee0506dabacfb",
@@ -77,7 +79,9 @@
     "description": "Implement Segregation of Duties",
     "createdAt": "2025-06-04 16:26:33.778",
     "updatedAt": "2025-06-04 19:41:06.631",
-    "documentTypes": []
+    "documentTypes": [
+      "rbac_matrix"
+    ]
   },
   {
     "id": "frk_ct_684073d541bfb8b8b777e529",
@@ -101,7 +105,9 @@
     "description": "Protect Authentication Information",
     "createdAt": "2025-06-03 19:20:04.055",
     "updatedAt": "2025-06-04 19:41:03.601",
-    "documentTypes": []
+    "documentTypes": [
+      "account_types"
+    ]
   },
   {
     "id": "frk_ct_683f4b7614d209f8b6ffd477",
@@ -117,7 +123,10 @@
     "description": "Apply Change Management for Information Systems",
     "createdAt": "2025-06-03 19:25:36.373",
     "updatedAt": "2025-06-04 19:41:03.850",
-    "documentTypes": []
+    "documentTypes": [
+      "penetration_test",
+      "significant_change_record"
+    ]
   },
   {
     "id": "frk_ct_683f4c9db20e7cf4a303af1f",
@@ -169,10 +178,10 @@
   },
   {
     "id": "frk_ct_68407122565b1968676d93db",
-    "name": "Physical Access Control",
+    "name": "Physical & Environmental Security",
     "description": "Control Physical Entry to Facilities",
     "createdAt": "2025-06-04 16:15:29.760",
-    "updatedAt": "2025-06-04 19:41:05.759",
+    "updatedAt": "2026-11-12 00:00:00.000",
     "documentTypes": []
   },
   {
@@ -245,7 +254,9 @@
     "description": "Establish an Incident Management Policy and Procedures",
     "createdAt": "2025-06-03 19:06:52.138",
     "updatedAt": "2025-06-04 19:41:03.035",
-    "documentTypes": []
+    "documentTypes": [
+      "tabletop_exercise"
+    ]
   },
   {
     "id": "frk_ct_683f48ee9534e1e0a088e922",
@@ -317,9 +328,7 @@
     "description": "Audits the execution of privileged program",
     "createdAt": "2025-06-11 17:19:15.284",
     "updatedAt": "2026-04-20 15:33:55.351",
-    "documentTypes": [
-      "infrastructure_inventory"
-    ]
+    "documentTypes": []
   },
   {
     "id": "frk_ct_691e53f4024ab9cc096bbc70",
@@ -361,7 +370,9 @@
     "description": "Governs the overall PCI DSS compliance program: executive ownership, SP-specific duties, customer attestations, and coordination of PCI-driven reviews and testing cadences.",
     "createdAt": "2026-04-13 18:19:18.460",
     "updatedAt": "2026-04-13 18:19:18.460",
-    "documentTypes": []
+    "documentTypes": [
+      "board_meeting"
+    ]
   },
   {
     "id": "frk_ct_683f4a410cf5bf6d40bf3583",
@@ -370,7 +381,9 @@
     "createdAt": "2025-06-03 19:17:20.504",
     "updatedAt": "2026-04-13 22:30:52.353",
     "documentTypes": [
-      "access_request"
+      "access_request",
+      "rbac_matrix",
+      "account_types"
     ]
   },
   {
@@ -400,7 +413,6 @@
     "createdAt": "2025-06-03 19:32:37.325",
     "updatedAt": "2026-04-20 17:55:13.005",
     "documentTypes": [
-      "board_meeting",
       "tabletop_exercise"
     ]
   },
@@ -411,7 +423,7 @@
     "createdAt": "2025-06-03 18:41:43.467",
     "updatedAt": "2026-04-27 17:12:09.307",
     "documentTypes": [
-      "rbac_matrix"
+      "board_meeting"
     ]
   },
   {
@@ -420,9 +432,7 @@
     "description": "Ensure Compliance with Security Policies and Standards",
     "createdAt": "2025-06-03 18:28:29.154",
     "updatedAt": "2026-04-27 17:12:14.631",
-    "documentTypes": [
-      "rbac_matrix"
-    ]
+    "documentTypes": []
   },
   {
     "id": "frk_ct_683f484fc7b5506ab97c26af",
@@ -431,7 +441,7 @@
     "createdAt": "2025-06-03 19:09:02.849",
     "updatedAt": "2026-04-27 17:12:22.641",
     "documentTypes": [
-      "rbac_matrix"
+      "targeted_risk_analysis"
     ]
   },
   {
@@ -469,14 +479,6 @@
     "documentTypes": []
   },
   {
-    "id": "frk_ct_69e639b9bf66b5a6ffb17d27",
-    "name": "Supplier & Third-Party Security",
-    "description": "Manages supplier due diligence, contract clauses, ongoing monitoring, and supply-chain risk for ICT services.",
-    "createdAt": "2026-04-20 14:35:36.585",
-    "updatedAt": "2026-04-20 14:35:36.585",
-    "documentTypes": []
-  },
-  {
     "id": "frk_ct_69e639b9d5ced482c12ae932",
     "name": "Business Continuity & ICT Readiness",
     "description": "Extends DR to include BIA, continuity strategy, tabletop/real exercises, and ICT readiness commitments per service tier.",
@@ -490,20 +492,7 @@
     "description": "Maintains an obligations register for applicable laws, regulations, contracts, and IP; tracks assurance for PII handling.",
     "createdAt": "2026-04-20 14:35:37.106",
     "updatedAt": "2026-04-20 15:31:42.642",
-    "documentTypes": [
-      "board_meeting",
-      "meeting"
-    ]
-  },
-  {
-    "id": "frk_ct_69e639b90a3bf8c1443cbf5b",
-    "name": "Risk Management",
-    "description": "Formal risk identification, assessment, treatment, and monitoring process, including risk register and treatment plans.",
-    "createdAt": "2026-04-20 14:35:36.757",
-    "updatedAt": "2026-04-20 15:33:55.473",
-    "documentTypes": [
-      "tabletop_exercise"
-    ]
+    "documentTypes": []
   },
   {
     "id": "frk_ct_69e639b96ad6c5e729676acb",
@@ -512,7 +501,6 @@
     "createdAt": "2026-04-20 14:35:36.934",
     "updatedAt": "2026-04-20 15:33:55.598",
     "documentTypes": [
-      "tabletop_exercise",
       "infrastructure_inventory",
       "rbac_matrix",
       "access_request"
@@ -527,14 +515,6 @@
     "documentTypes": [
       "penetration_test"
     ]
-  },
-  {
-    "id": "frk_ct_69e65ef9c20933590d85cc31",
-    "name": "Physical & Environmental Security",
-    "description": "Defines and maintains physical perimeters, entry controls, environmental threat protections, cabling security, and secure siting of equipment.",
-    "createdAt": "2026-04-20 17:14:33.358",
-    "updatedAt": "2026-04-20 17:14:33.358",
-    "documentTypes": []
   },
   {
     "id": "frk_ct_69e669af7fd9ef27754dc041",
