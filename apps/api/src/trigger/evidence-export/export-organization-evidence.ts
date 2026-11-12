@@ -38,7 +38,7 @@ const PRESIGNED_URL_EXPIRY = 3600;
 const UPLOAD_PART_SIZE = 10 * 1024 * 1024;
 const UPLOAD_QUEUE_SIZE = 4;
 
-function createS3Client(): S3Client {
+export function createS3Client(): S3Client {
   const region = process.env.APP_AWS_REGION || 'us-east-1';
   const accessKeyId = process.env.APP_AWS_ACCESS_KEY_ID;
   const secretAccessKey = process.env.APP_AWS_SECRET_ACCESS_KEY;
@@ -56,7 +56,7 @@ function createS3Client(): S3Client {
   });
 }
 
-function getBucketName(): string {
+export function getBucketName(): string {
   const bucket = process.env.APP_AWS_BUCKET_NAME;
   if (!bucket) throw new Error('APP_AWS_BUCKET_NAME is not set.');
   return bucket;

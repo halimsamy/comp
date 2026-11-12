@@ -45,19 +45,12 @@ export async function downloadTaskEvidenceZip({
 }
 
 /**
- * Start a native browser download of a framework's evidence ZIP (one folder per
- * requirement). The ZIP can be several GB, so it must stream to disk rather than
- * go through fetch() + Blob in memory; the session cookie is same-site, so a
- * top-level GET carries it.
+ * Start a native browser download of a (presigned) file URL. Large ZIPs must
+ * stream to disk rather than go through fetch() + Blob in memory.
  */
-export function startFrameworkEvidenceDownload({
-  frameworkInstanceId,
-}: {
-  frameworkInstanceId: string;
-}): void {
-  const baseUrl = env.NEXT_PUBLIC_API_URL || 'http://localhost:3333';
+export function startFileDownload(url: string): void {
   const link = document.createElement('a');
-  link.href = `${baseUrl}/v1/evidence-export/frameworks/${frameworkInstanceId}`;
+  link.href = url;
   link.rel = 'noopener';
   document.body.appendChild(link);
   link.click();
@@ -65,17 +58,32 @@ export function startFrameworkEvidenceDownload({
 }
 
 /**
+ * Trigger a framework's evidence export (one folder per requirement) as a
+ * background job. Returns a run ID for tracking with useJobRun; the finished
+ * run's output carries the download URL.
+ */
+export function triggerFrameworkEvidenceExport({
+  frameworkInstanceId,
+}: {
+  frameworkInstanceId: string;
+}): Promise<{ runId: string }> {
+  return startExportJob(`/v1/evidence-export/frameworks/${frameworkInstanceId}`);
+}
+
+/**
  * Trigger bulk evidence export as a background job.
  * Returns a run ID for tracking progress with useJobRun.
  */
-export async function triggerBulkEvidenceExport({
+export function triggerBulkEvidenceExport({
   includeJson = false,
 }: {
   includeJson?: boolean;
 }): Promise<{ runId: string }> {
-  const baseUrl = env.NEXT_PUBLIC_API_URL || 'http://localhost:3333';
-  const endpoint = `/v1/evidence-export/all?includeJson=${includeJson}`;
+  return startExportJob(`/v1/evidence-export/all?includeJson=${includeJson}`);
+}
 
+async function startExportJob(endpoint: string): Promise<{ runId: string }> {
+  const baseUrl = env.NEXT_PUBLIC_API_URL || 'http://localhost:3333';
   const response = await fetch(baseUrl + endpoint, {
     method: 'POST',
     credentials: 'include',

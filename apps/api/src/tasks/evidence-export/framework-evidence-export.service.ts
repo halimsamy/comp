@@ -1,6 +1,6 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { db, type EvidenceFormType as DbEvidenceFormType } from '@db';
-import archiver, { type Archiver } from 'archiver';
+import type { Archiver } from 'archiver';
 import { format } from 'date-fns';
 import { toCsvRow } from '../../evidence-forms/evidence-forms-csv';
 import { loadRequirementDefinitions } from '../../frameworks/frameworks-requirements.helper';
@@ -9,7 +9,6 @@ import {
   appendAttachmentToArchive,
   createFilenameTracker,
 } from './evidence-attachment-streamer';
-import type { EvidenceZipStream } from './evidence-export.types';
 import { sanitizeFilename } from './evidence-pdf-generator';
 import {
   appendDocumentEvidence,
@@ -28,7 +27,7 @@ import {
   type TaskBundle,
 } from './framework-evidence-tasks';
 
-type FrameworkForExport = {
+export type FrameworkForExport = {
   id: string;
   frameworkId: string | null;
   customFrameworkId: string | null;
@@ -36,19 +35,19 @@ type FrameworkForExport = {
   frameworkName: string;
   organizationName: string;
   primaryColor: string | null;
+  /** Top-level folder inside the ZIP; also the download's base filename. */
+  root: string;
 };
 
 @Injectable()
 export class FrameworkEvidenceExportService {
-  private readonly logger = new Logger(FrameworkEvidenceExportService.name);
-
   constructor(private readonly policyPdfRenderer: PolicyPdfRendererService) {}
 
-  /** ZIP with one folder per framework requirement holding its policies, tasks and documents. */
-  async streamFrameworkEvidenceZip(
+  /** The framework to export, scoped to the organization. */
+  async loadFramework(
     organizationId: string,
     frameworkInstanceId: string,
-  ): Promise<EvidenceZipStream> {
+  ): Promise<FrameworkForExport> {
     const fi = await db.frameworkInstance.findFirst({
       where: { id: frameworkInstanceId, organizationId },
       select: {
@@ -63,43 +62,30 @@ export class FrameworkEvidenceExportService {
     });
     if (!fi) throw new NotFoundException('Framework not found');
 
-    const framework: FrameworkForExport = {
+    const frameworkName = fi.framework?.name ?? fi.customFramework?.name ?? 'Framework';
+    return {
       ...fi,
-      frameworkName: fi.framework?.name ?? fi.customFramework?.name ?? 'Framework',
+      frameworkName,
       organizationName: fi.organization.name,
       primaryColor: fi.organization.primaryColor,
+      root: `${sanitizeFilename(fi.organization.name)}_${sanitizeFilename(frameworkName)}_evidence_${format(new Date(), 'yyyy-MM-dd')}`,
     };
-    const root = `${sanitizeFilename(framework.organizationName)}_${sanitizeFilename(framework.frameworkName)}_evidence_${format(new Date(), 'yyyy-MM-dd')}`;
-
-    const archive = archiver('zip', { zlib: { level: 6 } });
-    archive.on('warning', (err) => {
-      this.logger.warn(`Archive warning (framework ${fi.id}): ${err.message}`);
-    });
-
-    void this.populate({ archive, organizationId, framework, root }).catch(
-      (err) => {
-        this.logger.error(
-          `Failed to populate framework ZIP for ${fi.id}: ${err instanceof Error ? err.stack : String(err)}`,
-        );
-        archive.abort();
-      },
-    );
-
-    return { archive, filename: `${root}.zip` };
   }
 
-  private async populate({
+  /**
+   * Fill `archive` with one folder per framework requirement holding its policies,
+   * tasks and documents. The caller owns the archive and finalizes it.
+   */
+  async populate({
     archive,
     organizationId,
     framework,
-    root,
   }: {
     archive: Archiver;
     organizationId: string;
     framework: FrameworkForExport;
-    root: string;
   }): Promise<void> {
-    // Emit a byte right away so proxies see the response is alive while we load data.
+    const { root } = framework;
     archive.append(
       `${framework.frameworkName} evidence export for ${framework.organizationName}\nGenerated: ${new Date().toISOString()}\nOne folder per requirement; index.csv lists them all.\n`,
       { name: `${root}/README.txt` },
@@ -141,14 +127,13 @@ export class FrameworkEvidenceExportService {
     const policiesById = new Map(policies.map((p) => [p.id, p]));
 
     // shortcut: rendered PDFs are cached for the whole export (fine for one org's
-    // framework); move to the background-job + S3 flow if exports get very large.
+    // framework); render per folder if policy counts grow enough to pressure memory.
     const renderedPolicies = new Map<string, Buffer>();
     const taskBundles = new Map<string, TaskBundle>();
     const documentBundles = new Map<DbEvidenceFormType, DocumentBundle>();
     const indexRows: string[][] = [];
 
     for (const folder of folders) {
-      if (archive.destroyed) return; // client disconnected
       const base = `${root}/${folder.folder}`;
       const folderPolicies = folder.policyIds.flatMap((id) => policiesById.get(id) ?? []);
 
@@ -235,7 +220,6 @@ export class FrameworkEvidenceExportService {
       ].join('\n'),
       { name: `${root}/index.csv` },
     );
-    await archive.finalize();
   }
 
   private async loadMappings(frameworkInstanceId: string): Promise<MappedControl[]> {

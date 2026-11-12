@@ -1,12 +1,4 @@
-import {
-  Controller,
-  Get,
-  Logger,
-  Param,
-  Req,
-  Res,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Param, Post, UseGuards } from '@nestjs/common';
 import {
   ApiOperation,
   ApiParam,
@@ -14,27 +6,24 @@ import {
   ApiSecurity,
   ApiTags,
 } from '@nestjs/swagger';
-import type { Request, Response } from 'express';
+import { tasks } from '@trycompai/jobs';
 import { AuditRead } from '../../audit/skip-audit-log.decorator';
 import { OrganizationId } from '../../auth/auth-context.decorator';
 import { HybridAuthGuard } from '../../auth/hybrid-auth.guard';
 import { PermissionGuard } from '../../auth/permission.guard';
 import { RequirePermissions } from '../../auth/require-permission.decorator';
 import { FrameworkEvidenceExportService } from './framework-evidence-export.service';
-import { pipeArchiveToResponse } from './pipe-archive-to-response';
 
 @ApiTags('Evidence Export')
 @Controller({ path: 'evidence-export', version: '1' })
 @UseGuards(HybridAuthGuard, PermissionGuard)
 @ApiSecurity('apikey')
 export class FrameworkEvidenceExportController {
-  private readonly logger = new Logger(FrameworkEvidenceExportController.name);
-
   constructor(
     private readonly frameworkEvidenceExportService: FrameworkEvidenceExportService,
   ) {}
 
-  @Get('frameworks/:frameworkInstanceId')
+  @Post('frameworks/:frameworkInstanceId')
   // The ZIP bundles policies and evidence for every requirement of the framework.
   @RequirePermissions([
     { resource: 'framework', actions: ['read'] },
@@ -45,42 +34,36 @@ export class FrameworkEvidenceExportController {
   @ApiOperation({
     summary: 'Export framework evidence as ZIP',
     description:
-      'Download a ZIP with one folder per framework requirement containing its policies (PDF), task evidence and document submissions.',
+      'Starts a background job that builds a ZIP with one folder per framework requirement containing its policies (PDF), task evidence and document submissions. Returns a run ID; the finished run (GET /v1/job-runs/:runId) carries a download URL.',
   })
   @ApiParam({
     name: 'frameworkInstanceId',
     description: 'Framework instance identifier',
     example: 'frm_abc123def456',
   })
-  @ApiResponse({
-    status: 200,
-    description: 'ZIP file streamed',
-    content: { 'application/zip': {} },
-  })
+  @ApiResponse({ status: 201, description: 'Export job started' })
   @ApiResponse({ status: 404, description: 'Framework not found' })
   async exportFrameworkEvidence(
     @OrganizationId() organizationId: string,
     @Param('frameworkInstanceId') frameworkInstanceId: string,
-    @Req() req: Request,
-    @Res() res: Response,
   ) {
-    const { archive, filename } =
-      await this.frameworkEvidenceExportService.streamFrameworkEvidenceZip(
-        organizationId,
-        frameworkInstanceId,
-      );
+    // 404 for a framework outside the caller's organization before queueing anything.
+    await this.frameworkEvidenceExportService.loadFramework(
+      organizationId,
+      frameworkInstanceId,
+    );
 
-    res.setHeader('Content-Type', 'application/zip');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    // Send headers now so proxies don't idle-timeout while the first entries build.
-    res.flushHeaders();
+    const handle = await tasks.trigger(
+      'export-framework-evidence',
+      { organizationId, frameworkInstanceId },
+      {
+        concurrencyKey: organizationId,
+        // Collapse double-clicks into one run; short so a failed run can be retried soon.
+        idempotencyKey: `framework-evidence-export:${frameworkInstanceId}`,
+        idempotencyKeyTTL: '2m',
+      },
+    );
 
-    pipeArchiveToResponse({
-      archive,
-      req,
-      res,
-      logger: this.logger,
-      tag: `framework ${frameworkInstanceId}`,
-    });
+    return { runId: handle.id };
   }
 }

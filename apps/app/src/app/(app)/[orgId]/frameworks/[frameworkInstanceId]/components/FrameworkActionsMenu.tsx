@@ -1,7 +1,8 @@
 'use client';
 
 import { usePermissions } from '@/hooks/use-permissions';
-import { startFrameworkEvidenceDownload } from '@/lib/evidence-download';
+import { useJobRun } from '@/hooks/use-job-run';
+import { startFileDownload, triggerFrameworkEvidenceExport } from '@/lib/evidence-download';
 import { Button } from '@trycompai/design-system';
 import { Download, Edit, OverflowMenuVertical, TrashCan } from '@trycompai/design-system/icons';
 import {
@@ -10,7 +11,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@trycompai/ui/dropdown-menu';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 export function FrameworkActionsMenu({
@@ -33,14 +34,50 @@ export function FrameworkActionsMenu({
   // The ZIP bundles policies and evidence, so the API requires read on both.
   const canExport = hasPermission('evidence', 'read') && hasPermission('policy', 'read');
 
+  // The ZIP is built by a background job into storage; the browser then downloads
+  // it from there (known size, resumable) once the run finishes.
+  const [exportRunId, setExportRunId] = useState<string | null>(null);
+  const toastId = `framework-evidence-export-${frameworkInstanceId}`;
+  const failExport = () => {
+    setExportRunId(null);
+    toast.error('Evidence export failed. Please try again.', { id: toastId });
+  };
+
+  const { error: runError } = useJobRun<{ downloadUrl?: string }>(exportRunId, {
+    enabled: exportRunId !== null,
+    onComplete: (run) => {
+      const downloadUrl = run.output?.downloadUrl;
+      if (run.status !== 'COMPLETED' || !downloadUrl) return failExport();
+      setExportRunId(null);
+      startFileDownload(downloadUrl);
+      // The action covers browsers that block a download not started by a click.
+      toast.success(`${frameworkName} evidence ZIP is ready. Your download should start now.`, {
+        id: toastId,
+        duration: 60_000,
+        action: { label: 'Download', onClick: () => startFileDownload(downloadUrl) },
+      });
+    },
+  });
+
+  // The run can no longer be read (e.g. 404): stop waiting for it.
+  useEffect(() => {
+    if (runError && exportRunId !== null) failExport();
+  });
+
   if (!canEdit && !canDelete && !canExport) return null;
 
-  const handleExport = () => {
+  const handleExport = async () => {
     setOpen(false);
-    startFrameworkEvidenceDownload({ frameworkInstanceId });
-    toast.info(
-      `Exporting ${frameworkName} evidence. The ZIP downloads as it is built; large frameworks take a few minutes.`,
+    toast.loading(
+      `Preparing the ${frameworkName} evidence ZIP. Keep this page open; the download starts when it is ready.`,
+      { id: toastId, duration: Infinity },
     );
+    try {
+      const { runId } = await triggerFrameworkEvidenceExport({ frameworkInstanceId });
+      setExportRunId(runId);
+    } catch {
+      failExport();
+    }
   };
 
   return (
@@ -63,9 +100,9 @@ export function FrameworkActionsMenu({
           </DropdownMenuItem>
         )}
         {canExport && (
-          <DropdownMenuItem onClick={handleExport}>
+          <DropdownMenuItem onClick={handleExport} disabled={exportRunId !== null}>
             <Download size={16} className="mr-2" />
-            Export all evidences
+            {exportRunId !== null ? 'Preparing export…' : 'Export all evidences'}
           </DropdownMenuItem>
         )}
         {canDelete && (

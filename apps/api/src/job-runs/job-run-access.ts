@@ -25,6 +25,7 @@ export const JOB_RUN_READ_RESOURCES: ReadonlyMap<string, readonly string[]> = ne
   ['initialize-organization', ['organization', 'framework']],
   ['onboard-organization', ['organization', 'policy', 'vendor', 'risk']],
   ['export-organization-evidence', ['evidence']],
+  ['export-framework-evidence', ['framework', 'evidence', 'policy']],
   ['run-integration-tests', ['integration']],
   ['send-integration-results', ['integration']],
   ['run-cloud-security-scan', ['integration']],

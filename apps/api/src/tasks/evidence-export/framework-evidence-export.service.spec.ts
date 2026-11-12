@@ -2,26 +2,13 @@ import { NotFoundException } from '@nestjs/common';
 
 type AppendCall = { source: unknown; name: string };
 const appendCalls: AppendCall[] = [];
-let resolveFinalized: () => void = () => {};
-let finalized: Promise<void>;
-
-jest.mock('archiver', () =>
-  jest.fn(() => {
-    finalized = new Promise<void>((resolve) => {
-      resolveFinalized = resolve;
-    });
-    const archive = {
-      append: jest.fn((source: unknown, options: { name: string }) => {
-        appendCalls.push({ source, name: options.name });
-        return archive;
-      }),
-      finalize: jest.fn(async () => resolveFinalized()),
-      abort: jest.fn(),
-      on: jest.fn(() => archive),
-    };
+const archive = {
+  append: jest.fn((source: unknown, options: { name: string }) => {
+    appendCalls.push({ source, name: options.name });
     return archive;
   }),
-);
+  finalize: jest.fn(),
+};
 
 const mockDb = {
   frameworkInstance: { findFirst: jest.fn() },
@@ -127,9 +114,15 @@ describe('FrameworkEvidenceExportService', () => {
   });
 
   async function exportNames(): Promise<string[]> {
-    const { filename } = await service.streamFrameworkEvidenceZip('org_1', 'frm_1');
-    await finalized;
-    expect(filename).toMatch(/^spare-payments_pci-dss-level-1_evidence_\d{4}-\d{2}-\d{2}\.zip$/);
+    const framework = await service.loadFramework('org_1', 'frm_1');
+    expect(framework.root).toMatch(/^spare-payments_pci-dss-level-1_evidence_\d{4}-\d{2}-\d{2}$/);
+    await service.populate({
+      archive: archive as unknown as Parameters<typeof service.populate>[0]['archive'],
+      organizationId: 'org_1',
+      framework,
+    });
+    // The caller (the export job) finalizes the archive.
+    expect(archive.finalize).not.toHaveBeenCalled();
     return appendCalls.map((call) => call.name.split('/').slice(1).join('/'));
   }
 
@@ -187,7 +180,7 @@ describe('FrameworkEvidenceExportService', () => {
   it('rejects a framework from another organization', async () => {
     mockDb.frameworkInstance.findFirst.mockResolvedValue(null);
 
-    await expect(service.streamFrameworkEvidenceZip('org_2', 'frm_1')).rejects.toThrow(NotFoundException);
+    await expect(service.loadFramework('org_2', 'frm_1')).rejects.toThrow(NotFoundException);
     expect(mockDb.frameworkInstance.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: 'frm_1', organizationId: 'org_2' } }),
     );
