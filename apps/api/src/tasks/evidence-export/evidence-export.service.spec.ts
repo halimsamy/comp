@@ -1,4 +1,5 @@
 import { NotFoundException } from '@nestjs/common';
+import { Readable } from 'node:stream';
 
 // ------- Mock archiver -------
 // Collect append() calls on a simple harness. finalize() resolves a shared
@@ -9,6 +10,8 @@ interface MockArchive {
   finalize: jest.Mock;
   abort: jest.Mock;
   on: jest.Mock;
+  once: jest.Mock;
+  off: jest.Mock;
   pipe: jest.Mock;
   finalized: Promise<void>;
   aborted: boolean;
@@ -28,6 +31,8 @@ function createMockArchive(): MockArchive {
     appendCalls: [],
     append: jest.fn((source, options) => {
       archive.appendCalls.push({ source, options });
+      // Like the real archiver, drain stream sources (the streamer waits for that).
+      if (source instanceof Readable) source.resume();
       return archive;
     }),
     finalize: jest.fn(async () => {
@@ -38,6 +43,8 @@ function createMockArchive(): MockArchive {
       rejectFinalized(new Error('aborted'));
     }),
     on: jest.fn(() => archive),
+    once: jest.fn(() => archive),
+    off: jest.fn(() => archive),
     pipe: jest.fn(() => archive),
     finalized,
     aborted: false,

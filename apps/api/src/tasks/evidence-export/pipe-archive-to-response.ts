@@ -32,6 +32,9 @@ export function pipeArchiveToResponse(params: {
     aborted = true;
     logger.warn(`Client disconnected during export (${tag}); aborting archive`);
     archive.abort();
+    // abort() alone leaves the in-flight S3 body unread, pinning its socket;
+    // destroying the archive lets the attachment streamer release it.
+    archive.destroy();
   });
 
   archive.on('error', (err) => {

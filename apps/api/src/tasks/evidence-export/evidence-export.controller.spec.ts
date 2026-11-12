@@ -50,6 +50,7 @@ function makeFakeArchive() {
     append: jest.fn(),
     finalize: jest.fn(),
     abort: jest.fn(),
+    destroy: jest.fn(),
   });
   return archive;
 }
@@ -194,6 +195,8 @@ describe('EvidenceExportController', () => {
     res.emit('close');
 
     expect(archive.abort).toHaveBeenCalledTimes(1);
+    // Destroying releases the S3 socket held by the in-flight attachment body.
+    expect(archive.destroy).toHaveBeenCalledTimes(1);
   });
 
   it('does NOT abort the archive when the response completed normally', async () => {

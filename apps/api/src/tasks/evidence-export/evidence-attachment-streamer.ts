@@ -7,6 +7,7 @@ import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { Logger } from '@nestjs/common';
 import type { Archiver } from 'archiver';
 import { Readable } from 'node:stream';
+import { finished } from 'node:stream/promises';
 import { db } from '@db';
 import { AttachmentEntityType, type Attachment } from '@db';
 import { BUCKET_NAME, s3Client } from '../../app/s3';
@@ -101,7 +102,13 @@ export async function appendAttachmentToArchive(params: {
       'S3 client or bucket not configured; cannot stream attachments',
     );
   }
+  // Destroyed = the consumer went away (client disconnect). Opening more S3
+  // bodies would only leak sockets from the shared pool.
+  if (archive.destroyed) {
+    throw new Error('Archive closed; export cancelled');
+  }
 
+  let bodyStream: Readable;
   try {
     const response = await s3Client.send(
       new GetObjectCommand({
@@ -114,7 +121,7 @@ export async function appendAttachmentToArchive(params: {
       throw new Error('S3 returned no body');
     }
 
-    const bodyStream =
+    bodyStream =
       response.Body instanceof Readable
         ? response.Body
         : Readable.from(response.Body as AsyncIterable<Uint8Array>);
@@ -144,6 +151,32 @@ export async function appendAttachmentToArchive(params: {
     archive.append(buildMissingPlaceholder(attachment, message), {
       name: `${folderPath}/${placeholderName}`,
     });
+    return;
+  }
+
+  await waitUntilArchived({ archive, body: bodyStream });
+}
+
+/**
+ * Resolve once the archiver has read `body` to the end. Each unread S3 body
+ * holds a pooled socket, so callers must not open the next one before this
+ * resolves. If the archive is destroyed first, the body is destroyed too,
+ * which releases its socket, and this rejects.
+ */
+async function waitUntilArchived({
+  archive,
+  body,
+}: {
+  archive: Archiver;
+  body: Readable;
+}): Promise<void> {
+  const destroyBody = () => body.destroy();
+  if (archive.destroyed) destroyBody();
+  archive.once('close', destroyBody);
+  try {
+    await finished(body);
+  } finally {
+    archive.off('close', destroyBody);
   }
 }
 

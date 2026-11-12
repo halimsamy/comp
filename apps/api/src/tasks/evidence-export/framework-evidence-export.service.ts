@@ -148,6 +148,7 @@ export class FrameworkEvidenceExportService {
     const indexRows: string[][] = [];
 
     for (const folder of folders) {
+      if (archive.destroyed) return; // client disconnected
       const base = `${root}/${folder.folder}`;
       const folderPolicies = folder.policyIds.flatMap((id) => policiesById.get(id) ?? []);
 
