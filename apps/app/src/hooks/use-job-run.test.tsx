@@ -52,6 +52,16 @@ describe('useJobRun', () => {
     expect(result.current.error).toBeUndefined();
   });
 
+  it('keeps polling while the tab is hidden', async () => {
+    const visibility = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+    mockGet
+      .mockResolvedValueOnce(runResponse())
+      .mockResolvedValue(runResponse({ status: 'COMPLETED' }));
+    const { result } = renderHook(() => useJobRun('jrun_1', { refreshInterval: 20 }), { wrapper });
+    await waitFor(() => expect(result.current.run?.status).toBe('COMPLETED'));
+    visibility.mockRestore();
+  });
+
   it('polls until the run is terminal, then stops and calls onComplete once', async () => {
     mockGet
       .mockResolvedValueOnce(runResponse())

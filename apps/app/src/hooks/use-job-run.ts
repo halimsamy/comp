@@ -82,6 +82,9 @@ export function useJobRun<T = unknown>(
     },
     {
       refreshInterval: (latest) => (isJobRunFinished(latest?.status) ? 0 : refreshInterval),
+      // Keep polling in a background tab: users switch away while a job runs, and
+      // callers act on completion (e.g. start a download).
+      refreshWhenHidden: true,
       revalidateOnFocus: false,
       // SWR pauses refreshInterval while the last poll failed, so retries carry polling;
       // back off from refreshInterval up to 30s instead of SWR's default (minutes).
