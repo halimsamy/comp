@@ -15,6 +15,9 @@ export const EXTERNAL_TO_DB_EVIDENCE_FORM_TYPE = {
   'network-diagram': 'network_diagram',
   'tabletop-exercise': 'tabletop_exercise',
   'account-types': 'account_types',
+  'cryptographic-inventory': 'cryptographic_inventory',
+  'targeted-risk-analysis': 'targeted_risk_analysis',
+  'significant-change-record': 'significant_change_record',
 } as const satisfies Record<EvidenceFormType, string>;
 
 export type DbEvidenceFormTypeValue = (typeof EXTERNAL_TO_DB_EVIDENCE_FORM_TYPE)[EvidenceFormType];
@@ -33,6 +36,9 @@ export const DB_TO_EXTERNAL_EVIDENCE_FORM_TYPE = {
   network_diagram: 'network-diagram',
   tabletop_exercise: 'tabletop-exercise',
   account_types: 'account-types',
+  cryptographic_inventory: 'cryptographic-inventory',
+  targeted_risk_analysis: 'targeted-risk-analysis',
+  significant_change_record: 'significant-change-record',
 } as const satisfies Record<DbEvidenceFormTypeValue, EvidenceFormType>;
 
 export function toDbEvidenceFormTypeValue(formType: EvidenceFormType): DbEvidenceFormTypeValue {

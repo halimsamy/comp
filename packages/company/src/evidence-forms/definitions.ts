@@ -1,4 +1,5 @@
 import { meetingFields } from './field-builders';
+import { pciEvidenceFormDefinitions } from './definitions-pci';
 import type { EvidenceFormType } from './form-types';
 import {
   boardMeetingMinutesPlaceholder,
@@ -206,6 +207,14 @@ Remediation: Status of fixes (e.g. 3 of 5 critical findings remediated; 2 in pro
         required: true,
         accept: '.pdf',
         description: 'Upload the full third-party penetration test report',
+      },
+      {
+        key: 'rulesOfEngagementApproval',
+        label: 'Scope, timing and rules of engagement agreed with management',
+        type: 'text',
+        required: false,
+        description: 'Who in management approved the scope, timing and rules of engagement, and when',
+        placeholder: 'e.g. Jane Doe, CISO, 2026-03-01',
       },
     ],
   },
@@ -643,6 +652,7 @@ Injects: At 10:30, media contacts the company about the incident.`,
       },
     ],
   },
+  ...pciEvidenceFormDefinitions,
 };
 
 export const evidenceFormDefinitionList = Object.values(evidenceFormDefinitions);

@@ -14,6 +14,9 @@ export const evidenceFormTypeSchema = z.enum([
   'network-diagram',
   'tabletop-exercise',
   'account-types',
+  'cryptographic-inventory',
+  'targeted-risk-analysis',
+  'significant-change-record',
 ]);
 
 export type EvidenceFormType = z.infer<typeof evidenceFormTypeSchema>;

@@ -20,6 +20,9 @@ export const DOCUMENT_TYPE_LABELS: Record<EvidenceFormType, string> = {
   network_diagram: 'Network Diagram',
   tabletop_exercise: 'Tabletop Exercise',
   account_types: 'Account Types',
+  cryptographic_inventory: 'Cryptographic Inventory',
+  targeted_risk_analysis: 'Targeted Risk Analysis',
+  significant_change_record: 'Significant Change Record',
 };
 
 export const ALL_DOCUMENT_TYPES = Object.keys(

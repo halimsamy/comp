@@ -1,16 +1,13 @@
 import { z } from 'zod';
 import { evidenceFormFileSchema } from './file-schema';
 import type { EvidenceFormType } from './form-types';
+import { required, requiredTrimmed } from './schema-helpers';
+import {
+  cryptographicInventoryDataSchema,
+  significantChangeRecordDataSchema,
+  targetedRiskAnalysisDataSchema,
+} from './submission-schemas-pci';
 
-const required = (label?: string) => {
-  const msg = label ? `${label} is required` : 'This field is required';
-  return z.string({ error: msg }).min(1, msg);
-};
-
-const requiredTrimmed = (label?: string) => {
-  const msg = label ? `${label} is required` : 'This field is required';
-  return z.string({ error: msg }).trim().min(1, msg);
-};
 
 const meetingDataSchema = z.object({
   submissionDate: required('Submission date'),
@@ -48,6 +45,8 @@ const penetrationTestDataSchema = z.object({
   vendorName: required('Vendor name'),
   summary: required('Summary of findings'),
   pentestReport: evidenceFormFileSchema,
+  // Added later; optional so earlier submissions still validate.
+  rulesOfEngagementApproval: z.string().trim().optional(),
 });
 
 const rbacMatrixRowSchema = z.object({
@@ -253,4 +252,7 @@ export const evidenceFormSubmissionSchemaMap = {
   'network-diagram': networkDiagramDataSchema,
   'tabletop-exercise': tabletopExerciseDataSchema,
   'account-types': accountTypesDataSchema,
+  'cryptographic-inventory': cryptographicInventoryDataSchema,
+  'targeted-risk-analysis': targetedRiskAnalysisDataSchema,
+  'significant-change-record': significantChangeRecordDataSchema,
 } as const satisfies Record<EvidenceFormType, z.ZodTypeAny>;

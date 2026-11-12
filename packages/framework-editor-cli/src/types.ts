@@ -94,7 +94,11 @@ export type EvidenceFormType =
   | 'infrastructure_inventory'
   | 'employee_performance_evaluation'
   | 'network_diagram'
-  | 'tabletop_exercise';
+  | 'tabletop_exercise'
+  | 'account_types'
+  | 'cryptographic_inventory'
+  | 'targeted_risk_analysis'
+  | 'significant_change_record';
 
 export const FREQUENCY_VALUES: Frequency[] = ['monthly', 'quarterly', 'yearly'];
 export const DEPARTMENT_VALUES: Department[] = ['none', 'admin', 'gov', 'hr', 'it', 'itsm', 'qms'];
@@ -112,4 +116,8 @@ export const EVIDENCE_FORM_TYPE_VALUES: EvidenceFormType[] = [
   'employee_performance_evaluation',
   'network_diagram',
   'tabletop_exercise',
+  'account_types',
+  'cryptographic_inventory',
+  'targeted_risk_analysis',
+  'significant_change_record',
 ];

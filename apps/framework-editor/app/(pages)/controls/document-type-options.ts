@@ -19,6 +19,9 @@ export const DOCUMENT_TYPE_OPTIONS: MultiSelectOption[] = [
   { value: 'whistleblower_report', label: 'Whistleblower Report', category: 'People' },
   { value: 'employee_performance_evaluation', label: 'Employee Performance Evaluation', category: 'People' },
   { value: 'account_types', label: 'Account Types', category: 'Security' },
+  { value: 'cryptographic_inventory', label: 'Cryptographic Inventory', category: 'Security' },
+  { value: 'targeted_risk_analysis', label: 'Targeted Risk Analysis', category: 'Security' },
+  { value: 'significant_change_record', label: 'Significant Change Record', category: 'Security' },
 ];
 
 export function getDocumentTypeLabel(value: string): string {
