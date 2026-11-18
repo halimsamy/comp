@@ -38,5 +38,25 @@
     "frameworkId": "frk_681ecc34e85064efdbb76993",
     "controlTemplateId": "frk_ct_683f484fc7b5506ab97c26af",
     "documentType": "risk_treatment_plan"
+  },
+  {
+    "frameworkId": "frk_681ecc34e85064efdbb76993",
+    "controlTemplateId": "frk_ct_683f4f59dea367ca96145e14",
+    "documentType": "internal_audit"
+  },
+  {
+    "frameworkId": "frk_681ecc34e85064efdbb76993",
+    "controlTemplateId": "frk_ct_69e639b96ad6c5e729676acb",
+    "documentType": "internal_audit"
+  },
+  {
+    "frameworkId": "frk_681ecc34e85064efdbb76993",
+    "controlTemplateId": "frk_ct_683f4c9db20e7cf4a303af1f",
+    "documentType": "interested_parties_requirements"
+  },
+  {
+    "frameworkId": "frk_681ecc34e85064efdbb76993",
+    "controlTemplateId": "frk_ct_683f3ecd42e62fde624c59c1",
+    "documentType": "isms_scope"
   }
 ]

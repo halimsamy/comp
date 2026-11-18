@@ -361,8 +361,10 @@
     "name": "PCI DSS scope & cardholder data environment (CDE)",
     "description": "Defines and maintains the PCI DSS scope, CDE boundary, and inventory of in-scope components; records periodic scope confirmation and significant-change reviews.",
     "createdAt": "2026-04-13 18:19:18.314",
-    "updatedAt": "2026-04-13 18:19:18.314",
-    "documentTypes": []
+    "updatedAt": "2026-11-18 00:00:00.000",
+    "documentTypes": [
+      "infrastructure_inventory"
+    ]
   },
   {
     "id": "frk_ct_69dd33a6c094ddd8a7268013",
@@ -499,10 +501,8 @@
     "name": "Internal Audit & Management Review",
     "description": "Plans and executes internal ISMS audits, tracks findings, and facilitates periodic management review of ISMS effectiveness.",
     "createdAt": "2026-04-20 14:35:36.934",
-    "updatedAt": "2026-04-20 15:33:55.598",
+    "updatedAt": "2026-11-18 00:00:00.000",
     "documentTypes": [
-      "infrastructure_inventory",
-      "rbac_matrix",
       "access_request"
     ]
   },
