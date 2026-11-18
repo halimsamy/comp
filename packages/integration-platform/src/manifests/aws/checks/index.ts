@@ -1,4 +1,5 @@
 export { iamAccountSecurityCheck } from './iam';
+export { iamUsersCheck } from './iam-users';
 export { s3EncryptionCheck, s3PublicAccessCheck } from './s3';
 export { ec2SecurityGroupsCheck } from './ec2';
 export { rdsEncryptionCheck, rdsBackupsCheck } from './rds';

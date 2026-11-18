@@ -13,6 +13,7 @@ import { PeoplePageTabs } from './components/PeoplePageTabs';
 import { EmployeesOverview } from './dashboard/components/EmployeesOverview';
 import { DevicesTabContent } from './devices/components/DevicesTabContent';
 import { OrgChartTabContent } from './org-chart/components/OrgChartTabContent';
+import { AccessTabContent } from './access/components/AccessTabContent';
 import { PeopleSettings } from './settings/components/PeopleSettings';
 
 export default async function PeoplePage({ params }: { params: Promise<{ orgId: string }> }) {
@@ -78,6 +79,9 @@ export default async function PeoplePage({ params }: { params: Promise<{ orgId: 
       employeeTasksContent={<EmployeesOverview />}
       devicesContent={<DevicesTabContent isCurrentUserOwner={isCurrentUserOwner} />}
       orgChartContent={<OrgChartTabContent organizationId={orgId} />}
+      accessContent={
+        hasPermission(userPermissions, 'member', 'read') ? <AccessTabContent orgId={orgId} /> : null
+      }
       findingsContent={null}
       showRoleMapping={false}
       roleMappingContent={null}

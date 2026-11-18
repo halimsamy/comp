@@ -171,6 +171,7 @@ export const employeeAccessCheck: IntegrationCheck = {
         isDelegatedAdmin: user.isDelegatedAdmin,
         orgUnit: user.orgUnitPath,
         suspended: user.suspended,
+        isEnrolledIn2Sv: user.isEnrolledIn2Sv,
         creationTime: user.creationTime,
         lastLoginTime: user.lastLoginTime,
       };

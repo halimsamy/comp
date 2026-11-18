@@ -91,10 +91,15 @@ export class PeopleAccessService {
     if (!member) throw new NotFoundException('Member not found');
     const memberEmail = (member.user.email ?? '').toLowerCase().trim();
 
-    const sources = await this.checkResults.listSourcesBoundToTask(
-      organizationId,
-      TASK_TEMPLATES.employeeAccess,
-    );
+    const [sources, mappedAccounts] = await Promise.all([
+      this.checkResults.listSourcesBoundToTask(organizationId, TASK_TEMPLATES.employeeAccess),
+      // Accounts mapped to this member by hand on People > Access (e.g. GitHub logins).
+      db.accessAccountOwner.findMany({
+        where: { organizationId, memberId },
+        select: { systemKey: true, accountId: true },
+      }),
+    ]);
+    const mapped = new Set(mappedAccounts.map((m) => `${m.systemKey}|${m.accountId}`));
 
     const access: MemberAccessSource[] = await Promise.all(
       sources
@@ -106,9 +111,11 @@ export class PeopleAccessService {
             checkId: s.checkId,
           });
           const userRows = results.filter((r) => r.resourceType === 'user');
-          const memberRows = memberEmail
-            ? userRows.filter((r) => r.resourceId.toLowerCase().trim() === memberEmail)
-            : [];
+          const memberRows = userRows.filter(
+            (r) =>
+              (memberEmail && r.resourceId.toLowerCase().trim() === memberEmail) ||
+              mapped.has(`connection:${s.connectionId}|${r.resourceId}`),
+          );
           const lastCheckedAt = results.length
             ? new Date(
                 Math.max(...results.map((r) => new Date(r.collectedAt).getTime())),

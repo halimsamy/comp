@@ -29,7 +29,7 @@ describe('github-app manifest (CS-710)', () => {
     const appCheckIds = githubAppManifest.checks?.map((c) => c.id).sort();
     const legacyCheckIds = githubManifest.checks?.map((c) => c.id).sort();
     expect(appCheckIds).toEqual(legacyCheckIds);
-    expect(appCheckIds?.length).toBe(5);
+    expect(appCheckIds?.length).toBe(6);
   });
 
   it('leaves the legacy github manifest untouched (still OAuth `repo` scope)', () => {

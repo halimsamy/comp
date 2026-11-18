@@ -31,7 +31,7 @@
  *          the connection is finalized. The `installation_id` on the return trip
  *          is used only as a loop guard, never persisted.
  *
- * The five checks are reused verbatim from the `github` manifest — only the way
+ * The checks are reused verbatim from the `github` manifest — only the way
  * the token is obtained differs (read-only App vs read/write OAuth App), so there
  * is no logic duplication and both integrations stay in lockstep.
  */
@@ -41,6 +41,7 @@ import {
   branchProtectionCheck,
   codeScanningCheck,
   dependabotCheck,
+  orgMembersCheck,
   sanitizedInputsCheck,
   twoFactorAuthCheck,
 } from '../github/checks';
@@ -137,6 +138,7 @@ export const githubAppManifest: IntegrationManifest = {
     dependabotCheck,
     sanitizedInputsCheck,
     twoFactorAuthCheck,
+    orgMembersCheck,
   ],
 
   isActive: true,

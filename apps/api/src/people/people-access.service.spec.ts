@@ -1,4 +1,9 @@
-jest.mock('@db', () => ({ db: { member: { findFirst: jest.fn() } } }));
+jest.mock('@db', () => ({
+  db: {
+    member: { findFirst: jest.fn() },
+    accessAccountOwner: { findMany: jest.fn() },
+  },
+}));
 
 import { NotFoundException } from '@nestjs/common';
 import { db } from '@db';
@@ -9,6 +14,7 @@ import type {
 import { PeopleAccessService } from './people-access.service';
 
 const memberFindFirst = db.member.findFirst as jest.Mock;
+const ownerFindMany = db.accessAccountOwner.findMany as jest.Mock;
 
 function row(partial: Partial<CheckResultRow>): CheckResultRow {
   return {
@@ -46,6 +52,23 @@ describe('PeopleAccessService.getMemberAccess', () => {
     jest.clearAllMocks();
     memberFindFirst.mockResolvedValue({ id: 'mem_1', user: { email: 'Jane@X.com ' } });
     checkResults.listSourcesBoundToTask.mockResolvedValue([SOURCE]);
+    ownerFindMany.mockResolvedValue([]);
+  });
+
+  it('matches accounts mapped to the member by hand (e.g. GitHub logins)', async () => {
+    ownerFindMany.mockResolvedValue([{ systemKey: 'connection:conn_1', accountId: 'acme/jane' }]);
+    checkResults.getLatestResultsByCheck.mockResolvedValue([
+      row({ resourceType: 'user', resourceId: 'acme/jane' }),
+      row({ resultId: 'icr_2', resourceType: 'user', resourceId: 'acme/bob' }),
+    ]);
+
+    const { sources } = await service.getMemberAccess('org_1', 'mem_1');
+
+    expect(ownerFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { organizationId: 'org_1', memberId: 'mem_1' } }),
+    );
+    expect(sources[0].matchType).toBe('matched');
+    expect(sources[0].entries.map((e) => e.id)).toEqual(['icr_1']);
   });
 
   it('404s when the member is not in this organization', async () => {

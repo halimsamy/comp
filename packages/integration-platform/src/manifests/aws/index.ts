@@ -5,6 +5,7 @@ import {
   ec2SecurityGroupsCheck,
   environmentSeparationCheck,
   iamAccountSecurityCheck,
+  iamUsersCheck,
   kmsKeyRotationCheck,
   rdsBackupsCheck,
   rdsEncryptionCheck,
@@ -97,6 +98,7 @@ export const awsManifest: IntegrationManifest = {
 
   checks: [
     iamAccountSecurityCheck,
+    iamUsersCheck,
     s3EncryptionCheck,
     s3PublicAccessCheck,
     ec2SecurityGroupsCheck,

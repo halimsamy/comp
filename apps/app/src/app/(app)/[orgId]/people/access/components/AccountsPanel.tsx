@@ -1,0 +1,246 @@
+'use client';
+
+import { downloadCsv } from '@/components/risks/workspace/risk-actions-csv';
+import {
+  useAccessAccounts,
+  useAccessMutations,
+  useAccessSystems,
+  type AccessAccount,
+} from '@/hooks/use-access-reviews';
+import { usePermissions } from '@/hooks/use-permissions';
+import {
+  Button,
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyTitle,
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Spinner,
+  Text,
+} from '@trycompai/design-system';
+import { Add, Download, TrashCan, Upload } from '@trycompai/design-system/icons';
+import { useMemo, useState } from 'react';
+import { toast } from 'sonner';
+import { ACCOUNT_FILTERS, filterByFlag, formatDay, matchesSearch, type AccountFilter } from '../lib/access-labels';
+import { buildAccountsCsv } from '../lib/accounts-csv';
+import { AccountOwnerDialog, type OwnerOption, type OwnerValues } from './AccountOwnerDialog';
+import { AccountsTable } from './AccountsTable';
+import { AddSystemDialog, type SystemValues } from './AddSystemDialog';
+import { ImportAccountsDialog } from './ImportAccountsDialog';
+
+/** Vanta-style account inventory: pick a system, filter by flag, map owners, export. */
+export function AccountsPanel({ members }: { members: OwnerOption[] }) {
+  const { systems, isLoading: systemsLoading, error: systemsError, mutate: refreshSystems } = useAccessSystems();
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const systemKey = selectedKey ?? systems[0]?.key ?? null;
+  const system = systems.find((s) => s.key === systemKey) ?? null;
+  const { accounts, isLoading, error, mutate } = useAccessAccounts(systemKey);
+  const mutations = useAccessMutations();
+  const { hasPermission } = usePermissions();
+  const canUpdate = hasPermission('member', 'update');
+  const [filter, setFilter] = useState<AccountFilter>('all');
+  const [search, setSearch] = useState('');
+  const [ownerTarget, setOwnerTarget] = useState<AccessAccount | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+
+  const visible = useMemo(
+    () =>
+      filterByFlag({ rows: accounts, filter }).filter((a) =>
+        matchesSearch({ values: [a.name, a.email, a.owner?.name ?? null], query: search }),
+      ),
+    [accounts, filter, search],
+  );
+  const manualId = system?.kind === 'manual' ? system.key.slice('manual:'.length) : null;
+
+  const refresh = async () => {
+    await Promise.all([mutate(), refreshSystems()]);
+  };
+
+  const handleSaveOwner = async (values: OwnerValues) => {
+    if (!ownerTarget || !systemKey) return;
+    try {
+      await mutations.setOwner({
+        systemKey,
+        accountId: ownerTarget.accountId,
+        memberId: values.mode === 'member' ? values.memberId : null,
+        isServiceAccount: values.mode === 'service',
+        justification: values.mode === 'service' ? values.justification : undefined,
+      });
+      await refresh();
+      toast.success('Owner saved');
+    } catch (caught) {
+      toast.error(caught instanceof Error ? caught.message : 'Failed to save the owner');
+      throw caught;
+    }
+  };
+
+  const handleAddSystem = async (values: SystemValues) => {
+    try {
+      const created = await mutations.createSystem(values);
+      await refreshSystems();
+      setSelectedKey(created.key);
+      toast.success('System added. Import its accounts next.');
+    } catch (caught) {
+      toast.error(caught instanceof Error ? caught.message : 'Failed to add the system');
+      throw caught;
+    }
+  };
+
+  const handleImport = async (rows: Parameters<typeof mutations.importAccounts>[0]['accounts']) => {
+    if (!manualId) return;
+    try {
+      const { imported } = await mutations.importAccounts({ id: manualId, accounts: rows });
+      await refresh();
+      toast.success(`${imported} accounts imported`);
+    } catch (caught) {
+      toast.error(caught instanceof Error ? caught.message : 'Failed to import accounts');
+      throw caught;
+    }
+  };
+
+  const handleDeleteSystem = async () => {
+    if (!manualId || !system || !window.confirm(`Delete ${system.name} and its accounts?`)) return;
+    try {
+      await mutations.deleteSystem(manualId);
+      setSelectedKey(null);
+      await refreshSystems();
+      toast.success('System deleted');
+    } catch (caught) {
+      toast.error(caught instanceof Error ? caught.message : 'Failed to delete the system');
+    }
+  };
+
+  const handleExport = () => {
+    if (!system) return;
+    const day = new Date().toISOString().slice(0, 10);
+    const slug = system.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+    downloadCsv({ csv: buildAccountsCsv({ system: system.name, accounts: visible }), filename: `accounts-${slug}-${day}.csv` });
+  };
+
+  if (systemsError || error) {
+    return (
+      <div className="flex flex-wrap items-center gap-3 rounded-md border border-border p-6">
+        <Text variant="muted">Couldn&apos;t load accounts.</Text>
+        <Button size="sm" variant="outline" onClick={() => void refresh()}>
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="w-full sm:w-[260px]">
+            <Select value={systemKey ?? ''} onValueChange={(value) => setSelectedKey(value || null)}>
+              <SelectTrigger aria-label="System">
+                <SelectValue placeholder="Select a system">
+                  {(value: string) => systems.find((s) => s.key === value)?.name ?? 'Select a system'}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {systems.map((s) => (
+                  <SelectItem key={s.key} value={s.key}>
+                    {s.name} · {s.accountCount}
+                    {s.flaggedCount > 0 ? ` (${s.flaggedCount} flagged)` : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="w-full sm:w-[220px]">
+            <Input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search accounts"
+              aria-label="Search accounts"
+            />
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" iconLeft={<Download size={16} />} onClick={handleExport} disabled={visible.length === 0}>
+            Export CSV
+          </Button>
+          {canUpdate && manualId && (
+            <>
+              <Button variant="outline" iconLeft={<Upload size={16} />} onClick={() => setImportOpen(true)}>
+                Import CSV
+              </Button>
+              <Button variant="outline" iconLeft={<TrashCan size={16} />} onClick={() => void handleDeleteSystem()}>
+                Delete system
+              </Button>
+            </>
+          )}
+          {canUpdate && (
+            <Button iconLeft={<Add size={16} />} onClick={() => setAddOpen(true)}>
+              Add system
+            </Button>
+          )}
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Filter accounts">
+        {ACCOUNT_FILTERS.map((option) => (
+          <Button
+            key={option.value}
+            size="sm"
+            variant={filter === option.value ? 'default' : 'outline'}
+            aria-pressed={filter === option.value}
+            onClick={() => setFilter(option.value)}
+          >
+            {option.label} · {filterByFlag({ rows: accounts, filter: option.value }).length}
+          </Button>
+        ))}
+      </div>
+
+      {system && (
+        <Text size="sm" variant="muted">
+          {system.description ?? `${system.name} accounts`}
+          {system.lastSyncAt ? ` · updated ${formatDay(system.lastSyncAt)}` : ''}
+        </Text>
+      )}
+
+      {(systemsLoading || isLoading) && accounts.length === 0 ? (
+        <div className="flex justify-center py-10">
+          <Spinner />
+        </div>
+      ) : visible.length === 0 ? (
+        <Empty>
+          <EmptyHeader>
+            <EmptyTitle>{accounts.length === 0 ? 'No accounts yet' : 'Nothing matches'}</EmptyTitle>
+            <EmptyDescription>
+              {accounts.length === 0
+                ? manualId
+                  ? 'Import the user export of this system as CSV to review its accounts.'
+                  : 'Accounts appear after the integration check runs. Connect Google Workspace, GitHub or AWS under Integrations, or add a system and import a CSV.'
+                : 'No accounts match these filters.'}
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      ) : (
+        <AccountsTable accounts={visible} canMapOwners={canUpdate} onMapOwner={setOwnerTarget} />
+      )}
+
+      <AccountOwnerDialog
+        account={ownerTarget}
+        members={members}
+        onOpenChange={(open) => !open && setOwnerTarget(null)}
+        onSave={handleSaveOwner}
+      />
+      <AddSystemDialog open={addOpen} onOpenChange={setAddOpen} onSave={handleAddSystem} />
+      <ImportAccountsDialog
+        systemName={system?.name ?? ''}
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        onImport={handleImport}
+      />
+    </div>
+  );
+}
