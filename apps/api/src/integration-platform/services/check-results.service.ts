@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { Prisma } from '@db';
+import { db, type IntegrationFindingSeverity, type Prisma } from '@db';
 import {
   registry,
   type IntegrationCategory,
@@ -9,6 +9,7 @@ import {
 } from '@trycompai/integration-platform';
 import { CheckRunRepository } from '../repositories/check-run.repository';
 import { ConnectionRepository } from '../repositories/connection.repository';
+import { mappingAppliesTo } from '../utils/task-template-successors';
 
 /**
  * One row of an integration check's output, in a stable, FEATURE-AGNOSTIC shape.
@@ -29,6 +30,8 @@ export interface CheckResultRow {
   passed: boolean;
   title: string;
   description: string | null;
+  /** Severity the check gave a failing row (null/'info' for passes). */
+  severity?: IntegrationFindingSeverity | null;
   /** Check-specific payload — interpret this in the feature, never here. */
   evidence: Prisma.JsonValue;
   collectedAt: Date;
@@ -86,7 +89,7 @@ export class CheckResultsService {
   ): Array<{ manifest: IntegrationManifest; check: IntegrationCheck }> {
     return registry.getActiveManifests().flatMap((manifest) => {
       const check = manifest.checks?.find(
-        (c) => c.taskMapping === taskTemplateId,
+        (c) => mappingAppliesTo({ mapping: c.taskMapping, templateId: taskTemplateId }),
       );
       return check ? [{ manifest, check }] : [];
     });
@@ -153,10 +156,37 @@ export class CheckResultsService {
       passed: r.passed,
       title: r.title,
       description: r.description,
+      severity: r.severity,
       evidence: r.evidence,
       collectedAt: r.collectedAt,
       runId: latest.run.id,
       connectionId,
+    }));
+  }
+
+  /**
+   * Every (connection, check) pair that has ever run for the organization on a
+   * connection that is still connected. Lets a feature walk all latest results
+   * (e.g. the asset inventory) by calling getLatestResultsByCheck per pair.
+   */
+  async listRanChecks(
+    organizationId: string,
+  ): Promise<Array<{ connectionId: string; checkId: string; providerSlug: string }>> {
+    const runs = await db.integrationCheckRun.findMany({
+      where: {
+        connection: { organizationId, status: { not: 'disconnected' } },
+      },
+      distinct: ['connectionId', 'checkId'],
+      select: {
+        connectionId: true,
+        checkId: true,
+        connection: { select: { provider: { select: { slug: true } } } },
+      },
+    });
+    return runs.map((run) => ({
+      connectionId: run.connectionId,
+      checkId: run.checkId,
+      providerSlug: run.connection.provider.slug,
     }));
   }
 

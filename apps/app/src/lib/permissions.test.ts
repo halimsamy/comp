@@ -107,6 +107,12 @@ describe('canAccessRoute', () => {
     expect(canAccessRoute(permissions, 'nonexistent-route')).toBe(true);
   });
 
+  it('gates assets and vulnerabilities with integration:read', () => {
+    expect(canAccessRoute({ integration: ['read'] }, 'assets')).toBe(true);
+    expect(canAccessRoute({ integration: ['read'] }, 'vulnerabilities')).toBe(true);
+    expect(canAccessRoute({ control: ['read'] }, 'assets')).toBe(false);
+    expect(canAccessRoute({ control: ['read'] }, 'vulnerabilities')).toBe(false);
+  });
 });
 
 describe('getDefaultRoute', () => {
