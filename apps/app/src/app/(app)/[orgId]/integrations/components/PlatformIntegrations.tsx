@@ -9,6 +9,7 @@ import {
 } from '@/hooks/use-integration-platform';
 import { api } from '@/lib/api-client';
 import { usePermissions } from '@/hooks/use-permissions';
+import { useIntegrationCoverage } from '@/hooks/use-overview';
 import { useVendors } from '@/hooks/use-vendors';
 import { Badge } from '@trycompai/ui/badge';
 import { Button } from '@trycompai/ui/button';
@@ -40,6 +41,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { CATEGORIES, type Integration, type IntegrationCategory } from '../data/integrations';
 import { matchesIntegrationNameSearch } from './integration-search';
+import { IntegrationCoverageLine } from './IntegrationCoverageLine';
 import { SearchInput } from './SearchInput';
 import { TaskCard, TaskCardSkeleton } from './TaskCard';
 
@@ -123,6 +125,7 @@ export function PlatformIntegrations({ className, taskTemplates }: PlatformInteg
   const { connections, isLoading: loadingConnections } = useIntegrationConnections();
   const { hasPermission } = usePermissions();
   const canCreate = hasPermission('integration', 'create');
+  const { coverage } = useIntegrationCoverage({ enabled: hasPermission('integration', 'read') });
   const { startOAuth } = useIntegrationMutations();
   const { data: vendorsResponse } = useVendors();
 
@@ -614,6 +617,8 @@ export function PlatformIntegrations({ className, taskTemplates }: PlatformInteg
                           <CardDescription className="text-sm leading-relaxed line-clamp-2">
                             {provider.description}
                           </CardDescription>
+
+                          <IntegrationCoverageLine coverage={coverage.get(provider.id)} />
 
                           {/* Mapped tasks */}
                           {provider.mappedTasks && provider.mappedTasks.length > 0 && (

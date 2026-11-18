@@ -1,8 +1,11 @@
 'use client';
 
-import { FrameworkEditorFramework, Policy, Task } from '@db';
+import { usePermissions } from '@/hooks/use-permissions';
 import type { FrameworkInstanceWithControls } from '@/lib/types/framework';
-import { ComplianceOverview } from './ComplianceOverview';
+import { FrameworkEditorFramework, Policy, Task } from '@db';
+import { AttentionGrid } from './attention/AttentionGrid';
+import { ComplianceTrendCard } from './attention/ComplianceTrendCard';
+import { DeadlinesCard } from './attention/DeadlinesCard';
 import { FrameworksOverview } from './FrameworksOverview';
 import { ToDoOverview } from './ToDoOverview';
 import { FrameworkInstanceWithComplianceScore } from './types';
@@ -68,21 +71,14 @@ export const Overview = ({
     totalMembers: peopleScore.totalMembers,
   });
 
+  const { hasPermission } = usePermissions();
+  // The monitoring endpoints are gated by app:read; the overview route only needs framework:read.
+  const canReadProgram = hasPermission('app', 'read');
+
   return (
     <div className="flex flex-col gap-6">
+      {canReadProgram && <AttentionGrid organizationId={organizationId} />}
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <ComplianceOverview
-          organizationId={organizationId}
-          overallComplianceScore={overallComplianceScore}
-          totalPolicies={publishedPoliciesScore.totalPolicies}
-          publishedPolicies={publishedPoliciesScore.publishedPolicies}
-          totalTasks={doneTasksScore.totalTasks}
-          doneTasks={doneTasksScore.doneTasks}
-          totalDocuments={documentsScore.totalDocuments}
-          completedDocuments={documentsScore.completedDocuments}
-          totalMembers={peopleScore.totalMembers}
-          completedMembers={peopleScore.completedMembers}
-        />
         <FrameworksOverview
           frameworksWithControls={frameworksWithControls}
           frameworksWithCompliance={frameworksWithCompliance}
@@ -90,6 +86,8 @@ export const Overview = ({
           allFrameworks={allFrameworks}
           organizationId={organizationId}
         />
+        {canReadProgram && <DeadlinesCard organizationId={organizationId} />}
+        {canReadProgram && <ComplianceTrendCard />}
         <ToDoOverview
           totalPolicies={publishedPoliciesScore.totalPolicies}
           totalTasks={doneTasksScore.totalTasks}

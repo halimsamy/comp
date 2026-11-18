@@ -46,6 +46,10 @@ vi.mock('@/hooks/use-vendors', () => ({
   useVendors: mockUseVendors,
 }));
 
+vi.mock('@/hooks/use-overview', () => ({
+  useIntegrationCoverage: () => ({ coverage: new Map() }),
+}));
+
 // Mock integrations data
 vi.mock('../data/integrations', () => ({
   CATEGORIES: ['Development'],
