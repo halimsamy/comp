@@ -1,4 +1,5 @@
 import { CompanyFormPageClient } from '@/app/(app)/[orgId]/documents/components/CompanyFormPageClient';
+import { RelatedControls } from '@/components/related-controls/RelatedControls';
 import { Breadcrumb, PageLayout } from '@trycompai/design-system';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -47,6 +48,7 @@ export default async function CompanyFormDetailPage({
         formType={parsedType.data}
         isPlatformAdmin={isPlatformAdmin}
       />
+      <RelatedControls entityType="evidence_form" entityId={parsedType.data} />
     </PageLayout>
   );
 }

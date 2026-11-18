@@ -56,7 +56,10 @@ import { TaskDeleteDialog } from './TaskDeleteDialog';
 import { TaskIntegrationChecks } from './TaskIntegrationChecks';
 import { TaskMainContent } from './TaskMainContent';
 import { TaskPolicies } from './TaskPolicies';
+import { RelatedControls } from '@/components/related-controls/RelatedControls';
+import { AutomationReviewBanner } from './AutomationReviewBanner';
 import { TaskPropertiesSidebar } from './TaskPropertiesSidebar';
+import { TaskNativeEvidence } from './TaskNativeEvidence';
 
 type AutomationWithRuns = EvidenceAutomation & {
   runs: EvidenceAutomationRun[];
@@ -125,6 +128,7 @@ export function SingleTask({
   const canUpdateTask = hasPermission('task', 'update');
   const canDeleteTask = hasPermission('task', 'delete');
   const canReadPolicy = hasPermission('policy', 'read');
+  const canReadControl = hasPermission('control', 'read');
 
   const startEditingTitle = () => {
     if (!canUpdateTask) return;
@@ -329,8 +333,11 @@ export function SingleTask({
         <NotRelevantBanner justification={task.notRelevantJustification} />
       )}
 
+      {/* Automation moved a task with manual parts to review */}
+      {isInReview && !task.approverId && <AutomationReviewBanner />}
+
       {/* Approval Banner */}
-      {evidenceApprovalEnabled && isInReview && (
+      {evidenceApprovalEnabled && isInReview && task.approverId && (
         <ApprovalBanner
           canApprove={!!canApprove}
           canCancel={canCancel}
@@ -346,7 +353,9 @@ export function SingleTask({
           <TabsList variant="underline">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             {task.automationStatus !== 'MANUAL' && <TabsTrigger value="automations">Automations</TabsTrigger>}
-            {canReadPolicy && <TabsTrigger value="mappings">Mappings</TabsTrigger>}
+            {(canReadPolicy || canReadControl) && (
+              <TabsTrigger value="mappings">Mappings</TabsTrigger>
+            )}
             <TabsTrigger value="comments">Comments</TabsTrigger>
             <TabsTrigger value="activity">Activity</TabsTrigger>
             <TabsTrigger value="settings">Settings</TabsTrigger>
@@ -359,6 +368,7 @@ export function SingleTask({
                 evidenceApprovalEnabled={evidenceApprovalEnabled}
                 onRequestApproval={handleRequestApproval}
               />
+              <TaskNativeEvidence taskId={task.id} onTaskUpdated={() => mutateTask()} />
               <Stack gap="sm">
                 <Label>Comments</Label>
                 <Comments
@@ -374,7 +384,8 @@ export function SingleTask({
 
           <TabsContent value="mappings">
             <Stack gap="lg">
-              <TaskPolicies />
+              {canReadControl && <RelatedControls entityType="task" entityId={task.id} />}
+              {canReadPolicy && <TaskPolicies />}
             </Stack>
           </TabsContent>
 

@@ -1,6 +1,5 @@
 import type { Member, Policy, PolicyVersion, User } from '@db';
 import type { AuditLogWithRelations } from '../data';
-import type { MappedControl } from './PolicyControlMappings';
 import { PolicyPageTabs } from './PolicyPageTabs';
 
 type PolicyVersionWithPublisher = PolicyVersion & {
@@ -10,8 +9,6 @@ type PolicyVersionWithPublisher = PolicyVersion & {
 export default function PolicyPage({
   policy,
   assignees,
-  mappedControls,
-  allControls,
   isPendingApproval,
   policyId,
   organizationId,
@@ -21,8 +18,6 @@ export default function PolicyPage({
 }: {
   policy: (Policy & { approver: (Member & { user: User }) | null }) | null;
   assignees: (Member & { user: User })[];
-  mappedControls: MappedControl[];
-  allControls: MappedControl[];
   isPendingApproval: boolean;
   policyId: string;
   organizationId: string;
@@ -36,8 +31,6 @@ export default function PolicyPage({
       policyId={policyId}
       organizationId={organizationId}
       assignees={assignees}
-      mappedControls={mappedControls}
-      allControls={allControls}
       isPendingApproval={isPendingApproval}
       logs={logs}
       versions={versions}

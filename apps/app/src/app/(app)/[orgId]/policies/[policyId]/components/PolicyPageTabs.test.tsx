@@ -88,8 +88,8 @@ vi.mock('./PolicyArchiveSheet', () => ({
   PolicyArchiveSheet: () => <div data-testid="policy-archive-sheet" />,
 }));
 
-vi.mock('./PolicyControlMappings', () => ({
-  PolicyControlMappings: () => <div data-testid="policy-control-mappings" />,
+vi.mock('@/components/related-controls/RelatedControls', () => ({
+  RelatedControls: () => <div data-testid="policy-control-mappings" />,
 }));
 
 vi.mock('./PolicyEvidenceTasks', () => ({
@@ -108,6 +108,14 @@ vi.mock('./PolicyOverviewSheet', () => ({
 
 vi.mock('./PolicySettingsCard', () => ({
   PolicySettingsCard: () => <div data-testid="policy-settings-card" />,
+}));
+
+vi.mock('./PolicyLifecycle', () => ({
+  PolicyLifecycle: () => <div data-testid="policy-lifecycle" />,
+}));
+
+vi.mock('./PolicyAcknowledgementsTab', () => ({
+  PolicyAcknowledgementsTab: () => <div data-testid="policy-acknowledgements-tab" />,
 }));
 
 vi.mock('./PolicyVersionsTab', () => ({
@@ -156,8 +164,6 @@ const basePolicy = {
 const defaultProps = {
   policy: basePolicy,
   assignees: [],
-  mappedControls: [],
-  allControls: [],
   isPendingApproval: false,
   policyId: 'policy-1',
   organizationId: 'org-1',
@@ -200,6 +206,12 @@ describe('PolicyPageTabs', () => {
     it('renders overview tab content by default', () => {
       render(<PolicyPageTabs {...defaultProps} />);
       expect(screen.getByTestId('policy-settings-card')).toBeInTheDocument();
+    });
+
+    it('shows the lifecycle on the overview and an acknowledgements tab', () => {
+      render(<PolicyPageTabs {...defaultProps} />);
+      expect(screen.getByTestId('policy-lifecycle')).toBeInTheDocument();
+      expect(screen.getByText('Acknowledgements')).toBeInTheDocument();
     });
   });
 

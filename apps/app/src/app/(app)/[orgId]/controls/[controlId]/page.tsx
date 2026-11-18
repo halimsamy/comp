@@ -12,6 +12,7 @@ import type {
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { ControlHeaderActions } from './components/ControlHeaderActions';
+import { ControlOwnerSelect, type ControlOwnerSummary } from './components/ControlOwnerSelect';
 import { SingleControl } from './components/SingleControl';
 import type { ControlProgressResponse } from './data/getOrganizationControlProgress';
 
@@ -25,6 +26,7 @@ type ControlDetail = Control & {
     requirement: FrameworkEditorRequirement;
   })[];
   progress: ControlProgressResponse;
+  owner: ControlOwnerSummary | null;
 };
 
 interface ControlPageProps {
@@ -67,7 +69,12 @@ export default async function ControlPage({ params }: ControlPageProps) {
       />
       <PageHeader
         title={control.name}
-        actions={<ControlHeaderActions control={control} />}
+        actions={
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+            <ControlOwnerSelect controlId={control.id} owner={control.owner ?? null} />
+            <ControlHeaderActions control={control} />
+          </div>
+        }
       />
       <SingleControl
         control={control}

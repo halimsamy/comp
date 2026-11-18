@@ -6,7 +6,8 @@ import {
 import { db, EvidenceFormType, Prisma } from '@db';
 import { CreateControlDto } from './dto/create-control.dto';
 import { deduplicateById, deduplicateByFormType } from '../utils/deduplicate';
-import { syncDirectLinksToCustomFrameworks } from './sync-custom-framework-links';
+import { syncDirectLinksToAllFrameworks } from './sync-framework-links';
+import { controlSummarySelect } from './control-requirements';
 
 // A CustomRequirement is valid for a given FrameworkInstance when its parent
 // matches: either it lives on the FI's CustomFramework, or it was attached
@@ -112,6 +113,14 @@ export class ControlsService {
         policies: { where: { archivedAt: null, isArchived: false } },
         tasks: { where: { archivedAt: null } },
         controlDocumentTypes: true,
+        // Links made on a framework page only exist framework-scoped; show them too.
+        frameworkPolicyLinks: {
+          where: { policy: { archivedAt: null, isArchived: false } },
+          select: { policy: true },
+        },
+        frameworkTaskLinks: { where: { task: { archivedAt: null } }, select: { task: true } },
+        frameworkDocumentLinks: { select: { controlId: true, formType: true } },
+        owner: controlSummarySelect.owner,
         requirementsMapped: {
           where: { archivedAt: null },
           include: {
@@ -129,9 +138,16 @@ export class ControlsService {
       throw new NotFoundException('Control not found');
     }
 
-    const policies = control.policies || [];
-    const tasks = control.tasks || [];
-    const controlDocumentTypes = control.controlDocumentTypes || [];
+    const { frameworkPolicyLinks, frameworkTaskLinks, frameworkDocumentLinks, ...rest } = control;
+    const policies = deduplicateById([
+      ...control.policies,
+      ...frameworkPolicyLinks.map((l) => l.policy),
+    ]);
+    const tasks = deduplicateById([...control.tasks, ...frameworkTaskLinks.map((l) => l.task)]);
+    const controlDocumentTypes = deduplicateByFormType([
+      ...control.controlDocumentTypes,
+      ...frameworkDocumentLinks,
+    ]);
 
     const formTypes = controlDocumentTypes.map(
       (d) => d.formType,
@@ -181,7 +197,7 @@ export class ControlsService {
     const completed = policyCompleted + taskCompleted;
 
     return {
-      ...control,
+      ...rest,
       policies,
       tasks,
       controlDocumentTypes: controlDocumentTypes.map(
@@ -480,7 +496,7 @@ export class ControlsService {
       }
 
       if (scopedRequirementMappings.length > 0) {
-        await syncDirectLinksToCustomFrameworks({
+        await syncDirectLinksToAllFrameworks({
           controlId: control.id,
           organizationId,
           client: tx,
@@ -676,7 +692,7 @@ export class ControlsService {
         where: { id: controlId },
         data: { policies: { connect: policies.map((p) => ({ id: p.id })) } },
       });
-      await syncDirectLinksToCustomFrameworks({ controlId, organizationId });
+      await syncDirectLinksToAllFrameworks({ controlId, organizationId });
     }
 
     return { count: policies.length };
@@ -713,7 +729,7 @@ export class ControlsService {
         where: { id: controlId },
         data: { tasks: { connect: tasks.map((t) => ({ id: t.id })) } },
       });
-      await syncDirectLinksToCustomFrameworks({ controlId, organizationId });
+      await syncDirectLinksToAllFrameworks({ controlId, organizationId });
     }
 
     return { count: tasks.length };
@@ -812,6 +828,8 @@ export class ControlsService {
       })),
       skipDuplicates: true,
     });
+    // A newly mapped framework picks up the control's existing evidence links.
+    await syncDirectLinksToAllFrameworks({ controlId, organizationId });
 
     return { count: result.count };
   }
@@ -839,7 +857,7 @@ export class ControlsService {
       data: formTypes.map((formType) => ({ controlId, formType })),
       skipDuplicates: true,
     });
-    await syncDirectLinksToCustomFrameworks({ controlId, organizationId });
+    await syncDirectLinksToAllFrameworks({ controlId, organizationId });
     return { count: result.count };
   }
 
@@ -862,29 +880,10 @@ export class ControlsService {
         where: { controlId, formType },
       });
       if (deleted.count === 0) return { success: true };
-      const customFiIds = await tx.requirementMap.findMany({
-        where: {
-          controlId,
-          archivedAt: null,
-          frameworkInstance: {
-            organizationId,
-            customFrameworkId: { not: null },
-          },
-        },
-        select: { frameworkInstanceId: true },
-        distinct: ['frameworkInstanceId'],
+      // The direct link was fanned out to every framework instance; remove it everywhere.
+      await tx.frameworkControlDocumentTypeLink.deleteMany({
+        where: { controlId, formType, frameworkInstance: { organizationId } },
       });
-      if (customFiIds.length > 0) {
-        await tx.frameworkControlDocumentTypeLink.deleteMany({
-          where: {
-            controlId,
-            formType,
-            frameworkInstanceId: {
-              in: customFiIds.map((r) => r.frameworkInstanceId),
-            },
-          },
-        });
-      }
       return { success: true };
     });
   }

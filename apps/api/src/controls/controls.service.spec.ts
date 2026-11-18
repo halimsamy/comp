@@ -11,8 +11,8 @@ jest.mock('@trycompai/auth', () => ({
   BUILT_IN_ROLE_PERMISSIONS: {},
 }));
 
-jest.mock('./sync-custom-framework-links', () => ({
-  syncDirectLinksToCustomFrameworks: jest.fn().mockResolvedValue(undefined),
+jest.mock('./sync-framework-links', () => ({
+  syncDirectLinksToAllFrameworks: jest.fn().mockResolvedValue(undefined),
 }));
 
 const mockDb = {
@@ -233,6 +233,9 @@ describe('ControlsService', () => {
         policies: [],
         tasks: [],
         controlDocumentTypes: [],
+        frameworkPolicyLinks: [],
+        frameworkTaskLinks: [],
+        frameworkDocumentLinks: [],
         requirementsMapped: [],
       });
 
@@ -283,8 +286,8 @@ describe('ControlsService', () => {
   });
 
   describe('linkPolicies', () => {
-    const { syncDirectLinksToCustomFrameworks } = jest.requireMock(
-      './sync-custom-framework-links',
+    const { syncDirectLinksToAllFrameworks } = jest.requireMock(
+      './sync-framework-links',
     );
 
     it('should sync to custom frameworks when linking without frameworkInstanceId', async () => {
@@ -294,7 +297,7 @@ describe('ControlsService', () => {
 
       await service.linkPolicies('ctrl_1', 'org_1', ['pol_1']);
 
-      expect(syncDirectLinksToCustomFrameworks).toHaveBeenCalledWith({
+      expect(syncDirectLinksToAllFrameworks).toHaveBeenCalledWith({
         controlId: 'ctrl_1',
         organizationId: 'org_1',
       });
@@ -313,13 +316,13 @@ describe('ControlsService', () => {
 
       await service.linkPolicies('ctrl_1', 'org_1', ['pol_1'], 'fi_1');
 
-      expect(syncDirectLinksToCustomFrameworks).not.toHaveBeenCalled();
+      expect(syncDirectLinksToAllFrameworks).not.toHaveBeenCalled();
     });
   });
 
   describe('linkTasks', () => {
-    const { syncDirectLinksToCustomFrameworks } = jest.requireMock(
-      './sync-custom-framework-links',
+    const { syncDirectLinksToAllFrameworks } = jest.requireMock(
+      './sync-framework-links',
     );
 
     it('should sync to custom frameworks when linking without frameworkInstanceId', async () => {
@@ -329,10 +332,11 @@ describe('ControlsService', () => {
 
       await service.linkTasks('ctrl_1', 'org_1', ['task_1']);
 
-      expect(syncDirectLinksToCustomFrameworks).toHaveBeenCalledWith({
+      expect(syncDirectLinksToAllFrameworks).toHaveBeenCalledWith({
         controlId: 'ctrl_1',
         organizationId: 'org_1',
       });
     });
   });
+
 });

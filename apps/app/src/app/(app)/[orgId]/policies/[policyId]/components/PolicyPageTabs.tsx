@@ -12,55 +12,27 @@ import { PolicyContentManager } from '../editor/components/PolicyDetails';
 import { useAuditLogs } from '../hooks/useAuditLogs';
 import { usePolicy } from '../hooks/usePolicy';
 import { usePolicyVersions } from '../hooks/usePolicyVersions';
+import { sanitizePolicyContent } from '../lib/sanitize-policy-content';
+import { PolicyAcknowledgementsTab } from './PolicyAcknowledgementsTab';
 import { PolicyAlerts } from './PolicyAlerts';
 import { PolicyArchiveSheet } from './PolicyArchiveSheet';
-import {
-  PolicyControlMappings,
-  type MappedControl,
-} from './PolicyControlMappings';
 import { PolicyDeleteDialog } from './PolicyDeleteDialog';
 import { PolicyEvidenceTasks } from './PolicyEvidenceTasks';
+import { PolicyLifecycle } from './PolicyLifecycle';
 import { PolicyOverviewSheet } from './PolicyOverviewSheet';
 import { PolicySettingsCard } from './PolicySettingsCard';
 import { PolicyVersionsTab } from './PolicyVersionsTab';
 import { RecentAuditLogs } from './RecentAuditLogs';
+import { RelatedControls } from '@/components/related-controls/RelatedControls';
 
 type PolicyVersionWithPublisher = PolicyVersion & {
   publishedBy: (Member & { user: User }) | null;
+  approvedBy?: (Member & { user: User }) | null;
 };
-
-/**
- * Normalizes policy content from the database into a clean JSONContent[].
- * Handles two known storage patterns:
- *  - { set: [...] } wrapper from a previous createMany bug
- *  - [{type:"doc", content:[...]}] where a full doc was stored as an array element
- */
-function sanitizePolicyContent(raw: unknown): JSONContent[] {
-  if (!raw) return [];
-
-  let arr: unknown[] = Array.isArray(raw) ? raw : [raw];
-
-  if (arr.length === 1 && arr[0] && typeof arr[0] === 'object' && !Array.isArray(arr[0])) {
-    const first = arr[0] as Record<string, unknown>;
-
-    // Unwrap { set: [...] } wrapper
-    if (Array.isArray(first.set)) {
-      arr = first.set;
-    }
-    // Unwrap [{type:"doc", content:[...]}] — extract the doc's children
-    else if (first.type === 'doc' && Array.isArray(first.content)) {
-      arr = first.content;
-    }
-  }
-
-  return arr as JSONContent[];
-}
 
 interface PolicyPageTabsProps {
   policy: (Policy & { approver: (Member & { user: User }) | null }) | null;
   assignees: (Member & { user: User })[];
-  mappedControls: MappedControl[];
-  allControls: MappedControl[];
   isPendingApproval: boolean;
   policyId: string;
   organizationId: string;
@@ -72,8 +44,6 @@ interface PolicyPageTabsProps {
 export function PolicyPageTabs({
   policy: initialPolicy,
   assignees,
-  mappedControls,
-  allControls,
   isPendingApproval: initialIsPendingApproval,
   policyId,
   organizationId,
@@ -139,6 +109,10 @@ export function PolicyPageTabs({
     ? !!policy.approverId && !!policy.pendingVersionId
     : initialIsPendingApproval;
 
+  const currentVersion = (Array.isArray(versions) ? versions : []).find(
+    (v) => v.id === policy?.currentVersionId,
+  );
+
   const isDeleteDialogOpen = searchParams.get('delete-policy') === 'true';
   const tabFromUrl = searchParams.get('tab') || 'overview';
   const versionIdFromUrl = searchParams.get('versionId');
@@ -188,6 +162,7 @@ export function PolicyPageTabs({
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="content">Content</TabsTrigger>
             <TabsTrigger value="mappings">Mappings</TabsTrigger>
+            <TabsTrigger value="acknowledgements">Acknowledgements</TabsTrigger>
             <TabsTrigger value="versions">Versions</TabsTrigger>
             <TabsTrigger value="activity">Activity</TabsTrigger>
             <TabsTrigger value="comments">Comments</TabsTrigger>
@@ -195,6 +170,16 @@ export function PolicyPageTabs({
 
           <TabsContent value="overview">
             <Stack gap="md">
+              {policy && (
+                <PolicyLifecycle
+                  policy={{
+                    ...policy,
+                    assignee: assignees.find((member) => member.id === policy.assigneeId),
+                  }}
+                  currentVersion={currentVersion ?? null}
+                  onMutate={mutateAll}
+                />
+              )}
               <PolicySettingsCard
                 policy={policy}
                 assignees={assignees}
@@ -206,11 +191,11 @@ export function PolicyPageTabs({
 
           <TabsContent value="mappings">
             <Stack gap="lg">
-              <PolicyControlMappings
-                mappedControls={mappedControls}
-                allControls={allControls}
-                isPendingApproval={isPendingApproval}
-                onMutate={mutateAll}
+              <RelatedControls
+                entityType="policy"
+                entityId={policyId}
+                readOnly={isPendingApproval}
+                onChange={mutateAll}
               />
               <PolicyEvidenceTasks />
             </Stack>
@@ -249,6 +234,10 @@ export function PolicyPageTabs({
               onMutate={mutateAll}
               onVersionContentChange={updateVersionContent}
             />
+          </TabsContent>
+
+          <TabsContent value="acknowledgements">
+            <PolicyAcknowledgementsTab policyId={policyId} />
           </TabsContent>
 
           <TabsContent value="versions">

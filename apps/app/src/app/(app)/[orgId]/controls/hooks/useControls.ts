@@ -1,8 +1,9 @@
 'use client';
 
 import { apiClient } from '@/lib/api-client';
+import { controlsOverviewKey } from '@/hooks/use-controls-overview';
 import type { ControlWithRelations } from '../data/queries';
-import useSWR from 'swr';
+import useSWR, { useSWRConfig } from 'swr';
 
 interface ControlsApiResponse {
   data: ControlWithRelations[];
@@ -30,6 +31,7 @@ interface UseControlsOptions {
 
 export function useControls(options?: UseControlsOptions) {
   const { initialData } = options ?? {};
+  const { mutate: globalMutate } = useSWRConfig();
 
   const { data, error, isLoading, mutate } = useSWR(
     controlsKey(),
@@ -52,7 +54,7 @@ export function useControls(options?: UseControlsOptions) {
   const createControl = async (payload: CreateControlPayload) => {
     const response = await apiClient.post('/v1/controls', payload);
     if (response.error) throw new Error(response.error);
-    await mutate();
+    await Promise.all([mutate(), globalMutate(controlsOverviewKey)]);
     return response.data;
   };
 

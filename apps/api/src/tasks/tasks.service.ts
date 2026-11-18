@@ -12,27 +12,12 @@ import { TaskResponseDto } from './dto/task-responses.dto';
 import { TaskNotifierService } from './task-notifier.service';
 import { checkAutoCompletePhases } from '../frameworks/frameworks-timeline.helper';
 import { TimelinesService } from '../timelines/timelines.service';
+import { syncControlsToAllFrameworks } from '../controls/sync-framework-links';
 import { isMemberOrgParticipant } from '../utils/org-participation';
-
-function computeNextTaskReviewDate(
-  frequency: TaskFrequency | null | undefined,
-): Date {
-  const now = new Date();
-  switch (frequency) {
-    case TaskFrequency.daily:
-      return new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-    case TaskFrequency.weekly:
-      return new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7);
-    case TaskFrequency.monthly:
-      return new Date(now.getFullYear(), now.getMonth() + 1, now.getDate());
-    case TaskFrequency.quarterly:
-      return new Date(now.getFullYear(), now.getMonth() + 3, now.getDate());
-    case TaskFrequency.yearly:
-      return new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
-    default:
-      return new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
-  }
-}
+import {
+  completedTaskData,
+  computeNextTaskReviewDate,
+} from './task-completion';
 
 @Injectable()
 export class TasksService {
@@ -393,8 +378,9 @@ export class TasksService {
       };
 
       if (evidenceApprovalEnabled) {
-        // Cannot change status of tasks currently in review
-        where.status = { not: 'in_review' as TaskStatus };
+        // Cannot change status of tasks in an approval review (an
+        // automation-set review without an approver is not one)
+        where.NOT = { status: TaskStatus.in_review, approverId: { not: null } };
         // Cannot mark tasks as done if they have an approver assigned
         if (status === TaskStatus.done) {
           where.approverId = null;
@@ -406,6 +392,16 @@ export class TasksService {
           ? { notRelevantJustification: notRelevantJustification ?? null }
           : { notRelevantJustification: null };
 
+      // Completing sets each task's next due date from its own frequency, so
+      // capture the frequencies before the status update.
+      const completing =
+        status === TaskStatus.done
+          ? await db.task.findMany({
+              where: { ...where, status: { not: TaskStatus.done } },
+              select: { id: true, frequency: true },
+            })
+          : [];
+
       const result = await db.task.updateMany({
         where,
         data: {
@@ -415,6 +411,25 @@ export class TasksService {
           ...(reviewDate !== undefined ? { reviewDate } : {}),
         },
       });
+
+      const now = new Date();
+      for (const frequency of new Set(completing.map((t) => t.frequency))) {
+        const { reviewDate: nextDue, lastCompletedAt } = completedTaskData(
+          frequency,
+          now,
+        );
+        await db.task.updateMany({
+          where: {
+            id: {
+              in: completing
+                .filter((t) => t.frequency === frequency)
+                .map((t) => t.id),
+            },
+            organizationId,
+          },
+          data: { lastCompletedAt, reviewDate: reviewDate ?? nextDue },
+        });
+      }
 
       if (result.count === 0) {
         throw new BadRequestException(
@@ -609,6 +624,8 @@ export class TasksService {
           status: true,
           assigneeId: true,
           approverId: true,
+          frequency: true,
+          lastCompletedAt: true,
           // The submit-for-review → approve workflow only applies when the org
           // has evidence approval enabled. When it's disabled, the approver
           // dropdown and review flow are hidden in the UI, so a leftover
@@ -636,6 +653,7 @@ export class TasksService {
         integrationScheduleFrequency?: TaskFrequency;
         department?: string | null;
         reviewDate?: Date | null;
+        lastCompletedAt?: Date;
         notRelevantJustification?: string | null;
       } = {};
 
@@ -650,9 +668,11 @@ export class TasksService {
         // enabled for the org. With it disabled, these would wedge a task that
         // carries a stale approverId / in_review status (see comment above).
         if (evidenceApprovalEnabled) {
-          // Prevent bypassing the approval workflow via direct status change
+          // Prevent bypassing the approval workflow via direct status change.
+          // An automation-set review (no approver yet) is not an approval flow.
           if (
             existingTask.status === 'in_review' &&
+            existingTask.approverId &&
             updateData.status !== 'in_review'
           ) {
             throw new BadRequestException(
@@ -716,9 +736,10 @@ export class TasksService {
       }
       if (updateData.frequency !== undefined) {
         dataToUpdate.frequency = updateData.frequency;
-        // When frequency changes, recalculate the review date
+        // reviewDate is the next due date, counted from the last completion.
         dataToUpdate.reviewDate = computeNextTaskReviewDate(
           updateData.frequency,
+          existingTask.lastCompletedAt ?? undefined,
         );
       }
       if (updateData.integrationScheduleFrequency !== undefined) {
@@ -732,13 +753,16 @@ export class TasksService {
         dataToUpdate.reviewDate = updateData.reviewDate;
       }
 
-      // When status changes to done, set review date based on frequency
-      if (updateData.status === TaskStatus.done && !updateData.reviewDate) {
-        const task = await db.task.findFirst({
-          where: { id: taskId, organizationId, archivedAt: null },
-          select: { frequency: true },
-        });
-        dataToUpdate.reviewDate = computeNextTaskReviewDate(task?.frequency);
+      // Completing a task: reviewDate = next due date, lastCompletedAt = now.
+      if (
+        updateData.status === TaskStatus.done &&
+        existingTask.status !== TaskStatus.done
+      ) {
+        const { reviewDate, lastCompletedAt } = completedTaskData(
+          updateData.frequency ?? existingTask.frequency,
+        );
+        dataToUpdate.lastCompletedAt = lastCompletedAt;
+        if (!updateData.reviewDate) dataToUpdate.reviewDate = reviewDate;
       }
 
       // Get the current member for audit logging
@@ -913,6 +937,16 @@ export class TasksService {
         }
       }
 
+      // Only controls of this org; the link then counts for every framework mapping them.
+      const controlIds = createData.controlIds?.length
+        ? (
+            await db.control.findMany({
+              where: { id: { in: createData.controlIds }, organizationId },
+              select: { id: true },
+            })
+          ).map((c) => c.id)
+        : [];
+
       const task = await db.task.create({
         data: {
           title: createData.title,
@@ -925,12 +959,9 @@ export class TasksService {
           department: createData.department || null,
           automationStatus,
           taskTemplateId: createData.taskTemplateId || null,
-          ...(createData.controlIds &&
-            createData.controlIds.length > 0 && {
-              controls: {
-                connect: createData.controlIds.map((id) => ({ id })),
-              },
-            }),
+          ...(controlIds.length > 0 && {
+            controls: { connect: controlIds.map((id) => ({ id })) },
+          }),
           ...(createData.vendorId && {
             vendors: {
               connect: { id: createData.vendorId },
@@ -938,6 +969,8 @@ export class TasksService {
           }),
         },
       });
+
+      await syncControlsToAllFrameworks({ controlIds, organizationId });
 
       // Task creation drops the AUTO_TASKS completion % (denominator up,
       // numerator unchanged), so reconciliation can regress a COMPLETED
@@ -1058,7 +1091,9 @@ export class TasksService {
       throw new BadRequestException('Task not found or access denied');
     }
 
-    if (task.status === 'in_review') {
+    // An automation may move a task to in_review without an approver; let a
+    // person route it to one.
+    if (task.status === 'in_review' && task.approverId) {
       throw new BadRequestException('Task is already in review');
     }
 
@@ -1085,13 +1120,16 @@ export class TasksService {
     const currentMember = await db.member.findFirst({
       where: { userId, organizationId, deactivated: false },
     });
+    // A rejection restores previousStatus; never restore an approver-less review.
+    const previousStatus =
+      task.status === TaskStatus.in_review ? TaskStatus.todo : task.status;
 
     const updatedTask = await db.$transaction(async (tx) => {
       const updated = await tx.task.update({
         where: { id: taskId, organizationId },
         data: {
           status: TaskStatus.in_review,
-          previousStatus: task.status,
+          previousStatus,
           approverId,
         },
         include: { assignee: true, approver: true },
@@ -1109,7 +1147,7 @@ export class TasksService {
             action: 'review',
             taskTitle: task.title,
             approverId,
-            previousStatus: task.status,
+            previousStatus,
           },
         },
       });
@@ -1273,9 +1311,8 @@ export class TasksService {
       const updated = await tx.task.update({
         where: { id: taskId, organizationId },
         data: {
-          status: TaskStatus.done,
+          ...completedTaskData(task.frequency, now),
           approvedAt: now,
-          reviewDate: computeNextTaskReviewDate(task.frequency),
           previousStatus: null,
         },
         include: { assignee: true, approver: true },

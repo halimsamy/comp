@@ -274,7 +274,7 @@ export function IsmsDocumentShell({
       )}
 
       {document && (
-        <IsmsControlMappings document={document} organizationId={organizationId} canManage={canManage} />
+        <IsmsControlMappings document={document} canManage={canManage} />
       )}
 
       {document && (

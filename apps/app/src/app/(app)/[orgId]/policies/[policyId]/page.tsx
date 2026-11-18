@@ -14,7 +14,6 @@ import { Breadcrumb, PageLayout } from '@trycompai/design-system';
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import Link from 'next/link';
-import type { MappedControl } from './components/PolicyControlMappings';
 import { PolicyHeaderActions } from './components/PolicyHeaderActions';
 import PolicyPage from './components/PolicyPage';
 import { PolicyStatusBadge } from './components/PolicyStatusBadge';
@@ -46,14 +45,10 @@ export default async function PolicyDetails({
 }) {
   const { policyId, orgId } = await params;
 
-  const [policyRes, membersRes, controlsRes, activityRes, versionsRes] =
+  const [policyRes, membersRes, activityRes, versionsRes] =
     await Promise.all([
       serverApi.get<PolicyDetail>(`/v1/policies/${policyId}`),
       serverApi.get<{ data: (Member & { user: User })[] }>('/v1/people'),
-      serverApi.get<{
-        mappedControls: MappedControl[];
-        allControls: MappedControl[];
-      }>(`/v1/policies/${policyId}/controls`),
       serverApi.get<{ data: AuditLogWithRelations[] }>(
         `/v1/audit-logs?entityType=policy&entityId=${policyId}`,
       ),
@@ -73,8 +68,6 @@ export default async function PolicyDetails({
   // Filter to assignable members (only those with app access, exclude deactivated)
   const activeMembers = allMembers.filter((m) => !m.deactivated);
   const assignees = await filterAppAccessMembers(activeMembers, orgId);
-  const mappedControls = controlsRes.data?.mappedControls ?? [];
-  const allControls = controlsRes.data?.allControls ?? [];
   const logs = Array.isArray(activityRes.data?.data)
     ? activityRes.data.data
     : [];
@@ -118,8 +111,6 @@ export default async function PolicyDetails({
         policyId={policyId}
         organizationId={orgId}
         assignees={assignees}
-        mappedControls={mappedControls}
-        allControls={allControls}
         isPendingApproval={isPendingApproval}
         logs={logs}
         versions={versions}

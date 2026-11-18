@@ -7,11 +7,9 @@ import {
 import { db, type EvidenceFormType } from '@db';
 
 import { tasks } from '@trycompai/jobs';
-import {
-  getOverviewScores,
-  getCurrentMember,
-  computeFrameworkComplianceScore,
-} from './frameworks-scores.helper';
+import { getOverviewScores, getCurrentMember } from './frameworks-scores.helper';
+import { loadFrameworkScores } from './scoring/framework-scoring.loader';
+import { loadInstanceScoring, loadRequirementScoring } from './scoring/requirement-scoring';
 import { upsertOrgFrameworkStructure } from './frameworks-upsert.helper';
 import { createTimelinesForFrameworks } from './frameworks-timeline.helper';
 import { TimelinesService } from '../timelines/timelines.service';
@@ -19,6 +17,7 @@ import type { FrameworkManifest } from './framework-versioning/manifest.types';
 import { buildUpdatePreview } from './framework-versioning/framework-update-preview';
 import type { updatePolicy } from '../trigger/policies/update-policy';
 import { loadRequirementDefinitions } from './frameworks-requirements.helper';
+import { syncControlsToAllFrameworks } from '../controls/sync-framework-links';
 
 @Injectable()
 export class FrameworksService {
@@ -133,41 +132,20 @@ export class FrameworksService {
       return frameworksWithControls;
     }
 
-    const [tasks, evidenceSubmissions] = await Promise.all([
-      db.task.findMany({
-        where: {
-          organizationId,
-          archivedAt: null,
-          frameworkControlLinks: {
-            some: { frameworkInstance: { organizationId } },
-          },
-        },
-        include: {
-          frameworkControlLinks: {
-            where: { frameworkInstance: { organizationId } },
-            include: { control: true },
-          },
-        },
-      }),
-      db.evidenceSubmission.findMany({
-        where: { organizationId },
-        select: { formType: true, submittedAt: true },
-      }),
-    ]);
+    const scores = await loadFrameworkScores({
+      organizationId,
+      frameworkInstanceIds: frameworksWithControls.map((fw: { id: string }) => fw.id),
+    });
 
-    return frameworksWithControls.map((fw: any) => ({
-      ...fw,
-      complianceScore: computeFrameworkComplianceScore(
-        fw,
-        tasks.map(({ frameworkControlLinks, ...task }) => ({
-          ...task,
-          controls: frameworkControlLinks
-            .filter((link) => link.frameworkInstanceId === fw.id)
-            .map((link) => link.control),
-        })),
-        evidenceSubmissions,
-      ),
-    }));
+    return frameworksWithControls.map((fw: any) => {
+      const score = scores.get(fw.id);
+      return {
+        ...fw,
+        complianceScore: score?.complianceScore ?? 0,
+        controlsComplete: score?.controlsComplete ?? 0,
+        controlsTotal: score?.controlsTotal ?? 0,
+      };
+    });
   }
 
   async findOne(frameworkInstanceId: string, organizationId: string) {
@@ -286,10 +264,18 @@ export class FrameworksService {
         : Promise.resolve([]),
     ]);
 
+    const { scores, applicability } = await loadInstanceScoring({
+      organizationId,
+      frameworkInstanceId,
+      requirementKeys: requirementDefinitions.map((r) => r.id),
+    });
+
     return {
       ...rest,
       controls: Array.from(controlsMap.values()),
       requirementDefinitions,
+      scores,
+      applicability,
       tasks: tasks.map(({ frameworkControlLinks, ...task }) => ({
         ...task,
         controls: frameworkControlLinks.map((link) => link.control),
@@ -607,6 +593,12 @@ export class FrameworksService {
       );
     });
 
+    // Evidence once, map many: links already made on shared controls now count
+    // for the newly added frameworks too.
+    this.fanOutControlLinks({ organizationId, frameworkIds: result.finalIds }).catch((err) => {
+      this.logger.warn('fanOutControlLinks failed after framework add', err);
+    });
+
     // Regenerate only newly created policies so placeholder replacement runs
     // without touching customer-edited existing policies.
     if (result.createdPolicyIds.length > 0) {
@@ -623,6 +615,27 @@ export class FrameworksService {
     }
 
     return { success: result.success, frameworksAdded: result.frameworksAdded };
+  }
+
+  private async fanOutControlLinks({
+    organizationId,
+    frameworkIds,
+  }: {
+    organizationId: string;
+    frameworkIds: string[];
+  }) {
+    const mapped = await db.requirementMap.findMany({
+      where: {
+        archivedAt: null,
+        frameworkInstance: { organizationId, frameworkId: { in: frameworkIds } },
+      },
+      select: { controlId: true },
+      distinct: ['controlId'],
+    });
+    await syncControlsToAllFrameworks({
+      controlIds: mapped.map((m) => m.controlId),
+      organizationId,
+    });
   }
 
   private async enqueuePolicyGenerationForNewPolicies({
@@ -715,6 +728,8 @@ export class FrameworksService {
         frameworkId: true,
         customFrameworkId: true,
         currentVersionId: true,
+        framework: { select: { name: true } },
+        customFramework: { select: { name: true } },
       },
     });
     if (!fi) {
@@ -802,8 +817,18 @@ export class FrameworksService {
       .filter((r) => r.id !== requirementKey)
       .map((r) => ({ id: r.id, name: r.name }));
 
+    const scoring = await loadRequirementScoring({
+      organizationId,
+      frameworkInstanceId,
+      frameworkName: fi.framework?.name ?? fi.customFramework?.name,
+      requirement,
+      requirementKeys: allReqDefs.map((r) => r.id),
+      controlIds: relatedControls.map((rc) => rc.controlId),
+    });
+
     return {
       requirement,
+      ...scoring,
       relatedControls: relatedControls.map((relatedControl) => ({
         ...relatedControl,
         control: (() => {

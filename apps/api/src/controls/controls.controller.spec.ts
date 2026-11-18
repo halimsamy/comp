@@ -6,6 +6,9 @@ import { HybridAuthGuard } from '../auth/hybrid-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
 import { CreateControlDto } from './dto/create-control.dto';
 
+// Keep the real Prisma client (and its DB connection) out of a unit test.
+jest.mock('@db', () => ({ db: {}, Prisma: {}, EvidenceFormType: {} }));
+
 // Mock auth.server to avoid importing better-auth ESM in Jest
 jest.mock('../auth/auth.server', () => ({
   auth: { api: { getSession: jest.fn() } },
@@ -138,7 +141,7 @@ describe('ControlsController', () => {
       const result = await controller.findOne('org_1', 'ctrl_1');
 
       expect(result).toEqual(mockControl);
-      expect(service.findOne).toHaveBeenCalledWith('ctrl_1', 'org_1');
+      expect(service.findOne).toHaveBeenCalledWith('ctrl_1', 'org_1', undefined);
     });
 
     it('should propagate NotFoundException from service', async () => {
