@@ -33,12 +33,26 @@ describe('planRequirementFolders', () => {
         {
           requirementId: null,
           customRequirementId: 'creq_1',
-          control: { name: 'A', policyIds: ['p1'], taskIds: ['t1'], formTypes: [] },
+          control: {
+            id: 'ctl_a',
+            controlTemplateId: 'frk_ct_683f484fc7b5506ab97c26af',
+            name: 'A',
+            policyIds: ['p1'],
+            taskIds: ['t1'],
+            formTypes: [],
+          },
         },
         {
           requirementId: null,
           customRequirementId: 'creq_1',
-          control: { name: 'B', policyIds: ['p1'], taskIds: ['t2'], formTypes: [] },
+          control: {
+            id: 'ctl_b',
+            controlTemplateId: 'frk_ct_683f48ee9534e1e0a088e922',
+            name: 'B',
+            policyIds: ['p1'],
+            taskIds: ['t2'],
+            formTypes: [],
+          },
         },
       ],
     });
@@ -48,7 +62,10 @@ describe('planRequirementFolders', () => {
       controlNames: ['A', 'B'],
       policyIds: ['p1'],
       taskIds: ['t1', 't2'],
+      controlIds: ['ctl_a', 'ctl_b'],
     });
+    // Risk Management + Supplier Security templates, deduped.
+    expect(folder.registers).toEqual(['risks', 'risk-acceptances', 'vendors']);
   });
 
   it('keeps folder names unique', () => {
@@ -58,5 +75,17 @@ describe('planRequirementFolders', () => {
     });
 
     expect(folders.map((f) => f.folder)).toEqual(['Access', 'access (2)']);
+  });
+
+  it('does not repeat an identifier the name already starts with', () => {
+    const folders = planRequirementFolders({
+      requirements: [
+        requirement('a', '6.1.3', '6.1.3 Planning'),
+        requirement('b', '1.1.1', 'Processes are defined'),
+      ],
+      mappings: [],
+    });
+
+    expect(folders.map((f) => f.folder)).toEqual(['6.1.3 Planning', '1.1.1 Processes are defined']);
   });
 });

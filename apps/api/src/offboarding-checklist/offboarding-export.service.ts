@@ -166,6 +166,24 @@ export class OffboardingExportService {
     });
     archive.pipe(output);
 
+    await this.appendAllOffboardings({ archive, organizationId });
+    await archive.finalize();
+  }
+
+  /**
+   * Append every offboarded member's checklist summary, vendor access
+   * revocations and evidence files under `prefix` in an archive the caller owns
+   * (also used by the framework evidence export).
+   */
+  async appendAllOffboardings({
+    archive,
+    organizationId,
+    prefix = '',
+  }: {
+    archive: archiver.Archiver;
+    organizationId: string;
+    prefix?: string;
+  }) {
     const BATCH_SIZE = 50;
     let cursor: string | undefined;
 
@@ -183,7 +201,7 @@ export class OffboardingExportService {
           .replace(/[^a-zA-Z0-9 ]/g, '')
           .replace(/\s+/g, '-')
           .toLowerCase();
-        const prefix = `offboarded-employees/${safeName}-${member.id}/`;
+        const memberPrefix = `${prefix}offboarded-employees/${safeName}-${member.id}/`;
 
         const checklist = await this.offboardingChecklistService.getMemberChecklist(
           organizationId,
@@ -194,17 +212,15 @@ export class OffboardingExportService {
           member.id,
         );
 
-        this.appendSummaryCsv(archive, checklist.items, prefix);
-        this.appendVendorRevocationsCsv(archive, revocations.vendors, prefix);
-        await this.appendVendorEvidence(archive, organizationId, revocations.vendors, prefix);
-        await this.appendChecklistEvidence(archive, organizationId, checklist.items, prefix);
+        this.appendSummaryCsv(archive, checklist.items, memberPrefix);
+        this.appendVendorRevocationsCsv(archive, revocations.vendors, memberPrefix);
+        await this.appendVendorEvidence(archive, organizationId, revocations.vendors, memberPrefix);
+        await this.appendChecklistEvidence(archive, organizationId, checklist.items, memberPrefix);
       }
 
       if (batch.length < BATCH_SIZE) break;
       cursor = batch[batch.length - 1]!.id;
     }
-
-    await archive.finalize();
   }
 
   private async getAttachmentBuffer(

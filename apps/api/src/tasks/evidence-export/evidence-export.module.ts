@@ -8,6 +8,7 @@ import {
 } from './evidence-export.controller';
 import { FrameworkEvidenceExportController } from './framework-evidence-export.controller';
 import { FrameworkEvidenceExportService } from './framework-evidence-export.service';
+import { RegisterExportsController } from './registers/register-exports.controller';
 import { PolicyPdfRendererService } from '../../trust-portal/policy-pdf-renderer.service';
 
 @Module({
@@ -16,6 +17,7 @@ import { PolicyPdfRendererService } from '../../trust-portal/policy-pdf-renderer
     EvidenceExportController,
     AuditorEvidenceExportController,
     FrameworkEvidenceExportController,
+    RegisterExportsController,
   ],
   providers: [
     EvidenceExportService,

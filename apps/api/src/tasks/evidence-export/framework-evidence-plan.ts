@@ -1,10 +1,14 @@
 import type { EvidenceFormType as DbEvidenceFormType } from '@db';
 import type { RequirementDef } from '../../frameworks/frameworks-requirements.helper';
+import { registersForControlTemplates } from './native-artifact-control-map';
+import type { RegisterKey } from './registers/registers';
 
 export type MappedControl = {
   requirementId: string | null;
   customRequirementId: string | null;
   control: {
+    id: string;
+    controlTemplateId: string | null;
     name: string;
     policyIds: string[];
     taskIds: string[];
@@ -16,9 +20,12 @@ export type RequirementFolder = {
   folder: string;
   requirement: RequirementDef;
   controlNames: string[];
+  controlIds: string[];
   policyIds: string[];
   taskIds: string[];
   formTypes: DbEvidenceFormType[];
+  /** Platform registers that evidence this requirement's controls. */
+  registers: RegisterKey[];
 };
 
 /** A readable, cross-platform-safe path segment (keeps case and spaces). */
@@ -52,9 +59,11 @@ export function planRequirementFolders({
       )
       .map((m) => m.control);
 
-    const label = requirement.identifier
-      ? `${requirement.identifier} ${requirement.name}`
-      : requirement.name;
+    // ISO requirement names already start with their identifier ("6.1.3 Planning").
+    const label =
+      requirement.identifier && !requirement.name.startsWith(requirement.identifier)
+        ? `${requirement.identifier} ${requirement.name}`
+        : requirement.name;
     let folder = safeSegment(label);
     for (let i = 2; usedFolders.has(folder.toLowerCase()); i++) {
       folder = `${safeSegment(label, 74)} (${i})`;
@@ -65,9 +74,11 @@ export function planRequirementFolders({
       folder,
       requirement,
       controlNames: unique(controls.map((c) => c.name)),
+      controlIds: unique(controls.map((c) => c.id)),
       policyIds: unique(controls.flatMap((c) => c.policyIds)),
       taskIds: unique(controls.flatMap((c) => c.taskIds)),
       formTypes: unique(controls.flatMap((c) => c.formTypes)),
+      registers: registersForControlTemplates(controls.map((c) => c.controlTemplateId)),
     };
   });
 }
@@ -78,12 +89,15 @@ export function buildRequirementReadme({
   policyNames,
   taskTitles,
   documentTitles,
+  nativeTitles = [],
 }: {
   folder: RequirementFolder;
   frameworkName: string;
   policyNames: string[];
   taskTitles: string[];
   documentTitles: string[];
+  /** ISMS documents, SoA and registers placed in this folder. */
+  nativeTitles?: string[];
 }): string {
   const { requirement, controlNames } = folder;
   const list = (items: string[]) =>
@@ -106,6 +120,9 @@ export function buildRequirementReadme({
     '',
     'Documents (Documents/):',
     ...list(documentTitles),
+    '',
+    'Platform records (ISMS/, Registers/):',
+    ...list(nativeTitles),
     '',
   ].join('\n');
 }

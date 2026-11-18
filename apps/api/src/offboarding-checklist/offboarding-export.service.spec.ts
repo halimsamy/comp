@@ -4,6 +4,9 @@ const mockDb = {
   attachment: {
     findFirst: jest.fn(),
   },
+  member: {
+    findMany: jest.fn(),
+  },
 };
 
 jest.mock('@db', () => ({
@@ -16,6 +19,7 @@ jest.mock('@db', () => ({
 jest.mock('archiver', () => {
   const mockArchive = {
     pipe: jest.fn(),
+    on: jest.fn(),
     append: jest.fn(),
     finalize: jest.fn().mockResolvedValue(undefined),
   };
@@ -157,7 +161,7 @@ describe('OffboardingExportService', () => {
     const evidenceCall = appendCalls.find(
       (c: unknown[]) =>
         (c[1] as { name: string }).name ===
-        'vendor-access-revocations/evidence/aws-disable.png',
+        'vendor-access-revocations/evidence/att_1-aws-disable.png',
     );
     expect(evidenceCall).toBeDefined();
     expect(Buffer.isBuffer(evidenceCall[0])).toBe(true);
@@ -205,7 +209,7 @@ describe('OffboardingExportService', () => {
     const evidenceCall = appendCalls.find(
       (c: unknown[]) =>
         (c[1] as { name: string }).name ===
-        'checklist-items/01-recover-devices/device-receipt.pdf',
+        'checklist-items/01-recover-devices/att_2-device-receipt.pdf',
     );
     expect(evidenceCall).toBeDefined();
   });
@@ -246,5 +250,33 @@ describe('OffboardingExportService', () => {
     const appendCalls = (mockArchive.append as jest.Mock).mock.calls;
     expect(appendCalls).toHaveLength(2);
     expect(mockArchive.finalize).toHaveBeenCalled();
+  });
+
+  it('appends every offboarding under a prefix into an archive it does not own', async () => {
+    mockDb.member.findMany.mockResolvedValue([
+      { id: 'mem_1', user: { name: 'Bob Smith', email: 'bob@test' } },
+    ]);
+    mockChecklistService.getMemberChecklist.mockResolvedValue({ items: [] });
+    mockAccessRevocationService.getAccessRevocations.mockResolvedValue({ vendors: [] });
+
+    await service.appendAllOffboardings({
+      archive: mockArchive,
+      organizationId: 'org_1',
+      prefix: 'root/Offboarding evidence/',
+    });
+
+    expect(mockDb.member.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organizationId: 'org_1', offboardDate: { not: null }, deactivated: true },
+      }),
+    );
+    const names = (mockArchive.append as jest.Mock).mock.calls.map(
+      ([, options]: [unknown, { name: string }]) => options.name,
+    );
+    expect(names).toEqual([
+      'root/Offboarding evidence/offboarded-employees/bob-smith-mem_1/summary.csv',
+      'root/Offboarding evidence/offboarded-employees/bob-smith-mem_1/vendor-access-revocations/vendor-access-revocations.csv',
+    ]);
+    expect(mockArchive.finalize).not.toHaveBeenCalled();
   });
 });

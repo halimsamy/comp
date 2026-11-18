@@ -1,7 +1,7 @@
 'use client';
 
-import { usePermissions } from '@/hooks/use-permissions';
 import { useJobRun } from '@/hooks/use-job-run';
+import { usePermissions } from '@/hooks/use-permissions';
 import { startFileDownload, triggerFrameworkEvidenceExport } from '@/lib/evidence-download';
 import { Button } from '@trycompai/design-system';
 import { Download, Edit, OverflowMenuVertical, TrashCan } from '@trycompai/design-system/icons';
@@ -13,6 +13,7 @@ import {
 } from '@trycompai/ui/dropdown-menu';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { FrameworkExportDialog, type ExportPeriod } from './FrameworkExportDialog';
 
 export function FrameworkActionsMenu({
   frameworkInstanceId,
@@ -29,6 +30,7 @@ export function FrameworkActionsMenu({
 }) {
   const { hasPermission } = usePermissions();
   const [open, setOpen] = useState(false);
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
 
   const canDelete = hasPermission('framework', 'delete');
   // The ZIP bundles policies and evidence, so the API requires read on both.
@@ -66,14 +68,18 @@ export function FrameworkActionsMenu({
 
   if (!canEdit && !canDelete && !canExport) return null;
 
-  const handleExport = async () => {
-    setOpen(false);
+  const handleExport = async (period: ExportPeriod) => {
+    setIsExportDialogOpen(false);
     toast.loading(
       `Preparing the ${frameworkName} evidence ZIP. Keep this page open; the download starts when it is ready.`,
       { id: toastId, duration: Infinity },
     );
     try {
-      const { runId } = await triggerFrameworkEvidenceExport({ frameworkInstanceId });
+      const { runId } = await triggerFrameworkEvidenceExport({
+        frameworkInstanceId,
+        from: period.from || undefined,
+        to: period.to || undefined,
+      });
       setExportRunId(runId);
     } catch {
       failExport();
@@ -81,43 +87,57 @@ export function FrameworkActionsMenu({
   };
 
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger asChild>
-        <Button size="sm" variant="ghost" aria-label="Framework actions">
-          <OverflowMenuVertical size={16} />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        {canEdit && (
-          <DropdownMenuItem
-            onClick={() => {
-              setOpen(false);
-              onEdit();
-            }}
-          >
-            <Edit size={16} className="mr-2" />
-            Edit Framework
-          </DropdownMenuItem>
-        )}
-        {canExport && (
-          <DropdownMenuItem onClick={handleExport} disabled={exportRunId !== null}>
-            <Download size={16} className="mr-2" />
-            {exportRunId !== null ? 'Preparing export…' : 'Export all evidences'}
-          </DropdownMenuItem>
-        )}
-        {canDelete && (
-          <DropdownMenuItem
-            onClick={() => {
-              setOpen(false);
-              onDelete();
-            }}
-            className="text-destructive focus:text-destructive"
-          >
-            <TrashCan size={16} className="mr-2" />
-            Delete Framework
-          </DropdownMenuItem>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <>
+      <DropdownMenu open={open} onOpenChange={setOpen}>
+        <DropdownMenuTrigger asChild>
+          <Button size="sm" variant="ghost" aria-label="Framework actions">
+            <OverflowMenuVertical size={16} />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          {canEdit && (
+            <DropdownMenuItem
+              onClick={() => {
+                setOpen(false);
+                onEdit();
+              }}
+            >
+              <Edit size={16} className="mr-2" />
+              Edit Framework
+            </DropdownMenuItem>
+          )}
+          {canExport && (
+            <DropdownMenuItem
+              onClick={() => {
+                setOpen(false);
+                setIsExportDialogOpen(true);
+              }}
+              disabled={exportRunId !== null}
+            >
+              <Download size={16} className="mr-2" />
+              {exportRunId !== null ? 'Preparing export…' : 'Export all evidences'}
+            </DropdownMenuItem>
+          )}
+          {canDelete && (
+            <DropdownMenuItem
+              onClick={() => {
+                setOpen(false);
+                onDelete();
+              }}
+              className="text-destructive focus:text-destructive"
+            >
+              <TrashCan size={16} className="mr-2" />
+              Delete Framework
+            </DropdownMenuItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <FrameworkExportDialog
+        open={isExportDialogOpen}
+        onOpenChange={setIsExportDialogOpen}
+        frameworkName={frameworkName}
+        onExport={handleExport}
+      />
+    </>
   );
 }

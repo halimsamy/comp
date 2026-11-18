@@ -3,10 +3,10 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { AttachmentEntityType, db } from '@db';
+import { AttachmentEntityType, type ChecklistKind, db } from '@db';
 import { AttachmentsService } from '../attachments/attachments.service';
 import { AccessRevocationService } from './access-revocation.service';
-import { DEFAULT_OFFBOARDING_CHECKLIST_ITEMS } from './default-checklist-items';
+import { DEFAULT_CHECKLIST_ITEMS } from './default-checklist-items';
 
 interface CompleteChecklistItemDto {
   notes?: string;
@@ -32,11 +32,14 @@ export class OffboardingChecklistService {
     private readonly accessRevocationService: AccessRevocationService,
   ) {}
 
-  async getTemplate(organizationId: string) {
-    await this.seedDefaultsIfNeeded(organizationId);
+  async getTemplate(
+    organizationId: string,
+    kind: ChecklistKind = 'offboarding',
+  ) {
+    await this.seedDefaultsIfNeeded(organizationId, kind);
 
     return db.offboardingChecklistTemplate.findMany({
-      where: { organizationId },
+      where: { organizationId, kind },
       orderBy: { sortOrder: 'asc' },
     });
   }
@@ -47,10 +50,13 @@ export class OffboardingChecklistService {
       title: string;
       description?: string;
       evidenceRequired?: boolean;
+      dueDays?: number;
+      autoCompleteSource?: string;
     },
+    kind: ChecklistKind = 'offboarding',
   ) {
     const maxSortOrder = await db.offboardingChecklistTemplate.aggregate({
-      where: { organizationId },
+      where: { organizationId, kind },
       _max: { sortOrder: true },
     });
 
@@ -60,6 +66,9 @@ export class OffboardingChecklistService {
         title: dto.title,
         description: dto.description,
         evidenceRequired: dto.evidenceRequired ?? false,
+        dueDays: dto.dueDays,
+        autoCompleteSource: dto.autoCompleteSource,
+        kind,
         sortOrder: (maxSortOrder._max.sortOrder ?? 0) + 1,
         isDefault: false,
         isEnabled: true,
@@ -76,6 +85,8 @@ export class OffboardingChecklistService {
       evidenceRequired?: boolean;
       sortOrder?: number;
       isEnabled?: boolean;
+      dueDays?: number | null;
+      autoCompleteSource?: string | null;
     },
   ) {
     const item = await db.offboardingChecklistTemplate.findFirst({
@@ -113,16 +124,20 @@ export class OffboardingChecklistService {
     });
   }
 
-  async getMemberChecklist(organizationId: string, memberId: string) {
-    await this.seedDefaultsIfNeeded(organizationId);
+  async getMemberChecklist(
+    organizationId: string,
+    memberId: string,
+    kind: ChecklistKind = 'offboarding',
+  ) {
+    await this.seedDefaultsIfNeeded(organizationId, kind);
 
     const templateItems = await db.offboardingChecklistTemplate.findMany({
-      where: { organizationId, isEnabled: true },
+      where: { organizationId, isEnabled: true, kind },
       orderBy: { sortOrder: 'asc' },
     });
 
     const completions = await db.offboardingChecklistCompletion.findMany({
-      where: { organizationId, memberId },
+      where: { organizationId, memberId, templateItem: { kind } },
       include: { completedBy: { select: { id: true, name: true } } },
     });
 
@@ -364,10 +379,10 @@ export class OffboardingChecklistService {
   }
 
   async getPendingOffboardings(organizationId: string) {
-    await this.seedDefaultsIfNeeded(organizationId);
+    await this.seedDefaultsIfNeeded(organizationId, 'offboarding');
 
     const totalEnabled = await db.offboardingChecklistTemplate.count({
-      where: { organizationId, isEnabled: true },
+      where: { organizationId, isEnabled: true, kind: 'offboarding' },
     });
 
     const offboardedMembers = await db.member.findMany({
@@ -380,7 +395,7 @@ export class OffboardingChecklistService {
         user: { select: { id: true, name: true, email: true, image: true } },
         offboardingChecklistCompletions: {
           where: {
-            templateItem: { organizationId, isEnabled: true },
+            templateItem: { organizationId, isEnabled: true, kind: 'offboarding' },
           },
           select: { id: true },
         },
@@ -403,9 +418,12 @@ export class OffboardingChecklistService {
     };
   }
 
-  private async seedDefaultsIfNeeded(organizationId: string) {
+  private async seedDefaultsIfNeeded(
+    organizationId: string,
+    kind: ChecklistKind,
+  ) {
     const count = await db.offboardingChecklistTemplate.count({
-      where: { organizationId },
+      where: { organizationId, kind },
     });
 
     if (count > 0) {
@@ -415,7 +433,7 @@ export class OffboardingChecklistService {
     try {
       await db.$transaction(async (tx) => {
         const recheck = await tx.offboardingChecklistTemplate.count({
-          where: { organizationId },
+          where: { organizationId, kind },
         });
 
         if (recheck > 0) {
@@ -423,11 +441,14 @@ export class OffboardingChecklistService {
         }
 
         await tx.offboardingChecklistTemplate.createMany({
-          data: DEFAULT_OFFBOARDING_CHECKLIST_ITEMS.map((item) => ({
+          data: DEFAULT_CHECKLIST_ITEMS[kind].map((item) => ({
             organizationId,
+            kind,
             title: item.title,
             description: item.description,
             evidenceRequired: item.evidenceRequired,
+            dueDays: item.dueDays,
+            autoCompleteSource: item.autoCompleteSource,
           isAccessRevocation: item.isAccessRevocation,
           sortOrder: item.sortOrder,
           isDefault: true,

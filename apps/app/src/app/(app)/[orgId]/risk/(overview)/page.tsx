@@ -1,7 +1,10 @@
 import { AppOnboarding } from '@/components/app-onboarding';
+import { ExportRegisterButton } from '@/components/register-export/ExportRegisterButton';
 import { CreateRiskSheet } from '@/components/sheets/create-risk-sheet';
 import { serverApi } from '@/lib/api-server';
-import { PageHeader, PageLayout } from '@trycompai/design-system';
+import { RiskHeatmaps } from '@/components/risks/workspace/RiskHeatmaps';
+import { RiskWorkspaceTabs } from '@/components/risks/workspace/RiskWorkspaceTabs';
+import { HStack } from '@trycompai/design-system';
 import type { Metadata } from 'next';
 import { RisksTable } from './RisksTable';
 
@@ -109,53 +112,70 @@ export default async function RiskRegisterPage(props: {
   const isEmpty = risks.length === 0;
   const isOnboardingActive = Boolean(onboarding?.triggerJobId);
 
-  if (isEmpty && !isOnboardingActive) {
-    return (
-      <PageLayout padding="sm" container={false}>
-        <PageHeader title="Risks" actions={<CreateRiskSheet assignees={assignees as any} />} />
-        <AppOnboarding
-          title={'Risk Management'}
-          description={
-            "Identify, assess, and mitigate risks to protect your organization's assets and ensure compliance."
-          }
-          cta={'Create risk'}
-          imageSrcLight="/onboarding/risk-light.webp"
-          imageSrcDark="/onboarding/risk-dark.webp"
-          imageAlt="Risk Management"
-          sheetName="create-risk-sheet"
-          faqs={[
-            {
-              questionKey: 'What is risk management?',
-              answerKey:
-                "Risk management is the process of identifying, assessing, and controlling threats to an organization's capital and earnings.",
-            },
-            {
-              questionKey: 'Why is risk management important?',
-              answerKey:
-                'It helps organizations protect their assets, ensure stability, and achieve their objectives by minimizing potential disruptions.',
-            },
-            {
-              questionKey: 'What are the key steps in risk management?',
-              answerKey:
-                'The key steps are risk identification, risk analysis, risk evaluation, risk treatment, and risk monitoring and review.',
-            },
+  const headerActions = (
+    <HStack gap="2">
+      {!isEmpty && (
+        <ExportRegisterButton
+          options={[
+            { register: 'risks', label: 'Risk register' },
+            { register: 'risk-acceptances', label: 'Risk acceptances' },
           ]}
         />
-      </PageLayout>
+      )}
+      <CreateRiskSheet assignees={assignees as any} />
+    </HStack>
+  );
+
+  const register =
+    isEmpty && !isOnboardingActive ? (
+      <AppOnboarding
+        title={'Risk Management'}
+        description={
+          "Identify, assess, and mitigate risks to protect your organization's assets and ensure compliance. Start from the Library tab to add common payment and fintech risks in one click."
+        }
+        cta={'Create risk'}
+        imageSrcLight="/onboarding/risk-light.webp"
+        imageSrcDark="/onboarding/risk-dark.webp"
+        imageAlt="Risk Management"
+        sheetName="create-risk-sheet"
+        faqs={[
+          {
+            questionKey: 'What is risk management?',
+            answerKey:
+              "Risk management is the process of identifying, assessing, and controlling threats to an organization's capital and earnings.",
+          },
+          {
+            questionKey: 'Why is risk management important?',
+            answerKey:
+              'It helps organizations protect their assets, ensure stability, and achieve their objectives by minimizing potential disruptions.',
+          },
+          {
+            questionKey: 'What are the key steps in risk management?',
+            answerKey:
+              'The key steps are risk identification, risk analysis, risk evaluation, risk treatment, and risk monitoring and review.',
+          },
+        ]}
+      />
+    ) : (
+      <div className="flex flex-col gap-6">
+        <RiskHeatmaps />
+        <RisksTable
+          risks={risks as any}
+          pageCount={pageCount}
+          assignees={assignees as any}
+          onboardingRunId={onboarding?.triggerJobId ?? null}
+          orgId={orgId}
+        />
+      </div>
     );
-  }
 
   return (
-    <PageLayout>
-      <PageHeader title="Risks" actions={<CreateRiskSheet assignees={assignees as any} />} />
-      <RisksTable
-        risks={risks as any}
-        pageCount={pageCount}
-        assignees={assignees as any}
-        onboardingRunId={onboarding?.triggerJobId ?? null}
-        orgId={orgId}
-      />
-    </PageLayout>
+    <RiskWorkspaceTabs
+      orgId={orgId}
+      register={register}
+      actions={headerActions}
+      members={assignees.map((member) => ({ id: member.id, user: member.user }))}
+    />
   );
 }
 

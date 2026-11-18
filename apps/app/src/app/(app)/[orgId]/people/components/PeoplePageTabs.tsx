@@ -1,5 +1,7 @@
 'use client';
 
+import { useRegisterExport } from '@/components/register-export/ExportRegisterButton';
+import { usePermissions } from '@/hooks/use-permissions';
 import {
   Button,
   DropdownMenu,
@@ -26,6 +28,7 @@ interface PeoplePageTabsProps {
   employeeTasksContent: ReactNode | null;
   devicesContent: ReactNode;
   orgChartContent: ReactNode;
+  accessContent?: ReactNode;
   findingsContent?: ReactNode | null;
   roleMappingContent: ReactNode | null;
   showRoleMapping: boolean;
@@ -57,6 +60,9 @@ function tabParamToInternal(
   if (tabParam === 'chart') {
     return 'org-chart';
   }
+  if (tabParam === 'access') {
+    return 'access';
+  }
   if (tabParam === 'role-mapping') {
     return showRoleMapping ? 'role-mapping' : 'people';
   }
@@ -75,6 +81,7 @@ function internalValueToTabParam(value: string): string {
       return 'chart';
     case 'people':
     case 'devices':
+    case 'access':
     case 'role-mapping':
     case 'settings':
       return value;
@@ -88,6 +95,7 @@ export function PeoplePageTabs({
   employeeTasksContent,
   devicesContent,
   orgChartContent,
+  accessContent,
   findingsContent,
   roleMappingContent,
   showRoleMapping,
@@ -103,6 +111,9 @@ export function PeoplePageTabs({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const { hasPermission } = usePermissions();
+  const canExportPeople = hasPermission('member', 'read');
+  const { exporting, handleExport } = useRegisterExport();
 
   const activeTab = tabParamToInternal(
     searchParams.get('tab'),
@@ -138,6 +149,7 @@ export function PeoplePageTabs({
                 {showEmployeeTasks && <TabsTrigger value="employee-tasks">Tasks</TabsTrigger>}
                 <TabsTrigger value="devices">Devices</TabsTrigger>
                 <TabsTrigger value="org-chart">Chart</TabsTrigger>
+                {accessContent && <TabsTrigger value="access">Access</TabsTrigger>}
                 {showRoleMapping && <TabsTrigger value="role-mapping">Role Mapping</TabsTrigger>}
                 {showSettings && <TabsTrigger value="settings">Settings</TabsTrigger>}
               </TabsList>
@@ -168,6 +180,31 @@ export function PeoplePageTabs({
                       <Download size={14} className="mr-2" />
                       Export offboarding
                     </DropdownMenuItem>
+                    {canExportPeople && (
+                      <>
+                        <DropdownMenuItem
+                          disabled={exporting !== null}
+                          onClick={() => handleExport('people')}
+                        >
+                          <Download size={14} className="mr-2" />
+                          Export people (CSV)
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          disabled={exporting !== null}
+                          onClick={() => handleExport('devices')}
+                        >
+                          <Download size={14} className="mr-2" />
+                          Export devices (CSV)
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          disabled={exporting !== null}
+                          onClick={() => handleExport('offboarding')}
+                        >
+                          <Download size={14} className="mr-2" />
+                          Export offboarding records (CSV)
+                        </DropdownMenuItem>
+                      </>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </HStack>
@@ -181,6 +218,7 @@ export function PeoplePageTabs({
         )}
         <TabsContent value="devices">{devicesContent}</TabsContent>
         <TabsContent value="org-chart">{orgChartContent}</TabsContent>
+        {accessContent && <TabsContent value="access">{accessContent}</TabsContent>}
         {showRoleMapping && (
           <TabsContent value="role-mapping">{roleMappingContent}</TabsContent>
         )}

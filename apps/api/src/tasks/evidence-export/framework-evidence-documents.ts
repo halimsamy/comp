@@ -6,6 +6,7 @@ import {
   toCsvRow,
 } from '../../evidence-forms/evidence-forms-csv';
 import { evidenceFormDefinitions } from '../../evidence-forms/evidence-forms.definitions';
+import type { AuditPeriod } from './framework-evidence-native-archive';
 import {
   appendAttachmentToArchive,
   createFilenameTracker,
@@ -31,16 +32,26 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 export async function loadDocumentBundle({
   organizationId,
   formType,
+  period = {},
 }: {
   organizationId: string;
   formType: DbEvidenceFormType;
+  period?: AuditPeriod;
 }): Promise<DocumentBundle> {
   const externalType = toExternalEvidenceFormType(formType);
   const form = externalType ? evidenceFormDefinitions[externalType] : null;
   const title = form?.title ?? formType;
 
   const submissions = await db.evidenceSubmission.findMany({
-    where: { organizationId, formType },
+    where: {
+      organizationId,
+      formType,
+      // A rejected submission is not evidence of anything.
+      status: { not: 'rejected' },
+      ...(period.from || period.to
+        ? { submittedAt: { gte: period.from, lte: period.to } }
+        : {}),
+    },
     include: { submittedBy: { select: { name: true, email: true } } },
     orderBy: { submittedAt: 'desc' },
   });
@@ -75,6 +86,7 @@ export async function loadDocumentBundle({
         : submission.submittedAt.toISOString(),
       submission.submittedBy?.name ?? '',
       submission.submittedBy?.email ?? '',
+      submission.status,
       ...fields.map((field) =>
         getCsvFieldValue({ value: csvData[field.key], field }),
       ),
@@ -86,6 +98,7 @@ export async function loadDocumentBundle({
     'submissionDate',
     'submittedByName',
     'submittedByEmail',
+    'reviewStatus',
     ...fields.map((field) => field.key),
   ];
 

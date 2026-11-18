@@ -64,10 +64,56 @@ export function startFileDownload(url: string): void {
  */
 export function triggerFrameworkEvidenceExport({
   frameworkInstanceId,
+  from,
+  to,
 }: {
   frameworkInstanceId: string;
+  /** Optional audit period, `YYYY-MM-DD`, inclusive. */
+  from?: string;
+  to?: string;
 }): Promise<{ runId: string }> {
-  return startExportJob(`/v1/evidence-export/frameworks/${frameworkInstanceId}`);
+  return startExportJob(`/v1/evidence-export/frameworks/${frameworkInstanceId}`, {
+    ...(from ? { from } : {}),
+    ...(to ? { to } : {}),
+  });
+}
+
+export type RegisterExportKey =
+  | 'risks'
+  | 'risk-acceptances'
+  | 'vendors'
+  | 'people'
+  | 'devices'
+  | 'offboarding'
+  | 'findings'
+  | 'assets'
+  | 'vulnerabilities';
+
+/** Download a platform register (risks, vendors, people, …) as CSV. */
+export async function downloadRegisterCsv(register: RegisterExportKey): Promise<void> {
+  const baseUrl = env.NEXT_PUBLIC_API_URL || 'http://localhost:3333';
+  await downloadFile(`${baseUrl}/v1/register-exports/${register}`, {
+    fallbackBaseName: register,
+    fallbackExtension: 'csv',
+  });
+}
+
+/** Download the control crosswalk (ISO 27001 ↔ PCI DSS codes per control) as CSV. */
+export async function downloadControlCrosswalkCsv(): Promise<void> {
+  const baseUrl = env.NEXT_PUBLIC_API_URL || 'http://localhost:3333';
+  await downloadFile(`${baseUrl}/v1/controls/crosswalk`, {
+    fallbackBaseName: 'control-crosswalk',
+    fallbackExtension: 'csv',
+  });
+}
+
+/** Download the org event log (filtered) as CSV. `query` is the list endpoint's query string. */
+export async function downloadEventLogCsv(query: string): Promise<void> {
+  const baseUrl = env.NEXT_PUBLIC_API_URL || 'http://localhost:3333';
+  await downloadFile(`${baseUrl}/v1/audit-logs/events/export${query ? `?${query}` : ''}`, {
+    fallbackBaseName: 'event-log',
+    fallbackExtension: 'csv',
+  });
 }
 
 /**
@@ -82,11 +128,17 @@ export function triggerBulkEvidenceExport({
   return startExportJob(`/v1/evidence-export/all?includeJson=${includeJson}`);
 }
 
-async function startExportJob(endpoint: string): Promise<{ runId: string }> {
+async function startExportJob(
+  endpoint: string,
+  body?: Record<string, string>,
+): Promise<{ runId: string }> {
   const baseUrl = env.NEXT_PUBLIC_API_URL || 'http://localhost:3333';
   const response = await fetch(baseUrl + endpoint, {
     method: 'POST',
     credentials: 'include',
+    ...(body
+      ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
+      : {}),
   });
 
   if (!response.ok) {

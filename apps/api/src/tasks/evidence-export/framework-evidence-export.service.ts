@@ -10,6 +10,20 @@ import {
   createFilenameTracker,
 } from './evidence-attachment-streamer';
 import { sanitizeFilename } from './evidence-pdf-generator';
+import type { OffboardingExportService } from '../../offboarding-checklist/offboarding-export.service';
+import {
+  appendFolderNative,
+  appendRootNative,
+  buildReadme,
+  NativeIndex,
+  type AuditPeriod,
+} from './framework-evidence-native-archive';
+import {
+  folderNativeTitles,
+  loadNativeArtifacts,
+  nativeForFolder,
+  type NativeAccess,
+} from './framework-evidence-native';
 import {
   appendDocumentEvidence,
   loadDocumentBundle,
@@ -19,8 +33,8 @@ import {
   buildRequirementReadme,
   planRequirementFolders,
   safeSegment,
-  type MappedControl,
 } from './framework-evidence-plan';
+import { loadMappings } from './framework-evidence-mappings';
 import {
   appendTaskEvidence,
   loadTaskBundle,
@@ -74,26 +88,54 @@ export class FrameworkEvidenceExportService {
 
   /**
    * Fill `archive` with one folder per framework requirement holding its policies,
-   * tasks and documents. The caller owns the archive and finalizes it.
+   * tasks, documents and platform records (ISMS documents, SoA, registers). The
+   * caller owns the archive and finalizes it.
    */
   async populate({
     archive,
     organizationId,
     framework,
+    access = { registers: [], soa: false },
+    period = {},
+    offboardingExport,
   }: {
     archive: Archiver;
     organizationId: string;
     framework: FrameworkForExport;
+    /** Registers / SoA the caller may read; anything else is left out and named in the README. */
+    access?: NativeAccess;
+    period?: AuditPeriod;
+    /** Adds every offboarding's evidence files when the offboarding register is included. */
+    offboardingExport?: OffboardingExportService;
   }): Promise<void> {
     const { root } = framework;
+    const natives = await loadNativeArtifacts({
+      organizationId,
+      frameworkId: framework.frameworkId,
+      access,
+    });
     archive.append(
-      `${framework.frameworkName} evidence export for ${framework.organizationName}\nGenerated: ${new Date().toISOString()}\nOne folder per requirement; index.csv lists them all.\n`,
+      buildReadme({
+        frameworkName: framework.frameworkName,
+        organizationName: framework.organizationName,
+        natives,
+        period,
+      }),
       { name: `${root}/README.txt` },
     );
+    const nativeIndex = new NativeIndex();
+    appendRootNative({ archive, root, natives, index: nativeIndex });
+    if (offboardingExport && natives.registers.has('offboarding')) {
+      await offboardingExport.appendAllOffboardings({
+        archive,
+        organizationId,
+        prefix: `${root}/_Platform records/Offboarding evidence/`,
+      });
+    }
 
     const [requirements, mappings, notRelevant] = await Promise.all([
       loadRequirementDefinitions(framework),
-      this.loadMappings(framework.id),
+      loadMappings(framework.id),
       db.evidenceFormSetting.findMany({
         where: { organizationId, isNotRelevant: true },
         select: { formType: true },
@@ -139,16 +181,20 @@ export class FrameworkEvidenceExportService {
 
       for (const taskId of folder.taskIds) {
         if (!taskBundles.has(taskId)) {
-          taskBundles.set(taskId, await loadTaskBundle({ organizationId, taskId }));
+          taskBundles.set(taskId, await loadTaskBundle({ organizationId, taskId, period }));
         }
       }
       for (const formType of folder.formTypes) {
         if (!documentBundles.has(formType)) {
-          documentBundles.set(formType, await loadDocumentBundle({ organizationId, formType }));
+          documentBundles.set(
+            formType,
+            await loadDocumentBundle({ organizationId, formType, period }),
+          );
         }
       }
       const tasks = folder.taskIds.flatMap((id) => taskBundles.get(id) ?? []);
       const documents = folder.formTypes.flatMap((t) => documentBundles.get(t) ?? []);
+      const native = nativeForFolder({ folder, natives });
 
       archive.append(
         buildRequirementReadme({
@@ -157,6 +203,7 @@ export class FrameworkEvidenceExportService {
           policyNames: folderPolicies.map((p) => p.name),
           taskTitles: tasks.map((t) => t.title),
           documentTitles: documents.map((d) => d.title),
+          nativeTitles: folderNativeTitles(native, natives),
         }),
         { name: `${base}/00-requirement.txt` },
       );
@@ -202,6 +249,15 @@ export class FrameworkEvidenceExportService {
         });
       }
 
+      appendFolderNative({
+        archive,
+        root,
+        folder: folder.folder,
+        native,
+        natives,
+        index: nativeIndex,
+      });
+
       indexRows.push([
         folder.requirement.identifier,
         folder.requirement.name,
@@ -210,53 +266,21 @@ export class FrameworkEvidenceExportService {
         String(folderPolicies.length),
         String(tasks.length),
         String(documents.length),
+        String(native.isms.length + (native.soa ? 1 : 0)),
+        String(native.registers.length),
       ]);
     }
 
     archive.append(
       [
-        toCsvRow(['requirement', 'name', 'folder', 'controls', 'policies', 'tasks', 'documents']),
+        toCsvRow([
+          'requirement', 'name', 'folder', 'controls', 'policies', 'tasks',
+          'documents', 'isms_documents', 'registers',
+        ]),
         ...indexRows.map((row) => toCsvRow(row)),
       ].join('\n'),
       { name: `${root}/index.csv` },
     );
-  }
-
-  private async loadMappings(frameworkInstanceId: string): Promise<MappedControl[]> {
-    const rows = await db.requirementMap.findMany({
-      where: { frameworkInstanceId, archivedAt: null, control: { archivedAt: null } },
-      select: {
-        requirementId: true,
-        customRequirementId: true,
-        control: {
-          select: {
-            name: true,
-            frameworkPolicyLinks: {
-              where: { frameworkInstanceId, policy: { archivedAt: null, isArchived: false } },
-              select: { policyId: true },
-            },
-            frameworkTaskLinks: {
-              where: { frameworkInstanceId, task: { archivedAt: null } },
-              select: { taskId: true },
-            },
-            frameworkDocumentLinks: {
-              where: { frameworkInstanceId },
-              select: { formType: true },
-            },
-          },
-        },
-      },
-    });
-
-    return rows.map(({ requirementId, customRequirementId, control }) => ({
-      requirementId,
-      customRequirementId,
-      control: {
-        name: control.name,
-        policyIds: control.frameworkPolicyLinks.map((l) => l.policyId),
-        taskIds: control.frameworkTaskLinks.map((l) => l.taskId),
-        formTypes: control.frameworkDocumentLinks.map((l) => l.formType),
-      },
-    }));
+    archive.append(nativeIndex.toCsv(), { name: `${root}/native-artifacts.csv` });
   }
 }

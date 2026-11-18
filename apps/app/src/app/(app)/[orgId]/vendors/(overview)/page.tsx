@@ -1,6 +1,7 @@
 import { AppOnboarding } from '@/components/app-onboarding';
+import { ExportRegisterButton } from '@/components/register-export/ExportRegisterButton';
 import { serverApi } from '@/lib/api-server';
-import { PageHeader, PageLayout } from '@trycompai/design-system';
+import { HStack, PageHeader, PageLayout } from '@trycompai/design-system';
 import { CreateVendorSheet } from '../components/create-vendor-sheet';
 import { VendorsTable } from './components/VendorsTable';
 
@@ -103,7 +104,17 @@ export default async function Page({
       header={
         <PageHeader
           title="Vendors"
-          actions={<CreateVendorSheet assignees={assignees as any} organizationId={orgId} />}
+          actions={
+            <HStack gap="2">
+              <ExportRegisterButton
+                options={[
+                  { register: 'vendors', label: 'Vendor register' },
+                  { register: 'risk-acceptances', label: 'Risk acceptances' },
+                ]}
+              />
+              <CreateVendorSheet assignees={assignees as any} organizationId={orgId} />
+            </HStack>
+          }
         />
       }
     >

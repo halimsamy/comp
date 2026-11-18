@@ -51,6 +51,17 @@ vi.mock('@trycompai/ui/dropdown-menu', () => ({
   ),
 }));
 
+const dialogPeriod = { from: '', to: '' };
+vi.mock('./FrameworkExportDialog', () => ({
+  FrameworkExportDialog: ({
+    open,
+    onExport,
+  }: {
+    open: boolean;
+    onExport: (period: { from: string; to: string }) => void;
+  }) => (open ? <button onClick={() => onExport(dialogPeriod)}>Export ZIP</button> : null),
+}));
+
 import { FrameworkActionsMenu } from './FrameworkActionsMenu';
 
 function renderMenu() {
@@ -70,6 +81,8 @@ const menuItems = () => screen.queryAllByRole('menuitem').map((item) => item.tex
 describe('FrameworkActionsMenu', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    dialogPeriod.from = '';
+    dialogPeriod.to = '';
   });
 
   it('shows Export all evidences above Delete Framework for admins', () => {
@@ -84,13 +97,18 @@ describe('FrameworkActionsMenu', () => {
     mockTrigger.mockResolvedValue({ runId: 'jrun_1' });
     renderMenu();
     fireEvent.click(screen.getByRole('menuitem', { name: 'Export all evidences' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Export ZIP' }));
     await waitFor(() => expect(jobRun.runId).toBe('jrun_1'));
   }
 
   it('starts the export job and downloads the ZIP once the run completes', async () => {
     await startExport();
 
-    expect(mockTrigger).toHaveBeenCalledWith({ frameworkInstanceId: 'frm_1' });
+    expect(mockTrigger).toHaveBeenCalledWith({
+      frameworkInstanceId: 'frm_1',
+      from: undefined,
+      to: undefined,
+    });
     expect(mockToast.loading).toHaveBeenCalledWith(
       expect.stringContaining('PCI DSS Level 1'),
       expect.anything(),
@@ -98,11 +116,34 @@ describe('FrameworkActionsMenu', () => {
     expect(mockDownload).not.toHaveBeenCalled();
     expect(menuItems()).toContain('Preparing export…');
 
-    act(() => jobRun.onComplete?.({ status: 'COMPLETED', output: { downloadUrl: 'https://s3/x.zip' } }));
+    act(() =>
+      jobRun.onComplete?.({ status: 'COMPLETED', output: { downloadUrl: 'https://s3/x.zip' } }),
+    );
 
     expect(mockDownload).toHaveBeenCalledWith('https://s3/x.zip');
     expect(mockToast.success).toHaveBeenCalled();
     expect(menuItems()).toContain('Export all evidences');
+  });
+
+  it('asks for the audit period before exporting and passes it on', async () => {
+    dialogPeriod.from = '2026-01-01';
+    dialogPeriod.to = '2026-06-30';
+    setMockPermissions(ADMIN_PERMISSIONS);
+    mockTrigger.mockResolvedValue({ runId: 'jrun_1' });
+    renderMenu();
+
+    expect(screen.queryByRole('button', { name: 'Export ZIP' })).toBeNull();
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Export all evidences' }));
+    expect(mockTrigger).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Export ZIP' }));
+
+    await waitFor(() =>
+      expect(mockTrigger).toHaveBeenCalledWith({
+        frameworkInstanceId: 'frm_1',
+        from: '2026-01-01',
+        to: '2026-06-30',
+      }),
+    );
   });
 
   it('reports a failed run instead of downloading', async () => {
@@ -120,6 +161,7 @@ describe('FrameworkActionsMenu', () => {
     renderMenu();
 
     fireEvent.click(screen.getByRole('menuitem', { name: 'Export all evidences' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Export ZIP' }));
 
     await waitFor(() => expect(mockToast.error).toHaveBeenCalled());
     expect(jobRun.runId).toBeNull();
