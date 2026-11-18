@@ -1,0 +1,145 @@
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import {
+  IsDateString,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
+import type { Prisma } from '@db';
+import { toCsvRow } from '../evidence-forms/evidence-forms-csv';
+
+/** Filters for the org-wide event log (ISO 27001 A.8.15, PCI DSS 10.2). */
+export class AuditEventsQueryDto {
+  @ApiPropertyOptional({ description: 'Only events by this user ID', example: 'usr_abc123' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  userId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Only events on this resource (e.g. auth, policy, organization)',
+    example: 'auth',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  resource?: string;
+
+  @ApiPropertyOptional({ description: 'Events at or after this ISO date', example: '2026-01-01' })
+  @IsOptional()
+  @IsDateString()
+  from?: string;
+
+  @ApiPropertyOptional({ description: 'Events at or before this ISO date', example: '2026-12-31' })
+  @IsOptional()
+  @IsDateString()
+  to?: string;
+
+  @ApiPropertyOptional({ description: 'Text to find in the event description', example: 'signed in' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  search?: string;
+
+  @ApiPropertyOptional({ description: 'Page size (max 100, default 50)', example: 50 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  take?: number;
+
+  @ApiPropertyOptional({ description: 'Rows to skip (default 0)', example: 0 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(100_000)
+  offset?: number;
+}
+
+/** A date-only `to` (YYYY-MM-DD) includes the whole day. */
+function endOf(value: string): Date {
+  const date = new Date(value);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) date.setUTCHours(23, 59, 59, 999);
+  return date;
+}
+
+export function buildAuditEventsWhere({
+  organizationId,
+  query,
+}: {
+  organizationId: string;
+  query: AuditEventsQueryDto;
+}): Prisma.AuditLogWhereInput {
+  const timestamp: Prisma.DateTimeFilter = {};
+  if (query.from) timestamp.gte = new Date(query.from);
+  if (query.to) timestamp.lte = endOf(query.to);
+
+  return {
+    organizationId,
+    ...(query.userId && { userId: query.userId }),
+    ...(query.resource && {
+      data: { path: ['resource'], equals: query.resource },
+    }),
+    ...((query.from || query.to) && { timestamp }),
+    ...(query.search && {
+      description: { contains: query.search, mode: 'insensitive' },
+    }),
+  };
+}
+
+export interface AuditEventRow {
+  id: string;
+  timestamp: Date;
+  description: string | null;
+  entityType: string | null;
+  entityId: string | null;
+  data: Prisma.JsonValue;
+  user: { name: string | null; email: string } | null;
+}
+
+function dataField(data: Prisma.JsonValue, key: string): string {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return '';
+  const value = data[key];
+  return typeof value === 'string' ? value : '';
+}
+
+export const AUDIT_EVENT_CSV_HEADERS = [
+  'Timestamp (UTC)',
+  'User',
+  'Email',
+  'Event',
+  'Resource',
+  'Target type',
+  'Target ID',
+  'Method',
+  'Path',
+  'IP address',
+  'Sign-in method',
+];
+
+export function auditEventsToCsv(rows: AuditEventRow[]): string {
+  return [
+    toCsvRow(AUDIT_EVENT_CSV_HEADERS),
+    ...rows.map((row) =>
+      toCsvRow([
+        row.timestamp.toISOString(),
+        row.user?.name ?? '',
+        row.user?.email ?? '',
+        row.description ?? dataField(row.data, 'action'),
+        dataField(row.data, 'resource'),
+        row.entityType ?? '',
+        row.entityId ?? '',
+        dataField(row.data, 'method'),
+        dataField(row.data, 'path'),
+        dataField(row.data, 'ipAddress'),
+        dataField(row.data, 'signInMethod'),
+      ]),
+    ),
+  ].join('\n');
+}

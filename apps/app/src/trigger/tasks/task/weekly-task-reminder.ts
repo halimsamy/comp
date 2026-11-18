@@ -2,12 +2,13 @@ import { isOrgParticipant } from '@/lib/org-participation-rule';
 import { db } from '@db/server';
 import { logger, schedules } from '@trycompai/jobs';
 import { sendWeeklyTaskDigestEmailTask } from '../email/weekly-task-digest-email';
+import { getDigestFrequency, isDigestDue, selectDigestTasks } from './task-digest-helpers';
 
 const ORG_INACTIVITY_DAYS = 90;
 
 export const weeklyTaskReminder = schedules.task({
   id: 'weekly-task-reminder',
-  cron: '0 9 * * 1', // Every Monday at 9:00 AM UTC
+  cron: '0 9 * * *', // Daily at 9:00 AM UTC; weekly digests only go out on Mondays
   maxDuration: 60 * 10, // 10 minutes
   run: async () => {
     logger.info('Starting weekly task reminder job');
@@ -44,12 +45,14 @@ export const weeklyTaskReminder = schedules.task({
           },
           select: {
             id: true,
+            role: true,
             user: {
               select: {
                 id: true,
                 name: true,
                 email: true,
                 role: true,
+                emailPreferences: true,
               },
             },
           },
@@ -67,15 +70,16 @@ export const weeklyTaskReminder = schedules.task({
     for (const org of organizations) {
       logger.info(`Processing organization: ${org.name} (${org.id})`);
 
-      // Get all TODO tasks for this organization
+      // Get all open tasks for this organization
       const todoTasks = await db.task.findMany({
         where: {
           organizationId: org.id,
-          status: 'todo',
+          status: { in: ['todo', 'in_progress'] },
         },
         select: {
           id: true,
           title: true,
+          assigneeId: true,
         },
         orderBy: {
           createdAt: 'desc',
@@ -108,13 +112,24 @@ export const weeklyTaskReminder = schedules.task({
           continue;
         }
 
+        if (!isDigestDue({ frequency: getDigestFrequency(member.user.emailPreferences) })) {
+          continue;
+        }
+
+        const memberTasks = selectDigestTasks({
+          tasks: todoTasks,
+          memberId: member.id,
+          role: member.role,
+        });
+        if (memberTasks.length === 0) continue;
+
         emailPayloads.push({
           payload: {
             email: member.user.email,
             userName: member.user.name,
             organizationName: org.name,
             organizationId: org.id,
-            tasks: todoTasks,
+            tasks: memberTasks,
           },
         });
       }

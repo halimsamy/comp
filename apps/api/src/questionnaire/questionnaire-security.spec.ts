@@ -43,6 +43,7 @@ jest.mock('@/trigger/questionnaire/answer-question-helpers', () => ({
 import { QuestionnaireController } from './questionnaire.controller';
 import { QuestionnaireService } from './questionnaire.service';
 import { TrustAccessService } from '../trust-portal/trust-access.service';
+import { ExternalQuestionnaireReviewService } from './external-review.service';
 import { ApiKeyService } from '../auth/api-key.service';
 import { HybridAuthGuard } from '../auth/hybrid-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
@@ -88,6 +89,7 @@ describe('questionnaire API authorization uses session auth for job runs', () =>
         { provide: ApiKeyService, useValue: {} },
         { provide: QuestionnaireService, useValue: service },
         { provide: TrustAccessService, useValue: {} },
+        { provide: ExternalQuestionnaireReviewService, useValue: {} },
       ],
     }).compile();
     controller = module.get(QuestionnaireController);

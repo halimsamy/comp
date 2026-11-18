@@ -1478,7 +1478,8 @@ export class TrustPortalService {
 
   async updateSecurityQuestionnaireEnabled(
     organizationId: string,
-    enabled: boolean,
+    enabled: boolean | undefined,
+    requiresReview?: boolean,
   ) {
     const trust = await db.trust.findUnique({
       where: { organizationId },
@@ -1490,7 +1491,12 @@ export class TrustPortalService {
 
     return db.trust.update({
       where: { organizationId },
-      data: { securityQuestionnaireEnabled: enabled },
+      data: {
+        ...(enabled !== undefined && { securityQuestionnaireEnabled: enabled }),
+        ...(requiresReview !== undefined && {
+          securityQuestionnaireRequiresReview: requiresReview,
+        }),
+      },
     });
   }
 
@@ -1750,7 +1756,9 @@ export class TrustPortalService {
       overviewContent: trust.overviewContent ?? defaultOverviewContent,
       showOverview: trust.showOverview ?? false,
       // Security questionnaire visibility on the public portal
-      securityQuestionnaireEnabled: trust.securityQuestionnaireEnabled ?? true,
+      securityQuestionnaireEnabled: trust.securityQuestionnaireEnabled ?? false,
+      securityQuestionnaireRequiresReview:
+        trust.securityQuestionnaireRequiresReview ?? true,
       // Favicon
       faviconUrl,
       // Organization data

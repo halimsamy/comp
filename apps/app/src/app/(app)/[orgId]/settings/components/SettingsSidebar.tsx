@@ -1,5 +1,6 @@
 'use client';
 
+import { canAccessRoute, type UserPermissions } from '@/lib/permissions';
 import { AppShellNav, AppShellNavItem } from '@trycompai/design-system';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -8,6 +9,7 @@ interface SettingsSidebarProps {
   orgId: string;
   showBrowserTab: boolean;
   showBillingTab?: boolean;
+  permissions?: UserPermissions;
 }
 
 type SettingsNavItem = {
@@ -17,8 +19,14 @@ type SettingsNavItem = {
   hidden?: boolean;
 };
 
-export function SettingsSidebar({ orgId, showBrowserTab, showBillingTab }: SettingsSidebarProps) {
+export function SettingsSidebar({
+  orgId,
+  showBrowserTab,
+  showBillingTab,
+  permissions,
+}: SettingsSidebarProps) {
   const pathname = usePathname() ?? '';
+  const canSee = (segment: string) => !permissions || canAccessRoute(permissions, segment);
 
   const items: SettingsNavItem[] = [
     { id: 'general', label: 'General', path: `/${orgId}/settings` },
@@ -34,6 +42,18 @@ export function SettingsSidebar({ orgId, showBrowserTab, showBillingTab }: Setti
     { id: 'secrets', label: 'Secrets', path: `/${orgId}/settings/secrets` },
     { id: 'roles', label: 'Roles', path: `/${orgId}/settings/roles` },
     { id: 'notifications', label: 'Notifications', path: `/${orgId}/settings/notifications` },
+    {
+      id: 'security',
+      label: 'Security',
+      path: `/${orgId}/settings/security`,
+      hidden: !canSee('settings/security'),
+    },
+    {
+      id: 'event-log',
+      label: 'Event log',
+      path: `/${orgId}/settings/event-log`,
+      hidden: !canSee('settings/event-log'),
+    },
     {
       id: 'browser',
       label: 'Browser connections',

@@ -111,6 +111,7 @@ export class QuestionnaireService {
 
   async autoAnswerAndExport(
     dto: ExportQuestionnaireDto,
+    options: { review?: { requesterEmail: string } } = {},
   ): Promise<QuestionnaireExportResult> {
     let uploadInfo: { s3Key: string; fileSize: number } | null = null;
     if (dto.fileData) {
@@ -186,6 +187,7 @@ export class QuestionnaireService {
           s3Key: uploadInfo?.s3Key ?? null,
           questionsAndAnswers: answered,
           source: dto.source || 'internal',
+          review: options.review,
         },
         this.storageLogger,
       );
@@ -216,6 +218,7 @@ export class QuestionnaireService {
         s3Key: uploadInfo?.s3Key ?? null,
         questionsAndAnswers: answered,
         source: dto.source || 'internal',
+        review: options.review,
       },
       this.storageLogger,
     );
@@ -584,6 +587,8 @@ export class QuestionnaireService {
         totalQuestions: true,
         answeredQuestions: true,
         source: true,
+        reviewStatus: true,
+        requesterEmail: true,
         createdAt: true,
         updatedAt: true,
         questions: {

@@ -1241,7 +1241,7 @@ export class TrustAccessService {
     return {
       friendlyUrl,
       faviconUrl,
-      securityQuestionnaireEnabled: trust?.securityQuestionnaireEnabled ?? true,
+      securityQuestionnaireEnabled: trust?.securityQuestionnaireEnabled ?? false,
     };
   }
 
@@ -1274,7 +1274,7 @@ export class TrustAccessService {
    * Whether the AI-assisted Security Questionnaire is enabled for an
    * organization, keyed by organizationId (used by token-authenticated
    * questionnaire endpoints, which already have the organizationId resolved
-   * from the access token). Defaults to enabled when the Trust row does not
+   * from the access token). Defaults to disabled when the Trust row does not
    * exist yet, matching getPublicSecurityQuestionnaireEnabled's semantics.
    */
   async isSecurityQuestionnaireEnabledForOrganization(
@@ -1285,7 +1285,7 @@ export class TrustAccessService {
       select: { securityQuestionnaireEnabled: true },
     });
 
-    return trust?.securityQuestionnaireEnabled ?? true;
+    return trust?.securityQuestionnaireEnabled ?? false;
   }
 
   private async validateAccessToken(token: string) {
@@ -2433,8 +2433,8 @@ export class TrustAccessService {
   /**
    * Whether the public trust portal should offer the AI-assisted Security
    * Questionnaire. The public portal passes either the friendly URL or the
-   * organization ID, so we resolve on both. Defaults to enabled when the portal
-   * can't be resolved so the questionnaire never disappears by accident.
+   * organization ID, so we resolve on both. Defaults to disabled when the portal
+   * can't be resolved: AI answers are only offered once an admin opts in.
    */
   async getPublicSecurityQuestionnaireEnabled(
     friendlyUrl: string,
@@ -2443,7 +2443,7 @@ export class TrustAccessService {
       securityQuestionnaireEnabled: true,
     });
 
-    return trust?.securityQuestionnaireEnabled ?? true;
+    return trust?.securityQuestionnaireEnabled ?? false;
   }
 
   async getPublicCustomLinks(friendlyUrl: string) {

@@ -22,6 +22,10 @@ vi.mock('@/hooks/use-trust-portal-settings', () => ({
   }),
 }));
 
+vi.mock('./QuestionnaireReviewSetting', () => ({
+  QuestionnaireReviewSetting: () => null,
+}));
+
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));

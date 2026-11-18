@@ -134,6 +134,8 @@ describe('QuestionnaireService', () => {
           totalQuestions: true,
           answeredQuestions: true,
           source: true,
+          reviewStatus: true,
+          requesterEmail: true,
           createdAt: true,
           updatedAt: true,
           questions: {

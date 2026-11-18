@@ -30,4 +30,28 @@ describe('SettingsSidebar', () => {
 
     expect(screen.queryByRole('link', { name: 'Browser' })).not.toBeInTheDocument();
   });
+
+  it('shows Security and Event log only to users with access', () => {
+    const { rerender } = render(
+      <SettingsSidebar
+        orgId="org-1"
+        showBillingTab={false}
+        showBrowserTab={false}
+        permissions={{ organization: ['update'], audit: ['read'] }}
+      />,
+    );
+    expect(screen.getByRole('link', { name: 'Security' })).toHaveAttribute('href', '/org-1/settings/security');
+    expect(screen.getByRole('link', { name: 'Event log' })).toHaveAttribute('href', '/org-1/settings/event-log');
+
+    rerender(
+      <SettingsSidebar
+        orgId="org-1"
+        showBillingTab={false}
+        showBrowserTab={false}
+        permissions={{ evidence: ['read'] }}
+      />,
+    );
+    expect(screen.queryByRole('link', { name: 'Security' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Event log' })).not.toBeInTheDocument();
+  });
 });

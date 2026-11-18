@@ -75,7 +75,9 @@ export const ROUTE_PERMISSIONS: Record<string, Array<{ resource: string; action:
   overview: [{ resource: 'framework', action: 'read' }],
   frameworks: [{ resource: 'framework', action: 'read' }],
   auditor: [{ resource: 'audit', action: 'read' }],
+  audits: [{ resource: 'audit', action: 'read' }],
   controls: [{ resource: 'control', action: 'read' }],
+  'getting-started': [{ resource: 'app', action: 'read' }],
   policies: [{ resource: 'policy', action: 'read' }],
   tasks: [
     { resource: 'evidence', action: 'read' },
@@ -88,6 +90,8 @@ export const ROUTE_PERMISSIONS: Record<string, Array<{ resource: string; action:
   questionnaire: [{ resource: 'questionnaire', action: 'read' }],
   integrations: [{ resource: 'integration', action: 'read' }],
   'cloud-tests': [{ resource: 'integration', action: 'read' }],
+  assets: [{ resource: 'integration', action: 'read' }],
+  vulnerabilities: [{ resource: 'integration', action: 'read' }],
   // Trust center
   trust: [{ resource: 'trust', action: 'read' }],
   // Security product
@@ -106,6 +110,8 @@ export const ROUTE_PERMISSIONS: Record<string, Array<{ resource: string; action:
   'settings/secrets': [{ resource: 'secret', action: 'read' }],
   'settings/roles': [{ resource: 'member', action: 'read' }],
   'settings/notifications': [{ resource: 'organization', action: 'update' }],
+  'settings/security': [{ resource: 'organization', action: 'update' }],
+  'settings/event-log': [{ resource: 'audit', action: 'read' }],
   'settings/browser-connection': [{ resource: 'integration', action: 'read' }],
   // settings/user is intentionally not listed — every user can access their own preferences
 };
@@ -175,7 +181,7 @@ export function getDefaultRoute(permissions: UserPermissions, orgId: string): st
 /** Compliance route segments — used to determine if the Compliance rail icon should show. */
 const COMPLIANCE_ROUTE_SEGMENTS = [
   'overview', 'frameworks', 'controls', 'policies', 'tasks', 'documents', 'people',
-  'risk', 'vendors', 'questionnaire', 'integrations', 'cloud-tests', 'auditor',
+  'risk', 'vendors', 'questionnaire', 'integrations', 'cloud-tests', 'auditor', 'audits',
 ] as const;
 
 /**

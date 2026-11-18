@@ -23,12 +23,12 @@ export const metadata: Metadata = {
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Promise<{ inviteCode?: string; redirectTo?: string }>;
+  searchParams: Promise<{ inviteCode?: string; redirectTo?: string; reason?: string }>;
 }) {
   const session = await auth.api.getSession({
     headers: await headers(),
   });
-  const { inviteCode, redirectTo } = await searchParams;
+  const { inviteCode, redirectTo, reason } = await searchParams;
   const safeRedirectTo = getSafeRedirectPath(redirectTo);
 
   const orgId = session?.session?.activeOrganizationId;
@@ -60,6 +60,11 @@ export default async function Page({
             <CardDescription className="text-base text-muted-foreground px-4">
               {`Automate SOC 2, ISO 27001 and GDPR compliance with AI.`}
             </CardDescription>
+            {reason === 'idle' && (
+              <p role="status" className="text-sm text-muted-foreground">
+                You were signed out after a period of inactivity. Sign in again to continue.
+              </p>
+            )}
           </CardHeader>
           <CardContent className="space-y-6 pb-6 px-8">
             <LoginForm

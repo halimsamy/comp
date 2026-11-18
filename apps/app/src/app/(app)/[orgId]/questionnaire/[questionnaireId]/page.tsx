@@ -1,11 +1,15 @@
 import PageWithBreadcrumb from '@/components/pages/PageWithBreadcrumb';
 import { serverApi } from '@/lib/api-server';
 import { notFound } from 'next/navigation';
+import { ExternalReviewBanner } from './components/ExternalReviewBanner';
 import { QuestionnaireDetailClient } from './components/QuestionnaireDetailClient';
 
 interface QuestionnaireApiResponse {
   id: string;
   filename: string;
+  reviewStatus?: 'pending_review' | 'approved' | null;
+  requesterEmail?: string | null;
+  reviewedAt?: string | null;
   questions: Array<{
     id: string;
     question: string;
@@ -41,6 +45,12 @@ export default async function QuestionnaireDetailPage({
         { label: questionnaire.filename, current: true },
       ]}
     >
+      <ExternalReviewBanner
+        questionnaireId={questionnaireId}
+        reviewStatus={questionnaire.reviewStatus}
+        requesterEmail={questionnaire.requesterEmail}
+        reviewedAt={questionnaire.reviewedAt}
+      />
       <QuestionnaireDetailClient
         questionnaireId={questionnaireId}
         organizationId={orgId}

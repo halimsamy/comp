@@ -32,6 +32,8 @@ export function SettingsTabs({ orgId, children }: SettingsTabsProps) {
     if (pathname.startsWith(`/${orgId}/settings/secrets`)) return 'Secrets';
     if (pathname.startsWith(`/${orgId}/settings/roles`)) return 'Roles';
     if (pathname.startsWith(`/${orgId}/settings/notifications`)) return 'Notifications';
+    if (pathname.startsWith(`/${orgId}/settings/security`)) return 'Security';
+    if (pathname.startsWith(`/${orgId}/settings/event-log`)) return 'Event log';
     if (pathname.startsWith(`/${orgId}/settings/browser-connection`)) return 'Browser connections';
     if (pathname.startsWith(`/${orgId}/settings/billing`)) return 'Billing';
     if (pathname.startsWith(`/${orgId}/settings/user`)) return 'User Settings';

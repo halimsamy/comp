@@ -28,6 +28,7 @@ import {
   clearAssignments,
   removeMemberFromOrgChart,
   notifyOwnerOfUnassignedItems,
+  deactivateMember,
 } from './utils/member-deactivation';
 import { checkAutoCompletePhases } from '../frameworks/frameworks-timeline.helper';
 import { TimelinesService } from '../timelines/timelines.service';
@@ -489,21 +490,13 @@ export class PeopleService {
     await clearAssignments({ memberId, organizationId });
     await removeMemberFromOrgChart({ organizationId, memberId });
 
-    await db.member.update({
-      where: { id: memberId, organizationId },
-      data: {
-        deactivated: true,
-        isActive: false,
-        ...(skipOffboarding
-          ? { offboardDate: null }
-          : { offboardDate: member.offboardDate ?? new Date() }),
-      },
+    await deactivateMember({
+      memberId,
+      organizationId,
+      userId: member.userId,
+      offboardDate: member.offboardDate,
+      skipOffboarding,
     });
-
-    // Direct DB session deletion is correct here — the API server IS the auth server,
-    // and better-auth's own revokeUserSessions internally calls the same deleteSessions operation.
-    // The admin endpoint wrapper requires an authenticated admin session context we don't have.
-    await db.session.deleteMany({ where: { userId: member.userId } });
 
     if (member.fleetDmLabelId) {
       try {
@@ -803,11 +796,11 @@ export class PeopleService {
 
   async updateEmailPreferences(
     userId: string,
-    preferences: Record<string, boolean>,
+    preferences: Record<string, boolean | string>,
   ) {
-    const allUnsubscribed = Object.values(preferences).every(
-      (v) => v === false,
-    );
+    const allUnsubscribed = Object.values(preferences)
+      .filter((v) => typeof v === 'boolean')
+      .every((v) => v === false);
     await db.user.update({
       where: { id: userId },
       data: {

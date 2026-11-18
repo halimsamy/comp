@@ -34,7 +34,6 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
-  CommandSearch,
   HStack,
   Logo,
   Text,
@@ -48,8 +47,10 @@ import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { AdminSidebar } from '../admin/components/AdminSidebar';
 import { ImpersonationBanner } from '../admin/components/ImpersonationBanner';
 import { SettingsSidebar } from '../settings/components/SettingsSidebar';
+import { IdleSessionTimeout } from '@/components/session/IdleSessionTimeout';
 import { SecuritySidebar } from '../security/components/SecuritySidebar';
 import { TrustSidebar } from '../trust/components/TrustSidebar';
+import { AppCommandSearch } from './AppCommandSearch';
 import { getAppShellSearchGroups } from './app-shell-search-groups';
 import { AppSidebar } from './AppSidebar';
 import { ConditionalOnboardingTracker } from './ConditionalOnboardingTracker';
@@ -180,7 +181,7 @@ function AppShellWrapperContent({
               />
             </HStack>
           }
-          centerContent={<CommandSearch groups={searchGroups} placeholder="Search..." />}
+          centerContent={<AppCommandSearch organizationId={organization.id} staticGroups={searchGroups} />}
           endContent={
             <AppShellUserMenu>
               <AppShellAIChatTrigger />
@@ -311,7 +312,7 @@ function AppShellWrapperContent({
               {isAdminActive && isAdmin ? (
                 <AdminSidebar orgId={organization.id} />
               ) : isSettingsActive ? (
-                <SettingsSidebar orgId={organization.id} showBrowserTab={isWebAutomationsEnabled} showBillingTab={isSecurityEnabled} />
+                <SettingsSidebar orgId={organization.id} showBrowserTab={isWebAutomationsEnabled} showBillingTab={isSecurityEnabled} permissions={permissions} />
               ) : isTrustActive ? (
                 <TrustSidebar orgId={organization.id} />
               ) : isSecurityActive && isSecurityEnabled ? (
@@ -337,6 +338,7 @@ function AppShellWrapperContent({
           <Suspense fallback={null}>
             <CheckoutCompleteDialog orgId={organization.id} />
           </Suspense>
+          <IdleSessionTimeout />
         </AppShellBody>
       </AppShell>
     </TooltipProvider>

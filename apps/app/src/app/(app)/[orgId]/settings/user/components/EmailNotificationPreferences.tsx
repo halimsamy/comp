@@ -8,10 +8,11 @@ import {
   Stack,
   Text,
 } from '@trycompai/design-system';
-import { Lock } from 'lucide-react';
+import { Locked } from '@trycompai/design-system/icons';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { useEmailPreferences } from '../hooks/useEmailPreferences';
+import { useEmailPreferences, type DigestFrequency } from '../hooks/useEmailPreferences';
+import { DigestFrequencySelect } from './DigestFrequencySelect';
 
 interface EmailPreferences {
   policyNotifications: boolean;
@@ -32,7 +33,7 @@ interface RoleNotifications {
 }
 
 interface Props {
-  initialPreferences: EmailPreferences;
+  initialPreferences: EmailPreferences & { digestFrequency?: DigestFrequency };
   email: string;
   isAdminOrOwner?: boolean;
   roleNotifications?: RoleNotifications | null;
@@ -60,8 +61,9 @@ const NOTIFICATION_ITEMS: {
   {
     key: 'weeklyTaskDigest',
     roleKey: 'weeklyTaskDigest',
-    label: 'Weekly Task Digest',
-    description: 'Receive a weekly summary of pending tasks',
+    label: 'Task Digest',
+    description:
+      'Receive a summary of open tasks assigned to you (owners and admins also see unassigned tasks)',
   },
   {
     key: 'unassignedItemsNotifications',
@@ -89,9 +91,12 @@ export function EmailNotificationPreferences({
   isAdminOrOwner = true,
   roleNotifications,
 }: Props) {
+  const { digestFrequency: initialFrequency, ...initialToggles } = initialPreferences;
   const { savePreferences } = useEmailPreferences({ initialPreferences });
-  const [preferences, setPreferences] =
-    useState<EmailPreferences>(initialPreferences);
+  const [preferences, setPreferences] = useState<EmailPreferences>(initialToggles);
+  const [digestFrequency, setDigestFrequency] = useState<DigestFrequency>(
+    initialFrequency ?? 'weekly',
+  );
   const [saving, setSaving] = useState(false);
 
   const handleToggle = (key: keyof EmailPreferences, checked: boolean) => {
@@ -116,7 +121,7 @@ export function EmailNotificationPreferences({
   const handleSave = async () => {
     setSaving(true);
     try {
-      await savePreferences(preferences);
+      await savePreferences({ ...preferences, digestFrequency });
       toast.success('Email preferences updated successfully');
     } catch {
       toast.error('Failed to update preferences');
@@ -140,6 +145,11 @@ export function EmailNotificationPreferences({
     return preferences[item.key];
   };
 
+  const digestEnabled =
+    !isAdminOrOwner && roleNotifications
+      ? roleNotifications.weeklyTaskDigest
+      : preferences.weeklyTaskDigest;
+
   const description = isAdminOrOwner
     ? `Manage which email notifications you receive at ${email}.`
     : `Email notification settings for ${email}. Most settings are managed by your organization admin.`;
@@ -149,11 +159,9 @@ export function EmailNotificationPreferences({
       title="Email Notifications"
       description={description}
       actions={
-        isAdminOrOwner ? (
-          <Button onClick={handleSave} disabled={saving}>
-            {saving ? 'Saving...' : 'Save'}
-          </Button>
-        ) : undefined
+        <Button onClick={handleSave} disabled={saving}>
+          {saving ? 'Saving...' : 'Save'}
+        </Button>
       }
     >
       <Stack>
@@ -202,7 +210,7 @@ export function EmailNotificationPreferences({
                   <HStack align="center" gap="xs">
                     <Text weight="medium">{item.label}</Text>
                     {locked && (
-                      <Lock className="h-3.5 w-3.5 text-muted-foreground" />
+                      <Locked size={14} />
                     )}
                   </HStack>
                   <Text size="sm" variant="muted">
@@ -218,6 +226,12 @@ export function EmailNotificationPreferences({
             );
           })}
         </Stack>
+
+        <DigestFrequencySelect
+          value={digestFrequency}
+          onChange={setDigestFrequency}
+          disabled={!digestEnabled}
+        />
 
         <Text size="xs" variant="muted">
           {isAdminOrOwner

@@ -26,6 +26,7 @@ interface QuestionnaireApiResponse {
     totalQuestions: number;
     answeredQuestions: number;
     source: string | null;
+    reviewStatus?: 'pending_review' | 'approved' | null;
     createdAt: string;
     updatedAt: string;
     questions: Array<{

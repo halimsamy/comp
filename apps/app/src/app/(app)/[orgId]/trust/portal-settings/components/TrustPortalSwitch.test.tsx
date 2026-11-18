@@ -56,6 +56,10 @@ vi.mock('@/components/file-uploader', () => ({
   FileUploader: () => <div data-testid="file-uploader" />,
 }));
 
+vi.mock('./QuestionnaireReviewSetting', () => ({
+  QuestionnaireReviewSetting: () => null,
+}));
+
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn(), promise: vi.fn() },
 }));

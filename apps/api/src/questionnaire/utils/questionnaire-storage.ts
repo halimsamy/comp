@@ -58,6 +58,8 @@ export async function persistQuestionnaireResult(
     questionsAndAnswers: QuestionnaireAnswerData[];
     source: 'internal' | 'external';
     s3Key: string | null;
+    /** Hold the answers for admin review before they go to this requester. */
+    review?: { requesterEmail: string };
   },
   logger: StorageLogger = defaultLogger,
 ): Promise<string | null> {
@@ -78,6 +80,10 @@ export async function persistQuestionnaireResult(
         totalQuestions: params.questionsAndAnswers.length,
         answeredQuestions: answeredCount,
         source: params.source,
+        ...(params.review && {
+          reviewStatus: 'pending_review',
+          requesterEmail: params.review.requesterEmail,
+        }),
         questions: {
           create: params.questionsAndAnswers.map((qa, index) => ({
             question: qa.question,

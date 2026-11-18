@@ -28,6 +28,11 @@ import {
   assertEmailChangeLinkOwner,
 } from './auth-request-policy';
 import { mcpOAuthBeforeHook } from './mcp-oauth-hooks';
+import {
+  beforeSessionCreate,
+  handleSessionBeforeHook,
+  recordSignInEvents,
+} from './auth-session-hooks';
 import { assertMembershipRouteAllowed } from './membership-route-policy';
 import { mapMicrosoftProfileToUser } from './microsoft-email';
 import { assertMicrosoftSignUpVerified } from './microsoft-sign-up-policy';
@@ -314,62 +319,7 @@ export const auth = betterAuth({
     },
     session: {
       create: {
-        before: async (session) => {
-          const isDev = process.env.NODE_ENV === 'development';
-          if (isDev) {
-            console.log(
-              '[Better Auth] Session creation hook called for user:',
-              session.userId,
-            );
-          }
-          try {
-            const userOrganization = await db.organization.findFirst({
-              where: {
-                members: {
-                  some: {
-                    userId: session.userId,
-                  },
-                },
-              },
-              orderBy: {
-                createdAt: 'desc',
-              },
-              select: {
-                id: true,
-                name: true,
-              },
-            });
-
-            if (userOrganization) {
-              if (isDev) {
-                console.log(
-                  `[Better Auth] Setting activeOrganizationId to ${userOrganization.id} (${userOrganization.name}) for user ${session.userId}`,
-                );
-              }
-              return {
-                data: {
-                  ...session,
-                  activeOrganizationId: userOrganization.id,
-                },
-              };
-            } else {
-              if (isDev) {
-                console.log(
-                  `[Better Auth] No organization found for user ${session.userId}`,
-                );
-              }
-              return {
-                data: session,
-              };
-            }
-          } catch (error) {
-            // Always log errors, even in production
-            console.error('[Better Auth] Session creation hook error:', error);
-            return {
-              data: session,
-            };
-          }
-        },
+        before: (session, context) => beforeSessionCreate(session, context),
       },
     },
   },
@@ -378,9 +328,11 @@ export const auth = betterAuth({
       assertMembershipRouteAllowed(ctx.path);
       assertAuthRequestAllowed({ path: ctx.path, body: ctx.body });
       await assertEmailChangeLinkOwner(ctx);
+      await handleSessionBeforeHook(ctx);
       return mcpOAuthBeforeHook(ctx);
     }),
     after: createAuthMiddleware(async (ctx) => {
+      await recordSignInEvents(ctx);
       if (!ctx.path.startsWith('/admin/')) return;
 
       const session = ctx.context?.session;
@@ -586,6 +538,10 @@ export const auth = betterAuth({
   },
   session: {
     modelName: 'Session',
+    additionalFields: {
+      // Set by beforeSessionCreate; enforced against Organization.allowedSignInMethods
+      signInMethod: { type: 'string', required: false, input: false },
+    },
   },
   account: {
     modelName: 'Account',

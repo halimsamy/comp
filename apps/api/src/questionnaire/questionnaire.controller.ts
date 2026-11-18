@@ -54,6 +54,7 @@ import {
 } from '@/vector-store/lib';
 import { generateAnswerFromContent } from '@/trigger/questionnaire/answer-question-helpers';
 import { TrustAccessService } from '../trust-portal/trust-access.service';
+import { ExternalQuestionnaireReviewService } from './external-review.service';
 import {
   createSafeSSESender,
   setupSSEHeaders,
@@ -73,6 +74,7 @@ export class QuestionnaireController {
   constructor(
     private readonly questionnaireService: QuestionnaireService,
     private readonly trustAccessService: TrustAccessService,
+    private readonly externalReview: ExternalQuestionnaireReviewService,
   ) {}
 
   @Get()
@@ -498,7 +500,7 @@ export class QuestionnaireController {
       format?: 'pdf' | 'csv' | 'xlsx';
     },
     @Res({ passthrough: true }) res: Response,
-  ): Promise<void> {
+  ): Promise<void | { status: 'pending_review'; message: string }> {
     if (!file) {
       throw new BadRequestException('file is required');
     }
@@ -532,6 +534,25 @@ export class QuestionnaireController {
       source: 'external', // Always external for token-based access
       exportInAllExtensions: true, // Export in all formats (PDF, CSV, XLSX) as ZIP
     };
+
+    // AI answers are held for an admin to approve before they leave the org.
+    if (await this.externalReview.requiresReview(organizationId)) {
+      const requesterEmail =
+        await this.externalReview.getRequesterEmail(token);
+      await this.questionnaireService.autoAnswerAndExport(dto, {
+        review: { requesterEmail },
+      });
+      await this.externalReview.notifyReviewers({
+        organizationId,
+        requesterEmail,
+      });
+      res.status(202);
+      return {
+        status: 'pending_review',
+        message:
+          'Thanks. Your questionnaire was received and the answers are being reviewed. They will be emailed to you once approved.',
+      };
+    }
 
     const result = await this.questionnaireService.autoAnswerAndExport(dto);
 

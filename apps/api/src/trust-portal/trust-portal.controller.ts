@@ -452,12 +452,16 @@ export class TrustPortalController {
   @ApiBody({
     schema: {
       type: 'object',
-      required: ['enabled'],
       properties: {
         enabled: {
           type: 'boolean',
           description:
             'When false, the Security Questionnaire is hidden from the public trust portal.',
+        },
+        requiresReview: {
+          type: 'boolean',
+          description:
+            'When true, AI answers are held until an admin approves them, then emailed to the visitor.',
         },
       },
     },
@@ -470,6 +474,7 @@ export class TrustPortalController {
     return this.trustPortalService.updateSecurityQuestionnaireEnabled(
       organizationId,
       body.enabled,
+      body.requiresReview,
     );
   }
 

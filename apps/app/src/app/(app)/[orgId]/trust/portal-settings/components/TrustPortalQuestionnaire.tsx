@@ -5,6 +5,7 @@ import { useTrustPortalSettings } from '@/hooks/use-trust-portal-settings';
 import { View, ViewOff } from '@trycompai/design-system/icons';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { QuestionnaireReviewSetting } from './QuestionnaireReviewSetting';
 
 interface TrustPortalQuestionnaireProps {
   initialEnabled: boolean;
@@ -88,11 +89,13 @@ export function TrustPortalQuestionnaire({ initialEnabled, orgId }: TrustPortalQ
           receive AI-assisted answers drawn from your policy library.
         </p>
         <p className="text-sm text-muted-foreground">
-          Hide it if you'd rather review answers before they reach customers — hiding removes the
-          questionnaire button from your trust portal and the questionnaire tab from the access
-          area, so questionnaires can no longer be started from the portal.
+          Hidden by default. Hiding removes the questionnaire button from your trust portal and the
+          questionnaire tab from the access area, so questionnaires can no longer be started from
+          the portal.
         </p>
       </div>
+
+      <QuestionnaireReviewSetting canUpdate={canUpdate} />
     </div>
   );
 }

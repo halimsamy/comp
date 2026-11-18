@@ -30,6 +30,7 @@ import { QuestionnaireService } from './questionnaire.service';
 import { HybridAuthGuard } from '../auth/hybrid-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
 import { TrustAccessService } from '../trust-portal/trust-access.service';
+import { ExternalQuestionnaireReviewService } from './external-review.service';
 import type { AuthContext } from '../auth/types';
 
 describe('QuestionnaireController', () => {
@@ -55,6 +56,12 @@ describe('QuestionnaireController', () => {
     isSecurityQuestionnaireEnabledForOrganization: jest.fn(),
   };
 
+  const mockExternalReview = {
+    requiresReview: jest.fn().mockResolvedValue(false),
+    getRequesterEmail: jest.fn().mockResolvedValue('buyer@example.com'),
+    notifyReviewers: jest.fn().mockResolvedValue(undefined),
+  };
+
   const mockGuard = { canActivate: jest.fn().mockReturnValue(true) };
 
   const mockAuthContext: AuthContext = {
@@ -73,6 +80,7 @@ describe('QuestionnaireController', () => {
       providers: [
         { provide: QuestionnaireService, useValue: mockService },
         { provide: TrustAccessService, useValue: mockTrustAccessService },
+        { provide: ExternalQuestionnaireReviewService, useValue: mockExternalReview },
       ],
     })
       .overrideGuard(HybridAuthGuard)
@@ -359,7 +367,43 @@ describe('QuestionnaireController', () => {
     const mockRes = {
       setHeader: jest.fn(),
       send: jest.fn(),
+      status: jest.fn(),
     } as unknown as import('express').Response;
+
+    it('holds AI answers for admin review when the org requires it', async () => {
+      mockTrustAccessService.validateAccessTokenAndGetOrganizationId.mockResolvedValue(
+        'org_1',
+      );
+      mockTrustAccessService.isSecurityQuestionnaireEnabledForOrganization.mockResolvedValue(
+        true,
+      );
+      mockExternalReview.requiresReview.mockResolvedValueOnce(true);
+      mockService.autoAnswerAndExport.mockResolvedValue({
+        mimeType: 'application/zip',
+        filename: 'export.zip',
+        fileBuffer: Buffer.from('zip-contents'),
+        questionsAndAnswers: [],
+      });
+
+      const result = await controller.parseQuestionnaireUploadByToken(
+        mockFile,
+        'token_123',
+        {},
+        mockRes,
+      );
+
+      expect(service.autoAnswerAndExport).toHaveBeenCalledWith(
+        expect.objectContaining({ organizationId: 'org_1', source: 'external' }),
+        { review: { requesterEmail: 'buyer@example.com' } },
+      );
+      expect(mockExternalReview.notifyReviewers).toHaveBeenCalledWith({
+        organizationId: 'org_1',
+        requesterEmail: 'buyer@example.com',
+      });
+      expect(mockRes.status).toHaveBeenCalledWith(202);
+      expect(mockRes.send).not.toHaveBeenCalled();
+      expect(result).toMatchObject({ status: 'pending_review' });
+    });
 
     it('should throw ForbiddenException when the org disabled the security questionnaire', async () => {
       mockTrustAccessService.validateAccessTokenAndGetOrganizationId.mockResolvedValue(

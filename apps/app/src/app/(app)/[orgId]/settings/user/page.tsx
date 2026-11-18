@@ -22,6 +22,7 @@ export default async function UserSettings({
         unassignedItemsNotifications: boolean;
         taskMentions: boolean;
         taskAssignments: boolean;
+        digestFrequency?: 'daily' | 'weekly';
       };
       isAdminOrOwner: boolean;
       roleNotifications: {

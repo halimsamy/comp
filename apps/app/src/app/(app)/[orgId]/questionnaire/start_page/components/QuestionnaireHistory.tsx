@@ -384,6 +384,11 @@ function QuestionnaireHistoryItem({
                           Dashboard
                         </Badge>
                       )}
+                      {questionnaire.reviewStatus === 'pending_review' && (
+                        <Badge className="px-2 py-0.5 text-[10px] font-medium bg-amber-400/10 text-amber-700 dark:text-amber-400 ring-1 ring-amber-500/20">
+                          Needs review
+                        </Badge>
+                      )}
                     </>
                   )}
                 </div>

@@ -75,11 +75,11 @@ describe('TrustAccessService.getPublicSecurityQuestionnaireEnabled', () => {
     ).resolves.toBe(true);
   });
 
-  it('defaults to enabled when the portal cannot be resolved', async () => {
+  it('defaults to disabled when the portal cannot be resolved', async () => {
     mockDb.trust.findFirst.mockResolvedValue(null);
 
     await expect(
       service.getPublicSecurityQuestionnaireEnabled('unknown'),
-    ).resolves.toBe(true);
+    ).resolves.toBe(false);
   });
 });

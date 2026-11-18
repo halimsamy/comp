@@ -212,6 +212,17 @@ export function useTrustPortalSettings() {
     [api],
   );
 
+  const updateSecurityQuestionnaireRequiresReview = useCallback(
+    async (requiresReview: boolean) => {
+      const response = await api.put('/v1/trust-portal/settings/security-questionnaire', {
+        requiresReview,
+      });
+      if (response.error) throw new Error(response.error);
+      return response.data;
+    },
+    [api],
+  );
+
   const updateVendorTrustSettings = useCallback(
     async (vendorId: string, data: VendorTrustSettingsData) => {
       const response = await api.post(`/v1/trust-portal/vendors/${vendorId}/trust-settings`, data);
@@ -301,6 +312,7 @@ export function useTrustPortalSettings() {
     removeCustomFrameworkBadge,
     saveOverview,
     updateSecurityQuestionnaireEnabled,
+    updateSecurityQuestionnaireRequiresReview,
     updateVendorTrustSettings,
     updateAllowedDomains,
     updateAllowedEmails,

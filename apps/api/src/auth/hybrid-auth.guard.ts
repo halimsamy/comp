@@ -12,6 +12,7 @@ import { db } from '@db';
 import { ApiKeyService } from './api-key.service';
 import { hasAppAccess } from './app-access';
 import { auth } from './auth.server';
+import { enforceSessionPolicy } from './idle-session';
 import { IS_PUBLIC_KEY } from './public.decorator';
 import { SKIP_ORG_CHECK_KEY } from './skip-org-check.decorator';
 import { resolveServiceByToken } from './service-token.config';
@@ -225,6 +226,12 @@ export class HybridAuthGuard implements CanActivate {
             id: true,
             role: true,
             department: true,
+            organization: {
+              select: {
+                sessionIdleTimeoutMinutes: true,
+                allowedSignInMethods: true,
+              },
+            },
           },
         });
 
@@ -233,6 +240,12 @@ export class HybridAuthGuard implements CanActivate {
             `User is not a member of the active organization`,
           );
         }
+
+        await enforceSessionPolicy({
+          session: { ...sessionData, userId: user.id },
+          organizationId,
+          policy: member.organization,
+        });
 
         userRoles = member.role ? member.role.split(',') : null;
         request.memberId = member.id;

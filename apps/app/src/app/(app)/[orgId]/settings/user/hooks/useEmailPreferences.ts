@@ -3,6 +3,8 @@
 import { apiClient } from '@/lib/api-client';
 import useSWR from 'swr';
 
+export type DigestFrequency = 'daily' | 'weekly';
+
 interface EmailPreferences {
   policyNotifications: boolean;
   taskReminders: boolean;
@@ -10,6 +12,7 @@ interface EmailPreferences {
   unassignedItemsNotifications: boolean;
   taskMentions: boolean;
   taskAssignments: boolean;
+  digestFrequency?: DigestFrequency;
 }
 
 export const emailPreferencesKey = () =>
