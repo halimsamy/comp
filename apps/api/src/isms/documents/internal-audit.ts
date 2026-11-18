@@ -62,7 +62,7 @@ export function auditValidationMessages({
 }
 
 /**
- * Seed the fifteen default Controls Tested rows for an audit, idempotently by
+ * Seed the sixteen default Controls Tested rows for an audit, idempotently by
  * `controlKey`. Only creates seed rows that are missing — it NEVER deletes or
  * overwrites, so re-running can never clobber the customer's edits, results,
  * or notes (same guarantee as seedMetricsIfMissing). Called when an audit

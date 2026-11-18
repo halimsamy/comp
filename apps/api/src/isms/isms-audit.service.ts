@@ -21,7 +21,7 @@ import type {
 /**
  * CRUD for the Internal Audit instances register (clause 9.2, CS-724). Every
  * audit is customer-created; scope and criteria pre-fill with the template
- * defaults, the reference is server-generated ("IA-YYYY-NN"), and the fifteen
+ * defaults, the reference is server-generated ("IA-YYYY-NN"), and the sixteen
  * default Controls Tested rows are seeded in the same transaction. Deleting an
  * audit cascades to its control rows and findings.
  */

@@ -84,7 +84,7 @@ describe('IsmsAuditService', () => {
       });
     });
 
-    it('seeds the fifteen default Controls Tested rows in the same transaction', async () => {
+    it('seeds the sixteen default Controls Tested rows in the same transaction', async () => {
       (mockDb.ismsDocument.findFirst as jest.Mock).mockResolvedValue({
         id: 'doc_1',
       });
@@ -97,7 +97,7 @@ describe('IsmsAuditService', () => {
 
       const { data } = (mockDb.ismsAuditControl.createMany as jest.Mock).mock
         .calls[0][0];
-      expect(data).toHaveLength(15);
+      expect(data).toHaveLength(16);
       expect(data[0]).toMatchObject({ auditId: 'aud_1', documentId: 'doc_1' });
     });
 

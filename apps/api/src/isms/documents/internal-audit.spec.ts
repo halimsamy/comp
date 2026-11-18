@@ -119,7 +119,7 @@ describe('seedAuditControlsIfMissing', () => {
     return tx as unknown as Prisma.TransactionClient & typeof tx;
   };
 
-  it('seeds all fifteen defaults into a new audit', async () => {
+  it('seeds all sixteen defaults into a new audit', async () => {
     const tx = makeTx([]);
     await seedAuditControlsIfMissing({
       tx,
@@ -131,7 +131,7 @@ describe('seedAuditControlsIfMissing', () => {
       tx.ismsAuditControl.createMany as jest.Mock
     ).mock.calls[0][0];
     expect(skipDuplicates).toBe(true);
-    expect(data).toHaveLength(15);
+    expect(data).toHaveLength(16);
     expect(data.map((row: { controlKey: string }) => row.controlKey)).toEqual(
       SEED_AUDIT_CONTROL_DEFINITIONS.map((control) => control.controlKey),
     );
@@ -159,7 +159,7 @@ describe('seedAuditControlsIfMissing', () => {
 
     const { data } = (tx.ismsAuditControl.createMany as jest.Mock).mock
       .calls[0][0];
-    expect(data).toHaveLength(14);
+    expect(data).toHaveLength(15);
     expect(
       data.map((row: { controlKey: string }) => row.controlKey),
     ).not.toContain('clause_4_1_context');

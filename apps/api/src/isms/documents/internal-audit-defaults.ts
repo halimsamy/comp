@@ -38,7 +38,7 @@ export function conclusionSentence(verdict: string): string {
 }
 
 /**
- * The fifteen default Controls Tested rows seeded per audit, covering the
+ * The sixteen default Controls Tested rows seeded per audit, covering the
  * most-probed management-system clauses and high-impact Annex A controls.
  * "Where to find it" entries begin with "Comp AI" to signal the default
  * location; the customer overwrites the field when evidence lives elsewhere.
@@ -155,6 +155,14 @@ export const SEED_AUDIT_CONTROL_DEFINITIONS: SeedAuditControlDefinition[] = [
     whatWasTested:
       'Whether rules for the effective use of cryptography are defined and applied.',
     whereToFind: 'Comp AI > Policies > Encryption & Crypto Controls',
+  },
+  {
+    controlKey: 'a_8_34_audit_testing',
+    controlRef: 'A.8.34 Protection during audit testing',
+    whatWasTested:
+      'Whether audit tests on operational systems are planned and agreed with management, with read-only access where possible.',
+    whereToFind:
+      'Comp AI > ISMS > Internal Audit (plan) + Comp AI > Documents > Access Request form',
   },
 ];
 
