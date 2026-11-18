@@ -16,6 +16,7 @@ import {
   Impact,
   RiskTreatmentType,
 } from '@db';
+import { VendorTpspFieldsDto } from './vendor-tpsp-fields.dto';
 
 /**
  * DTO for PATCH /vendors/:id
@@ -26,7 +27,7 @@ import {
  * `description: ""` (common for vendors created during onboarding) should
  * not cause a 400.
  */
-export class UpdateVendorDto {
+export class UpdateVendorDto extends VendorTpspFieldsDto {
   @ApiPropertyOptional({ description: 'Vendor name' })
   @IsOptional()
   @IsString()

@@ -12,6 +12,9 @@ import type {
   Prisma,
   RiskTreatmentType,
   TaskStatus,
+  VendorAssuranceType,
+  VendorCriticality,
+  VendorPciStatus,
 } from '@db';
 
 export interface VendorLinkedTask {
@@ -34,7 +37,8 @@ export interface VendorAssignee {
   };
 }
 
-export interface Vendor {
+// TPSP fields are optional so fixtures and older payloads stay valid.
+export interface Vendor extends Partial<VendorTpspFields>, Partial<VendorComplianceSummary> {
   id: string;
   name: string;
   description: string;
@@ -55,6 +59,45 @@ export interface Vendor {
   createdAt: string;
   updatedAt: string;
 }
+
+export type VendorReviewStatus = 'never_reviewed' | 'overdue' | 'due_soon' | 'current';
+
+export interface ResponsibilityMatrixRow {
+  requirement: string;
+  owner: 'tpsp' | 'entity' | 'shared';
+  notes?: string | null;
+}
+
+/** Third-party service provider profile (ISO 27001 A.5.19-A.5.22, PCI DSS 12.8). */
+export interface VendorTpspFields {
+  criticality: VendorCriticality | null;
+  handlesCardholderData: boolean;
+  affectsCdeSecurity: boolean;
+  dataTypes: string[];
+  contractStartDate: string | null;
+  contractEndDate: string | null;
+  securityClausesConfirmed: boolean;
+  confidentialityClausesConfirmed: boolean;
+  tpspAcknowledgementDate: string | null;
+  responsibilityMatrix: ResponsibilityMatrixRow[] | null;
+  assuranceType: VendorAssuranceType | null;
+  assurancePeriodStart: string | null;
+  assurancePeriodEnd: string | null;
+  assuranceExpiresAt: string | null;
+  pciStatus: VendorPciStatus | null;
+  pciStatusCheckedAt: string | null;
+  lastReviewedAt: string | null;
+  nextReviewDue: string | null;
+}
+
+/** Server-computed review / document state on list and detail responses. */
+export interface VendorComplianceSummary {
+  reviewStatus: VendorReviewStatus;
+  nextDocumentExpiry: string | null;
+  expiringDocumentsCount: number;
+}
+
+export type UpdateVendorTpspData = Partial<Omit<VendorTpspFields, 'lastReviewedAt'>>;
 
 export interface VendorsResponse {
   data: Vendor[];
@@ -79,7 +122,7 @@ interface CreateVendorData {
   assigneeId?: string;
 }
 
-interface UpdateVendorData {
+interface UpdateVendorData extends UpdateVendorTpspData {
   name?: string;
   description?: string;
   category?: VendorCategory;

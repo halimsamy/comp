@@ -13,6 +13,11 @@ import type { TriggerVendorRiskAssessmentVendorDto } from './dto/trigger-vendor-
 import { resolveTaskCreatorAndAssignee } from '../trigger/vendor/vendor-risk-assessment/assignee';
 import { resolveStrategyDescriptionUpdate } from '../risks/strategy-descriptions';
 import { isMemberOrgParticipant } from '../utils/org-participation';
+import { vendorComplianceSummary } from './tpsp/vendor-review-status';
+import {
+  responsibilityMatrixUpdate,
+  tpspDateUpdate,
+} from './tpsp/vendor-tpsp-update';
 
 const normalizeWebsite = (
   website: string | null | undefined,
@@ -113,13 +118,18 @@ export class VendorsService {
           // reflects treatment progress, not just the static residual
           // probability/impact. Mirrors the risks service.
           tasks: { select: { id: true, status: true } },
+          documents: { select: { expiresAt: true } },
         },
       });
 
       this.logger.log(
         `Retrieved ${vendors.length} vendors for organization ${organizationId}`,
       );
-      return vendors;
+      const now = new Date();
+      return vendors.map((vendor) => {
+        const { documents, ...vendorFields } = vendor;
+        return { ...vendorFields, ...vendorComplianceSummary({ vendor, now }) };
+      });
     } catch (error) {
       this.logger.error(
         `Failed to retrieve vendors for organization ${organizationId}:`,
@@ -157,6 +167,7 @@ export class VendorsService {
               controls: { select: { id: true, name: true } },
             },
           },
+          documents: { select: { expiresAt: true } },
         },
       });
 
@@ -199,8 +210,10 @@ export class VendorsService {
       }
 
       // Merge GlobalVendors risk assessment data into response
+      const { documents, ...vendorFields } = vendor;
       const vendorWithRiskAssessment = {
-        ...vendor,
+        ...vendorFields,
+        ...vendorComplianceSummary({ vendor }),
         riskAssessmentData: globalVendorData?.riskAssessmentData ?? null,
         riskAssessmentVersion: globalVendorData?.riskAssessmentVersion ?? null,
         riskAssessmentUpdatedAt:
@@ -650,9 +663,15 @@ export class VendorsService {
         updateVendorDto,
       );
 
+      const { responsibilityMatrix, ...vendorFields } = updateVendorDto;
       const updatedVendor = await db.vendor.update({
         where: { id },
-        data: { ...updateVendorDto, ...resolvedStrategyFields },
+        data: {
+          ...vendorFields,
+          ...tpspDateUpdate(vendorFields),
+          ...responsibilityMatrixUpdate(responsibilityMatrix),
+          ...resolvedStrategyFields,
+        },
       });
 
       this.logger.log(`Updated vendor: ${updatedVendor.name} (${id})`);

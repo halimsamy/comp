@@ -54,6 +54,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { useOnboardingStatus } from '../hooks/use-onboarding-status';
 import { VendorOnboardingProvider, useVendorOnboardingStatus } from './vendor-onboarding-context';
+import { DEFAULT_TPSP_FILTERS, matchesTpspFilters } from '../../lib/vendor-tpsp';
+import { VendorCriticalityCell, VendorReviewCell, VendorTpspFilters } from './VendorTpspFilters';
 
 export type VendorRow = Vendor & {
   isPending?: boolean;
@@ -210,6 +212,7 @@ export function VendorsTable({
 
   // Local state for search, sorting, and pagination
   const [searchQuery, setSearchQuery] = useState('');
+  const [tpspFilters, setTpspFilters] = useState(DEFAULT_TPSP_FILTERS);
   const [sort, setSort] = useState<{
     id: 'name' | 'updatedAt' | 'inherentRisk' | 'residualRisk';
     desc: boolean;
@@ -354,7 +357,7 @@ export function VendorsTable({
   // Reset to page 1 when search changes
   useEffect(() => {
     setPage(1);
-  }, [searchQuery]);
+  }, [searchQuery, tpspFilters]);
 
   // Client-side filtering and sorting
   const filteredAndSortedVendors = useMemo(() => {
@@ -365,6 +368,7 @@ export function VendorsTable({
       const query = searchQuery.toLowerCase();
       result = result.filter((vendor) => vendor.name.toLowerCase().includes(query));
     }
+    result = result.filter((vendor) => matchesTpspFilters({ vendor, filters: tpspFilters }));
 
     // Sort
     result.sort((a, b) => {
@@ -402,7 +406,7 @@ export function VendorsTable({
     });
 
     return result;
-  }, [mergedVendors, searchQuery, sort]);
+  }, [mergedVendors, searchQuery, sort, tpspFilters]);
 
   // Calculate pageCount from filtered data and paginate
   const filteredPageCount = Math.max(
@@ -515,18 +519,21 @@ export function VendorsTable({
   return (
     <VendorOnboardingProvider statuses={itemStatuses}>
       <Stack gap="4">
-        {/* Search Bar */}
-        <div className="w-full md:max-w-[300px]">
-          <InputGroup>
-            <InputGroupAddon>
-              <Search size={16} />
-            </InputGroupAddon>
-            <InputGroupInput
-              placeholder="Search vendors..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </InputGroup>
+        {/* Search Bar + TPSP filters */}
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+          <div className="w-full md:max-w-[300px]">
+            <InputGroup>
+              <InputGroupAddon>
+                <Search size={16} />
+              </InputGroupAddon>
+              <InputGroupInput
+                placeholder="Search vendors..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </InputGroup>
+          </div>
+          <VendorTpspFilters filters={tpspFilters} onChange={setTpspFilters} />
         </div>
 
         {/* Onboarding Progress Banner */}
@@ -618,6 +625,8 @@ export function VendorsTable({
                     {getSortIcon('residualRisk')}
                   </button>
                 </TableHead>
+                <TableHead>CRITICALITY</TableHead>
+                <TableHead>REVIEW</TableHead>
                 <TableHead>CATEGORY</TableHead>
                 <TableHead>OWNER</TableHead>
                 {hasPermission('vendor', 'delete') && <TableHead>ACTIONS</TableHead>}
@@ -660,6 +669,12 @@ export function VendorsTable({
                         // can't reflect mid-treatment progress.
                         <RiskScoreBadge score={currentVendorSeverityScore(vendor)} />
                       )}
+                    </TableCell>
+                    <TableCell>
+                      <VendorCriticalityCell vendor={vendor} />
+                    </TableCell>
+                    <TableCell>
+                      <VendorReviewCell vendor={vendor} />
                     </TableCell>
                     <TableCell>
                       <Badge variant="secondary">

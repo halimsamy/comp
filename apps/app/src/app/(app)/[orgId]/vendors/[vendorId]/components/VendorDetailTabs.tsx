@@ -18,6 +18,9 @@ import { VendorResearchBadges, VendorResearchLinks } from './VendorResearchSecti
 import { VendorResearchFeed } from './VendorResearchFeed';
 import { VendorInherentRiskChart } from './VendorInherentRiskChart';
 import { VendorResidualRiskChart } from './VendorResidualRiskChart';
+import { VendorDocumentsTab } from './tpsp/VendorDocumentsTab';
+import { VendorReviewsTab } from './tpsp/VendorReviewsTab';
+import { VendorTpspProfile } from './tpsp/VendorTpspProfile';
 import { ResidualAcceptanceCard } from '@/components/risks/acceptance/ResidualAcceptanceCard';
 import { TreatmentPlanTab } from '@/components/risks/treatment-plan/TreatmentPlanTab';
 import type { Member, RiskTreatmentType, User, Vendor } from '@db';
@@ -481,20 +484,40 @@ export function VendorDetailTabs({
       ) : (
         <Tabs value={activeTab} onValueChange={(next) => void setActiveTab(String(next))}>
           <Stack gap="lg">
-            <TabsList variant="underline">
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="treatment-plan">Treatment Plan</TabsTrigger>
-              <TabsTrigger value="risk-matrix">Risk Matrix</TabsTrigger>
-              <TabsTrigger value="risk-assessment">Risk Assessment</TabsTrigger>
-              <TabsTrigger value="tasks">Tasks</TabsTrigger>
-              <TabsTrigger value="comments">Comments</TabsTrigger>
-              <TabsTrigger value="activity">Activity</TabsTrigger>
-              <TabsTrigger value="settings">Settings</TabsTrigger>
-            </TabsList>
+            {/* 10 tabs: scroll horizontally on phones instead of overflowing the page */}
+            <div className="max-w-full overflow-x-auto">
+              <TabsList variant="underline">
+                <TabsTrigger value="overview">Overview</TabsTrigger>
+                <TabsTrigger value="documents">Documents</TabsTrigger>
+                <TabsTrigger value="reviews">Reviews</TabsTrigger>
+                <TabsTrigger value="treatment-plan">Treatment Plan</TabsTrigger>
+                <TabsTrigger value="risk-matrix">Risk Matrix</TabsTrigger>
+                <TabsTrigger value="risk-assessment">Risk Assessment</TabsTrigger>
+                <TabsTrigger value="tasks">Tasks</TabsTrigger>
+                <TabsTrigger value="comments">Comments</TabsTrigger>
+                <TabsTrigger value="activity">Activity</TabsTrigger>
+                <TabsTrigger value="settings">Settings</TabsTrigger>
+              </TabsList>
+            </div>
 
             {activeTab === 'overview' && (
               <TabsContent value="overview">
-                <SecondaryFields vendor={resolvedVendor} assignees={assignees} onUpdate={refreshVendor} />
+                <Stack gap="lg">
+                  <VendorTpspProfile vendorId={vendorId} canUpdate={canUpdate} />
+                  <SecondaryFields vendor={resolvedVendor} assignees={assignees} onUpdate={refreshVendor} />
+                </Stack>
+              </TabsContent>
+            )}
+
+            {activeTab === 'documents' && (
+              <TabsContent value="documents">
+                <VendorDocumentsTab vendorId={vendorId} canUpdate={canUpdate} />
+              </TabsContent>
+            )}
+
+            {activeTab === 'reviews' && (
+              <TabsContent value="reviews">
+                <VendorReviewsTab vendorId={vendorId} canUpdate={canUpdate} />
               </TabsContent>
             )}
 

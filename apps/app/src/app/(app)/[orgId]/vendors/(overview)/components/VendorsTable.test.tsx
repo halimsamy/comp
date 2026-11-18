@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   setMockPermissions,
@@ -111,6 +111,11 @@ vi.mock('@trycompai/design-system', () => ({
   TableHeader: ({ children }: any) => <thead>{children}</thead>,
   TableRow: ({ children, ...props }: any) => <tr {...props}>{children}</tr>,
   Text: ({ children }: any) => <span>{children}</span>,
+  Select: ({ children }: any) => <div>{children}</div>,
+  SelectContent: ({ children }: any) => <div>{children}</div>,
+  SelectItem: ({ children }: any) => <div>{children}</div>,
+  SelectTrigger: ({ children }: any) => <div>{children}</div>,
+  SelectValue: ({ children }: any) => <span>{children}</span>,
 }));
 
 // Mock design system icons
@@ -118,6 +123,7 @@ vi.mock('@trycompai/design-system/icons', () => ({
   OverflowMenuVertical: () => <span data-testid="overflow-icon" />,
   Search: () => <span data-testid="search-icon" />,
   TrashCan: () => <span data-testid="trash-icon" />,
+  WarningAlt: () => <span data-testid="warning-icon" />,
 }));
 
 import { VendorsTable } from './VendorsTable';
@@ -133,6 +139,7 @@ const mockVendors: any[] = [
     inherentImpact: 'moderate',
     residualProbability: 'unlikely',
     residualImpact: 'minor',
+    treatmentStrategy: 'mitigate',
     website: null,
     isSubProcessor: false,
     logoUrl: null,
@@ -254,10 +261,10 @@ describe('VendorsTable', () => {
     // Column header
     expect(screen.getByText('INHERENT RISK')).toBeInTheDocument();
     // Acme Corp (possible × moderate) → raw 9 → score 4/10
-    expect(screen.getByText('4/10')).toBeInTheDocument();
+    expect(screen.getAllByText('4/10').length).toBeGreaterThan(0);
   });
 
-  it('renders the RESIDUAL RISK column immediately after INHERENT RISK', () => {
+  it('renders the CURRENT RISK column immediately after INHERENT RISK', () => {
     setMockPermissions({});
 
     render(
@@ -268,18 +275,18 @@ describe('VendorsTable', () => {
       />,
     );
 
-    expect(screen.getByText('RESIDUAL RISK')).toBeInTheDocument();
+    expect(screen.getByText('CURRENT RISK')).toBeInTheDocument();
 
     const headers = screen
       .getAllByRole('columnheader')
       .map((h) => (h.textContent || '').toUpperCase());
     const inherentIdx = headers.findIndex((h) => h.includes('INHERENT RISK'));
-    const residualIdx = headers.findIndex((h) => h.includes('RESIDUAL RISK'));
+    const residualIdx = headers.findIndex((h) => h.includes('CURRENT RISK'));
     expect(inherentIdx).toBeGreaterThanOrEqual(0);
     expect(residualIdx).toBe(inherentIdx + 1);
   });
 
-  it('renders a residual score badge for assessed vendors', () => {
+  it('shows current risk equal to inherent when no treatment work is linked', () => {
     setMockPermissions({});
 
     render(
@@ -290,8 +297,8 @@ describe('VendorsTable', () => {
       />,
     );
 
-    // Acme Corp residual (unlikely × minor) → raw 4 → score 2/10
-    expect(screen.getByText('2/10')).toBeInTheDocument();
+    // No linked tasks → no treatment progress → current = inherent (4/10).
+    expect(screen.getAllByText('4/10')).toHaveLength(2);
   });
 
   it('shows an em-dash for vendors that have not been assessed', () => {
@@ -315,5 +322,32 @@ describe('VendorsTable', () => {
     // One em-dash per risk column (inherent + residual) for not_assessed vendors.
     expect(screen.getAllByText('—').length).toBe(2);
     expect(screen.queryByText('1/10')).not.toBeInTheDocument();
+  });
+
+  it('renders criticality and review status with expiring documents', () => {
+    setMockPermissions({});
+
+    render(
+      <VendorsTable
+        vendors={[
+          {
+            ...mockVendors[0],
+            status: 'not_assessed',
+            criticality: 'critical',
+            reviewStatus: 'overdue',
+            expiringDocumentsCount: 2,
+          },
+        ]}
+        assignees={mockAssignees}
+        orgId="org-1"
+      />,
+    );
+
+    expect(screen.getByText('CRITICALITY')).toBeInTheDocument();
+    expect(screen.getByText('REVIEW')).toBeInTheDocument();
+    const row = screen.getAllByRole('row')[1];
+    expect(within(row).getByText('Critical')).toBeInTheDocument();
+    expect(within(row).getByText('Overdue')).toBeInTheDocument();
+    expect(within(row).getByText('2 expiring docs')).toBeInTheDocument();
   });
 });
