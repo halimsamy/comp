@@ -7,6 +7,10 @@ import {
 } from './run-org-integration-checks';
 import { runDeviceSync } from './run-device-sync';
 import { isCheckDisabledForTask } from '../../integration-platform/utils/disabled-task-checks';
+import {
+  mappingAppliesTo,
+  templatesForMapping,
+} from '../../integration-platform/utils/task-template-successors';
 import { isDueToday } from '../shared/is-due-today';
 
 /**
@@ -201,9 +205,9 @@ export const integrationChecksSchedule = schedules.task({
       }
 
       // Get task template IDs that this integration's checks map to
-      const taskTemplateIds = checks
-        .map((c) => c.taskMapping)
-        .filter((id): id is string => !!id);
+      const taskTemplateIds = checks.flatMap((c) =>
+        c.taskMapping ? templatesForMapping(c.taskMapping) : [],
+      );
 
       if (taskTemplateIds.length === 0) {
         continue;
@@ -244,7 +248,7 @@ export const integrationChecksSchedule = schedules.task({
         const checksForTask = checks
           .filter(
             (c) =>
-              c.taskMapping === t.taskTemplateId &&
+              mappingAppliesTo({ mapping: c.taskMapping, templateId: t.taskTemplateId }) &&
               !isCheckDisabledForTask(connection.metadata, t.id, c.id),
           )
           .map((c) => c.id);
