@@ -92,6 +92,9 @@ export function FrameworksOverview({
   const complianceMap = new Map(
     frameworksWithCompliance?.map((f) => [f.frameworkInstance.id, f.complianceScore]) ?? [],
   );
+  const controlsMap = new Map(
+    frameworksWithCompliance?.map((f) => [f.frameworkInstance.id, f]) ?? [],
+  );
 
   const availableFrameworksToAdd = allFrameworks.filter(
     (framework) =>
@@ -124,6 +127,11 @@ export function FrameworksOverview({
             <div className="space-y-0 pr-4">
               {frameworksWithControls.map((framework, index) => {
                 const complianceScore = complianceMap.get(framework.id) ?? 0;
+                const scoreEntry = controlsMap.get(framework.id);
+                const controlsLabel =
+                  scoreEntry?.controlsTotal !== undefined
+                    ? ` · ${scoreEntry.controlsComplete ?? 0}/${scoreEntry.controlsTotal} controls`
+                    : '';
                 const badgeSrc = mapFrameworkToBadge(framework);
                 const displayName =
                   framework.framework?.name ??
@@ -178,7 +186,7 @@ export function FrameworksOverview({
                                 />
                               </div>
                               <span className="text-xs text-muted-foreground tabular-nums text-right mt-1">
-                                {Math.round(complianceScore)}% compliant
+                                {Math.round(complianceScore)}% compliant{controlsLabel}
                               </span>
                             </div>
                           </div>

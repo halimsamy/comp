@@ -9,6 +9,7 @@ import { redirect } from 'next/navigation';
 import { RequirementControls } from './components/RequirementControls';
 import { AddCustomControlSheet } from './components/AddCustomControlSheet';
 import { LinkExistingControlSheet } from './components/LinkExistingControlSheet';
+import { RequirementApplicabilityCard } from './components/RequirementApplicabilityCard';
 
 interface PageProps {
   params: Promise<{
@@ -80,10 +81,19 @@ export default async function RequirementPage({ params }: PageProps) {
           />
         </PageHeaderActions>
       </PageHeader>
+      {reqData.applicabilityRules ? (
+        <RequirementApplicabilityCard
+          orgId={organizationId}
+          frameworkInstanceId={frameworkInstanceId}
+          requirementKey={requirementKey}
+          record={reqData.applicability ?? null}
+          rules={reqData.applicabilityRules}
+        />
+      ) : null}
       <RequirementControls
-        tasks={reqData.tasks ?? []}
         relatedControls={reqData.relatedControls ?? []}
-        evidenceSubmissions={reqData.evidenceSubmissions ?? []}
+        requirementScore={reqData.requirementScore ?? null}
+        controlScores={reqData.controlScores ?? {}}
         frameworkInstanceId={frameworkInstanceId}
       />
     </PageLayout>

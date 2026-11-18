@@ -21,21 +21,39 @@ import { evidenceFormDefinitionList, meetingSubTypeValues } from '../forms';
 import { useIso27001FrameworkId } from '../isms/hooks/useIso27001FrameworkId';
 import { SOAOverviewCard } from './SOAOverviewCard';
 
-type FormStatuses = Record<string, { lastSubmittedAt: string | null; isNotRelevant?: boolean }>;
-
-const SIX_MONTHS_MS = 6 * 30 * 24 * 60 * 60 * 1000;
+type FormStatus = {
+  lastSubmittedAt: string | null;
+  isNotRelevant?: boolean;
+  // Per-form cadence, computed by the API (one scoring source).
+  cadenceMonths?: number;
+  nextDueAt?: string | null;
+  isFresh?: boolean;
+};
+type FormStatuses = Record<string, FormStatus>;
 
 const MEETING_SUB_TYPES = meetingSubTypeValues;
 const MEETING_ALL_TYPES = new Set<string>([...MEETING_SUB_TYPES, 'meeting']);
 
-function isTodo(lastSubmittedAt: string | null): boolean {
-  if (!lastSubmittedAt) return true;
-  const elapsed = Date.now() - new Date(lastSubmittedAt).getTime();
-  return elapsed > SIX_MONTHS_MS;
+function isTodo(status: FormStatus | undefined): boolean {
+  return status?.isFresh !== true;
 }
 
 function isMeetingTodo(statuses: FormStatuses): boolean {
-  return MEETING_SUB_TYPES.every((subType) => isTodo(statuses[subType]?.lastSubmittedAt ?? null));
+  return MEETING_SUB_TYPES.every((subType) => isTodo(statuses[subType]));
+}
+
+function formatDue(value: string): string {
+  return new Date(value).toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+}
+
+/** "Due Mar 2027" while current, "Overdue since …" once the cadence lapsed. */
+function DueLabel({ status }: { status: FormStatus | undefined }) {
+  if (!status?.nextDueAt) return null;
+  return (
+    <Text size="xs" variant={status.isFresh ? 'muted' : 'destructive'}>
+      {status.isFresh ? 'Due' : 'Overdue since'} {formatDue(status.nextDueAt)}
+    </Text>
+  );
 }
 
 function StatusBadge({
@@ -78,7 +96,7 @@ function StatusBadge({
   const showTodo =
     form.type === 'meeting'
       ? isMeetingTodo(statuses)
-      : isTodo(statuses[form.type]?.lastSubmittedAt ?? null);
+      : isTodo(statuses[form.type]);
 
   const statusBadge = showTodo ? (
     form.optional ? (
@@ -95,8 +113,9 @@ function StatusBadge({
   );
 
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex flex-wrap items-center gap-1.5">
       {statusBadge}
+      {form.type !== 'meeting' && <DueLabel status={statuses[form.type]} />}
       {activeIssues > 0 && (
         <span className="inline-flex items-center rounded-sm bg-red-100 px-1.5 py-1 text-[10px] font-semibold uppercase tracking-wider leading-none text-red-800 dark:bg-red-950/30 dark:text-red-400">
           {activeIssues === 1 ? '1 Issue' : `${activeIssues} Issues`}

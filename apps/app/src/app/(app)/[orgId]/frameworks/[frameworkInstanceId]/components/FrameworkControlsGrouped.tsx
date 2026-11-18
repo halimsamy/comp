@@ -1,8 +1,8 @@
 'use client';
 
-import type { EvidenceSubmissionInfo } from '@/lib/control-compliance';
+import type { FrameworkScores } from '@/lib/control-compliance';
 import type { FrameworkInstanceWithControls } from '@/lib/types/framework';
-import type { Control, FrameworkEditorRequirement, Task } from '@db';
+import type { FrameworkEditorRequirement } from '@db';
 import {
   Button,
   Heading,
@@ -43,13 +43,11 @@ const COLUMN_COUNT = 7;
 export function FrameworkControlsGrouped({
   frameworkInstanceWithControls,
   requirementDefinitions,
-  tasks,
-  evidenceSubmissions = [],
+  scores,
 }: {
   frameworkInstanceWithControls: FrameworkInstanceWithControls;
   requirementDefinitions: FrameworkEditorRequirement[];
-  tasks: (Task & { controls: Control[] })[];
-  evidenceSubmissions?: EvidenceSubmissionInfo[];
+  scores: FrameworkScores | null | undefined;
 }) {
   const { orgId, frameworkInstanceId } = useParams<{ orgId: string; frameworkInstanceId: string }>();
   const router = useRouter();
@@ -201,8 +199,7 @@ export function FrameworkControlsGrouped({
                 group={group}
                 expanded={getIsFamilyExpanded(group.family)}
                 onToggle={() => handleToggleFamily(group.family)}
-                tasks={tasks}
-                evidenceSubmissions={evidenceSubmissions}
+                scores={scores}
                 orgId={orgId}
                 frameworkInstanceId={frameworkInstanceId}
                 onRowClick={handleRowClick}
@@ -219,8 +216,7 @@ function FamilySection({
   group,
   expanded,
   onToggle,
-  tasks,
-  evidenceSubmissions,
+  scores,
   orgId,
   frameworkInstanceId,
   onRowClick,
@@ -228,8 +224,7 @@ function FamilySection({
   group: FamilyGroup;
   expanded: boolean;
   onToggle: () => void;
-  tasks: (Task & { controls: Control[] })[];
-  evidenceSubmissions: EvidenceSubmissionInfo[];
+  scores: FrameworkScores | null | undefined;
   orgId: string;
   frameworkInstanceId: string;
   onRowClick: (controlId: string) => void;
@@ -266,8 +261,7 @@ function FamilySection({
             key={control.id}
             control={control}
             requirements={requirements}
-            tasks={tasks}
-            evidenceSubmissions={evidenceSubmissions}
+            scores={scores}
             orgId={orgId}
             frameworkInstanceId={frameworkInstanceId}
             onRowClick={onRowClick}

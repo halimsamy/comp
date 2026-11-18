@@ -27,12 +27,7 @@ jest.mock('../utils/compliance-filters', () => ({
 
 import { db } from '@db';
 import { filterComplianceMembers } from '../utils/compliance-filters';
-import {
-  computeFrameworkComplianceScore,
-  getOverviewScores,
-} from './frameworks-scores.helper';
-
-const SIX_MONTHS_MS = 6 * 30 * 24 * 60 * 60 * 1000;
+import { getOverviewScores } from './frameworks-scores.helper';
 
 const mockDb = db as jest.Mocked<typeof db>;
 const mockFilterComplianceMembers =
@@ -85,6 +80,32 @@ describe('frameworks-scores.helper', () => {
       completedDocuments: 0,
       outstandingDocuments: 6,
     });
+  });
+
+  it('scores documents with each form cadence and ignores rejected submissions', async () => {
+    (mockDb.member.findMany as jest.Mock).mockResolvedValue([]);
+    mockFilterComplianceMembers.mockResolvedValue([]);
+    (mockDb.organization.findUnique as jest.Mock).mockResolvedValue({
+      securityTrainingStepEnabled: false,
+      deviceAgentStepEnabled: false,
+      backgroundCheckStepEnabled: false,
+    });
+    const sevenMonthsAgo = new Date();
+    sevenMonthsAgo.setMonth(sevenMonthsAgo.getMonth() - 7);
+    (mockDb.evidenceSubmission.groupBy as jest.Mock).mockResolvedValue([
+      // 12-month pentest cadence: still current. 6-month RBAC cadence: stale.
+      { formType: 'penetration_test', _max: { submittedAt: sevenMonthsAgo } },
+      { formType: 'rbac_matrix', _max: { submittedAt: sevenMonthsAgo } },
+    ]);
+
+    const scores = await getOverviewScores('org_1');
+
+    expect(mockDb.evidenceSubmission.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organizationId: 'org_1', status: { not: 'rejected' } },
+      }),
+    );
+    expect(scores.documents.completedDocuments).toBe(1);
   });
 
   it('requires installed device for people completion when device agent step is enabled', async () => {
@@ -280,119 +301,6 @@ describe('frameworks-scores.helper', () => {
       mockDb.employeeTrainingVideoCompletion.findMany,
     ).toHaveBeenCalledWith({
       where: { memberId: { in: ['mem_1', 'mem_2'] } },
-    });
-  });
-
-  describe('computeFrameworkComplianceScore', () => {
-    it('returns 0 when the framework has no artifacts', () => {
-      expect(computeFrameworkComplianceScore({ controls: [] }, [], [])).toBe(0);
-    });
-
-    it('returns 100 when every artifact across the framework is complete', () => {
-      const framework = {
-        controls: [
-          {
-            id: 'c1',
-            policies: [{ id: 'p1', status: 'published' }],
-            controlDocumentTypes: [],
-          },
-        ],
-      };
-      const tasks = [{ id: 't1', status: 'done', controls: [{ id: 'c1' }] }];
-      expect(computeFrameworkComplianceScore(framework, tasks, [])).toBe(100);
-    });
-
-    it('weights every artifact equally instead of treating partial controls as 0%', () => {
-      const framework = {
-        controls: [
-          {
-            id: 'c1',
-            policies: [{ id: 'p1', status: 'published' }],
-            controlDocumentTypes: [{ formType: 'access_control_policy' }],
-          },
-          {
-            id: 'c2',
-            policies: [{ id: 'p2', status: 'draft' }],
-            controlDocumentTypes: [],
-          },
-        ],
-      };
-      const tasks = [
-        { id: 't1', status: 'done', controls: [{ id: 'c1' }] },
-        { id: 't2', status: 'todo', controls: [{ id: 'c2' }] },
-      ];
-      // 5 unique artifacts (2 policies, 2 tasks, 1 doc type), 2 completed → 40%
-      // The old binary-completion implementation would have returned 0%
-      // because no control is fully satisfied.
-      expect(computeFrameworkComplianceScore(framework, tasks, [])).toBe(40);
-    });
-
-    it('only treats a document as completed when its latest submission is within 6 months', () => {
-      const framework = {
-        controls: [
-          {
-            id: 'c1',
-            policies: [],
-            controlDocumentTypes: [
-              { formType: 'access_control_policy' },
-              { formType: 'incident_response_plan' },
-            ],
-          },
-        ],
-      };
-      const recent = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-      const stale = new Date(Date.now() - SIX_MONTHS_MS - 24 * 60 * 60 * 1000);
-      const submissions = [
-        { formType: 'access_control_policy', submittedAt: recent },
-        { formType: 'incident_response_plan', submittedAt: stale },
-      ];
-      expect(computeFrameworkComplianceScore(framework, [], submissions)).toBe(
-        50,
-      );
-    });
-
-    it('excludes not relevant document requirements from framework scores', () => {
-      const framework = {
-        controls: [
-          {
-            id: 'c1',
-            policies: [{ id: 'p1', status: 'published' }],
-            controlDocumentTypes: [
-              { formType: 'penetration_test', isNotRelevant: true },
-            ],
-          },
-        ],
-      };
-
-      expect(computeFrameworkComplianceScore(framework, [], [])).toBe(100);
-    });
-
-    it('deduplicates artifacts shared across controls', () => {
-      const framework = {
-        controls: [
-          {
-            id: 'c1',
-            policies: [{ id: 'p1', status: 'published' }],
-            controlDocumentTypes: [{ formType: 'access_control_policy' }],
-          },
-          {
-            id: 'c2',
-            policies: [{ id: 'p1', status: 'published' }],
-            controlDocumentTypes: [{ formType: 'access_control_policy' }],
-          },
-        ],
-      };
-      const sharedTask = {
-        id: 't1',
-        status: 'done',
-        controls: [{ id: 'c1' }, { id: 'c2' }],
-      };
-      // Without dedup: 6 artifacts (2 policies, 2 tasks, 2 docs), 4 completed → 67%
-      // With dedup: 2 unique artifacts (1 policy, 1 task), 2 completed; 1 unmet doc → 67%
-      // Wait: 1 policy (done) + 1 task (done) + 1 doc (no submission, not fresh) = 2/3 = 67%
-      expect(computeFrameworkComplianceScore(framework, [sharedTask], [])).toBe(
-        67,
-      );
     });
   });
 

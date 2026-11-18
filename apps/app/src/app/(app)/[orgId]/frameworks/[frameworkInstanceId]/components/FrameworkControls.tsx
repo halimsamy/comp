@@ -1,13 +1,8 @@
 'use client';
 
-import {
-  type EvidenceSubmissionInfo,
-  getControlProgressPercent,
-  getControlStatus,
-  getRequirementArtifactCounts,
-} from '@/lib/control-compliance';
+import { type FrameworkScores, documentCounts, getControlScore } from '@/lib/control-compliance';
 import type { FrameworkInstanceWithControls } from '@/lib/types/framework';
-import type { Control, FrameworkEditorRequirement, Task } from '@db';
+import type { FrameworkEditorRequirement } from '@db';
 import {
   buildControlItems,
   buildRequirementMap,
@@ -37,13 +32,11 @@ import { useEffect, useMemo, useState } from 'react';
 export function FrameworkControls({
   frameworkInstanceWithControls,
   requirementDefinitions,
-  tasks,
-  evidenceSubmissions = [],
+  scores,
 }: {
   frameworkInstanceWithControls: FrameworkInstanceWithControls;
   requirementDefinitions: FrameworkEditorRequirement[];
-  tasks: (Task & { controls: Control[] })[];
-  evidenceSubmissions?: EvidenceSubmissionInfo[];
+  scores: FrameworkScores | null | undefined;
 }) {
   const { orgId, frameworkInstanceId } = useParams<{
     orgId: string;
@@ -146,24 +139,12 @@ export function FrameworkControls({
             </TableRow>
           ) : (
             paginatedItems.map(({ control, requirements }) => {
-              const policies = control.policies ?? [];
-              const documentTypes = control.controlDocumentTypes ?? [];
-              const counts = getRequirementArtifactCounts([control], tasks, evidenceSubmissions);
-              const status = getControlStatus(
-                policies,
-                tasks,
+              const { status, percent: compliancePercent, counts } = getControlScore(
+                scores,
                 control.id,
-                documentTypes,
-                evidenceSubmissions,
               );
               const badge = getStatusBadge(status);
-              const compliancePercent = getControlProgressPercent(
-                policies,
-                tasks,
-                control.id,
-                documentTypes,
-                evidenceSubmissions,
-              );
+              const documents = documentCounts(counts);
 
               return (
                 <TableRow
@@ -224,7 +205,7 @@ export function FrameworkControls({
                   <TableCell>
                     <div className="tabular-nums">
                       <Text size="sm" variant="muted">
-                        {counts.documents.completed}/{counts.documents.total}
+                        {documents.completed}/{documents.total}
                       </Text>
                     </div>
                   </TableCell>

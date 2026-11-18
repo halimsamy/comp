@@ -49,8 +49,18 @@ jest.mock('@db', () => ({
 jest.mock('./frameworks-scores.helper', () => ({
   getOverviewScores: jest.fn(),
   getCurrentMember: jest.fn(),
-  computeFrameworkComplianceScore: jest.fn(),
 }));
+
+jest.mock('./scoring/framework-scoring.loader', () => ({
+  loadFrameworkScores: jest.fn(),
+}));
+
+jest.mock('./scoring/requirement-scoring', () => ({
+  loadInstanceScoring: jest.fn().mockResolvedValue({ scores: { complianceScore: 0 }, applicability: [] }),
+  loadRequirementScoring: jest.fn().mockResolvedValue({}),
+}));
+
+import { loadFrameworkScores } from './scoring/framework-scoring.loader';
 
 import { db } from '@db';
 import {
@@ -74,6 +84,7 @@ describe('FrameworksService', () => {
     service = module.get<FrameworksService>(FrameworksService);
 
     jest.clearAllMocks();
+    (mockDb.evidenceFormSetting.findMany as jest.Mock).mockResolvedValue([]);
   });
 
   describe('findAll', () => {
@@ -317,6 +328,26 @@ describe('FrameworksService', () => {
   // With the split, a custom framework instance reads from `customRequirement`
   // (which is always org-scoped) and a platform framework instance reads from
   // the global `frameworkEditorRequirement`. There is no shared table to leak.
+  describe('findAll with scores', () => {
+    it('returns the API score with N/M controls for every instance', async () => {
+      (mockDb.frameworkInstance.findMany as jest.Mock).mockResolvedValue([
+        { id: 'fi_1', framework: { name: 'ISO 27001' }, requirementsMapped: [] },
+      ]);
+      (mockDb.evidenceFormSetting.findMany as jest.Mock).mockResolvedValue([]);
+      (loadFrameworkScores as jest.Mock).mockResolvedValue(
+        new Map([['fi_1', { complianceScore: 62, controlsComplete: 5, controlsTotal: 8 }]]),
+      );
+
+      const result = await service.findAll('org_1', { includeControls: true, includeScores: true });
+
+      expect(loadFrameworkScores).toHaveBeenCalledWith({
+        organizationId: 'org_1',
+        frameworkInstanceIds: ['fi_1'],
+      });
+      expect(result[0]).toMatchObject({ complianceScore: 62, controlsComplete: 5, controlsTotal: 8 });
+    });
+  });
+
   describe('custom-framework isolation', () => {
     it('findOne on a custom FI reads only that org\'s custom requirements', async () => {
       (mockDb.frameworkInstance.findUnique as jest.Mock).mockResolvedValue({

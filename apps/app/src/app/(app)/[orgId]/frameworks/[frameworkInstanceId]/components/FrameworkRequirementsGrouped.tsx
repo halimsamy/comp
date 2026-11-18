@@ -1,8 +1,7 @@
 'use client';
 
-import type { EvidenceSubmissionInfo } from '@/lib/control-compliance';
-import type { FrameworkInstanceWithControls } from '@/lib/types/framework';
-import type { Control, FrameworkEditorRequirement, Task } from '@db';
+import type { FrameworkScores } from '@/lib/control-compliance';
+import type { FrameworkEditorRequirement } from '@db';
 import {
   Button,
   InputGroup,
@@ -41,14 +40,10 @@ import {
 
 export function FrameworkRequirementsGrouped({
   requirementDefinitions,
-  frameworkInstanceWithControls,
-  tasks,
-  evidenceSubmissions = [],
+  scores,
 }: {
   requirementDefinitions: FrameworkEditorRequirement[];
-  frameworkInstanceWithControls: FrameworkInstanceWithControls;
-  tasks?: (Task & { controls: Control[] })[];
-  evidenceSubmissions?: EvidenceSubmissionInfo[];
+  scores: FrameworkScores | null | undefined;
 }) {
   const { orgId, frameworkInstanceId } = useParams<{
     orgId: string;
@@ -76,14 +71,8 @@ export function FrameworkRequirementsGrouped({
   const selectedFamilyFilter = useMemo(() => new Set(familyFilterParam), [familyFilterParam]);
 
   const allItems = useMemo(
-    () =>
-      buildRequirementItems(
-        requirementDefinitions,
-        frameworkInstanceWithControls.controls,
-        tasks ?? [],
-        evidenceSubmissions,
-      ),
-    [requirementDefinitions, frameworkInstanceWithControls.controls, tasks, evidenceSubmissions],
+    () => buildRequirementItems(requirementDefinitions, scores),
+    [requirementDefinitions, scores],
   );
 
   const filteredItems = useMemo(() => {

@@ -21,6 +21,8 @@ export const evidenceFormDefinitions: Record<EvidenceFormType, EvidenceFormDefin
     description: 'Record meeting minutes for board, IT leadership, or risk committee meetings.',
     category: 'Governance',
     submissionDateMode: 'custom',
+    // Freshness of the latest minutes: board and risk committee meet twice a year.
+    cadenceMonths: 6,
     portalAccessible: false,
     fields: meetingFields(boardMeetingMinutesPlaceholder),
   },
@@ -31,6 +33,8 @@ export const evidenceFormDefinitions: Record<EvidenceFormType, EvidenceFormDefin
       "Create a company board that meets twice a year to discuss the company's direction. Conduct at least 1 meeting.",
     category: 'Governance',
     submissionDateMode: 'custom',
+    // Board meets twice a year.
+    cadenceMonths: 6,
     portalAccessible: false,
     hidden: true,
     fields: meetingFields(boardMeetingMinutesPlaceholder),
@@ -42,6 +46,8 @@ export const evidenceFormDefinitions: Record<EvidenceFormType, EvidenceFormDefin
       'Create an IT leadership committee that meets monthly to discuss tech development. Conduct at least 1 meeting.',
     category: 'Governance',
     submissionDateMode: 'custom',
+    // IT leadership: at least one recorded meeting per quarter.
+    cadenceMonths: 3,
     portalAccessible: false,
     hidden: true,
     fields: meetingFields(itLeadershipMinutesPlaceholder),
@@ -53,6 +59,8 @@ export const evidenceFormDefinitions: Record<EvidenceFormType, EvidenceFormDefin
       'Create a risk committee that meets twice a year to discuss risks to your company. Conduct at least 1 meeting.',
     category: 'Governance',
     submissionDateMode: 'custom',
+    // Risk committee meets twice a year.
+    cadenceMonths: 6,
     portalAccessible: false,
     hidden: true,
     fields: meetingFields(riskCommitteeMinutesPlaceholder),
@@ -63,6 +71,8 @@ export const evidenceFormDefinitions: Record<EvidenceFormType, EvidenceFormDefin
     description: 'Track and retain user access requests with justification.',
     category: 'Security',
     submissionDateMode: 'custom',
+    // Event-driven: at least one sample per 12-month audit period.
+    cadenceMonths: 12,
     portalAccessible: true,
     optional: true,
     fields: [
@@ -123,6 +133,8 @@ export const evidenceFormDefinitions: Record<EvidenceFormType, EvidenceFormDefin
     description: 'Submit an anonymous whistleblower report. Submissions are confidential.',
     category: 'Security',
     submissionDateMode: 'auto',
+    // Event-driven: at least one record per 12-month audit period.
+    cadenceMonths: 12,
     portalAccessible: true,
     optional: true,
     fields: [
@@ -174,6 +186,8 @@ export const evidenceFormDefinitions: Record<EvidenceFormType, EvidenceFormDefin
       'Upload a third-party penetration test report to satisfy security testing evidence requirements.',
     category: 'Security',
     submissionDateMode: 'custom',
+    // PCI DSS 11.4.2 / 11.4.3: at least once every 12 months.
+    cadenceMonths: 12,
     portalAccessible: false,
     fields: [
       {
@@ -225,6 +239,8 @@ Remediation: Status of fixes (e.g. 3 of 5 critical findings remediated; 2 in pro
       'Track role-based access control by documenting systems, roles, permissions scope, assignees, and approval records.',
     category: 'Security',
     submissionDateMode: 'custom',
+    // PCI DSS 7.2.4: accounts and access reviewed at least once every six months.
+    cadenceMonths: 6,
     portalAccessible: false,
     fields: [
       {
@@ -285,6 +301,8 @@ Remediation: Status of fixes (e.g. 3 of 5 critical findings remediated; 2 in pro
       'Maintain an infrastructure inventory across cloud and on-prem assets with ownership, platform details, and review cadence.',
     category: 'Security',
     submissionDateMode: 'custom',
+    // PCI DSS 12.5.1 / ISO A.5.9: inventory confirmed at least every 12 months.
+    cadenceMonths: 12,
     portalAccessible: false,
     fields: [
       {
@@ -340,6 +358,8 @@ Remediation: Status of fixes (e.g. 3 of 5 critical findings remediated; 2 in pro
     description: 'Capture a lightweight performance review record for audit evidence.',
     category: 'People',
     submissionDateMode: 'custom',
+    // Annual performance review cycle.
+    cadenceMonths: 12,
     portalAccessible: false,
     fields: [
       {
@@ -406,6 +426,8 @@ Remediation: Status of fixes (e.g. 3 of 5 critical findings remediated; 2 in pro
       'Provide either a link to your network diagram or upload a file (at least one required). Optional—include if you have a current diagram of your infrastructure.',
     category: 'Security',
     submissionDateMode: 'custom',
+    // PCI DSS 1.2.3 / 1.2.4: diagrams kept current; confirmed with the 12.5.2 scope review.
+    cadenceMonths: 12,
     portalAccessible: false,
     fields: [
       {
@@ -433,6 +455,8 @@ Remediation: Status of fixes (e.g. 3 of 5 critical findings remediated; 2 in pro
       'Conduct a periodic tabletop exercise to test the effectiveness of your incident response plan. Simulate a security incident to ensure all team members understand their roles, communication channels, and procedures during a real event.',
     category: 'Security',
     submissionDateMode: 'custom',
+    // PCI DSS 12.10.2: IR plan reviewed and tested at least once every 12 months.
+    cadenceMonths: 12,
     portalAccessible: false,
     fields: [
       {
@@ -598,6 +622,8 @@ Injects: At 10:30, media contacts the company about the incident.`,
     description: 'Document allowed Account types, with justification.',
     category: 'Security',
     submissionDateMode: 'custom',
+    // PCI DSS 12.5.2: account types confirmed with the annual scope review.
+    cadenceMonths: 12,
     portalAccessible: false,
     // NIST-specific: it should not appear in the global Documents browse list
     // (hidden) and must not affect the org-wide "expected documents" score

@@ -9,7 +9,11 @@ export async function generateMetadata() {
   return { title: 'Frameworks' };
 }
 
-type FrameworkWithScore = FrameworkInstanceWithControls & { complianceScore: number };
+type FrameworkWithScore = FrameworkInstanceWithControls & {
+  complianceScore: number;
+  controlsComplete: number;
+  controlsTotal: number;
+};
 
 export default async function FrameworksPage({ params }: { params: Promise<{ orgId: string }> }) {
   const { orgId: organizationId } = await params;
@@ -22,9 +26,18 @@ export default async function FrameworksPage({ params }: { params: Promise<{ org
   const frameworksData = frameworksRes.data?.data ?? [];
   const allFrameworks = availableRes.data?.data ?? [];
 
-  const frameworksWithControls = frameworksData.map(({ complianceScore: _, ...fw }) => fw);
-  const complianceMap = new Map(
-    frameworksData.map((fw) => [fw.id, fw.complianceScore ?? 0]),
+  const frameworksWithControls = frameworksData.map(
+    ({ complianceScore: _score, controlsComplete: _done, controlsTotal: _total, ...fw }) => fw,
+  );
+  const scoreMap = Object.fromEntries(
+    frameworksData.map((fw) => [
+      fw.id,
+      {
+        complianceScore: fw.complianceScore ?? 0,
+        controlsComplete: fw.controlsComplete ?? 0,
+        controlsTotal: fw.controlsTotal ?? fw.controls.length,
+      },
+    ]),
   );
 
   const availableToAdd = allFrameworks.filter(
@@ -49,7 +62,7 @@ export default async function FrameworksPage({ params }: { params: Promise<{ org
     >
       <FrameworksTable
         frameworks={frameworksWithControls}
-        complianceMap={Object.fromEntries(complianceMap)}
+        scoreMap={scoreMap}
         organizationId={organizationId}
       />
     </PageLayout>

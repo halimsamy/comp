@@ -2,7 +2,7 @@
 
 import { useFrameworkInstance } from '@/hooks/use-framework-instance';
 import { usePermissions } from '@/hooks/use-permissions';
-import { getFrameworkAggregatePercent } from '@/lib/control-compliance';
+import type { FrameworkScores } from '@/lib/control-compliance';
 import type { FrameworkUpdateStatus } from '@/types/framework-versioning';
 import { useFeatureFlag } from '@trycompai/analytics';
 import {
@@ -67,8 +67,8 @@ export function FrameworkDetailContent({
   const frameworkDescription =
     framework.framework?.description ?? framework.customFramework?.description ?? '';
 
-  const tasks = framework.tasks || [];
-  const evidenceSubmissions = framework.evidenceSubmissions || [];
+  // One scoring source: the API computes every %, status and count shown here.
+  const scores: FrameworkScores | undefined = framework.scores;
   const requirementDefinitions = framework.requirementDefinitions || [];
 
   const hasControlFamilies = useMemo(
@@ -111,11 +111,7 @@ export function FrameworkDetailContent({
   );
 
   // Tab label counts
-  const compliancePct = computeCompliancePercent(
-    frameworkInstanceWithControls.controls,
-    tasks,
-    evidenceSubmissions,
-  );
+  const compliancePct = scores?.complianceScore ?? 0;
   const controlsCount = frameworkInstanceWithControls.controls.length;
   const requirementsCount = requirementDefinitions.length;
 
@@ -181,11 +177,7 @@ export function FrameworkDetailContent({
         />
 
         {!complianceTimelineEnabled && (
-          <FrameworkProgress
-            framework={frameworkInstanceWithControls}
-            tasks={tasks}
-            evidenceSubmissions={evidenceSubmissions}
-          />
+          <FrameworkProgress scores={scores} />
         )}
 
         {complianceTimelineEnabled && (
@@ -200,16 +192,14 @@ export function FrameworkDetailContent({
               <FrameworkControlsGrouped
                 frameworkInstanceWithControls={frameworkInstanceWithControls}
                 requirementDefinitions={requirementDefinitions}
-                tasks={tasks}
-                evidenceSubmissions={evidenceSubmissions}
+                scores={scores}
               />
             </Suspense>
           ) : (
             <FrameworkControls
               frameworkInstanceWithControls={frameworkInstanceWithControls}
               requirementDefinitions={requirementDefinitions}
-              tasks={tasks}
-              evidenceSubmissions={evidenceSubmissions}
+              scores={scores}
             />
           )}
         </TabsContent>
@@ -219,17 +209,13 @@ export function FrameworkDetailContent({
             <Suspense>
               <FrameworkRequirementsGrouped
                 requirementDefinitions={requirementDefinitions}
-                frameworkInstanceWithControls={frameworkInstanceWithControls}
-                tasks={tasks}
-                evidenceSubmissions={evidenceSubmissions}
+                scores={scores}
               />
             </Suspense>
           ) : (
             <FrameworkRequirements
               requirementDefinitions={requirementDefinitions}
-              frameworkInstanceWithControls={frameworkInstanceWithControls}
-              tasks={tasks}
-              evidenceSubmissions={evidenceSubmissions}
+              scores={scores}
             />
           )}
         </TabsContent>
@@ -266,12 +252,4 @@ function TabBadge({ children }: { children: React.ReactNode }) {
       {children}
     </span>
   );
-}
-
-function computeCompliancePercent(
-  controls: any[],
-  tasks: any[],
-  evidenceSubmissions: any[],
-): number {
-  return getFrameworkAggregatePercent(controls, tasks, evidenceSubmissions);
 }

@@ -8,6 +8,7 @@ import { db } from '@db';
 import { SOAService } from './soa.service';
 import { generateSOAExportFile } from './utils/export-generator';
 import { checkIfFullyRemote } from './utils/soa-storage';
+import { syncSoaApplicability } from './utils/soa-applicability-sync';
 
 jest.mock('@db', () => ({
   db: {
@@ -59,6 +60,9 @@ jest.mock('./utils/soa-storage', () => ({
 }));
 jest.mock('./utils/export-generator', () => ({
   generateSOAExportFile: jest.fn(),
+}));
+jest.mock('./utils/soa-applicability-sync', () => ({
+  syncSoaApplicability: jest.fn().mockResolvedValue(0),
 }));
 
 const mockDb = jest.mocked(db);
@@ -276,6 +280,9 @@ describe('SOAService', () => {
       });
       const result = await service.approveDocument(dto, userId);
       expect(result.success).toBe(true);
+      expect(syncSoaApplicability).toHaveBeenCalledWith(
+        expect.objectContaining({ documentId: dto.documentId }),
+      );
       expect(mockDb.sOADocument.update).toHaveBeenCalledWith({
         where: { id: dto.documentId },
         data: expect.objectContaining({
@@ -839,6 +846,9 @@ describe('SOAService', () => {
         userId,
       );
 
+      expect(syncSoaApplicability).toHaveBeenCalledWith(
+        expect.objectContaining({ documentId: 'doc-1' }),
+      );
       expect(mockDb.sOAAnswer.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           documentId: 'doc-1',

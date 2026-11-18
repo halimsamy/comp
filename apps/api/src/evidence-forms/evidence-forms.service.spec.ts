@@ -120,13 +120,24 @@ describe('EvidenceFormsService', () => {
         where: { organizationId: 'org_123' },
         select: { formType: true, isNotRelevant: true },
       });
-      expect(result.meeting).toEqual({
+      expect(mockedDb.evidenceSubmission.groupBy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { organizationId: 'org_123', status: { not: 'rejected' } },
+        }),
+      );
+      expect(result.meeting).toMatchObject({
         lastSubmittedAt: '2026-01-01T00:00:00.000Z',
         isNotRelevant: true,
+        cadenceMonths: 6,
+        nextDueAt: '2026-07-01T00:00:00.000Z',
+        isFresh: false,
       });
       expect(result['access-request']).toEqual({
         lastSubmittedAt: null,
         isNotRelevant: false,
+        cadenceMonths: 12,
+        nextDueAt: null,
+        isFresh: false,
       });
     });
   });

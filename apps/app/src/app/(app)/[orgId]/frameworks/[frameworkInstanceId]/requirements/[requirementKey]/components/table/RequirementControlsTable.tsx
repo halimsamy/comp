@@ -1,12 +1,12 @@
 'use client';
 
 import {
-  type EvidenceSubmissionInfo,
-  getControlProgressPercent,
-  getControlStatus,
-  getRequirementArtifactCounts,
+  type ControlScore,
+  documentCounts,
+  getControlScore,
 } from '@/lib/control-compliance';
-import type { Control, Task } from '@db';
+import type { Control } from '@db';
+import { getStatusBadge } from '../../../../components/framework-controls-shared';
 import {
   Badge,
   InputGroup,
@@ -27,38 +27,15 @@ import { useEffect, useMemo, useState } from 'react';
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
-type ControlWithPolicies = Control & {
-  policies?: Array<{ id: string; name: string; status: string }>;
-  controlDocumentTypes?: Array<{ formType: string; isNotRelevant?: boolean }>;
-};
-
 interface RequirementControlsTableProps {
-  controls: ControlWithPolicies[];
-  tasks: (Task & { controls: Control[] })[];
-  evidenceSubmissions?: EvidenceSubmissionInfo[];
+  controls: Control[];
+  controlScores: Record<string, ControlScore>;
   frameworkInstanceId: string;
-}
-
-function getStatusBadge(status: string): {
-  label: string;
-  variant: 'default' | 'secondary' | 'destructive';
-} {
-  switch (status) {
-    case 'completed':
-      return { label: 'Satisfied', variant: 'default' };
-    case 'in_progress':
-      return { label: 'In Progress', variant: 'secondary' };
-    case 'not_relevant':
-      return { label: 'Not Relevant', variant: 'secondary' };
-    default:
-      return { label: 'Not Started', variant: 'destructive' };
-  }
 }
 
 export function RequirementControlsTable({
   controls,
-  tasks,
-  evidenceSubmissions = [],
+  controlScores,
   frameworkInstanceId,
 }: RequirementControlsTableProps) {
   const { orgId } = useParams<{ orgId: string }>();
@@ -156,29 +133,12 @@ export function RequirementControlsTable({
             </TableRow>
           ) : (
             paginatedControls.map((control) => {
-              const policies = control.policies ?? [];
-              const documentTypes = control.controlDocumentTypes ?? [];
-
-              // Use the shared aggregator so per-control counts (especially
-              // documents) honour the same 6-month freshness rule as
-              // getControlStatus / getControlProgressPercent below.
-              const counts = getRequirementArtifactCounts([control], tasks, evidenceSubmissions);
-
-              const status = getControlStatus(
-                policies,
-                tasks,
+              const { status, percent: compliancePercent, counts } = getControlScore(
+                { controls: controlScores },
                 control.id,
-                documentTypes,
-                evidenceSubmissions,
               );
               const badge = getStatusBadge(status);
-              const compliancePercent = getControlProgressPercent(
-                policies,
-                tasks,
-                control.id,
-                documentTypes,
-                evidenceSubmissions,
-              );
+              const documents = documentCounts(counts);
 
               return (
                 <TableRow
@@ -244,7 +204,7 @@ export function RequirementControlsTable({
                   <TableCell>
                     <div className="tabular-nums">
                       <Text size="sm" variant="muted">
-                        {counts.documents.completed}/{counts.documents.total}
+                        {documents.completed}/{documents.total}
                       </Text>
                     </div>
                   </TableCell>

@@ -23,9 +23,15 @@ import type { FrameworkInstanceWithControls } from '@/lib/types/framework';
 type SortColumn = 'name' | 'compliance' | 'controls';
 type SortDirection = 'asc' | 'desc';
 
+export interface FrameworkScoreSummary {
+  complianceScore: number;
+  controlsComplete: number;
+  controlsTotal: number;
+}
+
 interface FrameworksTableProps {
   frameworks: FrameworkInstanceWithControls[];
-  complianceMap: Record<string, number>;
+  scoreMap: Record<string, FrameworkScoreSummary>;
   organizationId: string;
 }
 
@@ -94,7 +100,7 @@ function SortIcon({
 
 export function FrameworksTable({
   frameworks,
-  complianceMap,
+  scoreMap,
   organizationId,
 }: FrameworksTableProps) {
   const router = useRouter();
@@ -129,19 +135,19 @@ export function FrameworksTable({
         case 'name':
           return dir * frameworkName(a).localeCompare(frameworkName(b));
         case 'compliance': {
-          const scoreA = complianceMap[a.id] ?? 0;
-          const scoreB = complianceMap[b.id] ?? 0;
+          const scoreA = scoreMap[a.id]?.complianceScore ?? 0;
+          const scoreB = scoreMap[b.id]?.complianceScore ?? 0;
           return dir * (scoreA - scoreB);
         }
         case 'controls':
-          return dir * (a.controls.length - b.controls.length);
+          return dir * ((scoreMap[a.id]?.controlsTotal ?? 0) - (scoreMap[b.id]?.controlsTotal ?? 0));
         default:
           return 0;
       }
     });
 
     return items;
-  }, [frameworks, searchTerm, sortColumn, sortDirection, complianceMap]);
+  }, [frameworks, searchTerm, sortColumn, sortDirection, scoreMap]);
 
   const handleRowClick = (frameworkId: string) => {
     router.push(`/${organizationId}/frameworks/${frameworkId}`);
@@ -217,7 +223,8 @@ export function FrameworksTable({
           </TableHeader>
           <TableBody>
             {filteredAndSorted.map((fw) => {
-              const score = complianceMap[fw.id] ?? 0;
+              const summary = scoreMap[fw.id];
+              const score = summary?.complianceScore ?? 0;
               const roundedScore = Math.round(score);
               const status = getFrameworkStatus(score);
               const name = frameworkName(fw);
@@ -282,7 +289,7 @@ export function FrameworksTable({
                   <TableCell>
                     <div className="tabular-nums">
                       <Text size="sm" variant="muted">
-                        {fw.controls.length}
+                        {summary?.controlsComplete ?? 0}/{summary?.controlsTotal ?? fw.controls.length}
                       </Text>
                     </div>
                   </TableCell>

@@ -1,13 +1,7 @@
 'use client';
 
-import {
-  type EvidenceSubmissionInfo,
-  getControlProgressPercent,
-  getControlStatus,
-  getRequirementArtifactCounts,
-} from '@/lib/control-compliance';
+import { type FrameworkScores, documentCounts, getControlScore } from '@/lib/control-compliance';
 import type { FrameworkInstanceWithControls } from '@/lib/types/framework';
-import type { Control, Task } from '@db';
 import { Badge, TableCell, TableRow, Text } from '@trycompai/design-system';
 import { Launch } from '@trycompai/design-system/icons';
 import Link from 'next/link';
@@ -16,32 +10,21 @@ import { getStatusBadge } from './framework-controls-shared';
 export function GroupedControlRow({
   control,
   requirements,
-  tasks,
-  evidenceSubmissions,
+  scores,
   orgId,
   frameworkInstanceId,
   onRowClick,
 }: {
   control: FrameworkInstanceWithControls['controls'][number];
   requirements: Array<{ id: string; name: string; identifier: string }>;
-  tasks: (Task & { controls: Control[] })[];
-  evidenceSubmissions: EvidenceSubmissionInfo[];
+  scores: FrameworkScores | null | undefined;
   orgId: string;
   frameworkInstanceId: string;
   onRowClick: (controlId: string) => void;
 }) {
-  const policies = control.policies ?? [];
-  const documentTypes = control.controlDocumentTypes ?? [];
-  const counts = getRequirementArtifactCounts([control], tasks, evidenceSubmissions);
-  const status = getControlStatus(policies, tasks, control.id, documentTypes, evidenceSubmissions);
+  const { status, percent: compliancePercent, counts } = getControlScore(scores, control.id);
   const badge = getStatusBadge(status);
-  const compliancePercent = getControlProgressPercent(
-    policies,
-    tasks,
-    control.id,
-    documentTypes,
-    evidenceSubmissions,
-  );
+  const documents = documentCounts(counts);
 
   const controlHref = `/${orgId}/frameworks/${frameworkInstanceId}/controls/${control.id}`;
 
@@ -117,7 +100,7 @@ export function GroupedControlRow({
       <TableCell>
         <div className="tabular-nums">
           <Text size="sm" variant="muted">
-            {counts.documents.completed}/{counts.documents.total}
+            {documents.completed}/{documents.total}
           </Text>
         </div>
       </TableCell>

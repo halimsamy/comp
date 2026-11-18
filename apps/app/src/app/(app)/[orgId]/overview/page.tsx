@@ -13,7 +13,11 @@ export async function generateMetadata() {
   return { title: 'Overview' };
 }
 
-type FrameworkWithScore = FrameworkInstanceWithControls & { complianceScore: number };
+type FrameworkWithScore = FrameworkInstanceWithControls & {
+  complianceScore: number;
+  controlsComplete?: number;
+  controlsTotal?: number;
+};
 
 interface ScoresResponse {
   policies: {
@@ -69,6 +73,8 @@ export default async function OverviewPage({ params }: { params: Promise<{ orgId
   const frameworksWithCompliance = frameworksData.map((fw: FrameworkWithScore) => ({
     frameworkInstance: { ...fw, complianceScore: undefined },
     complianceScore: fw.complianceScore ?? 0,
+    controlsComplete: fw.controlsComplete,
+    controlsTotal: fw.controlsTotal,
   }));
 
   return (

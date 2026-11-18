@@ -34,6 +34,8 @@ export const pciEvidenceFormDefinitions: Record<PciEvidenceFormType, EvidenceFor
       'Maintain an inventory of the cryptography protecting sensitive data: keys, certificates, protocols and cipher suites, with their custodians. Review it at least yearly and whenever it changes.',
     category: 'Security',
     submissionDateMode: 'custom',
+    // PCI DSS 12.3.3: cipher suites and protocols reviewed at least once every 12 months.
+    cadenceMonths: 12,
     portalAccessible: false,
     hidden: true,
     optional: true,
@@ -116,6 +118,8 @@ export const pciEvidenceFormDefinitions: Record<PciEvidenceFormType, EvidenceFor
       'Document one targeted risk analysis (PCI DSS 12.3.1 / 12.3.2) per submission. Review each analysis at least every 12 months.',
     category: 'Security',
     submissionDateMode: 'custom',
+    // PCI DSS 12.3.1: each targeted risk analysis reviewed at least once every 12 months.
+    cadenceMonths: 12,
     portalAccessible: false,
     hidden: true,
     optional: true,
@@ -187,6 +191,8 @@ export const pciEvidenceFormDefinitions: Record<PciEvidenceFormType, EvidenceFor
       'Record one significant change per submission and confirm the applicable PCI DSS requirements were re-validated.',
     category: 'Security',
     submissionDateMode: 'custom',
+    // Event-driven (PCI DSS 6.5.2): at least one record per 12-month audit period.
+    cadenceMonths: 12,
     portalAccessible: false,
     hidden: true,
     optional: true,

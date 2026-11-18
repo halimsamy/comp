@@ -1,5 +1,6 @@
 import {
   evidenceFormDefinitionList,
+  isEvidenceFormFresh,
   meetingSubTypeValues,
   toDbEvidenceFormType,
   toExternalEvidenceFormType,
@@ -8,9 +9,6 @@ import { db } from '@db';
 import { ISO27001_FRAMEWORK_NAMES } from '../soa/utils/constants';
 import { computePeopleScore } from './frameworks-people-score.helper';
 
-const SIX_MONTHS_MS = 6 * 30 * 24 * 60 * 60 * 1000;
-
-export { computeFrameworkComplianceScore } from './frameworks-compliance-score.helper';
 
 export async function getOverviewScores(organizationId: string) {
   const [allPolicies, allTasks, employees, onboarding, org, hipaaInstance] =
@@ -100,7 +98,7 @@ async function computeDocumentsScore(organizationId: string) {
   const [groupedStatuses, isoFrameworkInstances, settings] = await Promise.all([
     db.evidenceSubmission.groupBy({
       by: ['formType'],
-      where: { organizationId },
+      where: { organizationId, status: { not: 'rejected' } },
       _max: { submittedAt: true },
     }),
     db.frameworkInstance.findMany({
@@ -144,19 +142,19 @@ async function computeDocumentsScore(organizationId: string) {
   );
   const nonSOAOutstandingDocuments = includedForms.reduce((count, form) => {
     if (form.type === 'meeting') {
-      const allMeetingsOutstanding = meetingSubTypeValues.every((subType) => {
-        const lastSubmitted = statuses[subType]?.lastSubmittedAt;
-        return (
-          !lastSubmitted ||
-          Date.now() - new Date(lastSubmitted).getTime() > SIX_MONTHS_MS
-        );
-      });
+      const allMeetingsOutstanding = meetingSubTypeValues.every(
+        (subType) =>
+          !isEvidenceFormFresh({
+            formType: subType,
+            lastSubmittedAt: statuses[subType]?.lastSubmittedAt,
+          }),
+      );
       return allMeetingsOutstanding ? count + 1 : count;
     }
-    const lastSubmitted = statuses[form.type]?.lastSubmittedAt;
-    const isOutstanding =
-      !lastSubmitted ||
-      Date.now() - new Date(lastSubmitted).getTime() > SIX_MONTHS_MS;
+    const isOutstanding = !isEvidenceFormFresh({
+      formType: form.type,
+      lastSubmittedAt: statuses[form.type]?.lastSubmittedAt,
+    });
     return isOutstanding ? count + 1 : count;
   }, 0);
 

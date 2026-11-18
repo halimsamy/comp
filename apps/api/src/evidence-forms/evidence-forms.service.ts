@@ -2,6 +2,8 @@ import { AttachmentsService } from '@/attachments/attachments.service';
 import type { AuthContext } from '@/auth/types';
 import { db, EvidenceFormType as DbEvidenceFormType } from '@db';
 import {
+  evidenceFormNextDueAt,
+  isEvidenceFormFresh,
   toDbEvidenceFormType,
   toExternalEvidenceFormType,
 } from '@trycompai/company';
@@ -227,7 +229,7 @@ export class EvidenceFormsService {
     const [results, settings] = await Promise.all([
       db.evidenceSubmission.groupBy({
         by: ['formType'],
-        where: { organizationId },
+        where: { organizationId, status: { not: 'rejected' } },
         _max: { submittedAt: true },
       }),
       db.evidenceFormSetting.findMany({
@@ -244,7 +246,13 @@ export class EvidenceFormsService {
 
     const statuses: Record<
       string,
-      { lastSubmittedAt: string | null; isNotRelevant: boolean }
+      {
+        lastSubmittedAt: string | null;
+        isNotRelevant: boolean;
+        cadenceMonths: number;
+        nextDueAt: string | null;
+        isFresh: boolean;
+      }
     > = {};
 
     for (const form of evidenceFormDefinitionList) {
@@ -252,9 +260,14 @@ export class EvidenceFormsService {
         (r) => r.formType === toDbEvidenceFormType(form.type),
       );
       const dbFormType = toDbEvidenceFormType(form.type);
+      const lastSubmittedAt = match?._max.submittedAt ?? null;
       statuses[form.type] = {
-        lastSubmittedAt: match?._max.submittedAt?.toISOString() ?? null,
+        lastSubmittedAt: lastSubmittedAt?.toISOString() ?? null,
         isNotRelevant: notRelevantFormTypes.has(dbFormType),
+        cadenceMonths: form.cadenceMonths,
+        nextDueAt:
+          evidenceFormNextDueAt({ formType: form.type, lastSubmittedAt })?.toISOString() ?? null,
+        isFresh: isEvidenceFormFresh({ formType: form.type, lastSubmittedAt }),
       };
     }
 

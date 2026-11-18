@@ -1,6 +1,7 @@
 'use client';
 
-import { getRequirementStatus } from '@/lib/control-compliance';
+import { documentCounts, getRequirementStatusBadge } from '@/lib/control-compliance';
+import { ApplicabilityTag } from './ApplicabilityTag';
 import { Badge, TableCell, TableRow, Text } from '@trycompai/design-system';
 import { Launch } from '@trycompai/design-system/icons';
 import Link from 'next/link';
@@ -18,7 +19,8 @@ export function GroupedRequirementRow({
   frameworkInstanceId: string;
   onRowClick: (requirementId: string) => void;
 }) {
-  const status = getRequirementStatus(item.controlStatuses);
+  const status = getRequirementStatusBadge(item.status);
+  const documents = documentCounts(item.artifactCounts);
   const identifier = item.identifier?.trim();
   const href = `/${orgId}/frameworks/${frameworkInstanceId}/requirements/${item.id}`;
 
@@ -65,7 +67,10 @@ export function GroupedRequirementRow({
         </div>
       </TableCell>
       <TableCell>
-        <Badge variant={status.variant}>{status.label}</Badge>
+        <div className="flex flex-wrap items-center gap-1">
+          <Badge variant={status.variant}>{status.label}</Badge>
+          <ApplicabilityTag applicability={item.applicability} />
+        </div>
       </TableCell>
       <TableCell>
         <div className="tabular-nums">
@@ -91,7 +96,7 @@ export function GroupedRequirementRow({
       <TableCell>
         <div className="tabular-nums">
           <Text size="sm" variant="muted">
-            {item.artifactCounts.documents.completed}/{item.artifactCounts.documents.total}
+            {documents.completed}/{documents.total}
           </Text>
         </div>
       </TableCell>

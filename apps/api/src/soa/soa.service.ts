@@ -48,6 +48,7 @@ import {
   checkIfFullyRemote,
   type SOAStorageLogger,
 } from './utils/soa-storage';
+import { syncSoaApplicability } from './utils/soa-applicability-sync';
 
 @Injectable()
 export class SOAService {
@@ -170,8 +171,18 @@ export class SOAService {
       document.totalQuestions,
       answeredCount,
     );
+    await this.syncApplicability(dto.documentId);
 
     return { success: true };
+  }
+
+  /** Keeps ISO requirement applicability (and so framework scoring) in line with the SoA. */
+  private async syncApplicability(documentId: string): Promise<void> {
+    try {
+      await syncSoaApplicability({ documentId, logger: this.storageLogger });
+    } catch (error) {
+      this.logger.error('Failed to sync SoA applicability', { documentId, error });
+    }
   }
 
   async createDocument(dto: CreateSOADocumentDto) {
@@ -380,6 +391,7 @@ export class SOAService {
         declinedAt: null,
       },
     });
+    await this.syncApplicability(dto.documentId);
 
     return { success: true, data: updatedDocument };
   }
@@ -654,11 +666,8 @@ export class SOAService {
     totalQuestions: number,
     answeredCount: number,
   ): Promise<void> {
-    return updateDocumentAfterAutoFill(
-      documentId,
-      totalQuestions,
-      answeredCount,
-    );
+    await updateDocumentAfterAutoFill(documentId, totalQuestions, answeredCount);
+    await this.syncApplicability(documentId);
   }
 
   // Private helper methods

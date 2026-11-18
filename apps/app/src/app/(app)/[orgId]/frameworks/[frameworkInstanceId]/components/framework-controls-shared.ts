@@ -1,14 +1,13 @@
-import type { StatusType } from '@/components/status-indicator';
 import {
-  type EvidenceSubmissionInfo,
-  type RequirementArtifactCounts,
-  getControlProgressPercent,
-  getControlStatus,
-  getRequirementArtifactCounts,
-  getRequirementCompliancePercent,
+  type ArtifactCounts,
+  type ApplicabilityStatus,
+  type FrameworkScores,
+  type RequirementScoreStatus,
+  type StatusBadge,
+  getRequirementScore,
 } from '@/lib/control-compliance';
 import type { FrameworkInstanceWithControls } from '@/lib/types/framework';
-import type { Control, FrameworkEditorRequirement, Task } from '@db';
+import type { FrameworkEditorRequirement } from '@db';
 
 export const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
@@ -17,10 +16,7 @@ export interface ControlItem {
   requirements: Array<{ id: string; name: string; identifier: string }>;
 }
 
-export function getStatusBadge(status: StatusType): {
-  label: string;
-  variant: 'default' | 'secondary' | 'destructive';
-} {
+export function getStatusBadge(status: string): StatusBadge {
   switch (status) {
     case 'completed':
       return { label: 'Satisfied', variant: 'default' };
@@ -28,6 +24,8 @@ export function getStatusBadge(status: StatusType): {
       return { label: 'In Progress', variant: 'secondary' };
     case 'not_relevant':
       return { label: 'Not Relevant', variant: 'secondary' };
+    case 'not_applicable':
+      return { label: 'Not Applicable', variant: 'outline' };
     default:
       return { label: 'Not Started', variant: 'destructive' };
   }
@@ -116,8 +114,9 @@ export interface RequirementItem extends FrameworkEditorRequirement {
   mappedControlsCount: number;
   satisfiedControlsCount: number;
   compliancePercent: number;
-  controlStatuses: StatusType[];
-  artifactCounts: RequirementArtifactCounts;
+  status: RequirementScoreStatus;
+  applicability: ApplicabilityStatus;
+  artifactCounts: ArtifactCounts;
 }
 
 export interface RequirementFamilyGroup {
@@ -205,34 +204,21 @@ export function groupRequirementsByFamily(items: RequirementItem[]): Requirement
   return groups;
 }
 
+/** Requirement rows carrying the API score (see lib/control-compliance). */
 export function buildRequirementItems(
   requirementDefinitions: FrameworkEditorRequirement[],
-  controls: FrameworkInstanceWithControls['controls'],
-  tasks: (Task & { controls: Control[] })[],
-  evidenceSubmissions: EvidenceSubmissionInfo[],
+  scores: FrameworkScores | null | undefined,
 ): RequirementItem[] {
   return requirementDefinitions.map((def) => {
-    const mappedControls = controls.filter(
-      (control) =>
-        control.requirementsMapped?.some((rm) => rm.requirementId === def.id) ?? false,
-    );
-
-    const controlStatuses = mappedControls.map((c) =>
-      getControlStatus(c.policies, tasks, c.id, c.controlDocumentTypes, evidenceSubmissions),
-    );
-    const satisfiedControlsCount = controlStatuses.filter((s) => s === 'completed').length;
-
-    const progressPercents = mappedControls.map((c) =>
-      getControlProgressPercent(c.policies, tasks, c.id, c.controlDocumentTypes, evidenceSubmissions),
-    );
-
+    const score = getRequirementScore(scores, def.id);
     return {
       ...def,
-      mappedControlsCount: mappedControls.length,
-      satisfiedControlsCount,
-      compliancePercent: getRequirementCompliancePercent(progressPercents),
-      controlStatuses,
-      artifactCounts: getRequirementArtifactCounts(mappedControls, tasks, evidenceSubmissions),
+      mappedControlsCount: score.controlsTotal,
+      satisfiedControlsCount: score.controlsComplete,
+      compliancePercent: score.percent,
+      status: score.status,
+      applicability: score.applicability,
+      artifactCounts: score.counts,
     };
   });
 }

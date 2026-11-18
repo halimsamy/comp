@@ -33,6 +33,8 @@ export type EvidenceFormDefinition = {
   description: string;
   category: string;
   submissionDateMode: 'custom' | 'auto';
+  // How long a submission stays current; drives freshness and the next due date.
+  cadenceMonths: number;
   portalAccessible: boolean;
   fields: ReadonlyArray<EvidenceFormFieldDefinition>;
   optional?: boolean;
