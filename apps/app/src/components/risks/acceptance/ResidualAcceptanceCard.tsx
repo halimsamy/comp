@@ -10,6 +10,7 @@ import {
   type AcceptanceSubjectKind,
   type RiskAcceptanceEvent,
 } from '@/hooks/use-risk-acceptances';
+import { isAcceptanceRequired, useRiskSettings } from '@/hooks/use-risk-workspace';
 import { getRiskLevelFromScore, getRiskScore, LEVEL_LABEL } from '@/lib/risk-score';
 import { RecordAcceptanceDialog, type AcceptorOption } from './RecordAcceptanceDialog';
 
@@ -65,11 +66,15 @@ export function ResidualAcceptanceCard({
     subjectId,
   );
   const [dialogOpen, setDialogOpen] = useState(false);
+  const { settings } = useRiskSettings();
 
-  const currentLevelLabel =
-    LEVEL_LABEL[
-      getRiskLevelFromScore(getRiskScore(residualLikelihood, residualImpact).score)
-    ];
+  const currentLevel = getRiskLevelFromScore(getRiskScore(residualLikelihood, residualImpact).score);
+  const currentLevelLabel = LEVEL_LABEL[currentLevel];
+  // The 6.1.2 methodology sets the lowest level that needs owner acceptance.
+  // Until it loads (or without risk:read) we keep asking, the safe default.
+  const notRequired =
+    settings !== null &&
+    !isAcceptanceRequired({ level: currentLevel, threshold: settings.acceptanceRequiredFromLevel });
   const subjectLabel = kind === 'risk' ? 'risk' : "vendor's risk";
   // Stale is derived CLIENT-side from the frozen rating on each event vs the
   // live residual props (which the risk/vendor SWR keeps fresh) — the cached
@@ -98,8 +103,11 @@ export function ResidualAcceptanceCard({
             <h3 className="text-lg font-normal tracking-[-0.01em]">Residual risk acceptance</h3>
             {latest && !latestStale && <Badge variant="accent">Accepted</Badge>}
             {latest && latestStale && <Badge variant="destructive">Stale</Badge>}
-            {!latest && !isLoading && !error && (
+            {!latest && !isLoading && !error && !notRequired && (
               <Badge variant="secondary">Awaiting acceptance</Badge>
+            )}
+            {!latest && !isLoading && !error && notRequired && (
+              <Badge variant="outline">Not required</Badge>
             )}
           </div>
           <div className="text-xs text-muted-foreground">
@@ -145,6 +153,12 @@ export function ResidualAcceptanceCard({
             </Text>
           )}
         </div>
+      ) : notRequired && settings ? (
+        <Text variant="muted">
+          No acceptance needed: the residual level ({currentLevelLabel}) is below the{' '}
+          {LEVEL_LABEL[settings.acceptanceRequiredFromLevel].toLowerCase()} threshold set in your
+          Risk Assessment Methodology (6.1.2).
+        </Text>
       ) : (
         <Text variant="muted">
           No acceptance recorded yet. The current residual level is {currentLevelLabel}.

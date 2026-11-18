@@ -1,6 +1,9 @@
 import { db } from '@db';
 import type { Impact, Likelihood, Prisma } from '@db';
 import { LEVEL_LABEL, ratingLevel } from '../../risks/risk-level';
+import { loadRiskMethodologySettings } from '../../risks/load-risk-methodology-settings';
+import { isAcceptanceRequired } from '../../risks/risk-methodology-settings';
+import type { RiskLevel } from '../../risks/risk-level';
 import { formatExportDate } from '../utils/export-shared';
 import type {
   AcceptanceExportState,
@@ -53,11 +56,24 @@ function resolveAcceptance({
   latest,
   residualLikelihood,
   residualImpact,
+  threshold,
 }: {
   latest: LatestAcceptance | undefined;
   residualLikelihood: Likelihood;
   residualImpact: Impact;
+  /** 6.1.2 methodology: lowest residual level that needs owner acceptance. */
+  threshold: RiskLevel;
 }): { acceptance: string; acceptanceState: AcceptanceExportState } {
+  const required = isAcceptanceRequired({
+    level: ratingLevel(residualLikelihood, residualImpact),
+    threshold,
+  });
+  if (!latest && !required) {
+    return {
+      acceptance: 'Not required (below the methodology acceptance threshold)',
+      acceptanceState: 'not_required',
+    };
+  }
   if (!latest) {
     return { acceptance: 'Awaiting acceptance', acceptanceState: 'awaiting' };
   }
@@ -84,7 +100,7 @@ export async function loadRiskTreatmentExtras({
   client?: Prisma.TransactionClient;
 }): Promise<RiskTreatmentExtras> {
   const dbc = client ?? db;
-  const [risks, vendors, acceptances] = await Promise.all([
+  const [risks, vendors, acceptances, settings] = await Promise.all([
     // Archived risks are retired from the register and stay out of the plan.
     dbc.risk.findMany({
       where: { organizationId, status: { not: 'archived' } },
@@ -132,7 +148,9 @@ export async function loadRiskTreatmentExtras({
         createdAt: true,
       },
     }),
+    loadRiskMethodologySettings({ organizationId, client }),
   ]);
+  const threshold = settings.acceptanceRequiredFromLevel;
 
   // Newest-first order means the first acceptance seen per subject is the latest.
   const latestByRisk = new Map<string, LatestAcceptance>();
@@ -160,6 +178,7 @@ export async function loadRiskTreatmentExtras({
         latest: latestByRisk.get(risk.id),
         residualLikelihood: risk.residualLikelihood,
         residualImpact: risk.residualImpact,
+        threshold,
       }),
       status: humanizeEnum(risk.status),
     })),
@@ -178,6 +197,7 @@ export async function loadRiskTreatmentExtras({
         latest: latestByVendor.get(vendor.id),
         residualLikelihood: vendor.residualProbability,
         residualImpact: vendor.residualImpact,
+        threshold,
       }),
       status: humanizeEnum(vendor.status),
     })),

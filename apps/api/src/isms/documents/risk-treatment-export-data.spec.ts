@@ -2,6 +2,7 @@ const mockDb = {
   risk: { findMany: jest.fn() },
   vendor: { findMany: jest.fn() },
   riskAcceptance: { findMany: jest.fn() },
+  ismsDocument: { findFirst: jest.fn() },
 };
 
 jest.mock('@db', () => ({ db: mockDb }));
@@ -42,7 +43,11 @@ function seed({
   risks = [baseRisk],
   vendors = [baseVendor],
   acceptances = [] as Array<Record<string, unknown>>,
+  methodology = null as Record<string, unknown> | null,
 } = {}) {
+  mockDb.ismsDocument.findFirst.mockResolvedValue(
+    methodology ? { draftNarrative: methodology } : null,
+  );
   mockDb.risk.findMany.mockResolvedValue(risks);
   mockDb.vendor.findMany.mockResolvedValue(vendors);
   mockDb.riskAcceptance.findMany.mockResolvedValue(acceptances);
@@ -66,8 +71,8 @@ describe('loadRiskTreatmentExtras', () => {
       controls: 'IaC review; drift detection.',
       ownerName: 'Jane Doe',
       residualLevel: 'Very low', // unlikely(2) x minor(2) = raw 4 -> score 2
-      acceptance: 'Awaiting acceptance',
-      acceptanceState: 'awaiting',
+      // Very low is under the default (medium) methodology threshold.
+      acceptanceState: 'not_required',
       status: 'Open',
     });
     expect(extras.vendors[0]).toMatchObject({
@@ -77,6 +82,32 @@ describe('loadRiskTreatmentExtras', () => {
       ownerName: '—',
       status: 'Assessed',
     });
+  });
+
+  it('asks for acceptance when the methodology threshold covers the residual level', async () => {
+    seed({ methodology: { acceptanceRequiredFromLevel: 'very-low' } });
+
+    const extras = await loadRiskTreatmentExtras({ organizationId: ORG });
+
+    expect(extras.risks[0]).toMatchObject({
+      acceptance: 'Awaiting acceptance',
+      acceptanceState: 'awaiting',
+    });
+    expect(extras.vendors[0].acceptanceState).toBe('awaiting');
+  });
+
+  it('skips acceptance below the default threshold but not at it', async () => {
+    seed({
+      vendors: [
+        { ...baseVendor, residualProbability: 'possible', residualImpact: 'major' },
+      ],
+    });
+
+    const extras = await loadRiskTreatmentExtras({ organizationId: ORG });
+
+    expect(extras.risks[0].acceptanceState).toBe('not_required');
+    // possible(3) x major(4) = raw 12 -> score 5 -> medium: needs acceptance.
+    expect(extras.vendors[0].acceptanceState).toBe('awaiting');
   });
 
   it('excludes archived risks from the plan', async () => {

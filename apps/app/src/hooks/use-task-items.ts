@@ -21,6 +21,8 @@ export interface TaskItem {
   priority: TaskItemPriority;
   entityId: string;
   entityType: TaskItemEntityType;
+  dueDate?: string | null;
+  completedAt?: string | null;
   assignee: {
     id: string;
     user: {
@@ -83,6 +85,7 @@ interface CreateTaskItemData {
   entityId: string;
   entityType: TaskItemEntityType;
   assigneeId?: string;
+  dueDate?: string;
 }
 
 interface UpdateTaskItemData {
@@ -91,6 +94,7 @@ interface UpdateTaskItemData {
   status?: TaskItemStatus;
   priority?: TaskItemPriority;
   assigneeId?: string | null;
+  dueDate?: string | null;
 }
 
 export type TaskItemSortBy = 'createdAt' | 'updatedAt' | 'title' | 'status' | 'priority';

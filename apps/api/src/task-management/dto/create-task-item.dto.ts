@@ -1,5 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsOptional, IsEnum } from 'class-validator';
+import {
+  IsDateString,
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 import { TaskItemEntityType, TaskItemStatus, TaskItemPriority } from '@db';
 
 export class CreateTaskItemDto {
@@ -49,4 +55,12 @@ export class CreateTaskItemDto {
   @IsString()
   @IsNotEmpty()
   assigneeId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Target completion date (ISO 8601)',
+    example: '2026-12-31',
+  })
+  @IsOptional()
+  @IsDateString()
+  dueDate?: string;
 }

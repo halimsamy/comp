@@ -171,6 +171,48 @@ describe('TaskManagementService — API key actor fallback', () => {
     });
   });
 
+  describe('treatment dates', () => {
+    const sessionMember = { id: 'mem_session', userId: 'usr_session' };
+
+    it('stamps completedAt when an item moves to done and clears it when reopened', async () => {
+      db.member.findFirst.mockResolvedValueOnce(sessionMember);
+      db.taskItem.findFirst.mockResolvedValueOnce({ ...builtTaskItem, status: 'todo' });
+      db.taskItem.update.mockResolvedValueOnce({ ...builtTaskItem, status: 'done' });
+      await service.updateTaskItem(taskItemId, orgId, sessionAuth, { status: 'done' } as never);
+      expect(db.taskItem.update.mock.calls[0][0].data.completedAt).toBeInstanceOf(Date);
+
+      db.member.findFirst.mockResolvedValueOnce(sessionMember);
+      db.taskItem.findFirst.mockResolvedValueOnce({ ...builtTaskItem, status: 'done' });
+      db.taskItem.update.mockResolvedValueOnce({ ...builtTaskItem, status: 'todo' });
+      await service.updateTaskItem(taskItemId, orgId, sessionAuth, { status: 'todo' } as never);
+      expect(db.taskItem.update.mock.calls[1][0].data.completedAt).toBeNull();
+    });
+
+    it('keeps completedAt when the status is re-sent unchanged and parses due dates', async () => {
+      db.member.findFirst.mockResolvedValueOnce(sessionMember);
+      db.taskItem.findFirst.mockResolvedValueOnce({ ...builtTaskItem, status: 'done' });
+      db.taskItem.update.mockResolvedValueOnce({ ...builtTaskItem, status: 'done' });
+      await service.updateTaskItem(taskItemId, orgId, sessionAuth, {
+        status: 'done',
+        dueDate: '2026-12-31',
+      } as never);
+      const data = db.taskItem.update.mock.calls[0][0].data;
+      expect(data).not.toHaveProperty('completedAt');
+      expect(data.dueDate).toEqual(new Date('2026-12-31'));
+    });
+
+    it('returns dueDate and completedAt on the response', async () => {
+      const due = new Date('2026-12-31');
+      db.member.findFirst.mockResolvedValueOnce(sessionMember);
+      db.taskItem.findFirst.mockResolvedValueOnce({ ...builtTaskItem });
+      db.taskItem.update.mockResolvedValueOnce({ ...builtTaskItem, dueDate: due, completedAt: null });
+      const result = await service.updateTaskItem(taskItemId, orgId, sessionAuth, {
+        dueDate: '2026-12-31',
+      } as never);
+      expect(result).toMatchObject({ dueDate: due, completedAt: null });
+    });
+  });
+
   describe('createTaskItem', () => {
     it('creates via API key using an owner fallback and logs it as via API key', async () => {
       db.member.findFirst.mockResolvedValueOnce({

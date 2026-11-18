@@ -22,6 +22,12 @@ import {
   METHODOLOGY_LIKELIHOOD_LABELS,
   METHODOLOGY_TREATMENT_LABELS,
 } from './risk-methodology-defaults';
+import {
+  acceptanceRequiredFromLevelSchema,
+  DEFAULT_RISK_METHODOLOGY_SETTINGS,
+  parseRiskMethodologySettings,
+  reviewIntervalMonthsSchema,
+} from '../../risks/risk-methodology-settings';
 
 /**
  * Narrative shape persisted in IsmsDocument.draftNarrative for
@@ -46,6 +52,9 @@ export const riskMethodologyNarrativeSchema = z.object({
   responsibilities: z.string(),
   frequency: z.string(),
   documentation: z.string(),
+  /** Structured settings the Risks module reads (risk-methodology-settings.ts). */
+  acceptanceRequiredFromLevel: acceptanceRequiredFromLevelSchema.optional(),
+  reviewIntervalMonths: reviewIntervalMonthsSchema.optional(),
 });
 
 export type RiskMethodologyNarrative = z.infer<
@@ -73,6 +82,7 @@ export function defaultRiskMethodologyNarrative(
     responsibilities: defaultMethodologyResponsibilities(),
     frequency: defaultMethodologyFrequency(),
     documentation: defaultMethodologyDocumentation(),
+    ...DEFAULT_RISK_METHODOLOGY_SETTINGS,
   };
 }
 
@@ -135,6 +145,7 @@ export function buildRiskMethodologySections(
     ];
   }
   const narrative = parsed.data;
+  const settings = parseRiskMethodologySettings(narrative);
 
   return [
     { heading: 'Purpose', paragraphs: [{ text: narrative.purpose }] },
@@ -173,7 +184,7 @@ export function buildRiskMethodologySections(
     },
     {
       heading: 'Acceptance thresholds',
-      intro: 'Risk levels trigger different acceptance requirements:',
+      intro: `Risk levels trigger different acceptance requirements. Comp AI asks the risk owner for a formal acceptance from a ${LEVEL_LABEL[settings.acceptanceRequiredFromLevel]} residual level upward:`,
       table: {
         headers: ['Risk level', 'Acceptance requirement'],
         rows: labelledRows(
@@ -196,7 +207,12 @@ export function buildRiskMethodologySections(
     },
     {
       heading: 'Frequency of assessment',
-      paragraphs: [{ text: narrative.frequency }],
+      paragraphs: [
+        { text: narrative.frequency },
+        {
+          text: `Comp AI schedules a signed-off review of the whole register every ${settings.reviewIntervalMonths} month(s) (ISO 27001 Clause 8.2) and keeps each review in its history.`,
+        },
+      ],
     },
     {
       heading: 'Documentation approach',

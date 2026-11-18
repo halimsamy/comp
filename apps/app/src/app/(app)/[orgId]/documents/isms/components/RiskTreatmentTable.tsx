@@ -30,11 +30,13 @@ export interface RiskTreatmentTableRow {
 
 const ACCEPTANCE_BADGE: Record<
   IsmsAcceptanceState,
-  { variant: 'accent' | 'secondary' | 'destructive'; label: string }
+  { variant: 'accent' | 'secondary' | 'destructive' | 'outline'; label: string }
 > = {
   accepted: { variant: 'accent', label: 'Accepted' },
   awaiting: { variant: 'secondary', label: 'Awaiting acceptance' },
   stale: { variant: 'destructive', label: 'Stale' },
+  // Below the 6.1.2 methodology's acceptance threshold.
+  not_required: { variant: 'outline', label: 'Not required' },
 };
 
 interface RiskTreatmentTableProps {
@@ -104,7 +106,7 @@ export function RiskTreatmentTable({
                 <TableCell>
                   <span className="flex min-w-40 flex-col items-start gap-1">
                     <Badge variant={badge.variant}>{badge.label}</Badge>
-                    {row.acceptanceState !== 'awaiting' && (
+                    {(row.acceptanceState === 'accepted' || row.acceptanceState === 'stale') && (
                       <span className="whitespace-normal text-xs text-muted-foreground">
                         {row.acceptance}
                       </span>

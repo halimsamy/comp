@@ -18,6 +18,16 @@ vi.mock('@/hooks/use-risk-acceptances', () => ({
   }),
 }));
 
+let mockSettings: { acceptanceRequiredFromLevel: string; reviewIntervalMonths: number } | null = null;
+
+vi.mock('@/hooks/use-risk-workspace', () => ({
+  useRiskSettings: () => ({ settings: mockSettings }),
+  isAcceptanceRequired: ({ level, threshold }: { level: string; threshold: string }) => {
+    const order = ['very-low', 'low', 'medium', 'high', 'very-high'];
+    return order.indexOf(level) >= order.indexOf(threshold);
+  },
+}));
+
 vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
@@ -54,6 +64,21 @@ describe('ResidualAcceptanceCard', () => {
     vi.clearAllMocks();
     mockAcceptances = [];
     mockIsLoading = false;
+    mockSettings = null;
+  });
+
+  it('says no acceptance is needed below the methodology threshold', () => {
+    // unlikely x minor = very low, under a medium threshold.
+    mockSettings = { acceptanceRequiredFromLevel: 'medium', reviewIntervalMonths: 3 };
+    renderCard();
+    expect(screen.getByText('Not required')).toBeInTheDocument();
+    expect(screen.queryByText('Awaiting acceptance')).not.toBeInTheDocument();
+  });
+
+  it('still asks for acceptance at or above the threshold', () => {
+    mockSettings = { acceptanceRequiredFromLevel: 'very-low', reviewIntervalMonths: 3 };
+    renderCard();
+    expect(screen.getByText('Awaiting acceptance')).toBeInTheDocument();
   });
 
   it('shows the awaiting state when no acceptance is recorded', () => {

@@ -6,6 +6,7 @@ import { Controller, useForm } from 'react-hook-form';
 import { z } from 'zod';
 import type { IsmsRiskMethodologyNarrative } from '../isms-types';
 import { MethodologyLabelledList } from './MethodologyLabelledList';
+import { METHODOLOGY_LEVELS, MethodologyRiskSettingsFields } from './MethodologyRiskSettingsFields';
 import {
   METHODOLOGY_IMPACT_LABELS,
   METHODOLOGY_LEVEL_LABELS,
@@ -27,6 +28,8 @@ const methodologySchema = z.object({
   responsibilities: z.string().trim().min(1, 'Responsibilities are required'),
   frequency: z.string().trim().min(1, 'Frequency is required'),
   documentation: z.string().trim().min(1, 'Documentation approach is required'),
+  acceptanceRequiredFromLevel: z.enum(METHODOLOGY_LEVELS),
+  reviewIntervalMonths: z.number().int().min(1).max(24),
 });
 
 export type RiskMethodologyValues = z.infer<typeof methodologySchema>;
@@ -52,6 +55,9 @@ function toDefaults(narrative: IsmsRiskMethodologyNarrative): RiskMethodologyVal
     responsibilities: narrative.responsibilities ?? '',
     frequency: narrative.frequency ?? '',
     documentation: narrative.documentation ?? '',
+    // Same defaults as the API (risk-methodology-settings.ts).
+    acceptanceRequiredFromLevel: narrative.acceptanceRequiredFromLevel ?? 'medium',
+    reviewIntervalMonths: narrative.reviewIntervalMonths ?? 3,
   };
 }
 
@@ -189,6 +195,15 @@ export function RiskMethodologyForm({ narrative, canEdit, onSave }: RiskMethodol
         canEdit={canEdit}
         values={watch('acceptanceThresholds')}
         rowErrors={errors.acceptanceThresholds?.map?.((e) => e?.message)}
+      />
+
+      <MethodologyRiskSettingsFields
+        control={control}
+        canEdit={canEdit}
+        values={{
+          acceptanceRequiredFromLevel: watch('acceptanceRequiredFromLevel'),
+          reviewIntervalMonths: watch('reviewIntervalMonths'),
+        }}
       />
 
       <MethodologyLabelledList<RiskMethodologyValues>

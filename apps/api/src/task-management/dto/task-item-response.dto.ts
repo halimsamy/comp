@@ -62,6 +62,12 @@ export class TaskItemResponseDto {
   @ApiProperty({ description: 'Type of entity', enum: TaskItemEntityType })
   entityType: TaskItemEntityType;
 
+  @ApiProperty({ description: 'Target completion date', nullable: true })
+  dueDate: Date | null;
+
+  @ApiProperty({ description: 'When the item was marked done', nullable: true })
+  completedAt: Date | null;
+
   @ApiProperty({
     description: 'Assignee information',
     nullable: true,

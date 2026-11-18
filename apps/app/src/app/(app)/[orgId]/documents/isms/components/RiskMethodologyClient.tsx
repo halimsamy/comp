@@ -6,6 +6,7 @@ import type {
   IsmsRiskMethodologyNarrative,
 } from '../isms-types';
 import { IsmsDocumentShell } from './IsmsDocumentShell';
+import { METHODOLOGY_LEVELS } from './MethodologyRiskSettingsFields';
 import type { ApproverOption } from './IsmsApprovalSection';
 import { RiskMethodologyForm, type RiskMethodologyValues } from './RiskMethodologyForm';
 
@@ -48,6 +49,11 @@ function toMethodologyNarrative(value: unknown): IsmsRiskMethodologyNarrative {
     responsibilities: toStr(record.responsibilities),
     frequency: toStr(record.frequency),
     documentation: toStr(record.documentation),
+    acceptanceRequiredFromLevel: METHODOLOGY_LEVELS.find(
+      (level) => level === record.acceptanceRequiredFromLevel,
+    ),
+    reviewIntervalMonths:
+      typeof record.reviewIntervalMonths === 'number' ? record.reviewIntervalMonths : undefined,
   };
 }
 

@@ -1,6 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { TaskItemPriority, TaskItemStatus } from '@db';
 import {
+  IsDateString,
   IsEnum,
   IsNotEmpty,
   IsOptional,
@@ -44,4 +45,14 @@ export class UpdateTaskItemDto {
   @ValidateIf((o) => o.assigneeId !== null)
   @IsString()
   assigneeId?: string | null;
+
+  @ApiPropertyOptional({
+    description: 'Target completion date (ISO 8601); null clears it',
+    nullable: true,
+    example: '2026-12-31',
+  })
+  @IsOptional()
+  @ValidateIf((o) => o.dueDate !== null)
+  @IsDateString()
+  dueDate?: string | null;
 }

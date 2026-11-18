@@ -238,6 +238,8 @@ export class TaskManagementService {
         priority: taskItem.priority,
         entityId: taskItem.entityId,
         entityType: taskItem.entityType,
+        dueDate: taskItem.dueDate,
+        completedAt: taskItem.completedAt,
         assignee: taskItem.assignee
           ? {
               id: taskItem.assignee.id,
@@ -329,6 +331,12 @@ export class TaskManagementService {
       const taskItem = await db.taskItem.create({
         data: {
           ...createTaskItemDto,
+          dueDate: createTaskItemDto.dueDate
+            ? new Date(createTaskItemDto.dueDate)
+            : undefined,
+          ...(createTaskItemDto.status === TaskItemStatus.done && {
+            completedAt: new Date(),
+          }),
           organizationId,
           ...(createTaskItemDto.assigneeId && {
             assigneeId: createTaskItemDto.assigneeId,
@@ -426,6 +434,8 @@ export class TaskManagementService {
         priority: taskItem.priority,
         entityId: taskItem.entityId,
         entityType: taskItem.entityType,
+        dueDate: taskItem.dueDate,
+        completedAt: taskItem.completedAt,
         assignee: taskItem.assignee
           ? {
               id: taskItem.assignee.id,
@@ -505,6 +515,8 @@ export class TaskManagementService {
         status?: TaskItemStatus;
         priority?: TaskItemPriority;
         assigneeId?: string | null;
+        dueDate?: Date | null;
+        completedAt?: Date | null;
         updatedById: string;
       } = {
         updatedById: actor.memberId,
@@ -518,6 +530,16 @@ export class TaskManagementService {
       }
       if (updateTaskItemDto.status !== undefined) {
         updateData.status = updateTaskItemDto.status;
+        // Completion date tracks the move into / out of done (treatment evidence).
+        if (updateTaskItemDto.status !== existingTaskItem.status) {
+          updateData.completedAt =
+            updateTaskItemDto.status === TaskItemStatus.done ? new Date() : null;
+        }
+      }
+      if (updateTaskItemDto.dueDate !== undefined) {
+        updateData.dueDate = updateTaskItemDto.dueDate
+          ? new Date(updateTaskItemDto.dueDate)
+          : null;
       }
       if (updateTaskItemDto.priority !== undefined) {
         updateData.priority = updateTaskItemDto.priority;
@@ -669,6 +691,8 @@ export class TaskManagementService {
         priority: taskItem.priority,
         entityId: taskItem.entityId,
         entityType: taskItem.entityType,
+        dueDate: taskItem.dueDate,
+        completedAt: taskItem.completedAt,
         assignee: taskItem.assignee
           ? {
               id: taskItem.assignee.id,

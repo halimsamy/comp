@@ -64,7 +64,14 @@ import {
   parseAsString,
   useQueryState,
 } from 'nuqs';
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
+import { parseHeatmapCell, riskInCell } from '@/components/risks/workspace/heatmap-cells';
+import {
+  parseGroupBy,
+  registerGroup,
+  sortByGroup,
+} from '@/components/risks/workspace/register-grouping';
+import { RegisterViewControls } from '@/components/risks/workspace/RegisterViewControls';
 import { toast } from 'sonner';
 import { RiskOnboardingProvider } from './components/risk-onboarding-context';
 import { RisksLoadingAnimation } from './components/risks-loading-animation';
@@ -187,6 +194,14 @@ export const RisksTable = ({
     'severity',
     parseAsString.withDefault(''),
   );
+  const [categoryFilter, setCategoryFilter] = useQueryState(
+    'category',
+    parseAsString.withDefault(''),
+  );
+  const [groupParam, setGroupParam] = useQueryState('group', parseAsString.withDefault(''));
+  const [cellParam, setCellParam] = useQueryState('cell', parseAsString);
+  const groupBy = parseGroupBy(groupParam);
+  const cellFilter = useMemo(() => parseHeatmapCell(cellParam), [cellParam]);
   const [sort, setSort] = useQueryState(
     'sort',
     getSortingStateParser<RiskType>().withDefault([{ id: 'title', desc: false }]),
@@ -199,8 +214,10 @@ export const RisksTable = ({
   // Without this, severity filtering would only see whatever happened to
   // be on the current server page — causing wrong/missing results and an
   // incorrect total count. (Cubic finding #27 on PR #2671.)
-  const FILTER_ALL_PAGE_SIZE = 1000;
-  const fetchAllForSeverity = Boolean(severityFilter);
+  // The API caps perPage at 250 (a larger value is rejected with a 400).
+  const FILTER_ALL_PAGE_SIZE = 250;
+  // Heatmap cell and grouping also work on the full set, like severity.
+  const fetchAllForSeverity = Boolean(severityFilter || cellFilter || groupBy);
   const queryParams = useMemo<RisksQueryParams>(() => {
     const currentSort = sort[0];
     return {
@@ -209,12 +226,13 @@ export const RisksTable = ({
       ...(title && { title }),
       ...(statusFilter && { status: statusFilter }),
       ...(assigneeFilter && { assigneeId: assigneeFilter }),
+      ...(categoryFilter && { category: categoryFilter }),
       ...(currentSort && {
         sort: currentSort.id,
         sortDirection: currentSort.desc ? 'desc' as const : 'asc' as const,
       }),
     };
-  }, [page, perPage, title, statusFilter, assigneeFilter, sort, fetchAllForSeverity]);
+  }, [page, perPage, title, statusFilter, assigneeFilter, categoryFilter, sort, fetchAllForSeverity]);
 
   // Use the useRisks hook with query params
   const { data: risksData, mutate: mutateRisks } = useRisks({
@@ -233,12 +251,18 @@ export const RisksTable = ({
   // After server filtering, apply the (derived) severity filter and then
   // re-paginate client-side so totals reflect the filtered result.
   const filteredList = useMemo(() => {
-    if (!severityFilter) return fullList;
-    return fullList.filter((risk) => {
-      const score = currentSeverityScore(risk);
-      return getRiskLevelFromScore(score) === severityFilter;
+    const filtered = fullList.filter((risk) => {
+      if (cellFilter && !riskInCell({ risk, cell: cellFilter })) return false;
+      if (!severityFilter) return true;
+      return getRiskLevelFromScore(currentSeverityScore(risk)) === severityFilter;
     });
-  }, [fullList, severityFilter]);
+    if (!groupBy) return filtered;
+    return sortByGroup({
+      risks: filtered,
+      groupBy,
+      severityOf: (risk) => getRiskLevelFromScore(currentSeverityScore(risk)),
+    });
+  }, [fullList, severityFilter, cellFilter, groupBy]);
 
   const risks = useMemo(() => {
     if (!fetchAllForSeverity) return filteredList;
@@ -540,7 +564,13 @@ export const RisksTable = ({
               </SelectContent>
             </Select>
           </div>
-          {(severityFilter || statusFilter || assigneeFilter || title) && (
+          <RegisterViewControls
+            category={categoryFilter}
+            onCategoryChange={(value) => void setCategoryFilter(value)}
+            groupBy={groupParam}
+            onGroupByChange={(value) => void setGroupParam(value)}
+          />
+          {(severityFilter || statusFilter || assigneeFilter || title || categoryFilter || cellFilter) && (
             <Button
               variant="ghost"
               size="sm"
@@ -549,6 +579,8 @@ export const RisksTable = ({
                 void setSeverityFilter(null);
                 void setStatusFilter(null);
                 void setAssigneeFilter(null);
+                void setCategoryFilter(null);
+                void setCellParam(null);
               }}
             >
               Clear filters
@@ -643,11 +675,32 @@ export const RisksTable = ({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {mergedRisks.map((risk) => {
+                {mergedRisks.map((risk, index) => {
                   const blocked = isRowBlocked(risk);
+                  const groupOf = (row: RiskRow) =>
+                    groupBy
+                      ? registerGroup({
+                          risk: row,
+                          groupBy,
+                          severity: getRiskLevelFromScore(currentSeverityScore(row)),
+                        }).label
+                      : null;
+                  const groupLabel = groupOf(risk);
+                  const startsGroup =
+                    groupLabel !== null &&
+                    (index === 0 || groupOf(mergedRisks[index - 1]) !== groupLabel);
                   return (
+                    <Fragment key={risk.id}>
+                    {startsGroup && (
+                      <TableRow data-group-header>
+                        <TableCell colSpan={hasPermission('risk', 'delete') ? 8 : 7}>
+                          <Text size="sm" weight="semibold">
+                            {groupLabel}
+                          </Text>
+                        </TableCell>
+                      </TableRow>
+                    )}
                     <TableRow
-                      key={risk.id}
                       onClick={() => !blocked && handleRowClick(risk.id)}
                       style={{ cursor: blocked ? 'default' : 'pointer' }}
                       data-state={blocked ? 'disabled' : undefined}
@@ -723,6 +776,7 @@ export const RisksTable = ({
                         </TableCell>
                       )}
                     </TableRow>
+                    </Fragment>
                   );
                 })}
               </TableBody>
