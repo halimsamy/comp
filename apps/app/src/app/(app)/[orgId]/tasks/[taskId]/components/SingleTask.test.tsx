@@ -162,6 +162,10 @@ vi.mock('./TaskIntegrationChecks', () => ({
   TaskIntegrationChecks: () => <div data-testid="integration-checks" />,
 }));
 
+vi.mock('./TaskNativeEvidence', () => ({
+  TaskNativeEvidence: () => null,
+}));
+
 vi.mock('./TaskMainContent', () => ({
   TaskMainContent: () => <div data-testid="task-main-content" />,
 }));
