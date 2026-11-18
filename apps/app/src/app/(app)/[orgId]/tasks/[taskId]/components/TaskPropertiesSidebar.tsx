@@ -22,7 +22,7 @@ import {
   Stack,
   Text,
 } from '@trycompai/design-system';
-import { Calendar } from 'lucide-react';
+import { Calendar } from '@trycompai/design-system/icons';
 import { useState } from 'react';
 import { NotRelevantJustificationDialog } from '../../components/NotRelevantJustificationDialog';
 import { useTask } from '../hooks/use-task';
@@ -53,7 +53,10 @@ export function TaskPropertiesSidebar({
 
   if (isLoading || !task) return null;
 
-  const isStatusLocked = evidenceApprovalEnabled && task.status === 'in_review';
+  // Only an approval review locks status; an automation-set review (results
+  // attached, no approver yet) is finished by a person from here.
+  const isStatusLocked =
+    evidenceApprovalEnabled && task.status === 'in_review' && Boolean(task.approverId);
 
   const handleStatusChange = (selectedStatus: string | null) => {
     if (!selectedStatus || selectedStatus === 'none') return;
@@ -148,22 +151,8 @@ export function TaskPropertiesSidebar({
             />
           </Stack>
 
-          {/* Review Date */}
-          <Stack gap="sm">
-            <Label>Review Date</Label>
-            <InputGroup>
-              <InputGroupInput
-                type="text"
-                value={task.reviewDate ? format(new Date(task.reviewDate), 'M/d/yyyy') : ''}
-                placeholder="Not set"
-                disabled
-                readOnly
-              />
-              <InputGroupAddon align="inline-end">
-                <Calendar size={16} />
-              </InputGroupAddon>
-            </InputGroup>
-          </Stack>
+          <ReadOnlyDate label="Next Due Date" value={task.reviewDate} />
+          <ReadOnlyDate label="Last Completed" value={task.lastCompletedAt} />
 
           {/* Approver */}
           {evidenceApprovalEnabled && (
@@ -187,5 +176,26 @@ export function TaskPropertiesSidebar({
       onConfirm={handleNotRelevantConfirm}
     />
   </>
+  );
+}
+
+function ReadOnlyDate({ label, value }: { label: string; value: Date | string | null }) {
+  return (
+    <Stack gap="sm">
+      <Label>{label}</Label>
+      <InputGroup>
+        <InputGroupInput
+          type="text"
+          aria-label={label}
+          value={value ? format(new Date(value), 'M/d/yyyy') : ''}
+          placeholder="Not set"
+          disabled
+          readOnly
+        />
+        <InputGroupAddon align="inline-end">
+          <Calendar size={16} />
+        </InputGroupAddon>
+      </InputGroup>
+    </Stack>
   );
 }

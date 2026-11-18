@@ -7,7 +7,7 @@ import { OAuthCredentialsService } from '../integration-platform/services/oauth-
 import { GCPSecurityService } from './providers/gcp-security.service';
 import { AWSSecurityService } from './providers/aws-security.service';
 import { AzureSecurityService } from './providers/azure-security.service';
-import { AWS_SERVICE_TASK_MAPPINGS } from './aws-task-mappings';
+import { autoSatisfyAwsTasks } from './aws-task-auto-satisfy';
 import { CloudReconciliationService } from './reconciliation.service';
 import { resolveAwsScanMode } from './aws-scan-mode';
 import {
@@ -363,7 +363,7 @@ export class CloudSecurityService {
 
       // Auto-satisfy evidence tasks based on passing scan results (AWS only)
       if (providerSlug === 'aws') {
-        await this.autoSatisfyTasks(organizationId, findings);
+        await autoSatisfyAwsTasks({ organizationId, connectionId, findings });
       }
 
       // GCP & Azure: auto-detect services from scan findings
@@ -936,108 +936,5 @@ export class CloudSecurityService {
     });
 
     return runId;
-  }
-
-  /**
-   * Auto-satisfy evidence tasks when ALL findings for a service pass.
-   *
-   * Safety rules:
-   * - Only sets tasks to 'done' — never failed/in_progress/todo
-   * - Only when ALL findings pass for a service
-   * - Skips tasks with status 'not_relevant' (user intent)
-   * - Skips tasks already 'done' (idempotent)
-   * - Idempotent: re-running with same results is safe
-   */
-  private async autoSatisfyTasks(
-    organizationId: string,
-    findings: SecurityFinding[],
-  ): Promise<void> {
-    // Group findings by serviceId
-    const findingsByService = new Map<string, SecurityFinding[]>();
-    for (const finding of findings) {
-      const serviceId = finding.evidence?.serviceId as string | undefined;
-      if (!serviceId) continue;
-      const group = findingsByService.get(serviceId) ?? [];
-      group.push(finding);
-      findingsByService.set(serviceId, group);
-    }
-
-    // Find services where ALL findings pass
-    const passingServices: string[] = [];
-    for (const [serviceId, serviceFindings] of findingsByService) {
-      if (
-        serviceFindings.length > 0 &&
-        serviceFindings.every((f) => f.passed)
-      ) {
-        passingServices.push(serviceId);
-      }
-    }
-
-    if (passingServices.length === 0) return;
-
-    // Collect all task template IDs to satisfy
-    const templateIds = new Set<string>();
-    for (const serviceId of passingServices) {
-      const mappedTemplates = AWS_SERVICE_TASK_MAPPINGS[serviceId];
-      if (mappedTemplates) {
-        for (const id of mappedTemplates) {
-          templateIds.add(id);
-        }
-      }
-    }
-
-    if (templateIds.size === 0) return;
-
-    // For each template ID, only satisfy if ALL mapped services pass.
-    // A task template may be linked to multiple services (e.g. Encryption at Rest
-    // requires KMS + S3 + RDS + DynamoDB). Only mark done if every scanned
-    // service that maps to this template is fully passing.
-    const eligibleTemplateIds: string[] = [];
-    for (const templateId of templateIds) {
-      // Find all services that map to this template
-      const servicesForTemplate = Object.entries(AWS_SERVICE_TASK_MAPPINGS)
-        .filter(([, templates]) => templates.includes(templateId))
-        .map(([serviceId]) => serviceId);
-
-      // Only consider services that were actually scanned
-      const scannedServicesForTemplate = servicesForTemplate.filter((s) =>
-        findingsByService.has(s),
-      );
-
-      // If no services were scanned for this template, skip
-      if (scannedServicesForTemplate.length === 0) continue;
-
-      // All scanned services for this template must be passing
-      const allPassing = scannedServicesForTemplate.every((s) =>
-        passingServices.includes(s),
-      );
-
-      if (allPassing) {
-        eligibleTemplateIds.push(templateId);
-      }
-    }
-
-    if (eligibleTemplateIds.length === 0) return;
-
-    const now = new Date();
-
-    // Update tasks: only those in todo/in_progress/in_review/failed status
-    const result = await db.task.updateMany({
-      where: {
-        organizationId,
-        taskTemplateId: { in: eligibleTemplateIds },
-        status: { in: ['todo', 'in_progress', 'in_review', 'failed'] },
-      },
-      data: {
-        status: 'done',
-        lastCompletedAt: now,
-      },
-    });
-
-    if (result.count > 0) {
-      this.logger.log(
-        `Auto-satisfied ${result.count} evidence task(s) from passing AWS scan (services: ${passingServices.join(', ')})`,
-      );
-    }
   }
 }

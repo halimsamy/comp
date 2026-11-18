@@ -9,6 +9,7 @@ export const taskFrequencies: TaskFrequency[] = [
   'weekly',
   'monthly',
   'quarterly',
+  'semiannually',
   'yearly',
 ];
 

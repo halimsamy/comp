@@ -342,6 +342,101 @@ describe('TaskIntegrationsController', () => {
       expect(result.taskStatus).toBe('done');
     });
 
+    describe('tasks with manual parts', () => {
+      const oneAccount = () => {
+        mockConnectionRepository.findById.mockResolvedValue({
+          id: 'conn_1',
+          organizationId: 'org_1',
+          providerId: 'prov_aws',
+          status: 'active',
+        });
+        mockConnectionRepository.findActiveByProviderAndOrg.mockResolvedValue([
+          { id: 'conn_1', organizationId: 'org_1', providerId: 'prov_aws', metadata: {}, variables: {} },
+        ]);
+      };
+
+      it('moves a MANUAL task to in_review (not done) when all checks pass', async () => {
+        oneAccount();
+        mockTaskFindUnique.mockResolvedValue({
+          id: 'task_1',
+          organizationId: 'org_1',
+          status: 'todo',
+          frequency: 'quarterly',
+          automationStatus: 'MANUAL',
+        });
+        mockedRunAllChecks.mockResolvedValue(passingResult());
+
+        const result = await controller.runCheckForTask('task_1', 'org_1', body);
+
+        expect(result.taskStatus).toBe('in_review');
+        expect(mockTaskUpdate).toHaveBeenCalledWith({
+          where: { id: 'task_1' },
+          data: { status: 'in_review' },
+        });
+      });
+
+      it('completes an AUTOMATED task with lastCompletedAt and the next due date', async () => {
+        oneAccount();
+        mockTaskFindUnique.mockResolvedValue({
+          id: 'task_1',
+          organizationId: 'org_1',
+          status: 'todo',
+          frequency: 'semiannually',
+          automationStatus: 'AUTOMATED',
+        });
+        mockedRunAllChecks.mockResolvedValue(passingResult());
+
+        const result = await controller.runCheckForTask('task_1', 'org_1', body);
+
+        expect(result.taskStatus).toBe('done');
+        const data = mockTaskUpdate.mock.calls[0][0].data;
+        expect(data.lastCompletedAt).toBeInstanceOf(Date);
+        expect(data.reviewDate.getTime()).toBeGreaterThan(Date.now());
+      });
+
+      it('leaves a task a person is reviewing untouched', async () => {
+        oneAccount();
+        mockTaskFindUnique.mockResolvedValue({
+          id: 'task_1',
+          organizationId: 'org_1',
+          status: 'in_review',
+          frequency: null,
+          automationStatus: 'AUTOMATED',
+        });
+        mockedRunAllChecks.mockResolvedValue(passingResult());
+
+        await controller.runCheckForTask('task_1', 'org_1', body);
+
+        expect(mockTaskUpdate).not.toHaveBeenCalled();
+      });
+
+      it('leaves a done task alone until it is due, then moves its due date on', async () => {
+        oneAccount();
+        const doneTask = {
+          id: 'task_1',
+          organizationId: 'org_1',
+          status: 'done',
+          frequency: 'quarterly',
+          automationStatus: 'AUTOMATED',
+          reviewDate: new Date(Date.now() + 86_400_000),
+        };
+        mockTaskFindUnique.mockResolvedValue(doneTask);
+        mockedRunAllChecks.mockResolvedValue(passingResult());
+
+        await controller.runCheckForTask('task_1', 'org_1', body);
+        expect(mockTaskUpdate).not.toHaveBeenCalled();
+
+        mockTaskFindUnique.mockResolvedValue({
+          ...doneTask,
+          reviewDate: new Date(Date.now() - 86_400_000),
+        });
+        await controller.runCheckForTask('task_1', 'org_1', body);
+        const data = mockTaskUpdate.mock.calls[0][0].data;
+        expect(data.status).toBe('done');
+        expect(data.reviewDate.getTime()).toBeGreaterThan(Date.now());
+      });
+    });
+
     it('marks the task failed if ANY account has findings', async () => {
       mockConnectionRepository.findById.mockResolvedValue({
         id: 'conn_1',
@@ -690,6 +785,9 @@ describe('TaskIntegrationsController', () => {
       );
       expect(result.accountsRun).toBe(2);
       expect(result.success).toBe(true);
+      // The account that could not run is inconclusive: the task must not go done.
+      expect(result.taskStatus).toBeNull();
+      expect(mockTaskUpdate).not.toHaveBeenCalled();
     });
 
     it('rejects an inactive referenced connection (never runs a non-active account)', async () => {

@@ -39,6 +39,7 @@ import { getStringValue } from '../utils/credential-utils';
 import { isCheckDisabledForTask } from '../utils/disabled-task-checks';
 import { getProviderSummary } from '../utils/provider-summary';
 import { getConnectionLabel } from '../utils/connection-label';
+import { mappingAppliesTo } from '../utils/task-template-successors';
 import { loadActiveExceptionSet } from '../../cloud-security/finding-exceptions';
 import {
   countEffectiveFailures,
@@ -52,6 +53,10 @@ import {
   capResultsForList,
 } from '../utils/run-history-limits';
 import { db } from '@db';
+import {
+  autoCompleteTaskData,
+  canAutoComplete,
+} from '../../tasks/task-completion';
 import type { IntegrationConnection, Prisma } from '@db';
 
 /** Manifest + check types derived from the integration-platform registry. */
@@ -195,7 +200,7 @@ export class TaskIntegrationsController {
 
       for (const check of manifest.checks) {
         // Check if this check maps to the requested task template
-        if (check.taskMapping === templateId) {
+        if (mappingAppliesTo({ mapping: check.taskMapping, templateId })) {
           // Find if there's a connection for this integration
           const connection = connections.find(
             (c) => c.provider?.slug === manifest.id,
@@ -448,6 +453,8 @@ export class TaskIntegrationsController {
       // For dynamic, any non-success account run was held (pending) — count it so
       // an error-only account (no findings) still keeps the task pending.
       if (isDynamic && outcome.status !== 'success') heldRunCount++;
+      // A static check that could not run is inconclusive, not a pass.
+      else if (outcome.status === 'error') heldRunCount++;
       failingFindings.push(...outcome.failures);
       lastCheckRunId = outcome.checkRunId;
     }
@@ -485,35 +492,19 @@ export class TaskIntegrationsController {
       heldCount,
     );
 
-    if (newStatus) {
-      const isTransitioningToDone =
-        newStatus === 'done' && task.status !== 'done';
-
-      let reviewDate: Date | undefined;
-      if (isTransitioningToDone && task.frequency) {
-        reviewDate = new Date();
-        switch (task.frequency) {
-          case 'monthly':
-            reviewDate.setMonth(reviewDate.getMonth() + 1);
-            break;
-          case 'quarterly':
-            reviewDate.setMonth(reviewDate.getMonth() + 3);
-            break;
-          case 'yearly':
-            reviewDate.setFullYear(reviewDate.getFullYear() + 1);
-            break;
-        }
-      }
-
-      await db.task.update({
-        where: { id: taskId },
-        data: {
-          status: newStatus,
-          ...(reviewDate ? { reviewDate } : {}),
-        },
-      });
+    // Passing checks never complete a task with manual parts (it goes to
+    // review), never override a person's in-review / not-relevant decision,
+    // and re-complete a done task only once it is due.
+    const update =
+      newStatus === 'failed'
+        ? { status: 'failed' as const }
+        : newStatus === 'done' && canAutoComplete(task)
+          ? autoCompleteTaskData(task)
+          : null;
+    if (update) {
+      await db.task.update({ where: { id: taskId }, data: update });
       this.logger.log(
-        `Updated task ${taskId} status to ${newStatus} across ${accountsRun} account(s)${reviewDate ? `, next review: ${reviewDate.toISOString()}` : ''}`,
+        `Updated task ${taskId} status to ${update.status} across ${accountsRun} account(s)${'reviewDate' in update ? `, next review: ${update.reviewDate.toISOString()}` : ''}`,
       );
     }
 
@@ -524,7 +515,7 @@ export class TaskIntegrationsController {
       totalFindings,
       hadErrors: hasExecutionError,
       checkRunId: lastCheckRunId,
-      taskStatus: newStatus,
+      taskStatus: update?.status ?? newStatus,
     };
   }
 

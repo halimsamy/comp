@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { getManifest } from '@trycompai/integration-platform';
 import { db } from '@db';
+import { AWS_TASK_EVIDENCE_CHECK_ID } from '../../cloud-security/aws-task-mappings';
 import { ConnectionRepository } from '../repositories/connection.repository';
 import { ProviderRepository } from '../repositories/provider.repository';
 import { ConnectionAuthTeardownService } from './connection-auth-teardown.service';
@@ -222,7 +223,10 @@ export class ConnectionService {
           },
         },
         integrationCheckRuns: {
-          where: { connection: { status: { not: 'disconnected' } } },
+          where: {
+            connection: { status: { not: 'disconnected' } },
+            checkId: { not: AWS_TASK_EVIDENCE_CHECK_ID },
+          },
           orderBy: { createdAt: 'desc' },
           select: { checkId: true, status: true, createdAt: true },
         },

@@ -72,6 +72,7 @@ export const TASK_TEMPLATE_IDS = [
   'frk_tt_6901e0aa6d3f2bbab1ea5b84', // Secure Storage
   'frk_tt_69033a6bfeb4759be36257bc', // Infrastructure Inventory
   'frk_tt_68fa2a852e70f757188f0c39', // Production Firewall & No-Public-Access Controls
+  'frk_tt_69f0d514d103c34ca40ad332', // Static Code Scanning
 ] as const;
 
 /**
@@ -213,6 +214,8 @@ export const TASK_TEMPLATES = {
   infrastructureInventory: 'frk_tt_69033a6bfeb4759be36257bc',
   /** Production Firewall & No-Public-Access Controls */
   productionFirewallNopublicaccessControls: 'frk_tt_68fa2a852e70f757188f0c39',
+  /** Static Code Scanning */
+  staticCodeScanning: 'frk_tt_69f0d514d103c34ca40ad332',
 } as const;
 
 /**
@@ -626,5 +629,11 @@ Photo of visitor badge/st...`,
     description: `Upload proof that production hosts enforce a deny-by-default firewall and that production databases ...`,
     department: 'itsm',
     frequency: 'yearly',
+  },
+  frk_tt_69f0d514d103c34ca40ad332: {
+    name: 'Static Code Scanning',
+    description: `Enable a static code analysis tool such as CodeQL (or its equivalent) to automatically detect securi...`,
+    department: 'none',
+    frequency: 'quarterly',
   },
 };

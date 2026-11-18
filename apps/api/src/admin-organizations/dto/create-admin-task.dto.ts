@@ -15,6 +15,7 @@ const TASK_FREQUENCIES = [
   'weekly',
   'monthly',
   'quarterly',
+  'semiannually',
   'yearly',
 ] as const;
 

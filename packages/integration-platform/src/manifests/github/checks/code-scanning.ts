@@ -69,7 +69,7 @@ export const codeScanningCheck: IntegrationCheck = {
   description:
     'Verifies repositories have GitHub CodeQL or an equivalent static analysis tool configured. Detects default-setup CodeQL, custom CodeQL workflows, and third-party SARIF uploaders.',
   service: 'code-security',
-  taskMapping: TASK_TEMPLATES.sanitizedInputs,
+  taskMapping: TASK_TEMPLATES.staticCodeScanning,
   defaultSeverity: 'medium',
   variables: [targetReposVariable],
 

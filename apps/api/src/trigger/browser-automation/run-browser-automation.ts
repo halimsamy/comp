@@ -1,6 +1,7 @@
 import { db } from '@db';
 import { logger, tags, task } from '@trycompai/jobs';
 import { BrowserbaseService } from '../../browserbase/browserbase.service';
+import { autoCompleteTaskData } from '../../tasks/task-completion';
 
 const browserbaseService = new BrowserbaseService();
 
@@ -136,36 +137,31 @@ export const runBrowserAutomation = task({
       ) {
         const currentTask = await db.task.findUnique({
           where: { id: taskId },
-          select: { frequency: true },
+          select: { frequency: true, automationStatus: true },
         });
+        // Manual tasks go to review with the screenshot attached, not done.
+        const data = currentTask ? autoCompleteTaskData(currentTask) : null;
 
-        let reviewDate: Date | undefined;
-        if (currentTask?.frequency) {
-          reviewDate = new Date();
-          switch (currentTask.frequency) {
-            case 'monthly':
-              reviewDate.setMonth(reviewDate.getMonth() + 1);
-              break;
-            case 'quarterly':
-              reviewDate.setMonth(reviewDate.getMonth() + 3);
-              break;
-            case 'yearly':
-              reviewDate.setFullYear(reviewDate.getFullYear() + 1);
-              break;
-          }
-        }
-
-        // Atomic: flip to done only if it isn't already done and isn't a
+        // Atomic: flip only if it isn't already done/in review and isn't a
         // protected human status — the guard is in the WHERE, so a concurrent
         // `not_relevant` action can't be clobbered between a read and the write.
-        const doneUpdate = await db.task.updateMany({
-          where: {
-            id: taskId,
-            status: { notIn: ['done', ...AUTOMATION_PROTECTED_TASK_STATUSES] },
-          },
-          data: { status: 'done', ...(reviewDate ? { reviewDate } : {}) },
-        });
-        if (doneUpdate.count > 0) logger.info(`Task ${taskId} marked as done`);
+        const doneUpdate = data
+          ? await db.task.updateMany({
+              where: {
+                id: taskId,
+                status: {
+                  notIn: [
+                    'done',
+                    'in_review',
+                    ...AUTOMATION_PROTECTED_TASK_STATUSES,
+                  ],
+                },
+              },
+              data,
+            })
+          : { count: 0 };
+        if (doneUpdate.count > 0 && data)
+          logger.info(`Task ${taskId} moved to ${data.status}`);
       }
     } else {
       logger.error(`Automation ${automationId} failed`, {

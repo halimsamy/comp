@@ -35,7 +35,7 @@ interface UseTasksReturn {
   isError: boolean;
   mutate: () => Promise<TaskWithRelations[] | undefined>;
   bulkDelete: (taskIds: string[]) => Promise<{ deletedCount: number }>;
-  bulkUpdateStatus: (taskIds: string[], status: TaskStatus, reviewDate?: string, notRelevantJustification?: string) => Promise<{ updatedCount: number }>;
+  bulkUpdateStatus: (taskIds: string[], status: TaskStatus, notRelevantJustification?: string) => Promise<{ updatedCount: number }>;
   bulkUpdateAssignee: (taskIds: string[], assigneeId: string | null) => Promise<{ updatedCount: number }>;
   bulkSubmitForReview: (taskIds: string[], approverId: string) => Promise<{ submittedCount: number }>;
   createTask: (data: CreateTaskPayload) => Promise<void>;
@@ -100,11 +100,9 @@ export function useTasks({ initialData }: UseTasksOptions = {}): UseTasksReturn 
   const bulkUpdateStatus = async (
     taskIds: string[],
     status: TaskStatus,
-    reviewDate?: string,
     notRelevantJustification?: string,
   ): Promise<{ updatedCount: number }> => {
     const payload: Record<string, unknown> = { taskIds, status };
-    if (reviewDate) payload.reviewDate = reviewDate;
     if (notRelevantJustification)
       payload.notRelevantJustification = notRelevantJustification;
 

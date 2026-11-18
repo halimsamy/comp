@@ -10,6 +10,7 @@ export const PERIOD_DAYS: Record<TaskFrequency, number> = {
   weekly: 7,
   monthly: 30,
   quarterly: 91,
+  semiannually: 182,
   yearly: 365,
 };
 

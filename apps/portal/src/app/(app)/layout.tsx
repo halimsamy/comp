@@ -14,7 +14,7 @@ export default async function Layout({ children }: { children: React.ReactNode }
 
   return (
     <div className="flex min-h-dvh">
-      <div className="flex flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col">
         <Header />
         <main className="w-full min-w-0 flex-1 px-3 pt-4 sm:px-4 sm:pt-6 lg:px-6">{children}</main>
       </div>

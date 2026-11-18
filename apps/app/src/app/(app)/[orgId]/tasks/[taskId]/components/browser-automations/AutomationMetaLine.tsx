@@ -11,6 +11,7 @@ const CADENCE_WORD: Record<TaskFrequency, string> = {
   weekly: 'weekly',
   monthly: 'monthly',
   quarterly: 'quarterly',
+  semiannually: 'every 6 months',
   yearly: 'yearly',
 };
 

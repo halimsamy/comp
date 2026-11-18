@@ -199,7 +199,7 @@ export class TasksController {
         },
         frequency: {
           type: 'string',
-          enum: ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'],
+          enum: ['daily', 'weekly', 'monthly', 'quarterly', 'semiannually', 'yearly'],
           nullable: true,
           example: 'monthly',
         },
@@ -295,7 +295,8 @@ export class TasksController {
           type: 'string',
           format: 'date-time',
           example: '2025-01-01T00:00:00.000Z',
-          description: 'Optional review date to set on all tasks',
+          description:
+            "Optional next due date to set on all tasks. When status is done and this is omitted, each task's due date is computed from its frequency.",
         },
         notRelevantJustification: {
           type: 'string',
@@ -831,12 +832,12 @@ export class TasksController {
         },
         frequency: {
           type: 'string',
-          enum: ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'],
+          enum: ['daily', 'weekly', 'monthly', 'quarterly', 'semiannually', 'yearly'],
           example: 'monthly',
         },
         integrationScheduleFrequency: {
           type: 'string',
-          enum: ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'],
+          enum: ['daily', 'weekly', 'monthly', 'quarterly', 'semiannually', 'yearly'],
           example: 'daily',
           description:
             'Cadence for running the integration check attached to this task',

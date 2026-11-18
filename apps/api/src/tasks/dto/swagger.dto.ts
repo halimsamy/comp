@@ -24,7 +24,7 @@ export class CreateTaskDto {
 
   @ApiProperty({
     description: 'Task frequency',
-    enum: ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'],
+    enum: ['daily', 'weekly', 'monthly', 'quarterly', 'semiannually', 'yearly'],
     required: false,
   })
   frequency?: string;
@@ -32,7 +32,7 @@ export class CreateTaskDto {
   @ApiProperty({
     description:
       'Cadence for running the integration check attached to this task',
-    enum: ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'],
+    enum: ['daily', 'weekly', 'monthly', 'quarterly', 'semiannually', 'yearly'],
     required: false,
   })
   integrationScheduleFrequency?: string;
@@ -86,7 +86,7 @@ export class UpdateTaskDto {
 
   @ApiProperty({
     description: 'Task frequency',
-    enum: ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'],
+    enum: ['daily', 'weekly', 'monthly', 'quarterly', 'semiannually', 'yearly'],
     required: false,
   })
   frequency?: string;
@@ -94,7 +94,7 @@ export class UpdateTaskDto {
   @ApiProperty({
     description:
       'Cadence for running the integration check attached to this task',
-    enum: ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'],
+    enum: ['daily', 'weekly', 'monthly', 'quarterly', 'semiannually', 'yearly'],
     required: false,
   })
   integrationScheduleFrequency?: string;
@@ -142,7 +142,7 @@ export class TaskQueryDto {
 
   @ApiProperty({
     description: 'Filter by frequency',
-    enum: ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'],
+    enum: ['daily', 'weekly', 'monthly', 'quarterly', 'semiannually', 'yearly'],
     required: false,
   })
   frequency?: string;
@@ -190,14 +190,14 @@ export class TaskResponseDto {
 
   @ApiProperty({
     description: 'Task frequency',
-    enum: ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'],
+    enum: ['daily', 'weekly', 'monthly', 'quarterly', 'semiannually', 'yearly'],
     nullable: true,
   })
   frequency: string | null;
 
   @ApiProperty({
     description: 'Cadence for running the integration check attached to this task',
-    enum: ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'],
+    enum: ['daily', 'weekly', 'monthly', 'quarterly', 'semiannually', 'yearly'],
   })
   integrationScheduleFrequency: string;
 

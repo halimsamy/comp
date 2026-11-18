@@ -15,6 +15,7 @@ const FREQUENCY_DESCRIPTIONS: Record<TaskFrequency, string> = {
   weekly: 'Every week',
   monthly: 'Every month',
   quarterly: 'Every quarter',
+  semiannually: 'Every 6 months',
   yearly: 'Every year',
 };
 
@@ -23,6 +24,7 @@ const PERIOD_DAYS: Record<TaskFrequency, number> = {
   weekly: 7,
   monthly: 30,
   quarterly: 91,
+  semiannually: 182,
   yearly: 365,
 };
 

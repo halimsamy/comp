@@ -42,6 +42,7 @@ const FREQUENCY_OPTIONS = [
   { value: 'weekly', label: 'Weekly' },
   { value: 'monthly', label: 'Monthly' },
   { value: 'quarterly', label: 'Quarterly' },
+  { value: 'semiannually', label: 'Every 6 months' },
   { value: 'yearly', label: 'Yearly' },
 ];
 

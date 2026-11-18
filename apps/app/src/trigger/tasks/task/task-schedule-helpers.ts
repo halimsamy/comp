@@ -6,6 +6,7 @@
 import type {
   EvidenceAutomationEvaluationStatus,
   IntegrationRunStatus,
+  TaskAutomationStatus,
   TaskStatus,
 } from '@db';
 
@@ -27,6 +28,9 @@ export interface AppAutomationRun {
 export interface TaskAutomationData {
   evidenceAutomations: CustomAutomation[];
   integrationCheckRuns: AppAutomationRun[];
+  /** MANUAL tasks have a part only a person can redo, so passing automations
+   * never keep them done past their due date. */
+  automationStatus?: TaskAutomationStatus;
 }
 
 /**
@@ -86,7 +90,7 @@ export const getTargetStatus = (task: TaskAutomationData): TargetStatus => {
     (!hasAppAutomations || appAutomationsPassing);
 
   if (allPassing) {
-    return 'done';
+    return task.automationStatus === 'MANUAL' ? 'todo' : 'done';
   }
 
   // Some automations are failing → move to "failed"
@@ -94,38 +98,10 @@ export const getTargetStatus = (task: TaskAutomationData): TargetStatus => {
 };
 
 /**
- * Calculate next due date based on review date and frequency
+ * `reviewDate` holds the task's next due date (set on completion from its
+ * frequency), so a done task is overdue once that date has passed.
  */
-export const calculateNextDueDate = (
-  reviewDate: Date,
-  frequency: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly',
-): Date => {
-  const addDaysToDate = (date: Date, days: number): Date => {
-    const result = new Date(date.getTime());
-    result.setDate(result.getDate() + days);
-    return result;
-  };
-
-  const addMonthsToDate = (date: Date, months: number): Date => {
-    const result = new Date(date.getTime());
-    const originalDayOfMonth = result.getDate();
-    result.setMonth(result.getMonth() + months);
-    if (result.getDate() < originalDayOfMonth) {
-      result.setDate(0);
-    }
-    return result;
-  };
-
-  switch (frequency) {
-    case 'daily':
-      return addDaysToDate(reviewDate, 1);
-    case 'weekly':
-      return addDaysToDate(reviewDate, 7);
-    case 'monthly':
-      return addMonthsToDate(reviewDate, 1);
-    case 'quarterly':
-      return addMonthsToDate(reviewDate, 3);
-    case 'yearly':
-      return addMonthsToDate(reviewDate, 12);
-  }
-};
+export const isTaskOverdue = (
+  task: { reviewDate: Date | null; frequency: string | null },
+  now: Date,
+): boolean => task.reviewDate !== null && task.frequency !== null && task.reviewDate <= now;

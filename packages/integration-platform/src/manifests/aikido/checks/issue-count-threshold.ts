@@ -55,19 +55,9 @@ export const issueCountThresholdCheck: IntegrationCheck = {
       counts = await ctx.fetch<AikidoIssueCounts>('issues/counts');
       ctx.log(`Issue counts response: ${JSON.stringify(counts)}`);
     } catch (error) {
-      ctx.warn(`Issue counts endpoint error: ${error}`);
-      ctx.pass({
-        title: 'Issue count check skipped',
-        description: 'Could not fetch issue counts from Aikido.',
-        resourceType: 'workspace',
-        resourceId: 'issue-counts',
-        evidence: {
-          reason: 'API endpoint not accessible',
-          error: String(error),
-          checked_at: new Date().toISOString(),
-        },
-      });
-      return;
+      // An API error proves nothing: fail the run as an error (inconclusive),
+      // never report it as a pass.
+      throw new Error(`Could not fetch issue counts from Aikido: ${String(error)}`);
     }
 
     // API returns: { issue_groups: { critical, high, medium, low, all }, issues: { ... } }
@@ -75,18 +65,7 @@ export const issueCountThresholdCheck: IntegrationCheck = {
     const issues = counts?.issues;
 
     if (!issueGroups) {
-      ctx.warn('No issue group counts in response');
-      ctx.pass({
-        title: 'Issue count check skipped',
-        description: 'Could not parse issue counts from Aikido response.',
-        resourceType: 'workspace',
-        resourceId: 'issue-counts',
-        evidence: {
-          reason: 'Invalid response format',
-          checked_at: new Date().toISOString(),
-        },
-      });
-      return;
+      throw new Error('Could not parse issue counts from the Aikido response');
     }
 
     // Count only issues at or above the severity threshold

@@ -5,6 +5,7 @@ jest.mock('@db', () => ({
   db: {
     task: {
       findFirst: jest.fn(),
+      findMany: jest.fn(),
       update: jest.fn(),
       updateMany: jest.fn(),
     },
@@ -41,7 +42,7 @@ jest.mock('../auth/auth.server', () => ({
 }));
 
 import { Test } from '@nestjs/testing';
-import { db, TaskStatus } from '@db';
+import { db, TaskFrequency, TaskStatus } from '@db';
 import { TaskNotifierService } from './task-notifier.service';
 import { TimelinesService } from '../timelines/timelines.service';
 import { TasksService } from './tasks.service';
@@ -49,6 +50,7 @@ import { TasksService } from './tasks.service';
 const taskFindFirst = db.task.findFirst as jest.Mock;
 const taskUpdate = db.task.update as jest.Mock;
 const taskUpdateMany = db.task.updateMany as jest.Mock;
+const taskFindMany = db.task.findMany as jest.Mock;
 const orgFindUnique = db.organization.findUnique as jest.Mock;
 const memberFindFirst = db.member.findFirst as jest.Mock;
 const auditLogCreate = db.auditLog.create as jest.Mock;
@@ -98,6 +100,7 @@ describe('TasksService approval gating', () => {
     service = moduleRef.get(TasksService);
     memberFindFirst.mockResolvedValue({ id: 'mem_actor', user: { role: 'owner' } });
     taskUpdate.mockResolvedValue({ id: TASK_ID });
+    taskFindMany.mockResolvedValue([]);
     auditLogCreate.mockResolvedValue({});
   });
 
@@ -146,12 +149,49 @@ describe('TasksService approval gating', () => {
     });
 
     it('IN_REVIEW LOCK: approval ON blocks moving an in_review task directly', async () => {
-      taskFindFirst.mockResolvedValue(existing(true, { status: TaskStatus.in_review }));
+      taskFindFirst.mockResolvedValue(
+        existing(true, { status: TaskStatus.in_review, approverId: 'mem_appr' }),
+      );
 
       await expect(
         service.updateTask(ORG_ID, TASK_ID, { status: TaskStatus.todo }, USER_ID),
       ).rejects.toThrow('Cannot change status directly while task is in review');
       expect(taskUpdate).not.toHaveBeenCalled();
+    });
+
+    it('AUTOMATION REVIEW: approval ON lets a person finish an approver-less in_review task', async () => {
+      taskFindFirst.mockResolvedValue(
+        existing(true, { status: TaskStatus.in_review, approverId: null }),
+      );
+
+      await service.updateTask(ORG_ID, TASK_ID, { status: TaskStatus.done }, USER_ID);
+
+      expect(lastUpdateData().status).toBe(TaskStatus.done);
+    });
+
+    it('COMPLETION: done sets lastCompletedAt and reviewDate = next due date', async () => {
+      taskFindFirst.mockResolvedValue(
+        existing(false, { frequency: TaskFrequency.semiannually }),
+      );
+
+      const before = new Date();
+      await service.updateTask(ORG_ID, TASK_ID, { status: TaskStatus.done }, USER_ID);
+
+      const data = lastUpdateData();
+      expect(data.lastCompletedAt.getTime()).toBeGreaterThanOrEqual(before.getTime());
+      const months =
+        (data.reviewDate.getFullYear() - before.getFullYear()) * 12 +
+        data.reviewDate.getMonth() -
+        before.getMonth();
+      expect(months).toBe(6);
+    });
+
+    it('COMPLETION: re-saving an already-done task keeps its completion date', async () => {
+      taskFindFirst.mockResolvedValue(existing(false, { status: TaskStatus.done }));
+
+      await service.updateTask(ORG_ID, TASK_ID, { status: TaskStatus.done }, USER_ID);
+
+      expect(lastUpdateData().lastCompletedAt).toBeUndefined();
     });
 
     it('SELF-HEAL GUARD: an explicit approverId from the caller is not force-cleared', async () => {
@@ -214,7 +254,46 @@ describe('TasksService approval gating', () => {
 
       const where = taskUpdateMany.mock.calls[0][0].where;
       expect(where.approverId).toBeNull();
-      expect(where.status).toEqual({ not: 'in_review' });
+      // Only approval reviews are locked; automation reviews (no approver) are not.
+      expect(where.NOT).toEqual({ status: 'in_review', approverId: { not: null } });
+    });
+
+    it('bulk done sets each task\'s due date from its own frequency, when no date is sent', async () => {
+      orgFindUnique.mockResolvedValue({ evidenceApprovalEnabled: false });
+      taskUpdateMany.mockResolvedValue({ count: 2 });
+      taskFindMany.mockResolvedValue([
+        { id: 'tsk_q', frequency: TaskFrequency.quarterly },
+        { id: 'tsk_y', frequency: TaskFrequency.yearly },
+      ]);
+
+      await service.updateTasksStatus(
+        ORG_ID,
+        ['tsk_q', 'tsk_y'],
+        TaskStatus.done,
+        undefined,
+        USER_ID,
+      );
+
+      // 1 status update + 1 per distinct frequency
+      expect(taskUpdateMany).toHaveBeenCalledTimes(3);
+      const [, quarterly, yearly] = taskUpdateMany.mock.calls.map((c) => c[0]);
+      expect(quarterly.where.id).toEqual({ in: ['tsk_q'] });
+      expect(yearly.where.id).toEqual({ in: ['tsk_y'] });
+      expect(yearly.data.lastCompletedAt).toBeInstanceOf(Date);
+      const monthsAhead = (d: Date) =>
+        (d.getFullYear() - new Date().getFullYear()) * 12 + d.getMonth() - new Date().getMonth();
+      expect(monthsAhead(quarterly.data.reviewDate)).toBe(3);
+      expect(monthsAhead(yearly.data.reviewDate)).toBe(12);
+    });
+
+    it('bulk non-done status does not touch due dates', async () => {
+      orgFindUnique.mockResolvedValue({ evidenceApprovalEnabled: false });
+      taskUpdateMany.mockResolvedValue({ count: 1 });
+
+      await service.updateTasksStatus(ORG_ID, [TASK_ID], TaskStatus.todo, undefined, USER_ID);
+
+      expect(taskFindMany).not.toHaveBeenCalled();
+      expect(taskUpdateMany).toHaveBeenCalledTimes(1);
     });
   });
 

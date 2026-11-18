@@ -50,6 +50,7 @@ const FREQUENCY_OPTIONS = [
   'weekly',
   'monthly',
   'quarterly',
+  'semiannually',
   'yearly',
 ];
 

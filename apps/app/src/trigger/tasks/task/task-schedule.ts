@@ -1,11 +1,11 @@
 import { isOrgParticipant } from '@/lib/org-participation-rule';
 import { db } from '@db/server';
 import { Novu } from '@novu/api';
-import { logger, schedules } from '@trycompai/jobs';
+import { logger, schedules, tasks } from '@trycompai/jobs';
 import { isUserUnsubscribed, TaskStatusNotificationEmail } from '@trycompai/email';
 import { sendEmailViaApi } from '../../lib/send-email-via-api';
 
-import { getTargetStatus } from './task-schedule-helpers';
+import { getTargetStatus, isTaskOverdue } from './task-schedule-helpers';
 
 export const taskSchedule = schedules.task({
   id: 'task-schedule',
@@ -13,6 +13,17 @@ export const taskSchedule = schedules.task({
   cron: '0 */12 * * *', // Every 12 hours
   maxDuration: 60 * 10, // 10 minutes
   run: async () => {
+    const result = await reopenOverdueTasks();
+    // The API worker derives evidence from native module state (ISMS, People,
+    // Vendors) and re-checks the tasks reopened above.
+    await tasks.trigger('evaluate-native-task-evidence', {}).catch((error: unknown) => {
+      logger.error(`Failed to trigger native task evidence: ${error}`);
+    });
+    return result;
+  },
+});
+
+async function reopenOverdueTasks() {
     const now = new Date();
     const novu = new Novu({
       secretKey: process.env.NOVU_API_KEY,
@@ -23,7 +34,7 @@ export const taskSchedule = schedules.task({
       where: {
         status: 'done',
         reviewDate: {
-          not: null,
+          lte: now,
         },
         frequency: {
           not: null,
@@ -72,7 +83,12 @@ export const taskSchedule = schedules.task({
         // CS-166: exclude runs from disconnected connections — their historical
         // "failed" state must not drive scheduled status changes.
         integrationCheckRuns: {
-          where: { connection: { status: { not: 'disconnected' } } },
+          // 'aws-task-evidence' runs only attach scan results to a task; they
+          // are not checks and must not keep it done or fail it.
+          where: {
+            connection: { status: { not: 'disconnected' } },
+            checkId: { not: 'aws-task-evidence' },
+          },
           orderBy: { createdAt: 'desc' },
           select: {
             checkId: true,
@@ -83,50 +99,8 @@ export const taskSchedule = schedules.task({
       },
     });
 
-    // FIle all tasks past their review deadline.
-    const addDaysToDate = (date: Date, days: number) => {
-      const result = new Date(date.getTime());
-      result.setDate(result.getDate() + days);
-      return result;
-    };
-
-    const addMonthsToDate = (date: Date, months: number) => {
-      const result = new Date(date.getTime());
-      const originalDayOfMonth = result.getDate();
-      result.setMonth(result.getMonth() + months);
-      // Handle month rollover (e.g., Jan 31 + 1 month -> Feb 28/29)
-      if (result.getDate() < originalDayOfMonth) {
-        result.setDate(0);
-      }
-      return result;
-    };
-
-    const overdueTasks = candidateTasks.filter((task) => {
-      if (!task.reviewDate || !task.frequency) return false;
-
-      let nextDueDate: Date | null = null;
-      switch (task.frequency) {
-        case 'daily':
-          nextDueDate = addDaysToDate(task.reviewDate, 1);
-          break;
-        case 'weekly':
-          nextDueDate = addDaysToDate(task.reviewDate, 7);
-          break;
-        case 'monthly':
-          nextDueDate = addMonthsToDate(task.reviewDate, 1);
-          break;
-        case 'quarterly':
-          nextDueDate = addMonthsToDate(task.reviewDate, 3);
-          break;
-        case 'yearly':
-          nextDueDate = addMonthsToDate(task.reviewDate, 12);
-          break;
-        default:
-          nextDueDate = null;
-      }
-
-      return nextDueDate !== null && nextDueDate <= now;
-    });
+    // reviewDate is the next due date, so overdue means reviewDate <= now.
+    const overdueTasks = candidateTasks.filter((task) => isTaskOverdue(task, now));
 
     logger.info(`Found ${overdueTasks.length} tasks past their computed review deadline`);
 
@@ -348,5 +322,4 @@ export const taskSchedule = schedules.task({
         message: 'Failed to update tasks past their review deadline',
       };
     }
-  },
-});
+}

@@ -118,6 +118,27 @@ describe('isDueToday', () => {
     });
   });
 
+  describe('semiannually', () => {
+    it('returns false when lastRunAt is 5 months ago', () => {
+      expect(
+        isDueToday({
+          scheduleFrequency: TaskFrequency.semiannually,
+          lastRunAt: atUtc('2025-11-24'),
+          now,
+        }),
+      ).toBe(false);
+    });
+    it('returns true when lastRunAt is 6 months ago', () => {
+      expect(
+        isDueToday({
+          scheduleFrequency: TaskFrequency.semiannually,
+          lastRunAt: atUtc('2025-10-24'),
+          now,
+        }),
+      ).toBe(true);
+    });
+  });
+
   describe('yearly', () => {
     it('returns false when lastRunAt is 11 months ago', () => {
       expect(

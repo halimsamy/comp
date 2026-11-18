@@ -12,6 +12,10 @@ import {
   type RunAllChecksResult,
 } from './run-checks-on-server';
 import { isActiveDynamicProvider, shouldRunOnServer } from './dynamic-provider';
+import {
+  autoCompleteTaskData,
+  canAutoComplete,
+} from '../../tasks/task-completion';
 import { loadActiveExceptionSet } from '../../cloud-security/finding-exceptions';
 import {
   countEffectiveFailures,
@@ -321,9 +325,9 @@ export const runTaskIntegrationChecks = task({
           logger.error(
             `Server-run failed for check ${checkId} on task ${taskId}: ${message}`,
           );
-          // A dynamic transport error was just held as 'inconclusive' — count it
-          // so an error-only failure (no findings) still keeps the task pending.
-          if (isDynamic) heldRunCount++;
+          // A transport error is inconclusive — count it so the task stays
+          // pending instead of slipping to done on its siblings' passes.
+          heldRunCount++;
           continue;
         }
 
@@ -345,6 +349,9 @@ export const runTaskIntegrationChecks = task({
         failingFindings.push(...checkFailures);
         if (checkResult.status === 'error') {
           hasExecutionErrors = true;
+          // A check that could not run is inconclusive: it must not let the
+          // task slip to done on its siblings' passes.
+          if (!isDynamic) heldRunCount++;
         }
 
         // Per-check run status (shared rule). For DYNAMIC integrations a check
@@ -501,38 +508,23 @@ export const runTaskIntegrationChecks = task({
           );
         }
       } else if (newStatus === 'done') {
-        // Only update to done if not already done
         const currentTask = await db.task.findUnique({
           where: { id: taskId },
-          select: { status: true, frequency: true },
+          select: {
+            status: true,
+            frequency: true,
+            automationStatus: true,
+            reviewDate: true,
+          },
         });
-        if (currentTask && currentTask.status !== 'done') {
-          // Calculate next review date based on frequency
-          let reviewDate: Date | undefined;
-          if (currentTask.frequency) {
-            reviewDate = new Date();
-            switch (currentTask.frequency) {
-              case 'monthly':
-                reviewDate.setMonth(reviewDate.getMonth() + 1);
-                break;
-              case 'quarterly':
-                reviewDate.setMonth(reviewDate.getMonth() + 3);
-                break;
-              case 'yearly':
-                reviewDate.setFullYear(reviewDate.getFullYear() + 1);
-                break;
-            }
-          }
-
-          await db.task.update({
-            where: { id: taskId },
-            data: {
-              status: 'done',
-              ...(reviewDate ? { reviewDate } : {}),
-            },
-          });
+        // Tasks with manual parts go to review, never straight to done. A
+        // person's in-review / not-relevant decision is left alone; a done
+        // task is re-completed (next due date) once it is due.
+        if (currentTask && canAutoComplete(currentTask)) {
+          const data = autoCompleteTaskData(currentTask);
+          await db.task.update({ where: { id: taskId }, data });
           logger.info(
-            `Task ${taskId} marked as done - all ${totalPassing} checks passed${reviewDate ? `, next review: ${reviewDate.toISOString()}` : ''}`,
+            `Task ${taskId} moved to ${data.status} - all ${totalPassing} checks passed${'reviewDate' in data ? `, next review: ${data.reviewDate.toISOString()}` : ''}`,
           );
         }
       }

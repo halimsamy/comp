@@ -98,19 +98,9 @@ export const openSecurityIssuesCheck: IntegrationCheck = {
         params: { status: 'open' },
       });
     } catch (error) {
-      ctx.warn(`Failed to fetch issue counts from Aikido API: ${error}`);
-      ctx.pass({
-        title: 'Unable to verify security issues',
-        description:
-          'Could not fetch issue counts from Aikido API. The API may be temporarily unavailable.',
-        resourceType: 'workspace',
-        resourceId: 'aikido-workspace',
-        evidence: {
-          error: error instanceof Error ? error.message : String(error),
-          checked_at: new Date().toISOString(),
-        },
-      });
-      return;
+      // An API error proves nothing: fail the run as an error (inconclusive),
+      // never report it as a pass.
+      throw new Error(`Could not fetch issue counts from Aikido: ${String(error)}`);
     }
 
     ctx.log(`Open issues response: ${JSON.stringify(openResponse)}`);

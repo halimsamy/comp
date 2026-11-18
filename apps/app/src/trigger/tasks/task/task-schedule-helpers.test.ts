@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  calculateNextDueDate,
   getTargetStatus,
+  isTaskOverdue,
   type TaskAutomationData,
 } from './task-schedule-helpers';
 
@@ -276,50 +276,45 @@ describe('task-schedule-helpers', () => {
     });
   });
 
-  describe('calculateNextDueDate', () => {
-    const baseDate = new Date('2024-01-15T10:00:00Z');
-
-    it('should add 1 day for daily frequency', () => {
-      const result = calculateNextDueDate(baseDate, 'daily');
-      expect(result.toISOString()).toBe('2024-01-16T10:00:00.000Z');
+  describe('getTargetStatus — MANUAL tasks', () => {
+    it('returns "todo" for a MANUAL task even when all automations pass', () => {
+      const task = {
+        automationStatus: 'MANUAL' as const,
+        evidenceAutomations: [],
+        integrationCheckRuns: [
+          { checkId: 'iam', status: 'success' as const, createdAt: new Date('2024-01-01') },
+        ],
+      };
+      expect(getTargetStatus(task)).toBe('todo');
     });
 
-    it('should add 7 days for weekly frequency', () => {
-      const result = calculateNextDueDate(baseDate, 'weekly');
-      expect(result.toISOString()).toBe('2024-01-22T10:00:00.000Z');
+    it('still returns "failed" for a MANUAL task with failing automations', () => {
+      const task = {
+        automationStatus: 'MANUAL' as const,
+        evidenceAutomations: [],
+        integrationCheckRuns: [
+          { checkId: 'iam', status: 'failed' as const, createdAt: new Date('2024-01-01') },
+        ],
+      };
+      expect(getTargetStatus(task)).toBe('failed');
+    });
+  });
+
+  describe('isTaskOverdue', () => {
+    const now = new Date('2024-06-15T12:00:00Z');
+
+    it('is overdue once the due date (reviewDate) has passed', () => {
+      expect(isTaskOverdue({ reviewDate: new Date('2024-06-15T11:59:59Z'), frequency: 'semiannually' }, now)).toBe(true);
+      expect(isTaskOverdue({ reviewDate: now, frequency: 'yearly' }, now)).toBe(true);
     });
 
-    it('should add 1 month for monthly frequency', () => {
-      const result = calculateNextDueDate(baseDate, 'monthly');
-      expect(result.toISOString()).toBe('2024-02-15T10:00:00.000Z');
+    it('is not overdue before the due date — no extra period is added', () => {
+      expect(isTaskOverdue({ reviewDate: new Date('2024-06-16T00:00:00Z'), frequency: 'daily' }, now)).toBe(false);
     });
 
-    it('should add 3 months for quarterly frequency', () => {
-      const result = calculateNextDueDate(baseDate, 'quarterly');
-      // Check date components (timezone-safe)
-      expect(result.getFullYear()).toBe(2024);
-      expect(result.getMonth()).toBe(3); // April (0-indexed)
-      expect(result.getDate()).toBe(15);
-    });
-
-    it('should add 12 months for yearly frequency', () => {
-      const result = calculateNextDueDate(baseDate, 'yearly');
-      expect(result.toISOString()).toBe('2025-01-15T10:00:00.000Z');
-    });
-
-    it('should handle month rollover (Jan 31 + 1 month = Feb 29 in leap year)', () => {
-      const jan31 = new Date('2024-01-31T10:00:00Z'); // 2024 is a leap year
-      const result = calculateNextDueDate(jan31, 'monthly');
-      // Feb doesn't have 31 days, so it should be Feb 29 (leap year)
-      expect(result.getMonth()).toBe(1); // February
-      expect(result.getDate()).toBeLessThanOrEqual(29);
-    });
-
-    it('should handle month rollover (Jan 31 + 1 month = Feb 28 in non-leap year)', () => {
-      const jan31 = new Date('2023-01-31T10:00:00Z'); // 2023 is not a leap year
-      const result = calculateNextDueDate(jan31, 'monthly');
-      expect(result.getMonth()).toBe(1); // February
-      expect(result.getDate()).toBeLessThanOrEqual(28);
+    it('is never overdue without a due date or frequency', () => {
+      expect(isTaskOverdue({ reviewDate: null, frequency: 'monthly' }, now)).toBe(false);
+      expect(isTaskOverdue({ reviewDate: new Date('2020-01-01'), frequency: null }, now)).toBe(false);
     });
   });
 });

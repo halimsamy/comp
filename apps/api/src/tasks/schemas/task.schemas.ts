@@ -12,6 +12,7 @@ export const TaskFrequencySchema = z.enum([
   'weekly',
   'monthly',
   'quarterly',
+  'semiannually',
   'yearly',
 ]);
 export const DepartmentsSchema = z.enum([

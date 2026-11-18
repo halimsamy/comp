@@ -14,6 +14,7 @@ const LABELS: Record<TaskFrequency, string> = {
   weekly: 'Weekly',
   monthly: 'Monthly',
   quarterly: 'Quarterly',
+  semiannually: 'Every 6 months',
   yearly: 'Yearly',
 };
 
