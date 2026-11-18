@@ -1,0 +1,40 @@
+// Organization-defined training (e.g. secure coding for developers, PCI DSS 6.2.2 / 12.6.3),
+// assigned to members by role and/or department.
+model TrainingModule {
+  id                 String        @id @default(dbgenerated("generate_prefixed_cuid('trm'::text)"))
+  organizationId     String
+  organization       Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  title              String
+  description        String?       @db.Text
+  contentUrl         String?
+  // Framework requirement this training satisfies, e.g. "PCI DSS 6.2.2".
+  frameworkReference String?
+  // Empty = every member. Values are member role names.
+  targetRoles        String[]      @default([])
+  // Empty = every department.
+  targetDepartments  Departments[] @default([])
+  recurrenceMonths   Int           @default(12)
+  isEnabled          Boolean       @default(true)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  @@index([organizationId])
+}
+
+// Append-only log of every training completion (built-in videos and TrainingModule ids),
+// one row per completion cycle. Current state of built-in videos stays in
+// EmployeeTrainingVideoCompletion; this table keeps past cycles for certificates and audits.
+model TrainingCompletionRecord {
+  id             String       @id @default(dbgenerated("generate_prefixed_cuid('tcr'::text)"))
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  memberId       String
+  member         Member       @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  // Built-in video id (e.g. "sat-1", "hipaa-sat-1") or a TrainingModule id.
+  moduleId       String
+  completedAt    DateTime     @default(now())
+  expiresAt      DateTime
+
+  @@index([organizationId])
+  @@index([memberId, moduleId])
+}

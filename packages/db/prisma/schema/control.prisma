@@ -14,6 +14,10 @@ model Control {
   // archive (no user archive exists on Control today).
   archivedAt DateTime?
 
+  // Accountable owner shown on the controls list (Vanta-style "Owner" column).
+  ownerId String?
+  owner   Member? @relation("ControlOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+
   // Relationships
   organization           Organization                       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   organizationId         String
@@ -31,6 +35,7 @@ model Control {
 
   @@index([organizationId])
   @@index([organizationId, archivedAt])
+  @@index([ownerId])
 }
 
 model FrameworkControlFamily {

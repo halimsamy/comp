@@ -249,6 +249,10 @@ model IsmsInterestedPartyRequirement {
   requirement String // the party's requirement (4.2b)
   treatment   String // whether and how the ISMS addresses it (4.2c)
 
+  // Who keeps this obligation current and when it was last checked (4.2b).
+  ownerMemberId  String? // plain member id, like IsmsObjective.ownerMemberId
+  lastReviewedAt DateTime? @db.Date
+
   source      IsmsContextSource @default(derived)
   derivedFrom String?
 
@@ -371,6 +375,11 @@ model IsmsRoleAssignment {
   gap                String? // optional competence gap
   remediationAction  String? // shown only when a gap is set
   remediationDueDate DateTime?
+
+  // The assignee's own acknowledgement of the role (5.3, PCI 12.4.1). Cleared
+  // when the role's responsibilities or authorities change.
+  acknowledgedAt         DateTime?
+  acknowledgedByMemberId String?
 
   position  Int      @default(0)
   createdAt DateTime @default(now())
@@ -650,6 +659,13 @@ model IsmsAuditFinding {
   status          IsmsAuditFindingStatus @default(open)
   closureEvidence String? // free text or link
 
+  // Corrective action (10.2): operational tracking, editable after sign-off.
+  rootCause                 String?
+  correctiveAction          String?
+  effectivenessReviewedAt   DateTime? @db.Date
+  effectivenessReviewedById String? // plain member id
+  effectivenessNotes        String?
+
   position  Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -831,4 +847,45 @@ model IsmsDocumentControlLink {
   @@unique([ismsDocumentId, controlId])
   @@index([ismsDocumentId])
   @@index([controlId])
+}
+
+// --- Register: Nonconformity & Corrective Action (clause 10.2) ---
+
+// Where a standalone nonconformity came from. Internal-audit nonconformities
+// stay on IsmsAuditFinding and are listed alongside these.
+enum IsmsNonconformitySource {
+  incident
+  external_audit
+  management_review
+  monitoring
+  complaint
+  other
+}
+
+model IsmsNonconformity {
+  id             String       @id @default(dbgenerated("generate_prefixed_cuid('isms_nc'::text)"))
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  reference String // server-generated "NC-NN", per organization
+  source    IsmsNonconformitySource
+  sourceRef String? // e.g. "MR-2026-01-A02", an incident id, an external audit report
+
+  description      String
+  rootCause        String?
+  correctiveAction String?
+  ownerMemberId    String?
+  dueDate          DateTime?              @db.Date
+  status           IsmsAuditFindingStatus @default(open)
+  closureEvidence  String?
+
+  effectivenessReviewedAt   DateTime? @db.Date
+  effectivenessReviewedById String?
+  effectivenessNotes        String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, reference])
+  @@index([organizationId])
 }

@@ -45,6 +45,7 @@ model AuditLog {
   @@index([organizationId])
   @@index([memberId])
   @@index([entityType])
+  @@index([organizationId, timestamp])
 }
 
 enum AuditLogEntityType {
@@ -122,6 +123,7 @@ enum Departments {
 enum Frequency {
   monthly
   quarterly
+  semiannually
   yearly
 }
 

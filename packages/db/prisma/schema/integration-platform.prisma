@@ -88,6 +88,7 @@ model IntegrationConnection {
   findingExceptions  FindingException[]
   findingResolutions FindingResolution[]
   findingRegressions FindingRegression[]
+  assets             Asset[]
 
   @@index([organizationId])
   @@index([providerId])
@@ -196,9 +197,33 @@ model IntegrationPlatformFinding {
   runId String?
   run   IntegrationRun? @relation(fields: [runId], references: [id], onDelete: SetNull)
 
-  /// Parent connection
-  connectionId String
-  connection   IntegrationConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  /// Owning organization (vulnerability store); null only on legacy webhook rows
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /// Parent connection (null for imported ASV / pentest / manual findings)
+  connectionId String?
+  connection   IntegrationConnection? @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  /// Where the vulnerability came from
+  source VulnerabilitySource @default(integration)
+  /// Stable id within the source (dedupes re-syncs and re-imports)
+  externalId String?
+  cveId      String?
+
+  assetId String?
+  asset   Asset?  @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  ownerId String?
+  owner   Member? @relation("VulnerabilityOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+
+  /// Lifecycle: first detection drives the remediation SLA (PCI DSS 6.3.3, 11.3.1)
+  firstSeenAt DateTime  @default(now())
+  lastSeenAt  DateTime  @default(now())
+  resolvedAt  DateTime?
+  /// Snapshotted at first detection so later SLA changes never rewrite history
+  slaDueAt    DateTime?
+  /// Why a finding was ignored (accepted risk / false positive) or how it was fixed
+  statusNote  String?
 
   /// Resource classification
   resourceType String
@@ -223,6 +248,9 @@ model IntegrationPlatformFinding {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@unique([organizationId, source, externalId])
+  @@index([organizationId, status])
+  @@index([assetId])
   @@index([connectionId])
   @@index([runId])
   @@index([resourceType, resourceId])

@@ -12,3 +12,17 @@ model OrganizationChart {
 
   @@index([organizationId])
 }
+
+// Dated, immutable copy of the org chart, kept as audit evidence (ISO 27001 5.3).
+model OrganizationChartSnapshot {
+  id             String       @id @default(dbgenerated("generate_prefixed_cuid('ocs'::text)"))
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  nodes          Json         @default("[]")
+  edges          Json         @default("[]")
+  createdById    String?
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, createdAt])
+}

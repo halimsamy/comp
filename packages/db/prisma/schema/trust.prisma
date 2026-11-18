@@ -54,9 +54,11 @@ model Trust {
   favicon String?
 
   // Whether the AI-assisted Security Questionnaire is offered on the public
-  // trust portal. Defaults to true so existing portals keep their current
-  // behavior; org owners can hide it when they'd rather review answers first.
-  securityQuestionnaireEnabled Boolean @default(true)
+  // trust portal. Off for new portals; existing rows keep their value.
+  securityQuestionnaireEnabled Boolean @default(false)
+  // When true, AI answers to visitor questionnaires are held for an admin to
+  // review and approve before they are emailed to the requester.
+  securityQuestionnaireRequiresReview Boolean @default(true)
 
   @@id([status, organizationId])
   @@unique([organizationId])

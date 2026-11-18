@@ -28,6 +28,9 @@ model FrameworkInstance {
   // CustomFramework hang off CustomFramework.requirements instead.
   customRequirements   CustomRequirement[]
   controlFamilies      FrameworkControlFamily[]
+  requirementApplicability RequirementApplicability[]
+  auditEngagements         AuditEngagement[]
+  complianceSnapshots      ComplianceSnapshot[]
 
   // (id, organizationId) is the composite-FK target for CustomRequirement.frameworkInstanceId
   // so a per-instance custom requirement can only point at an FI in its own org.

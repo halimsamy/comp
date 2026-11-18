@@ -15,6 +15,13 @@ model Attachment {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   comment        Comment?     @relation(fields: [commentId], references: [id])
   commentId      String?
+  vendorDocument VendorDocument?
+
+  // Evidence validity: a file is current from validFrom until validUntil, then "needs update".
+  // Framework exports take only files valid inside the audit period.
+  validFrom    DateTime?
+  validUntil   DateTime?
+  uploadedById String? // User id of the uploader
 
   @@index([entityId, entityType])
 }
@@ -30,6 +37,7 @@ enum AttachmentEntityType {
   employment_onboard
   employment_offboard
   offboarding_checklist
+  audit_request
 }
 
 enum AttachmentType {

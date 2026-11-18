@@ -13,6 +13,9 @@ model Onboarding {
   companyDetails        Json?
   triggerJobId          String?
   triggerJobCompleted   Boolean      @default(false)
+  /// Getting Started items the team skipped: { [itemId]: { reason, skippedAt, skippedById } }.
+  /// Item completion itself is computed from live state, never stored.
+  checklistSkips        Json         @default("{}")
 
   @@index([organizationId])
 }

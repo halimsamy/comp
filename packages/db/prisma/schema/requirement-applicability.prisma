@@ -1,0 +1,34 @@
+// Whether a framework requirement applies to the organization (ISO 27001 SoA,
+// PCI DSS ROC "N/A" / compensating control / customized approach). Scoring
+// excludes not_applicable requirements.
+enum RequirementApplicabilityStatus {
+  applicable
+  not_applicable
+  compensating_control // PCI DSS Appendix B/C: in place via compensating controls
+  customized_approach // PCI DSS Appendix D: in place via the customized approach
+}
+
+enum RequirementApplicabilitySource {
+  manual // set on the requirement page
+  soa // written by the ISO 27001 Statement of Applicability
+}
+
+model RequirementApplicability {
+  id                  String                         @id @default(dbgenerated("generate_prefixed_cuid('rap'::text)"))
+  organizationId      String
+  organization        Organization                   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  frameworkInstanceId String
+  frameworkInstance   FrameworkInstance              @relation(fields: [frameworkInstanceId], references: [id], onDelete: Cascade)
+  // FrameworkEditorRequirement.id or CustomRequirement.id (the requirement page key).
+  requirementKey      String
+  status              RequirementApplicabilityStatus @default(applicable)
+  justification       String?
+  source              RequirementApplicabilitySource @default(manual)
+  updatedById         String?
+  updatedBy           Member?                        @relation("RequirementApplicabilityUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt           DateTime                       @default(now())
+  updatedAt           DateTime                       @updatedAt
+
+  @@unique([frameworkInstanceId, requirementKey])
+  @@index([organizationId])
+}

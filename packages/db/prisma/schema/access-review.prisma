@@ -1,0 +1,160 @@
+// Access management (ISO 27001 A.5.18; PCI DSS 7.2.4, 7.2.5.1, 8.2.6).
+//
+// Integration systems (Google Workspace, GitHub, AWS IAM) read their accounts
+// live from integration check results; CompAI itself is a built-in system.
+// Systems without an integration are AccessSystem rows whose accounts come
+// from a CSV import. A system is addressed by a "system key":
+//   'compai' | 'connection:<connectionId>' | 'manual:<accessSystemId>'.
+// Member ids are stored without relations and names are frozen, so review
+// evidence survives member removal.
+
+model AccessSystem {
+  id String @id @default(dbgenerated("generate_prefixed_cuid('asy'::text)"))
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String?
+  importedAt  DateTime?
+
+  accounts AccessSystemAccount[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, name])
+}
+
+// One account of a manual system, replaced on every CSV import.
+model AccessSystemAccount {
+  id String @id @default(dbgenerated("generate_prefixed_cuid('asa'::text)"))
+
+  systemId String
+  system   AccessSystem @relation(fields: [systemId], references: [id], onDelete: Cascade)
+
+  externalId       String
+  name             String?
+  email            String?
+  type             String? // human | service
+  status           String? // active | suspended | deactivated
+  roles            String[]
+  isAdmin          Boolean   @default(false)
+  mfaEnabled       Boolean?
+  lastLoginAt      DateTime?
+  accountCreatedAt DateTime?
+
+  @@unique([systemId, externalId])
+}
+
+// Manual owner mapping for accounts that email matching can't place.
+model AccessAccountOwner {
+  id String @id @default(dbgenerated("generate_prefixed_cuid('aao'::text)"))
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  systemKey        String
+  accountId        String
+  memberId         String?
+  isServiceAccount Boolean @default(false)
+  justification    String?
+  updatedById      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, systemKey, accountId])
+  @@index([organizationId, memberId])
+}
+
+enum AccessReviewStatus {
+  in_progress
+  completed
+}
+
+enum AccessReviewDecision {
+  keep
+  revoke
+  modify
+}
+
+model AccessReview {
+  id String @id @default(dbgenerated("generate_prefixed_cuid('arv'::text)"))
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  name          String
+  status        AccessReviewStatus @default(in_progress)
+  dueDate       DateTime
+  createdById   String?
+  createdByName String?
+
+  // PCI 7.2.4 / 7.2.5.1: management acknowledges that access remains appropriate.
+  signedOffById      String?
+  signedOffByName    String?
+  signedOffAt        DateTime?
+  signOffNote        String?
+  reportAttachmentId String?
+  taskId             String?
+
+  systems AccessReviewSystem[]
+  items   AccessReviewItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([organizationId, status])
+}
+
+model AccessReviewSystem {
+  id String @id @default(dbgenerated("generate_prefixed_cuid('ars'::text)"))
+
+  reviewId String
+  review   AccessReview @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  systemKey    String
+  systemName   String
+  reviewerId   String?
+  reviewerName String?
+
+  items AccessReviewItem[]
+
+  @@index([reviewId])
+}
+
+// Snapshot of one account at review start, plus the reviewer's decision.
+model AccessReviewItem {
+  id String @id @default(dbgenerated("generate_prefixed_cuid('ari'::text)"))
+
+  reviewId       String
+  review         AccessReview       @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  reviewSystemId String
+  reviewSystem   AccessReviewSystem @relation(fields: [reviewSystemId], references: [id], onDelete: Cascade)
+  organizationId String
+
+  accountId     String
+  accountName   String
+  email         String?
+  ownerMemberId String?
+  ownerName     String?
+  accountType   String?
+  accountStatus String?
+  roles         String[]
+  isAdmin       Boolean   @default(false)
+  mfaEnabled    Boolean?
+  lastLoginAt   DateTime?
+  flags         String[]
+
+  decision        AccessReviewDecision?
+  comment         String?
+  decidedById     String?
+  decidedByName   String?
+  decidedAt       DateTime?
+  remediatedAt    DateTime?
+  remediationNote String?
+
+  @@index([reviewId])
+  @@index([organizationId])
+}

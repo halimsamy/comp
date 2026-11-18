@@ -4,6 +4,9 @@ model TaskItem {
   description String?
   status      TaskItemStatus   @default(todo)
   priority    TaskItemPriority @default(medium)
+  // Treatment-plan tracking (ISO 6.1.3 / 8.3): target date and when it was done.
+  dueDate     DateTime?
+  completedAt DateTime?
 
   // Polymorphic relation (like Comment and Attachment)
   entityId   String

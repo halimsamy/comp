@@ -63,6 +63,8 @@ model Session {
   userId               String
   activeOrganizationId String?
   impersonatedBy       String?
+  // How the session was created (google, github, microsoft, magic-link, email-otp)
+  signInMethod         String?
 
   deviceAgent    Boolean  @default(false)
   deviceAgentFor Device[] @relation("DeviceAgentSession")
@@ -200,6 +202,7 @@ model Member {
   role           String // Purposefully a string, since BetterAuth doesn't support enums this way
   createdAt      DateTime     @default(now())
 
+  requirementApplicabilityUpdates RequirementApplicability[] @relation("RequirementApplicabilityUpdatedBy")
   department                      String                            @default("none")
   jobTitle                        String?
   isActive                        Boolean                           @default(true)
@@ -221,6 +224,11 @@ model Member {
   publishedIsmsVersions            IsmsDocumentVersion[]    @relation("IsmsDocumentVersionPublisher") // ISMS document versions this member published
   risks                            Risk[]
   riskAcceptances                  RiskAcceptance[] // acceptance events this member recorded as acceptor
+  riskReviews                      RiskReview[] // periodic risk reviews this member signed off
+  auditGrants                      AuditEngagementAuditor[] @relation("AuditEngagementAuditors")
+  auditReviews                     AuditRequirementReview[] @relation("AuditRequirementReviewer")
+  auditComments                    AuditComment[]           @relation("AuditCommentAuthor")
+  auditRequests                    AuditEvidenceRequest[]   @relation("AuditRequestRequester")
   tasks                            Task[]
   vendors                          Vendor[]
   comments                         Comment[]
@@ -235,12 +243,19 @@ model Member {
   subjectFindings                  Finding[]                @relation("FindingSubject")
   createdApiKeys                   ApiKey[]                 @relation("ApiKeyCreatedBy")
   publishedPolicyVersions          PolicyVersion[]          @relation("PolicyVersionPublisher")
+  approvedPolicyVersions           PolicyVersion[]                  @relation("PolicyVersionApprover")
+  policyReviews                    PolicyReview[]                   @relation("PolicyReviewer")
+  policyAcknowledgements           PolicyAcknowledgement[]
   performedFrameworkSyncOperations FrameworkSyncOperation[] @relation("FrameworkSyncOperationPerformer")
   approvedTasks                    Task[]                   @relation("TaskApprover")
   devices                          Device[]
   backgroundCheckRequests          BackgroundCheckRequest[]
   offboardingChecklistCompletions  OffboardingChecklistCompletion[]
   offboardingAccessRevocations     OffboardingAccessRevocation[]
+  ownedControls                    Control[]                @relation("ControlOwner")
+  trainingCompletionRecords        TrainingCompletionRecord[]
+  ownedAssets                      Asset[]                  @relation("AssetOwner")
+  ownedVulnerabilities             IntegrationPlatformFinding[] @relation("VulnerabilityOwner")
 }
 
 model Invitation {

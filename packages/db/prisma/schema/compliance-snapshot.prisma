@@ -1,0 +1,25 @@
+// Daily per-framework compliance score history (ISO 27001 9.1 monitoring; "were
+// we compliant in period X"). Written by the compliance-snapshot-schedule job,
+// one row per framework instance per UTC day, and read by the overview trend chart.
+model ComplianceSnapshot {
+  id String @id @default(dbgenerated("generate_prefixed_cuid('csnap'::text)"))
+
+  organizationId      String
+  organization        Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  frameworkInstanceId String
+  frameworkInstance   FrameworkInstance @relation(fields: [frameworkInstanceId], references: [id], onDelete: Cascade)
+
+  // Denormalised so history stays readable if the framework is renamed.
+  frameworkName         String
+  date                  DateTime @db.Date
+  scorePercent          Int
+  controlsComplete      Int
+  controlsTotal         Int
+  requirementsSatisfied Int
+  requirementsTotal     Int
+
+  createdAt DateTime @default(now())
+
+  @@unique([frameworkInstanceId, date])
+  @@index([organizationId, date])
+}

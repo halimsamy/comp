@@ -6,6 +6,7 @@ model Organization {
   createdAt                   DateTime    @default(now())
   metadata                    String?
   onboarding                  Onboarding?
+  requirementApplicability    RequirementApplicability[]
   website                     String?
   onboardingCompleted         Boolean     @default(false)
   hasAccess                   Boolean     @default(false)
@@ -20,6 +21,11 @@ model Organization {
   backgroundCheckStepEnabled  Boolean     @default(true)
   whistleblowerReportEnabled  Boolean     @default(true)
   accessRequestFormEnabled    Boolean     @default(true)
+
+  // Security settings. Idle timeout in minutes (null = no idle timeout; 15 meets
+  // PCI DSS 8.2.8). Empty allowedSignInMethods = every method is allowed.
+  sessionIdleTimeoutMinutes Int?
+  allowedSignInMethods      String[] @default([])
 
   // FleetDM
   fleetDmLabelId        Int?
@@ -46,8 +52,11 @@ model Organization {
   invitations                        Invitation[]
   members                            Member[]
   policy                             Policy[]
+  policyReviews                          PolicyReview[]
+  policyAcknowledgements                 PolicyAcknowledgement[]
   risk                               Risk[]
   riskAcceptances                    RiskAcceptance[]
+  riskReviews                        RiskReview[]
   vendors                            Vendor[]
   tasks                              Task[]
   taskItems                          TaskItem[]
@@ -72,6 +81,7 @@ model Organization {
   soaDocuments                       SOADocument[]
   ismsDocuments                      IsmsDocument[]
   ismsProfiles                       IsmsProfile[]
+  ismsNonconformities                IsmsNonconformity[]
   primaryColor                       String?
   trustPortalFaqs                    Json? // Array of { question: string, answer: string, order: number }
 
@@ -126,7 +136,17 @@ model Organization {
   // Offboarding Checklist
   offboardingChecklistTemplates    OffboardingChecklistTemplate[]
   offboardingChecklistCompletions  OffboardingChecklistCompletion[]
+  trainingModules                 TrainingModule[]
+  trainingCompletionRecords       TrainingCompletionRecord[]
+  organizationChartSnapshots      OrganizationChartSnapshot[]
   offboardingAccessRevocations     OffboardingAccessRevocation[]
+  accessSystems                    AccessSystem[]
+  accessAccountOwners              AccessAccountOwner[]
+  accessReviews                    AccessReview[]
+  complianceSnapshots              ComplianceSnapshot[]
+  auditEngagements                 AuditEngagement[]
+  assets                           Asset[]
+  vulnerabilities                  IntegrationPlatformFinding[]
 
   @@index([slug])
 }

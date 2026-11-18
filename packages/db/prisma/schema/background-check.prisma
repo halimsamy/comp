@@ -23,6 +23,8 @@ model BackgroundCheckRequest {
   lastSyncedAt              DateTime?
   reportSnapshot            Json?
   reportSyncedAt            DateTime?
+  // Maintained by a DB trigger: stamped when status becomes completed/completed_with_flags, cleared otherwise.
+  completedAt               DateTime?
   createdAt                 DateTime              @default(now())
   updatedAt                 DateTime              @updatedAt
 

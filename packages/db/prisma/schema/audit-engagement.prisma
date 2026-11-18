@@ -1,0 +1,108 @@
+// External audit engagements (ISO 27001 certification / surveillance audit,
+// PCI DSS ROC by a QSA) and the auditor workspace built on them.
+
+enum AuditEngagementStatus {
+  planned
+  in_progress
+  awaiting_report
+  completed
+}
+
+// The auditor's assessment of one requirement's evidence. No row = not reviewed.
+enum AuditItemStatus {
+  accepted
+  flagged
+  requested
+}
+
+enum AuditRequestStatus {
+  open // waiting on the team
+  submitted // the team responded; waiting on the auditor
+  accepted // the auditor accepted the response
+}
+
+model AuditEngagement {
+  id                  String                @id @default(dbgenerated("generate_prefixed_cuid('aud'::text)"))
+  organizationId      String
+  organization        Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  frameworkInstanceId String
+  frameworkInstance   FrameworkInstance     @relation(fields: [frameworkInstanceId], references: [id], onDelete: Cascade)
+  title               String
+  firmName            String?
+  status              AuditEngagementStatus @default(planned)
+  // Audit (observation) period: evidence valid inside it is in scope and exported.
+  periodStart         DateTime
+  periodEnd           DateTime
+  // Auditor-only members lose access after this; a daily job deactivates them.
+  accessEndsAt        DateTime?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  auditors AuditEngagementAuditor[]
+  reviews  AuditRequirementReview[]
+  comments AuditComment[]
+  requests AuditEvidenceRequest[]
+
+  @@index([organizationId])
+  @@index([frameworkInstanceId])
+}
+
+model AuditEngagementAuditor {
+  id        String          @id @default(dbgenerated("generate_prefixed_cuid('aua'::text)"))
+  auditId   String
+  audit     AuditEngagement @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  memberId  String
+  member    Member          @relation("AuditEngagementAuditors", fields: [memberId], references: [id], onDelete: Cascade)
+  createdAt DateTime        @default(now())
+
+  @@unique([auditId, memberId])
+  @@index([memberId])
+}
+
+model AuditRequirementReview {
+  id            String          @id @default(dbgenerated("generate_prefixed_cuid('arr'::text)"))
+  auditId       String
+  audit         AuditEngagement @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  // FrameworkEditorRequirement.id or CustomRequirement.id (the requirement page key).
+  requirementId String
+  status        AuditItemStatus
+  note          String?         @db.Text
+  reviewedById  String?
+  reviewedBy    Member?         @relation("AuditRequirementReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt    DateTime        @default(now())
+
+  @@unique([auditId, requirementId])
+}
+
+model AuditComment {
+  id            String          @id @default(dbgenerated("generate_prefixed_cuid('acm'::text)"))
+  auditId       String
+  audit         AuditEngagement @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  // Null = a comment on the audit as a whole.
+  requirementId String?
+  authorId      String?
+  author        Member?         @relation("AuditCommentAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  content       String          @db.Text
+  createdAt     DateTime        @default(now())
+
+  @@index([auditId, requirementId])
+}
+
+model AuditEvidenceRequest {
+  id            String             @id @default(dbgenerated("generate_prefixed_cuid('aer'::text)"))
+  auditId       String
+  audit         AuditEngagement    @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  requirementId String?
+  title         String
+  description   String?            @db.Text
+  status        AuditRequestStatus @default(open)
+  dueDate       DateTime?
+  requestedById String?
+  requestedBy   Member?            @relation("AuditRequestRequester", fields: [requestedById], references: [id], onDelete: SetNull)
+  response      String?            @db.Text
+  respondedAt   DateTime?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@index([auditId])
+}

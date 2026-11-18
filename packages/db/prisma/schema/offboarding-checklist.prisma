@@ -9,6 +9,12 @@ model OffboardingChecklistTemplate {
   isDefault          Boolean      @default(false)
   isEnabled          Boolean      @default(true)
   isAccessRevocation Boolean      @default(false)
+  // Same template table serves onboarding and offboarding checklists.
+  kind               ChecklistKind @default(offboarding)
+  // SLA: days after onboardDate (onboarding) or offboardDate (offboarding) the item is due.
+  dueDays            Int?
+  // When set, the item completes itself from native state: policies | training | device | background_check
+  autoCompleteSource String?
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
 
@@ -16,6 +22,12 @@ model OffboardingChecklistTemplate {
 
   @@index([organizationId])
   @@index([organizationId, isEnabled])
+  @@index([organizationId, kind])
+}
+
+enum ChecklistKind {
+  onboarding
+  offboarding
 }
 
 model OffboardingChecklistCompletion {

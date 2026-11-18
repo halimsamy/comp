@@ -55,6 +55,14 @@ model Task {
   // Null means "never embedded" so the next linkage run will embed.
   embeddingHash String?
 
+  // Auto-evidence derived from native module state (ISMS, people, vendors):
+  // the evidence fingerprint last sent to review, when, and the snapshot PDF.
+  // A rejected submission is not resent until the evidence changes or the
+  // task is completed again.
+  nativeEvidenceFingerprint  String?
+  nativeEvidenceSubmittedAt  DateTime?
+  nativeEvidenceAttachmentId String?
+
   @@index([organizationId, archivedAt])
 }
 
@@ -72,6 +80,7 @@ enum TaskFrequency {
   weekly
   monthly
   quarterly
+  semiannually
   yearly
 }
 

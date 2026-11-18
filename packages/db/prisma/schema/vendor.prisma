@@ -43,10 +43,39 @@ model Vendor {
   findings                     Finding[]
   offboardingAccessRevocations OffboardingAccessRevocation[]
   acceptances                  RiskAcceptance[] // risk-owner residual-risk acceptance events (6.1.3(f))
+  documents                    VendorDocument[]
+  reviews                      VendorReview[]
+
+  // Third-party service provider profile (ISO 27001 A.5.19-A.5.22, PCI DSS 12.8).
+  // null criticality = not yet classified; drives the review cadence.
+  criticality                     VendorCriticality?
+  // PCI DSS 12.8.1: account data is shared with the TPSP, or it can affect its security.
+  handlesCardholderData           Boolean              @default(false)
+  affectsCdeSecurity              Boolean              @default(false)
+  dataTypes                       String[]             @default([])
+  contractStartDate               DateTime?
+  contractEndDate                 DateTime?
+  // ISO 27001 A.5.20: security and confidentiality requirements in the agreement.
+  securityClausesConfirmed        Boolean              @default(false)
+  confidentialityClausesConfirmed Boolean              @default(false)
+  // PCI DSS 12.8.2: date the TPSP's written acknowledgement was received (null = not received).
+  tpspAcknowledgementDate         DateTime?
+  // PCI DSS 12.8.5: [{ requirement, owner: tpsp|entity|shared, notes? }]
+  responsibilityMatrix            Json?
+  assuranceType                   VendorAssuranceType?
+  assurancePeriodStart            DateTime?
+  assurancePeriodEnd              DateTime?
+  assuranceExpiresAt              DateTime?
+  // PCI DSS 12.8.4: TPSP compliance status, monitored at least once every 12 months.
+  pciStatus                       VendorPciStatus?
+  pciStatusCheckedAt              DateTime?
+  lastReviewedAt                  DateTime?
+  nextReviewDue                   DateTime?
 
   @@index([organizationId])
   @@index([assigneeId])
   @@index([category])
+  @@index([organizationId, nextReviewDue])
 }
 
 model VendorContact {
@@ -77,4 +106,104 @@ enum VendorStatus {
   not_assessed
   in_progress
   assessed
+}
+
+enum VendorCriticality {
+  critical
+  high
+  medium
+  low
+}
+
+enum VendorAssuranceType {
+  soc2_type1
+  soc2_type2
+  iso27001
+  pci_aoc
+  pci_roc
+  other
+  none
+}
+
+enum VendorPciStatus {
+  compliant
+  non_compliant
+  in_progress
+  not_applicable
+  unknown
+}
+
+enum VendorDocumentType {
+  soc2_type1
+  soc2_type2
+  iso27001_certificate
+  pci_aoc
+  dpa
+  contract
+  nda
+  pentest_report
+  insurance
+  questionnaire
+  other
+}
+
+enum VendorDocumentSummaryStatus {
+  pending
+  completed
+  failed
+}
+
+enum VendorReviewOutcome {
+  approved
+  approved_with_conditions
+  rejected
+}
+
+// A typed vendor document (SOC 2, ISO certificate, AOC, DPA, contract, ...).
+// The file itself is a vendor Attachment; this row adds type, coverage period,
+// expiry (drives renewal reminders) and the AI summary of the report.
+model VendorDocument {
+  id             String             @id @default(dbgenerated("generate_prefixed_cuid('vdoc'::text)"))
+  organizationId String
+  vendorId       String
+  vendor         Vendor             @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  attachmentId   String             @unique
+  attachment     Attachment         @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
+  type           VendorDocumentType
+  name           String
+  periodStart    DateTime?
+  periodEnd      DateTime?
+  expiresAt      DateTime?
+  uploadedById   String? // user id
+
+  aiSummary       Json?
+  aiSummaryStatus VendorDocumentSummaryStatus?
+  aiSummaryRunId  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([vendorId])
+  @@index([organizationId, expiresAt])
+}
+
+// A signed-off periodic vendor review (ISO 27001 A.5.22, PCI DSS 12.8.4).
+// Append-only: the reviewer name is frozen so the record survives member removal.
+model VendorReview {
+  id               String              @id @default(dbgenerated("generate_prefixed_cuid('vrv'::text)"))
+  organizationId   String
+  vendorId         String
+  vendor           Vendor              @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  outcome          VendorReviewOutcome
+  notes            String?
+  // { assuranceReviewed, pciStatusConfirmed, contractReviewed, riskReassessed }
+  checklist        Json
+  criticality      VendorCriticality?
+  reviewedByUserId String?
+  reviewedByName   String
+  reviewedAt       DateTime            @default(now())
+  nextReviewDue    DateTime
+
+  @@index([vendorId, reviewedAt])
+  @@index([organizationId])
 }

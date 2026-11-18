@@ -56,6 +56,8 @@ model Policy {
   pendingVersionId      String?
   versions              PolicyVersion[]                @relation("PolicyVersions")
   findings              Finding[]
+  reviews               PolicyReview[]
+  acknowledgements      PolicyAcknowledgement[]
 
   @@index([organizationId])
   @@index([organizationId, archivedAt])
@@ -79,7 +81,55 @@ model PolicyVersion {
   publishedBy   Member? @relation("PolicyVersionPublisher", fields: [publishedById], references: [id], onDelete: SetNull)
   changelog     String?
 
+  // Approval record — set when the assigned approver accepts this version.
+  approvedAt      DateTime?
+  approvedById    String?
+  approvedBy      Member?   @relation("PolicyVersionApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvalComment String?
+
+  reviews          PolicyReview[]
+  acknowledgements PolicyAcknowledgement[]
+
   @@unique([policyId, version])
   @@index([policyId])
   @@index([createdAt])
+}
+
+// Append-only record of a periodic policy review ("renew without changes").
+model PolicyReview {
+  id              String         @id @default(dbgenerated("generate_prefixed_cuid('prv'::text)"))
+  organizationId  String
+  organization    Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  policyId        String
+  policy          Policy         @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  policyVersionId String?
+  policyVersion   PolicyVersion? @relation(fields: [policyVersionId], references: [id], onDelete: SetNull)
+  reviewerId      String?
+  reviewer        Member?        @relation("PolicyReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  reviewedAt      DateTime       @default(now())
+  notes           String?
+  nextReviewDate  DateTime
+  createdAt       DateTime       @default(now())
+
+  @@index([policyId, reviewedAt])
+  @@index([organizationId])
+}
+
+// Append-only record of an employee acknowledging a specific policy version.
+// Policy.signedBy remains the cache for the current version only.
+model PolicyAcknowledgement {
+  id              String         @id @default(dbgenerated("generate_prefixed_cuid('pak'::text)"))
+  organizationId  String
+  organization    Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  policyId        String
+  policy          Policy         @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  policyVersionId String?
+  policyVersion   PolicyVersion? @relation(fields: [policyVersionId], references: [id], onDelete: SetNull)
+  memberId        String?
+  member          Member?        @relation(fields: [memberId], references: [id], onDelete: SetNull)
+  acknowledgedAt  DateTime       @default(now())
+
+  @@index([policyId, memberId])
+  @@index([memberId])
+  @@index([organizationId, acknowledgedAt])
 }

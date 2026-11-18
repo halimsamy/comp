@@ -10,6 +10,13 @@ model Questionnaire {
   answeredQuestions Int                 @default(0) // Number of questions with answers
   source            String              @default("internal") // Source of the questionnaire: 'internal' (from app) or 'external' (from trust portal)
 
+  // Review gate for trust-portal (external) questionnaires: answers are only
+  // sent to requesterEmail after an admin approves them.
+  reviewStatus     QuestionnaireReviewStatus?
+  requesterEmail   String?
+  reviewedAt       DateTime?
+  reviewedByUserId String?
+
   // Dates
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -53,6 +60,11 @@ enum QuestionnaireStatus {
   parsing // Currently being parsed
   completed // Successfully parsed
   failed // Parsing failed
+}
+
+enum QuestionnaireReviewStatus {
+  pending_review
+  approved
 }
 
 enum QuestionnaireAnswerStatus {
