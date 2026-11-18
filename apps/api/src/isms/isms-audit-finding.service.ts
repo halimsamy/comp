@@ -4,10 +4,33 @@ import type { Prisma } from '@db';
 import { invalidateApprovalIfNeeded } from './utils/approval';
 import { lockDocument } from './utils/document-lock';
 import { parseOptionalDate } from './utils/parse-optional-date';
+import { resolveActiveMember } from './utils/resolve-active-member';
 import type {
   CreateAuditFindingInput,
   UpdateAuditFindingInput,
 } from './registers/register-registry';
+
+/** Corrective-action fields (10.2): tracked to closure after the audit is signed. */
+const CAPA_KEYS = [
+  'rootCause',
+  'correctiveAction',
+  'effectivenessReviewedAt',
+  'effectivenessReviewedById',
+  'effectivenessNotes',
+] as const;
+
+/** True when an update touches nothing but corrective-action tracking. */
+export function isCapaOnlyUpdate(dto: UpdateAuditFindingInput): boolean {
+  const keys = Object.entries(dto)
+    .filter(([, value]) => value !== undefined)
+    .map(([key]) => key);
+  const capa: readonly string[] = CAPA_KEYS;
+  return keys.length > 0 && keys.every((key) => capa.includes(key));
+}
+
+function trimOrNull(value: string | null | undefined): string | null | undefined {
+  return value === undefined ? undefined : value?.trim() || null;
+}
 
 /**
  * CRUD for an audit's findings (clause 9.2, CS-724). Most findings are raised
@@ -35,11 +58,15 @@ export class IsmsAuditFindingService {
       controlId: dto.controlId,
       auditId: audit.id,
     });
-    const ownerMemberId = await this.resolveMember({
+    const ownerMemberId = await resolveActiveMember({
       memberId: dto.ownerMemberId,
       organizationId,
     });
     const dueDate = parseOptionalDate(dto.dueDate);
+    const effectivenessReviewedById = await resolveActiveMember({
+      memberId: dto.effectivenessReviewedById,
+      organizationId,
+    });
 
     return db.$transaction(async (tx) => {
       // The lock also serializes reference generation, so concurrent creates
@@ -65,6 +92,12 @@ export class IsmsAuditFindingService {
           dueDate: dueDate ?? null,
           status: dto.status ?? 'open',
           closureEvidence: dto.closureEvidence?.trim() || null,
+          rootCause: trimOrNull(dto.rootCause) ?? null,
+          correctiveAction: trimOrNull(dto.correctiveAction) ?? null,
+          effectivenessReviewedAt:
+            parseOptionalDate(dto.effectivenessReviewedAt) ?? null,
+          effectivenessReviewedById: effectivenessReviewedById ?? null,
+          effectivenessNotes: trimOrNull(dto.effectivenessNotes) ?? null,
           position,
         },
       });
@@ -92,8 +125,12 @@ export class IsmsAuditFindingService {
         ? finding.clauseOrControl
         : dto.clauseOrControl?.trim() || null;
     const derivedClause = requestedClause ?? control?.controlRef ?? null;
-    const ownerMemberId = await this.resolveMember({
+    const ownerMemberId = await resolveActiveMember({
       memberId: dto.ownerMemberId,
+      organizationId,
+    });
+    const effectivenessReviewedById = await resolveActiveMember({
+      memberId: dto.effectivenessReviewedById,
       organizationId,
     });
 
@@ -101,7 +138,11 @@ export class IsmsAuditFindingService {
       // Same per-document lock submit/approve take, so an edit can't race the
       // submission's completeness check.
       await lockDocument(tx, finding.documentId);
-      await invalidateApprovalIfNeeded({ tx, documentId: finding.documentId });
+      // Corrective-action tracking is operational (like review actions after
+      // sign-off), so it never reverts the approved 9.2 document to draft.
+      if (!isCapaOnlyUpdate(dto)) {
+        await invalidateApprovalIfNeeded({ tx, documentId: finding.documentId });
+      }
       return tx.ismsAuditFinding.update({
         where: { id: findingId },
         data: {
@@ -120,6 +161,11 @@ export class IsmsAuditFindingService {
             dto.closureEvidence === undefined
               ? undefined
               : dto.closureEvidence?.trim() || null,
+          rootCause: trimOrNull(dto.rootCause),
+          correctiveAction: trimOrNull(dto.correctiveAction),
+          effectivenessReviewedAt: parseOptionalDate(dto.effectivenessReviewedAt),
+          effectivenessReviewedById,
+          effectivenessNotes: trimOrNull(dto.effectivenessNotes),
           position: dto.position ?? undefined,
         },
       });
@@ -189,26 +235,6 @@ export class IsmsAuditFindingService {
       throw new NotFoundException('Audit control row not found in this audit');
     }
     return control;
-  }
-
-  private async resolveMember({
-    memberId,
-    organizationId,
-  }: {
-    memberId: string | null | undefined;
-    organizationId: string;
-  }): Promise<string | null | undefined> {
-    if (memberId === undefined) return undefined;
-    const trimmed = memberId?.trim();
-    if (!trimmed) return null;
-    // Finding owners must be active People members.
-    const member = await db.member.findFirst({
-      where: { id: trimmed, organizationId, deactivated: false },
-    });
-    if (!member) {
-      throw new NotFoundException('Active member not found in organization');
-    }
-    return trimmed;
   }
 
   private async nextPosition({

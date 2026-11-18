@@ -117,6 +117,20 @@ describe('IsmsProfileController', () => {
       expect(mockService.generateAll).toHaveBeenCalledWith({
         organizationId: 'org_1',
         frameworkId: 'fw_1',
+        draftsOnly: false,
+      });
+    });
+
+    it('passes draftsOnly through for the one-click draft refresh', async () => {
+      mockService.generateAll.mockResolvedValue({ success: true });
+      await controller.generateAll(
+        { frameworkId: 'fw_1', draftsOnly: true },
+        'org_1',
+      );
+      expect(mockService.generateAll).toHaveBeenCalledWith({
+        organizationId: 'org_1',
+        frameworkId: 'fw_1',
+        draftsOnly: true,
       });
     });
   });

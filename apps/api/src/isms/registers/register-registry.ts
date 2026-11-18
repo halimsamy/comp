@@ -87,6 +87,8 @@ const schemas = {
     partyName: z.string(),
     requirement: z.string(),
     treatment: z.string(),
+    ownerMemberId: z.string().nullish(),
+    lastReviewedAt: z.string().nullish(), // ISO date string
     position,
   }),
   requirementUpdate: z.object({
@@ -96,6 +98,9 @@ const schemas = {
     partyName: z.string().optional(),
     requirement: z.string().optional(),
     treatment: z.string().optional(),
+    // Nullish: undefined = leave as-is, null = clear.
+    ownerMemberId: z.string().nullish(),
+    lastReviewedAt: z.string().nullish(),
     position,
   }),
   objectiveCreate: z.object({
@@ -259,6 +264,12 @@ const schemas = {
     dueDate: z.string().nullish(), // ISO date string
     status: z.enum(AUDIT_FINDING_STATUS).optional(),
     closureEvidence: z.string().nullish(),
+    // Corrective action (10.2). Nullish: undefined = leave as-is, null = clear.
+    rootCause: z.string().nullish(),
+    correctiveAction: z.string().nullish(),
+    effectivenessReviewedAt: z.string().nullish(), // ISO date string
+    effectivenessReviewedById: z.string().nullish(),
+    effectivenessNotes: z.string().nullish(),
     position,
   }),
   auditFindingUpdate: z.object({
@@ -270,6 +281,12 @@ const schemas = {
     dueDate: z.string().nullish(),
     status: z.enum(AUDIT_FINDING_STATUS).optional(),
     closureEvidence: z.string().nullish(),
+    // Corrective action (10.2). Nullish: undefined = leave as-is, null = clear.
+    rootCause: z.string().nullish(),
+    correctiveAction: z.string().nullish(),
+    effectivenessReviewedAt: z.string().nullish(), // ISO date string
+    effectivenessReviewedById: z.string().nullish(),
+    effectivenessNotes: z.string().nullish(),
     position,
   }),
   // reference ("MR-YYYY-NN") and recordedAt are server-generated and immutable;

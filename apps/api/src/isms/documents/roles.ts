@@ -13,6 +13,7 @@ import {
   SEED_ROLE_DEFINITIONS,
   SEED_ROLE_KEYS,
 } from './roles-defaults';
+import { PCI_EXECUTIVE_OWNER_KEY } from './role-automation';
 
 type Tx = Prisma.TransactionClient;
 
@@ -128,6 +129,16 @@ export function roleValidationMessages({
       messages.push(...auditRouteMessages(role, activeMemberIds));
     }
   }
+  // The PCI role is seeded only for PCI orgs; once present it needs a holder.
+  const pciRole = byKey.get(PCI_EXECUTIVE_OWNER_KEY);
+  if (
+    pciRole &&
+    !pciRole.assignments.some((assignment) =>
+      activeMemberIds.has(assignment.memberId),
+    )
+  ) {
+    messages.push(`${pciRole.name} needs at least one assigned member.`);
+  }
   return messages;
 }
 
@@ -235,7 +246,10 @@ function buildRoleTable(roles: RoleExportRow[]): IsmsExportSection['table'] {
   // auto-generated rows. Custom roles are managed on the page but are not part of
   // this standardized Clause 5.3 table, so they're excluded here.
   const seededRoles = roles.filter(
-    (role) => role.roleKey !== null && SEED_ROLE_KEYS.includes(role.roleKey),
+    (role) =>
+      role.roleKey !== null &&
+      (SEED_ROLE_KEYS.includes(role.roleKey) ||
+        role.roleKey === PCI_EXECUTIVE_OWNER_KEY),
   );
   return {
     headers: ['Role', 'Holder', 'Responsibility', 'Authority — and granted by'],

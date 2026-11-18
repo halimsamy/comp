@@ -36,6 +36,28 @@ vi.mock('swr', () => ({
         },
       };
     }
+    if (Array.isArray(key) && key[0] === '/v1/isms/readiness') {
+      return {
+        data: {
+          percent: 50,
+          documents: [
+            {
+              type: 'monitoring',
+              documentId: 'd9',
+              status: 'draft',
+              checks: [
+                { label: 'Record every metric for its latest period', done: false },
+                { label: 'Approve and publish the document', done: true },
+              ],
+              percent: 50,
+              missing: ['Record every metric for its latest period'],
+            },
+          ],
+          nonconformities: { open: 2, overdue: 0 },
+        },
+        isLoading: false,
+      };
+    }
     if (Array.isArray(key) && key[2] === 'drift') {
       return { data: { isStale: false, changedSources: [] } };
     }
@@ -51,6 +73,7 @@ vi.mock('@trycompai/design-system', () => ({
   AlertTitle: ({ children }: Kids) => <strong>{children}</strong>,
   AlertDescription: ({ children }: Kids) => <div>{children}</div>,
   Spinner: () => <span role="status" aria-label="Loading" />,
+  Progress: ({ value }: { value: number }) => <progress value={value} max={100} />,
   Badge: ({ children }: Kids) => <span>{children}</span>,
   Button: ({ children }: Kids) => <button type="button">{children}</button>,
   Card: ({ children }: Kids) => <div data-testid="card">{children}</div>,
@@ -152,7 +175,8 @@ describe('IsmsOverview', () => {
     expect(screen.queryByText('Coming soon')).not.toBeInTheDocument();
     const ismsDetailLinks = screen
       .getAllByRole('link')
-      .filter((link) => link.getAttribute('href')?.includes('/documents/isms/'));
+      .filter((link) => link.getAttribute('href')?.includes('/documents/isms/'))
+      .filter((link) => !link.getAttribute('href')?.endsWith('/nonconformities'));
     expect(ismsDetailLinks).toHaveLength(ISMS_TYPE_META.length);
   });
 
@@ -167,5 +191,16 @@ describe('IsmsOverview', () => {
   it('renders the Metrics overdue tile', () => {
     render(<IsmsOverview organizationId="org-1" />);
     expect(screen.getByText('Metrics overdue')).toBeInTheDocument();
+  });
+
+  it('shows clause progress, the next missing step and the nonconformity register', () => {
+    render(<IsmsOverview organizationId="org-1" />);
+    expect(screen.getByText('1 of 2 steps · 50%')).toBeInTheDocument();
+    expect(screen.getByText('Next: Record every metric for its latest period')).toBeInTheDocument();
+    expect(
+      screen
+        .getAllByRole('link')
+        .some((link) => link.getAttribute('href') === '/org-1/documents/isms/nonconformities'),
+    ).toBe(true);
   });
 });

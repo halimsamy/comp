@@ -20,12 +20,46 @@ function makeRequirement(
     treatment: 'AES-256 encryption applied to all stores',
     source: 'manual',
     derivedFrom: null,
+    ownerMemberId: null,
+    lastReviewedAt: null,
     position: 0,
     ...overrides,
   };
 }
 
+const MEMBERS = [{ id: 'mem_1', name: 'Dana Owner' }];
+
 describe('RequirementsRow', () => {
+  it('shows the owner and flags a requirement never reviewed (4.2b)', () => {
+    render(
+      <RequirementsRow
+        requirement={makeRequirement({ ownerMemberId: 'mem_1' })}
+        canEdit={false}
+        memberOptions={MEMBERS}
+        onSave={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(/Dana Owner/)).toBeInTheDocument();
+    expect(screen.getByText(/Never reviewed/)).toBeInTheDocument();
+    expect(screen.getByText('Review due')).toBeInTheDocument();
+  });
+
+  it('does not flag a requirement reviewed in the last 12 months', () => {
+    const recent = new Date(Date.now() - 30 * 86_400_000).toISOString();
+    render(
+      <RequirementsRow
+        requirement={makeRequirement({ lastReviewedAt: recent })}
+        canEdit={false}
+        memberOptions={MEMBERS}
+        onSave={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+    expect(screen.getByText(/No owner/)).toBeInTheDocument();
+    expect(screen.queryByText('Review due')).not.toBeInTheDocument();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -36,6 +70,7 @@ describe('RequirementsRow', () => {
       <RequirementsRow
         requirement={makeRequirement()}
         canEdit
+        memberOptions={MEMBERS}
         onSave={onSave}
         onDelete={vi.fn().mockResolvedValue(undefined)}
       />,
@@ -61,6 +96,7 @@ describe('RequirementsRow', () => {
       <RequirementsRow
         requirement={makeRequirement()}
         canEdit
+        memberOptions={MEMBERS}
         onSave={onSave}
         onDelete={vi.fn().mockResolvedValue(undefined)}
       />,
@@ -81,6 +117,7 @@ describe('RequirementsRow', () => {
       <RequirementsRow
         requirement={makeRequirement()}
         canEdit
+        memberOptions={MEMBERS}
         onSave={vi.fn().mockResolvedValue(undefined)}
         onDelete={vi.fn().mockResolvedValue(undefined)}
       />,
@@ -91,6 +128,7 @@ describe('RequirementsRow', () => {
         <RequirementsRow
           requirement={makeRequirement({ requirement: 'Revalidated requirement' })}
           canEdit
+          memberOptions={MEMBERS}
           onSave={vi.fn().mockResolvedValue(undefined)}
           onDelete={vi.fn().mockResolvedValue(undefined)}
         />,
@@ -109,6 +147,7 @@ describe('RequirementsRow', () => {
       <RequirementsRow
         requirement={makeRequirement()}
         canEdit
+        memberOptions={MEMBERS}
         onSave={onSave}
         onDelete={vi.fn().mockResolvedValue(undefined)}
       />,
@@ -131,6 +170,7 @@ describe('RequirementsRow', () => {
       <RequirementsRow
         requirement={makeRequirement({ interestedPartyId: 'isms_ip_abc123' })}
         canEdit
+        memberOptions={MEMBERS}
         onSave={vi.fn().mockResolvedValue(undefined)}
         onDelete={vi.fn().mockResolvedValue(undefined)}
       />,
@@ -148,6 +188,7 @@ describe('RequirementsRow', () => {
       <RequirementsRow
         requirement={makeRequirement({ interestedPartyId: 'isms_ip_abc123' })}
         canEdit
+        memberOptions={MEMBERS}
         onSave={onSave}
         onDelete={vi.fn().mockResolvedValue(undefined)}
       />,

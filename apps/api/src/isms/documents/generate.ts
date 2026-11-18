@@ -5,6 +5,7 @@ import { deriveInterestedParties } from './interested-parties';
 import { deriveRequirements } from './requirements';
 import { deriveObjectives } from './objectives';
 import { seedRolesIfMissing } from './roles';
+import { assignSuggestedHolders, seedPciRoleIfMissing } from './role-automation';
 import { seedMetricsIfMissing } from './monitoring';
 import { deriveNarrativeForType, isNarrativeType } from './registry';
 import type { IsmsPlatformData } from './types';
@@ -254,6 +255,13 @@ export async function runDerivation({
     // Idempotent seed only — never a destructive replace, so member assignments
     // (IsmsRoleAssignment) and customer edits survive every regenerate.
     await seedRolesIfMissing({ tx, documentId, memberCount: data.memberCount });
+    await seedPciRoleIfMissing({
+      tx,
+      documentId,
+      frameworkNames: data.frameworkNames,
+    });
+    // Fills only roles with no holder yet, so existing choices are kept.
+    await assignSuggestedHolders({ tx, documentId, organizationId });
     return;
   }
   if (type === 'monitoring') {

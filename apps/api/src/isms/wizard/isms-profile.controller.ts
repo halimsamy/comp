@@ -122,6 +122,7 @@ export class IsmsProfileController {
     return this.profileService.generateAll({
       organizationId,
       frameworkId: dto.frameworkId,
+      draftsOnly: dto.draftsOnly ?? false,
     });
   }
 }

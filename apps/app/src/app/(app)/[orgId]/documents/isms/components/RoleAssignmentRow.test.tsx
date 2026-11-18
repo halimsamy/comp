@@ -19,6 +19,8 @@ function makeAssignment(overrides: Partial<IsmsRoleAssignment> = {}): IsmsRoleAs
     gap: null,
     remediationAction: null,
     remediationDueDate: null,
+    acknowledgedAt: null,
+    acknowledgedByMemberId: null,
     position: 0,
     ...overrides,
   };

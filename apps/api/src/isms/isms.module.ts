@@ -20,6 +20,10 @@ import { IsmsManagementReviewService } from './isms-management-review.service';
 import { IsmsReviewInputService } from './isms-review-input.service';
 import { IsmsReviewActionService } from './isms-review-action.service';
 import { IsmsNarrativeService } from './isms-narrative.service';
+import { IsmsAutomationController } from './isms-automation.controller';
+import { IsmsNonconformitiesController } from './isms-nonconformities.controller';
+import { IsmsNonconformityService } from './isms-nonconformity.service';
+import { IsmsReadinessService } from './isms-readiness.service';
 import { IsmsProfileController } from './wizard/isms-profile.controller';
 import { IsmsProfileService } from './wizard/isms-profile.service';
 import { AuthModule } from '../auth/auth.module';
@@ -32,6 +36,8 @@ import { AttachmentsModule } from '../attachments/attachments.module';
     IsmsController,
     IsmsRegistersController,
     IsmsProfileController,
+    IsmsAutomationController,
+    IsmsNonconformitiesController,
   ],
   providers: [
     IsmsService,
@@ -54,6 +60,8 @@ import { AttachmentsModule } from '../attachments/attachments.module';
     IsmsReviewActionService,
     IsmsNarrativeService,
     IsmsProfileService,
+    IsmsNonconformityService,
+    IsmsReadinessService,
   ],
   exports: [
     IsmsService,

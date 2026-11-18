@@ -153,6 +153,7 @@ describe('IsmsAuditFindingService', () => {
       ).rejects.toThrow(NotFoundException);
       expect(mockDb.member.findFirst).toHaveBeenCalledWith({
         where: { id: 'mem_x', organizationId: 'org_1', deactivated: false },
+        select: { id: true },
       });
     });
   });

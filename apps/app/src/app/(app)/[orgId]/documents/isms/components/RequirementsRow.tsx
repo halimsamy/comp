@@ -2,6 +2,7 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
+  Badge,
   Field,
   FieldError,
   Heading,
@@ -12,6 +13,8 @@ import {
 import { useEffect, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import type { IsmsInterestedPartyRequirement } from '../isms-types';
+import type { ApproverOption } from './IsmsApprovalSection';
+import { isReviewDue, RequirementOwnerFields } from './RequirementOwnerFields';
 import { requirementSchema, type RequirementFormValues } from './requirement-schema';
 import {
   IsmsCardActions,
@@ -30,6 +33,7 @@ export type RequirementRowValues = RequirementFormValues;
 interface RequirementsRowProps {
   requirement: IsmsInterestedPartyRequirement;
   canEdit: boolean;
+  memberOptions: ApproverOption[];
   onSave: (values: RequirementRowValues) => Promise<void>;
   onDelete: () => Promise<void>;
 }
@@ -40,10 +44,22 @@ function toFormValues(requirement: IsmsInterestedPartyRequirement): RequirementF
     interestedPartyId: requirement.interestedPartyId ?? '',
     requirement: requirement.requirement,
     treatment: requirement.treatment,
+    ownerMemberId: requirement.ownerMemberId ?? '',
+    lastReviewedAt: requirement.lastReviewedAt?.slice(0, 10) ?? '',
   };
 }
 
-export function RequirementsRow({ requirement, canEdit, onSave, onDelete }: RequirementsRowProps) {
+function formatDate(value: string): string {
+  return new Date(value).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+export function RequirementsRow({
+  requirement,
+  canEdit,
+  memberOptions,
+  onSave,
+  onDelete,
+}: RequirementsRowProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -156,6 +172,7 @@ export function RequirementsRow({ requirement, canEdit, onSave, onDelete }: Requ
               <FieldError>{errors.treatment?.message}</FieldError>
             </Field>
           </IsmsFieldLabel>
+          <RequirementOwnerFields control={control} memberOptions={memberOptions} />
         </Stack>
       </IsmsRegisterCard>
     );
@@ -174,6 +191,14 @@ export function RequirementsRow({ requirement, canEdit, onSave, onDelete }: Requ
       <Stack gap="3">
         <IsmsRegisterField label="Interested party">{requirement.partyName}</IsmsRegisterField>
         <IsmsRegisterField label="ISMS treatment">{requirement.treatment}</IsmsRegisterField>
+        <IsmsRegisterField label="Owner · last reviewed">
+          <span className="inline-flex flex-wrap items-center gap-2">
+            {memberOptions.find((m) => m.id === requirement.ownerMemberId)?.name ?? 'No owner'}
+            {' · '}
+            {requirement.lastReviewedAt ? formatDate(requirement.lastReviewedAt) : 'Never reviewed'}
+            {isReviewDue(requirement.lastReviewedAt) ? <Badge variant="destructive">Review due</Badge> : null}
+          </span>
+        </IsmsRegisterField>
       </Stack>
     </IsmsRegisterCard>
   );

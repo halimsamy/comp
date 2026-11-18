@@ -1,4 +1,4 @@
-import { Badge, HStack, Heading, Stack, Text } from '@trycompai/design-system';
+import { Badge, HStack, Heading, Progress, Stack, Text } from '@trycompai/design-system';
 import { ArrowRight } from '@trycompai/design-system/icons';
 import Link from 'next/link';
 import type { IsmsDocumentStatus } from '../../isms-types';
@@ -16,6 +16,8 @@ export interface IsmsDocumentCardProps {
   status: IsmsDocumentStatus | null;
   /** Renders the "Needs review" drift indicator alongside the status. */
   isStale?: boolean;
+  /** Clause checklist progress; the first missing step is shown as "Next". */
+  readiness?: { percent: number; missing: string[] };
 }
 
 /**
@@ -32,7 +34,9 @@ export function IsmsDocumentCard({
   description,
   status,
   isStale,
+  readiness,
 }: IsmsDocumentCardProps) {
+  const nextStep = readiness?.missing[0];
   return (
     <Link
       href={href}
@@ -55,7 +59,19 @@ export function IsmsDocumentCard({
           </div>
         </Stack>
       </Stack>
-      <IsmsStatusBadge status={status} isStale={isStale} />
+      <Stack gap="2">
+        {readiness ? (
+          <>
+            <Progress value={readiness.percent} aria-label={`${title} progress`} />
+            <div className="line-clamp-2">
+              <Text size="xs" variant="muted">
+                {nextStep ? `Next: ${nextStep}` : 'All steps complete'}
+              </Text>
+            </div>
+          </>
+        ) : null}
+        <IsmsStatusBadge status={status} isStale={isStale} />
+      </Stack>
     </Link>
   );
 }

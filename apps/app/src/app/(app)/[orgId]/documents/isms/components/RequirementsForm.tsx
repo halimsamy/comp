@@ -4,6 +4,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Button, Field, FieldError, HStack, Input, Textarea } from '@trycompai/design-system';
 import { Add } from '@trycompai/design-system/icons';
 import { Controller, useForm } from 'react-hook-form';
+import type { ApproverOption } from './IsmsApprovalSection';
+import { RequirementOwnerFields } from './RequirementOwnerFields';
 import { requirementSchema, type RequirementFormValues } from './requirement-schema';
 import { IsmsAddCard } from './shared';
 
@@ -11,18 +13,29 @@ export type { RequirementFormValues };
 
 interface RequirementsFormProps {
   onAdd: (values: RequirementFormValues) => Promise<void>;
+  memberOptions: ApproverOption[];
 }
 
-export function RequirementsForm({ onAdd }: RequirementsFormProps) {
+const EMPTY: RequirementFormValues = {
+  partyName: '',
+  interestedPartyId: '',
+  requirement: '',
+  treatment: '',
+  ownerMemberId: '',
+  lastReviewedAt: '',
+};
+
+export function RequirementsForm({ onAdd, memberOptions }: RequirementsFormProps) {
   return (
     <IsmsAddCard addLabel="Add requirement" formTitle="New requirement">
-      {({ close }) => <RequirementsFields onAdd={onAdd} onClose={close} />}
+      {({ close }) => <RequirementsFields onAdd={onAdd} memberOptions={memberOptions} onClose={close} />}
     </IsmsAddCard>
   );
 }
 
 function RequirementsFields({
   onAdd,
+  memberOptions,
   onClose,
 }: RequirementsFormProps & { onClose: () => void }) {
   const {
@@ -32,7 +45,7 @@ function RequirementsFields({
     formState: { isSubmitting, errors },
   } = useForm<RequirementFormValues>({
     resolver: zodResolver(requirementSchema),
-    defaultValues: { partyName: '', interestedPartyId: '', requirement: '', treatment: '' },
+    defaultValues: EMPTY,
   });
 
   const handleAdd = handleSubmit(async (values) => {
@@ -42,7 +55,7 @@ function RequirementsFields({
       // Keep the user's input and the form open when the save fails.
       return;
     }
-    reset({ partyName: '', interestedPartyId: '', requirement: '', treatment: '' });
+    reset(EMPTY);
     onClose();
   });
 
@@ -92,6 +105,7 @@ function RequirementsFields({
           <FieldError>{errors.treatment?.message}</FieldError>
         </Field>
       </div>
+      <RequirementOwnerFields control={control} memberOptions={memberOptions} />
       <HStack justify="end">
         <Button
           type="submit"

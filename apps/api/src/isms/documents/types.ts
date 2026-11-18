@@ -90,7 +90,12 @@ export type IsmsTeamSizeBand = 'small' | 'standard'; // small = 1-3 people, stan
 
 /** The four seeded ISMS governance roles and their pre-filled default text. */
 export interface SeedRoleDefinition {
-  roleKey: 'top_management' | 'spo' | 'deputy_spo' | 'internal_auditor';
+  roleKey:
+    | 'top_management'
+    | 'spo'
+    | 'deputy_spo'
+    | 'internal_auditor'
+    | 'pci_executive_owner';
   name: string;
   description: string;
   responsibilities: string;
@@ -154,7 +159,7 @@ export interface MetricExportRow {
   currentValue: string;
 }
 
-/** The fifteen seeded Controls Tested rows and their pre-filled text (9.2). */
+/** The sixteen seeded Controls Tested rows and their pre-filled text (9.2). */
 export interface SeedAuditControlDefinition {
   controlKey: string;
   controlRef: string;
@@ -271,7 +276,11 @@ export interface ReviewExportRow {
 }
 
 /** How a risk's / vendor's latest acceptance stands relative to its live residual rating. */
-export type AcceptanceExportState = 'accepted' | 'awaiting' | 'stale';
+export type AcceptanceExportState =
+  | 'accepted'
+  | 'awaiting'
+  | 'stale'
+  | 'not_required';
 
 /** One Risk Register row, resolved for the Risk Treatment Plan (6.1.3). */
 export interface RiskTreatmentExportRow {

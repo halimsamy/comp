@@ -138,9 +138,12 @@ export class IsmsProfileService {
   async generateAll({
     organizationId,
     frameworkId,
+    draftsOnly = false,
   }: {
     organizationId: string;
     frameworkId: string;
+    /** Skip approved / pending documents so a refresh never reopens sign-off. */
+    draftsOnly?: boolean;
   }) {
     await this.requireFramework({ frameworkId });
 
@@ -152,7 +155,11 @@ export class IsmsProfileService {
     });
 
     const documents = await db.ismsDocument.findMany({
-      where: { organizationId, frameworkId },
+      where: {
+        organizationId,
+        frameworkId,
+        ...(draftsOnly ? { status: { in: ['draft', 'declined'] } } : {}),
+      },
       select: { id: true, type: true },
     });
     const ordered = [...documents].sort(

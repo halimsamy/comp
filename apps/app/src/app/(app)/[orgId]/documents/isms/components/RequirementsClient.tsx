@@ -14,6 +14,7 @@ interface RequirementsClientProps {
   fallbackData: IsmsDocumentData | null;
   currentMemberId: string | null;
   approverOptions: ApproverOption[];
+  memberOptions: ApproverOption[];
 }
 
 const REGISTER = 'requirements' as const;
@@ -24,6 +25,8 @@ function toPayload(values: RequirementFormValues | RequirementRowValues) {
     interestedPartyId: values.interestedPartyId?.trim() ? values.interestedPartyId.trim() : null,
     requirement: values.requirement,
     treatment: values.treatment,
+    ownerMemberId: values.ownerMemberId || null,
+    lastReviewedAt: values.lastReviewedAt || null,
   };
 }
 
@@ -80,6 +83,7 @@ export function RequirementsClient(props: RequirementsClientProps) {
           <RequirementsTable
             requirements={requirements}
             canEdit={canManage}
+            memberOptions={props.memberOptions}
             onCreate={handleCreate}
             onUpdate={handleUpdate}
             onDelete={handleDelete}

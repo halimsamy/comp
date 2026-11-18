@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { db } from '@db';
 import type { Prisma } from '@db';
 import { invalidateApprovalIfNeeded } from './utils/approval';
@@ -99,6 +103,35 @@ export class IsmsRoleAssignmentService {
           position: dto.position ?? undefined,
         },
       });
+    });
+  }
+
+  /**
+   * The assignee records that they accept the role (5.3, PCI 12.4.1). Only the
+   * assigned member can acknowledge for themselves. An operational record, so
+   * it never reverts the approved document to draft.
+   */
+  async acknowledge({
+    assignmentId,
+    organizationId,
+    memberId,
+  }: {
+    assignmentId: string;
+    organizationId: string;
+    memberId: string | null | undefined;
+  }) {
+    const assignment = await this.requireAssignment({
+      assignmentId,
+      organizationId,
+    });
+    if (!memberId || assignment.memberId !== memberId) {
+      throw new ForbiddenException(
+        'Only the assigned member can acknowledge this role',
+      );
+    }
+    return db.ismsRoleAssignment.update({
+      where: { id: assignmentId },
+      data: { acknowledgedAt: new Date(), acknowledgedByMemberId: memberId },
     });
   }
 

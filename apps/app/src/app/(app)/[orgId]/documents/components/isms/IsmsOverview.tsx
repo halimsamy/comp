@@ -26,6 +26,7 @@ import useSWR from 'swr';
 import { usePermissions } from '@/hooks/use-permissions';
 import { api } from '@/lib/api-client';
 import { useIso27001FrameworkId } from '../../isms/hooks/useIso27001FrameworkId';
+import { useIsmsReadiness } from '../../isms/hooks/useIsmsReadiness';
 import {
   ISMS_TYPE_META,
   ismsTypeToSlug,
@@ -38,6 +39,7 @@ import {
   IsmsSummaryRow,
   type IsmsSummaryStat,
 } from '../../isms/components/shared';
+import { IsmsReadinessPanel } from './IsmsReadinessPanel';
 
 export function IsmsOverview({ organizationId }: { organizationId: string }) {
   const iso27001FrameworkId = useIso27001FrameworkId(organizationId);
@@ -63,6 +65,16 @@ export function IsmsOverview({ organizationId }: { organizationId: string }) {
       return response.data;
     },
   );
+
+  const readinessState = useIsmsReadiness({
+    organizationId,
+    frameworkId: iso27001FrameworkId,
+  });
+
+  const handleRefreshDrafts = async () => {
+    await readinessState.refreshDrafts();
+    await mutateSetup();
+  };
 
   const documents = useMemo(() => {
     const list = setupResponse?.documents;
@@ -172,15 +184,27 @@ export function IsmsOverview({ organizationId }: { organizationId: string }) {
     <Stack gap="8">
       <IsmsSummaryRow stats={summary} />
 
+      <IsmsReadinessPanel
+        organizationId={organizationId}
+        readiness={readinessState.readiness}
+        isLoading={readinessState.isLoading}
+        error={readinessState.error}
+        canRefresh={canRunWizard}
+        onRefresh={handleRefreshDrafts}
+      />
+
       <Section
         title="Foundational Documents"
-        description="The ISO 27001 clause 4–9 documents that establish and monitor your information security management system."
+        description="The ISO 27001 clause 4–10 documents that establish and monitor your information security management system."
         actions={wizardAction}
       >
         <Grid cols={{ base: '1', md: '2', xl: '3' }} gap="4">
           {ISMS_TYPE_META.map((meta) => {
             const setupDoc = documents.find((doc) => doc.type === meta.type);
             const isStale = meta.type === 'context_of_organization' ? isContextStale : false;
+            const docReadiness = readinessState.readiness?.documents.find(
+              (doc) => doc.type === meta.type,
+            );
             return (
               <IsmsDocumentCard
                 key={meta.type}
@@ -190,6 +214,7 @@ export function IsmsOverview({ organizationId }: { organizationId: string }) {
                 description={meta.description}
                 status={setupDoc?.status ?? null}
                 isStale={isStale}
+                readiness={docReadiness}
               />
             );
           })}

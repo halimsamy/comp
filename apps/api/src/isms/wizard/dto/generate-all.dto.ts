@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsString } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsBoolean, IsOptional, IsString } from 'class-validator';
 
 export class GenerateAllDto {
   @ApiProperty({
@@ -9,4 +9,13 @@ export class GenerateAllDto {
   })
   @IsString()
   frameworkId!: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Only refresh documents still in draft or declined, leaving approved and pending-approval documents untouched',
+    example: true,
+  })
+  @IsOptional()
+  @IsBoolean()
+  draftsOnly?: boolean;
 }

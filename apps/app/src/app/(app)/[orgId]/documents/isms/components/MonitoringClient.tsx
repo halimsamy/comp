@@ -1,7 +1,9 @@
 'use client';
 
+import { Stack } from '@trycompai/design-system';
 import { toast } from 'sonner';
 import type { IsmsDocument as IsmsDocumentData } from '../isms-types';
+import { ComputedMetricsCard } from './ComputedMetricsCard';
 import type { ApproverOption } from './IsmsApprovalSection';
 import { IsmsDocumentShell } from './IsmsDocumentShell';
 import { MonitoringTable } from './MonitoringTable';
@@ -39,7 +41,7 @@ export function MonitoringClient({ memberOptions, ...props }: MonitoringClientPr
       title="Monitoring, Measurement, Analysis and Evaluation"
       description="Define what the organization measures, how, at what cadence, and who monitors and analyses the results (ISO 27001 clause 9.1). Record measurement values each period; history stays with each metric for auditor sampling."
       sectionTitle="Monitoring metrics"
-      sectionDescription="Nine defaults ship active — edit, deactivate, or add custom metrics. Values are entered manually in v1."
+      sectionDescription="Defaults ship active — edit, deactivate, or add custom metrics. Metrics Comp AI can measure are recorded automatically each month; enter the rest by hand."
       generateSuccessMessage="Restored any missing seeded metrics"
       getSubmitBlockedReason={(document) => {
         const messages = metricValidationMessages({
@@ -55,62 +57,70 @@ export function MonitoringClient({ memberOptions, ...props }: MonitoringClientPr
         const validationMessages = metricValidationMessages({ metrics });
 
         return (
-          <MonitoringTable
-            metrics={metrics}
-            canEdit={canManage}
-            memberOptions={memberOptions}
-            validationMessages={validationMessages}
-            onCreateMetric={(values) =>
-              run(
-                hook.createRow({ register: METRICS, data: toMetricPayload(values) }),
-                'Metric added',
-                'Failed to add metric',
-              )
-            }
-            onUpdateMetric={(metricId, payload) =>
-              run(
-                hook.updateRow({ register: METRICS, id: metricId, data: payload }),
-                'Metric updated',
-                'Failed to update metric',
-              )
-            }
-            onDeleteMetric={(metricId) =>
-              run(
-                hook.deleteRow({ register: METRICS, id: metricId }),
-                'Metric deleted',
-                'Failed to delete metric',
-              )
-            }
-            onRecordMeasurement={(metricId, values) =>
-              run(
-                hook.createRow({
-                  register: MEASUREMENTS,
-                  data: {
-                    metricId,
-                    periodStart: values.periodStart,
-                    value: values.value,
-                    note: values.note || null,
-                  },
-                }),
-                'Measurement recorded',
-                'Failed to record measurement',
-              )
-            }
-            onBulkSaveMeasurements={(rows) =>
-              run(
-                hook.bulkCreateMeasurements(rows),
-                `Recorded ${rows.length} measurement${rows.length === 1 ? '' : 's'}`,
-                'Failed to record measurements',
-              )
-            }
-            onDeleteMeasurement={(measurementId) =>
-              run(
-                hook.deleteRow({ register: MEASUREMENTS, id: measurementId }),
-                'Measurement deleted',
-                'Failed to delete measurement',
-              )
-            }
-          />
+          <Stack gap="6">
+            <ComputedMetricsCard
+              organizationId={props.organizationId}
+              documentId={document.id}
+              canRecord={canManage}
+              onRecorded={hook.refresh}
+            />
+            <MonitoringTable
+              metrics={metrics}
+              canEdit={canManage}
+              memberOptions={memberOptions}
+              validationMessages={validationMessages}
+              onCreateMetric={(values) =>
+                run(
+                  hook.createRow({ register: METRICS, data: toMetricPayload(values) }),
+                  'Metric added',
+                  'Failed to add metric',
+                )
+              }
+              onUpdateMetric={(metricId, payload) =>
+                run(
+                  hook.updateRow({ register: METRICS, id: metricId, data: payload }),
+                  'Metric updated',
+                  'Failed to update metric',
+                )
+              }
+              onDeleteMetric={(metricId) =>
+                run(
+                  hook.deleteRow({ register: METRICS, id: metricId }),
+                  'Metric deleted',
+                  'Failed to delete metric',
+                )
+              }
+              onRecordMeasurement={(metricId, values) =>
+                run(
+                  hook.createRow({
+                    register: MEASUREMENTS,
+                    data: {
+                      metricId,
+                      periodStart: values.periodStart,
+                      value: values.value,
+                      note: values.note || null,
+                    },
+                  }),
+                  'Measurement recorded',
+                  'Failed to record measurement',
+                )
+              }
+              onBulkSaveMeasurements={(rows) =>
+                run(
+                  hook.bulkCreateMeasurements(rows),
+                  `Recorded ${rows.length} measurement${rows.length === 1 ? '' : 's'}`,
+                  'Failed to record measurements',
+                )
+              }
+              onDeleteMeasurement={(measurementId) =>
+                run(
+                  hook.deleteRow({ register: MEASUREMENTS, id: measurementId }),
+                  'Measurement deleted',
+                  'Failed to delete measurement',
+                )
+              }
+            />
+          </Stack>
         );
       }}
     </IsmsDocumentShell>

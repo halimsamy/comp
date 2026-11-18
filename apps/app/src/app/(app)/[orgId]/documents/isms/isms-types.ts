@@ -108,6 +108,10 @@ export interface IsmsInterestedPartyRequirement {
   partyName: string;
   requirement: string;
   treatment: string;
+  /** Who keeps this obligation current (4.2b). */
+  ownerMemberId: string | null;
+  /** Date the requirement was last reviewed (YYYY-MM-DD…). */
+  lastReviewedAt: string | null;
   source: IsmsContextSource;
   derivedFrom: string | null;
   position: number;
@@ -138,6 +142,9 @@ export interface IsmsRoleAssignment {
   gap: string | null;
   remediationAction: string | null;
   remediationDueDate: string | null;
+  /** When the holder acknowledged the role (5.3, PCI 12.4.1); null = pending. */
+  acknowledgedAt: string | null;
+  acknowledgedByMemberId: string | null;
   position: number;
 }
 
@@ -244,6 +251,12 @@ export interface IsmsAuditFinding {
   dueDate: string | null;
   status: IsmsAuditFindingStatus;
   closureEvidence: string | null;
+  /** Corrective action (10.2), tracked after the audit is signed. */
+  rootCause: string | null;
+  correctiveAction: string | null;
+  effectivenessReviewedAt: string | null;
+  effectivenessReviewedById: string | null;
+  effectivenessNotes: string | null;
   position: number;
 }
 
@@ -472,10 +485,14 @@ export interface IsmsRiskMethodologyNarrative {
   responsibilities: string;
   frequency: string;
   documentation: string;
+  /** Lowest residual level that needs risk-owner acceptance (drives the Risks module). */
+  acceptanceRequiredFromLevel?: 'very-low' | 'low' | 'medium' | 'high' | 'very-high';
+  /** Months between signed-off risk register reviews (ISO 27001 8.2). */
+  reviewIntervalMonths?: number;
 }
 
 /** How a risk's / vendor's latest acceptance stands relative to its live residual rating. */
-export type IsmsAcceptanceState = 'accepted' | 'awaiting' | 'stale';
+export type IsmsAcceptanceState = 'accepted' | 'awaiting' | 'stale' | 'not_required';
 
 /** One Risk Register row of the Risk Treatment Plan (6.1.3), resolved server-side. */
 export interface IsmsRiskTreatmentRow {

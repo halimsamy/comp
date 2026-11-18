@@ -58,6 +58,20 @@ describe('roleValidationMessages', () => {
     ).toEqual([]);
   });
 
+  it('requires a holder for the PCI DSS executive owner once the role exists', () => {
+    const pci = role({ roleKey: 'pci_executive_owner', name: 'PCI DSS Executive Owner', assignments: [] });
+    expect(
+      roleValidationMessages({ roles: [...fullyAssigned(), pci], band: 'standard', activeMemberIds: ACTIVE }),
+    ).toEqual(['PCI DSS Executive Owner needs at least one assigned member.']);
+    expect(
+      roleValidationMessages({
+        roles: [...fullyAssigned(), { ...pci, assignments: [withMember] }],
+        band: 'standard',
+        activeMemberIds: ACTIVE,
+      }),
+    ).toEqual([]);
+  });
+
   it('flags a seeded role with no assigned member', () => {
     const roles = fullyAssigned();
     roles[0] = role({ roleKey: 'top_management', name: 'Top Management', assignments: [] });

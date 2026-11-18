@@ -18,6 +18,7 @@ import {
 import { useEffect, useState } from 'react';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import type { IsmsRoleAssignment } from '../isms-types';
+import { RoleAcknowledgement } from './RoleAcknowledgement';
 import {
   COMPETENCE_BASIS_LABELS,
   COMPETENCE_BASIS_OPTIONS,
@@ -146,6 +147,7 @@ export function RoleAssignmentRow({
         {memberName}
       </Text>
       {assignment.gap ? <Badge variant="destructive">Gap</Badge> : null}
+      <RoleAcknowledgement assignment={assignment} />
     </HStack>
   );
 

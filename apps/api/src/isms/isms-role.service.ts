@@ -75,6 +75,16 @@ export class IsmsRoleService {
       // submission's completeness check.
       await lockDocument(tx, role.documentId);
       await invalidateApprovalIfNeeded({ tx, documentId: role.documentId });
+      // Holders acknowledged the old text; a changed role must be re-acknowledged.
+      const textChanged = (['name', 'responsibilities', 'authorities'] as const).some(
+        (key) => dto[key] !== undefined && dto[key] !== role[key],
+      );
+      if (textChanged) {
+        await tx.ismsRoleAssignment.updateMany({
+          where: { roleId },
+          data: { acknowledgedAt: null, acknowledgedByMemberId: null },
+        });
+      }
       return tx.ismsRole.update({
         where: { id: roleId },
         data: {

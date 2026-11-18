@@ -38,6 +38,16 @@ const emptyInput = (narrative: unknown): DocumentExportInput => ({
 });
 
 describe('scope narrative (4.3)', () => {
+  it('names managed endpoints and adds the PCI DSS CDE only for PCI organizations', () => {
+    expect(deriveScopeNarrative(data).inScope).toContain('4 managed endpoints');
+    expect(deriveScopeNarrative(data).inScope).not.toContain('cardholder data');
+    const pci = deriveScopeNarrative({
+      ...data,
+      frameworkNames: ['ISO 27001', 'PCI DSS'],
+    });
+    expect(pci.inScope).toContain('cardholder data environment (CDE)');
+  });
+
   it('derives a schema-valid narrative referencing org + frameworks', () => {
     const narrative = deriveScopeNarrative(data);
     expect(ismsScopeNarrativeSchema.safeParse(narrative).success).toBe(true);

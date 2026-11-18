@@ -133,6 +133,8 @@ function makeAudit(overrides: Partial<IsmsAudit> = {}): IsmsAudit {
         dueDate: '2026-06-15T00:00:00.000Z',
         status: 'open',
         closureEvidence: null,
+        ...{ rootCause: null, correctiveAction: null, effectivenessNotes: null },
+        ...{ effectivenessReviewedAt: null, effectivenessReviewedById: null },
         position: 0,
       },
     ],

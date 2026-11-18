@@ -11,6 +11,9 @@ export const requirementSchema = z.object({
   interestedPartyId: z.string().optional(),
   requirement: z.string().trim().min(1, 'Requirement is required'),
   treatment: z.string().trim().min(1, 'ISMS treatment is required'),
+  // 4.2b: who keeps the obligation current and when it was last checked ('' = none).
+  ownerMemberId: z.string().optional(),
+  lastReviewedAt: z.string().optional(),
 });
 
 export type RequirementFormValues = z.infer<typeof requirementSchema>;

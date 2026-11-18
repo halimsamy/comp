@@ -50,7 +50,7 @@ describe('seedMetricsIfMissing', () => {
     return tx as unknown as Prisma.TransactionClient & typeof tx;
   };
 
-  it('seeds all nine defaults into an empty document', async () => {
+  it('seeds all ten defaults into an empty document', async () => {
     const tx = makeTx([]);
     await seedMetricsIfMissing({ tx, documentId: 'doc_1' });
 
@@ -58,7 +58,7 @@ describe('seedMetricsIfMissing', () => {
       tx.ismsMetric.createMany as jest.Mock
     ).mock.calls[0][0];
     expect(skipDuplicates).toBe(true);
-    expect(data).toHaveLength(9);
+    expect(data).toHaveLength(10);
     expect(data.map((row: { metricKey: string }) => row.metricKey)).toEqual(
       SEED_METRIC_DEFINITIONS.map((metric) => metric.metricKey),
     );
@@ -80,7 +80,7 @@ describe('seedMetricsIfMissing', () => {
     await seedMetricsIfMissing({ tx, documentId: 'doc_1' });
 
     const { data } = (tx.ismsMetric.createMany as jest.Mock).mock.calls[0][0];
-    expect(data).toHaveLength(8);
+    expect(data).toHaveLength(9);
     expect(
       data.map((row: { metricKey: string }) => row.metricKey),
     ).not.toContain('training_completion');

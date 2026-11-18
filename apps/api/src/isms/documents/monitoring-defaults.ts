@@ -1,7 +1,7 @@
 import type { SeedMetricDefinition } from './types';
 
 /**
- * The nine seeded monitoring metrics (CS-723), active from day one. Names,
+ * The seeded monitoring metrics (CS-723), active from day one. Names,
  * measured text, methods, cadences and targets follow the ticket and the
  * clause-9.1 reference document; the customer edits any field, deactivates a
  * metric, or adds custom ones. Seeding is idempotent by metricKey
@@ -97,9 +97,19 @@ export const SEED_METRIC_DEFINITIONS: SeedMetricDefinition[] = [
     cadence: 'monthly',
     target: 'Within the severity SLA for every incident',
   },
+  {
+    metricKey: 'task_on_time',
+    name: 'Evidence task on-time rate',
+    whatIsMeasured:
+      'Percentage of recurring evidence tasks completed within their due date.',
+    method:
+      'Comp AI task tracker: recurring tasks not past their next due date, over all recurring tasks in scope.',
+    cadence: 'monthly',
+    target: '90% of recurring tasks on time or above',
+  },
 ];
 
-/** Stable keys of the nine seeded metrics. */
+/** Stable keys of the seeded metrics. */
 export const SEED_METRIC_KEYS: string[] = SEED_METRIC_DEFINITIONS.map(
   (metric) => metric.metricKey,
 );

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { IsmsExportSection } from '../utils/export-shared';
+import { hasPciFramework } from './role-automation';
 import type { DocumentExportInput, IsmsPlatformData } from './types';
 
 /** Narrative shape persisted in IsmsDocumentVersion.narrative for isms_scope (4.3). */
@@ -62,10 +63,21 @@ export function deriveScopeNarrative(
 /** In-scope description: prefer the wizard's confirmed live capabilities. */
 function deriveInScope(data: IsmsPlatformData): string {
   const capabilities = data.wizardAnswers.capabilitiesInProduction ?? [];
-  if (capabilities.length > 0) {
-    return `The ISMS covers the delivery and operation of the following capabilities in production: ${capabilities.join(', ')}. All supporting information assets, personnel${data.memberCount > 0 ? ` (${data.memberCount} workforce members)` : ''}, systems and cloud infrastructure are within scope.`;
+  const base =
+    capabilities.length > 0
+      ? `The ISMS covers the delivery and operation of the following capabilities in production: ${capabilities.join(', ')}. All supporting information assets, personnel${data.memberCount > 0 ? ` (${data.memberCount} workforce members)` : ''}, systems and cloud infrastructure are within scope.`
+      : `All information assets, personnel${data.memberCount > 0 ? ` (${data.memberCount} workforce members)` : ''}, systems and supporting cloud infrastructure used by ${data.organizationName} to deliver its services are within the ISMS scope.`;
+  const extras: string[] = [];
+  if (data.deviceCount > 0) {
+    extras.push(`This includes the ${data.deviceCount} managed endpoints in the device inventory.`);
   }
-  return `All information assets, personnel${data.memberCount > 0 ? ` (${data.memberCount} workforce members)` : ''}, systems and supporting cloud infrastructure used by ${data.organizationName} to deliver its services are within the ISMS scope.`;
+  // PCI DSS scope (Req. 12.5.2) sits inside the ISMS when both programmes run.
+  if (hasPciFramework(data.frameworkNames)) {
+    extras.push(
+      'The cardholder data environment (CDE) and all system components connected to it or able to affect its security are within scope for PCI DSS.',
+    );
+  }
+  return [base, ...extras].join(' ');
 }
 
 /** Interfaces: include the provider-managed cloud layers named in the wizard. */

@@ -40,6 +40,8 @@ export const AUDIT_ROUTE_LABELS: Record<IsmsAuditRoute, string> =
 export const INTERNAL_AUDITOR_ROLE_KEY = 'internal_auditor';
 export const SPO_ROLE_KEY = 'spo';
 export const DEPUTY_SPO_ROLE_KEY = 'deputy_spo';
+/** PCI DSS 12.4.1 executive owner; seeded only for PCI DSS organizations. */
+export const PCI_EXECUTIVE_OWNER_ROLE_KEY = 'pci_executive_owner';
 
 /** Seeded roles that must be present + assigned to generate the doc (key + fallback label). */
 const REQUIRED_SEED_ROLES: { key: string; label: string }[] = [
@@ -125,6 +127,10 @@ export function roleValidationMessages({
     if (key === INTERNAL_AUDITOR_ROLE_KEY) {
       messages.push(...auditRouteMessages(role, activeMemberIds));
     }
+  }
+  const pciRole = byKey.get(PCI_EXECUTIVE_OWNER_ROLE_KEY);
+  if (pciRole && !pciRole.assignments.some((a) => activeMemberIds.has(a.memberId))) {
+    messages.push(`${pciRole.name} needs at least one assigned member.`);
   }
   return messages;
 }

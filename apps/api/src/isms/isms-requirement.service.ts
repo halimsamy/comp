@@ -7,6 +7,8 @@ import { db } from '@db';
 import type { Prisma } from '@db';
 import { invalidateApprovalIfNeeded } from './utils/approval';
 import { lockDocument } from './utils/document-lock';
+import { parseOptionalDate } from './utils/parse-optional-date';
+import { resolveActiveMember } from './utils/resolve-active-member';
 import type {
   CreateRequirementInput,
   UpdateRequirementInput,
@@ -35,6 +37,11 @@ export class IsmsRequirementService {
     if (interestedPartyId) {
       await this.requirePartyInDocument({ interestedPartyId, documentId });
     }
+    const ownerMemberId = await resolveActiveMember({
+      memberId: dto.ownerMemberId,
+      organizationId,
+    });
+    const lastReviewedAt = parseOptionalDate(dto.lastReviewedAt);
 
     return db.$transaction(async (tx) => {
       await lockDocument(tx, documentId);
@@ -48,6 +55,8 @@ export class IsmsRequirementService {
           partyName: dto.partyName,
           requirement: dto.requirement,
           treatment: dto.treatment,
+          ownerMemberId: ownerMemberId ?? null,
+          lastReviewedAt: lastReviewedAt ?? null,
           source: 'manual',
           position,
         },
@@ -77,6 +86,10 @@ export class IsmsRequirementService {
         documentId: requirement.documentId,
       });
     }
+    const ownerMemberId = await resolveActiveMember({
+      memberId: dto.ownerMemberId,
+      organizationId,
+    });
 
     return db.$transaction(async (tx) => {
       await invalidateApprovalIfNeeded({
@@ -90,6 +103,8 @@ export class IsmsRequirementService {
           partyName: dto.partyName ?? undefined,
           requirement: dto.requirement ?? undefined,
           treatment: dto.treatment ?? undefined,
+          ownerMemberId,
+          lastReviewedAt: parseOptionalDate(dto.lastReviewedAt),
           position: dto.position ?? undefined,
           source: 'manual',
         },

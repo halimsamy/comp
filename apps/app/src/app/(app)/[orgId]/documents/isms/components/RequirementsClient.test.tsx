@@ -86,6 +86,8 @@ const REQUIREMENTS: IsmsInterestedPartyRequirement[] = [
     treatment: 'Encrypt data at rest',
     source: 'derived',
     derivedFrom: 'framework:ISO 27001',
+    ownerMemberId: null,
+    lastReviewedAt: null,
     position: 0,
   },
   {
@@ -96,6 +98,8 @@ const REQUIREMENTS: IsmsInterestedPartyRequirement[] = [
     treatment: 'Maintain breach notification process',
     source: 'manual',
     derivedFrom: null,
+    ownerMemberId: null,
+    lastReviewedAt: null,
     position: 1,
   },
 ];
@@ -131,6 +135,7 @@ const baseProps = {
   fallbackData: null,
   currentMemberId: 'm1',
   approverOptions: [{ id: 'm2', name: 'Approver Two' }],
+  memberOptions: [{ id: 'm2', name: 'Approver Two' }],
 };
 
 describe('RequirementsClient', () => {

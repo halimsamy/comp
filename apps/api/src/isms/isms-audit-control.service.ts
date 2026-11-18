@@ -9,7 +9,7 @@ import type {
 } from './registers/register-registry';
 
 /**
- * CRUD for an audit's Controls Tested rows (clause 9.2, CS-724). The fifteen
+ * CRUD for an audit's Controls Tested rows (clause 9.2, CS-724). The sixteen
  * default rows are created idempotently by seedAuditControlsIfMissing when the
  * audit is created; this service handles customer-added rows and edits. The
  * ticket allows adding, editing, and removing rows freely — seeded rows are
