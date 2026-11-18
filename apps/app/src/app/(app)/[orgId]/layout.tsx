@@ -10,14 +10,9 @@ import { auth } from '@/utils/auth';
 import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { db, Role } from '@db/server';
 import { OrganizationIdentifier, ServerFeatureFlagsProvider } from '@trycompai/analytics';
-import dynamic from 'next/dynamic';
 import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { AppShellWrapper } from './components/AppShellWrapper';
-
-const HotKeys = dynamic(() => import('@/components/hot-keys').then((mod) => mod.HotKeys), {
-  ssr: true,
-});
 
 export default async function Layout({
   children,
@@ -202,7 +197,6 @@ export default async function Layout({
           </AppShellWrapper>
         </OrgInternalProvider>
       </ServerFeatureFlagsProvider>
-      <HotKeys />
     </>
   );
 }
