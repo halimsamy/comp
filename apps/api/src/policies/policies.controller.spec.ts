@@ -22,6 +22,10 @@ jest.mock('@trycompai/auth', () => ({
   BUILT_IN_ROLE_PERMISSIONS: {},
 }));
 
+jest.mock('../controls/sync-framework-links', () => ({
+  syncControlsToAllFrameworks: jest.fn().mockResolvedValue(undefined),
+}));
+
 jest.mock('@db', () => ({
   db: {
     policy: {
@@ -560,11 +564,10 @@ describe('PoliciesController', () => {
           requirementsMapped: [],
         },
       ];
-      db.policy.findFirst.mockResolvedValue({
-        id: 'pol_1',
-        controls: mappedControls,
-      });
-      db.control.findMany.mockResolvedValue(allControls);
+      db.policy.findFirst.mockResolvedValue({ id: 'pol_1' });
+      db.control.findMany
+        .mockResolvedValueOnce(allControls)
+        .mockResolvedValueOnce(mappedControls);
 
       const result = await controller.getPolicyControls(
         'pol_1',
@@ -628,10 +631,7 @@ describe('PoliciesController', () => {
           ],
         },
       ];
-      db.policy.findFirst.mockResolvedValue({
-        id: 'pol_1',
-        controls,
-      });
+      db.policy.findFirst.mockResolvedValue({ id: 'pol_1' });
       db.control.findMany.mockResolvedValue(controls);
 
       const result = await controller.getPolicyControls(
@@ -661,7 +661,7 @@ describe('PoliciesController', () => {
 
     it('scopes the requirementsMapped query to the caller organization', async () => {
       const { db } = require('@db');
-      db.policy.findFirst.mockResolvedValue({ id: 'pol_1', controls: [] });
+      db.policy.findFirst.mockResolvedValue({ id: 'pol_1' });
       db.control.findMany.mockResolvedValue([]);
 
       await controller.getPolicyControls('pol_1', orgId, mockAuthContext);
@@ -669,17 +669,25 @@ describe('PoliciesController', () => {
       expect(db.policy.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: 'pol_1', organizationId: orgId, archivedAt: null },
+        }),
+      );
+      // Mapped controls: both control-level and framework-scoped links, org-scoped.
+      expect(db.control.findMany).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          where: {
+            organizationId: orgId,
+            archivedAt: null,
+            OR: [
+              { policies: { some: { id: 'pol_1' } } },
+              { frameworkPolicyLinks: { some: { policyId: 'pol_1' } } },
+            ],
+          },
           select: expect.objectContaining({
-            controls: expect.objectContaining({
-              where: { archivedAt: null },
-              select: expect.objectContaining({
-                requirementsMapped: expect.objectContaining({
-                  where: {
-                    archivedAt: null,
-                    frameworkInstance: { organizationId: orgId },
-                  },
-                }),
-              }),
+            requirementsMapped: expect.objectContaining({
+              where: {
+                archivedAt: null,
+                frameworkInstance: { organizationId: orgId },
+              },
             }),
           }),
         }),
@@ -690,15 +698,22 @@ describe('PoliciesController', () => {
   describe('addPolicyControls', () => {
     it('should connect controls to policy and return success', async () => {
       const { db } = require('@db');
+      const { syncControlsToAllFrameworks } = jest.requireMock('../controls/sync-framework-links');
       db.policy.update.mockResolvedValue({});
+      // ctrl_foreign belongs to another org and is dropped.
+      db.control.findMany.mockResolvedValue([{ id: 'ctrl_1' }, { id: 'ctrl_2' }]);
 
       const result = await controller.addPolicyControls(
         'pol_1',
-        { controlIds: ['ctrl_1', 'ctrl_2'] },
+        { controlIds: ['ctrl_1', 'ctrl_2', 'ctrl_foreign'] },
         orgId,
         mockAuthContext,
       );
 
+      expect(db.control.findMany).toHaveBeenCalledWith({
+        where: { id: { in: ['ctrl_1', 'ctrl_2', 'ctrl_foreign'] }, organizationId: orgId, archivedAt: null },
+        select: { id: true },
+      });
       expect(db.policy.update).toHaveBeenCalledWith({
         where: { id: 'pol_1', organizationId: orgId },
         data: {
@@ -706,6 +721,11 @@ describe('PoliciesController', () => {
             connect: [{ id: 'ctrl_1' }, { id: 'ctrl_2' }],
           },
         },
+      });
+      // Evidence once, map many: the links fan out to every framework.
+      expect(syncControlsToAllFrameworks).toHaveBeenCalledWith({
+        controlIds: ['ctrl_1', 'ctrl_2'],
+        organizationId: orgId,
       });
       expect(result.success).toBe(true);
     });
@@ -1003,14 +1023,15 @@ describe('PoliciesController', () => {
         'pol_1',
         body,
         orgId,
-        mockAuthContext,
+        { ...mockAuthContext, memberId: 'mem_session' },
       );
 
+      // The approver comes from the session member, never from the body.
       expect(policiesService.acceptChanges).toHaveBeenCalledWith(
         'pol_1',
         orgId,
-        body,
-        'usr_123',
+        { comment: 'Looks good' },
+        'mem_session',
       );
       expect(result.data).toEqual(mockResult);
     });
@@ -1026,13 +1047,14 @@ describe('PoliciesController', () => {
         'pol_1',
         body,
         orgId,
-        mockAuthContext,
+        { ...mockAuthContext, memberId: 'mem_session' },
       );
 
       expect(policiesService.denyChanges).toHaveBeenCalledWith(
         'pol_1',
         orgId,
-        body,
+        { comment: 'Needs revision' },
+        'mem_session',
       );
       expect(result.data).toEqual(mockResult);
     });

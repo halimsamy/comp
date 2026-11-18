@@ -1,10 +1,11 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { db, Frequency, PolicyStatus, Prisma } from '@db';
+import { db, PolicyStatus, Prisma } from '@db';
 import { HeadObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import { AttachmentsService } from '../attachments/attachments.service';
@@ -27,6 +28,11 @@ import type {
 } from './dto/version.dto';
 import { checkAutoCompletePhases } from '../frameworks/frameworks-timeline.helper';
 import { TimelinesService } from '../timelines/timelines.service';
+import { computeNextReviewDate } from './lifecycle/review-date';
+import {
+  buildDocumentControlRows,
+  DOCUMENT_CONTROL_POLICY_SELECT,
+} from './lifecycle/policy-document-control.service';
 
 // Fields returned by updateById in both the standard and auto-publish paths.
 const POLICY_UPDATE_SELECT = {
@@ -52,20 +58,6 @@ const POLICY_UPDATE_SELECT = {
   policyTemplateId: true,
   currentVersionId: true,
 } as const;
-
-function computeNextReviewDate(frequency: Frequency | null | undefined): Date {
-  const now = new Date();
-  switch (frequency) {
-    case Frequency.monthly:
-      return new Date(now.getFullYear(), now.getMonth() + 1, now.getDate());
-    case Frequency.quarterly:
-      return new Date(now.getFullYear(), now.getMonth() + 3, now.getDate());
-    case Frequency.yearly:
-      return new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
-    default:
-      return new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
-  }
-}
 
 @Injectable()
 export class PoliciesService {
@@ -725,6 +717,11 @@ export class PoliciesService {
             },
           },
         },
+        approvedBy: {
+          include: {
+            user: { select: { id: true, name: true, image: true } },
+          },
+        },
       },
     });
 
@@ -1308,11 +1305,15 @@ export class PoliciesService {
     };
   }
 
+  /**
+   * The approver is the authenticated member (session or service token acting
+   * as a user) — never a value from the request body.
+   */
   async acceptChanges(
     policyId: string,
     organizationId: string,
-    dto: { approverId: string; comment?: string },
-    userId?: string,
+    dto: { comment?: string },
+    actorMemberId?: string,
   ) {
     const policy = await db.policy.findUnique({
       where: { id: policyId, organizationId },
@@ -1324,8 +1325,8 @@ export class PoliciesService {
 
     if (!policy.pendingVersionId) {
       if (policy.approverId) {
-        if (policy.approverId !== dto.approverId) {
-          throw new BadRequestException(
+        if (!actorMemberId || policy.approverId !== actorMemberId) {
+          throw new ForbiddenException(
             'Only the assigned approver can accept changes',
           );
         }
@@ -1340,8 +1341,8 @@ export class PoliciesService {
       throw new BadRequestException('No pending version to approve');
     }
 
-    if (policy.approverId !== dto.approverId) {
-      throw new BadRequestException(
+    if (!actorMemberId || policy.approverId !== actorMemberId) {
+      throw new ForbiddenException(
         'Only the assigned approver can accept changes',
       );
     }
@@ -1354,7 +1355,8 @@ export class PoliciesService {
       throw new NotFoundException('Pending version not found');
     }
 
-    const memberId = await this.getMemberId(organizationId, userId);
+    const memberId = actorMemberId;
+    const approvedAt = new Date();
 
     await db.$transaction(async (tx) => {
       // Publish the pending version. Policy row first, then the version row —
@@ -1376,10 +1378,15 @@ export class PoliciesService {
         },
       });
 
-      // Stamp the version with the publisher
+      // Stamp the version with the publisher and the approval record
       await tx.policyVersion.update({
         where: { id: version.id },
-        data: { publishedById: memberId },
+        data: {
+          publishedById: memberId,
+          approvedAt,
+          approvedById: memberId,
+          approvalComment: dto.comment?.trim() || null,
+        },
       });
     });
 
@@ -1428,7 +1435,8 @@ export class PoliciesService {
   async denyChanges(
     policyId: string,
     organizationId: string,
-    dto: { approverId: string; comment?: string },
+    _dto: { comment?: string },
+    actorMemberId?: string,
   ) {
     const policy = await db.policy.findUnique({
       where: { id: policyId, organizationId },
@@ -1440,6 +1448,11 @@ export class PoliciesService {
 
     if (!policy.pendingVersionId) {
       if (policy.approverId) {
+        if (!actorMemberId || policy.approverId !== actorMemberId) {
+          throw new ForbiddenException(
+            'Only the assigned approver can deny changes',
+          );
+        }
         await db.policy.update({
           where: { id: policyId },
           data: { approverId: null },
@@ -1451,8 +1464,8 @@ export class PoliciesService {
       throw new BadRequestException('No pending version to deny');
     }
 
-    if (policy.approverId !== dto.approverId) {
-      throw new BadRequestException(
+    if (!actorMemberId || policy.approverId !== actorMemberId) {
+      throw new ForbiddenException(
         'Only the assigned approver can deny changes',
       );
     }
@@ -1559,13 +1572,12 @@ export class PoliciesService {
         ...(policyIds && policyIds.length > 0 ? { id: { in: policyIds } } : {}),
       },
       select: {
-        id: true,
-        name: true,
-        status: true,
+        ...DOCUMENT_CONTROL_POLICY_SELECT,
         content: true,
         pdfUrl: true,
         currentVersion: {
           select: {
+            ...DOCUMENT_CONTROL_POLICY_SELECT.currentVersion.select,
             content: true,
             pdfUrl: true,
           },
@@ -1639,7 +1651,13 @@ export class PoliciesService {
 
       // Render from content (either no pdfUrl or fetch failed)
       const renderedBuffer = this.pdfRendererService.renderPoliciesPdfBuffer(
-        [{ name: policy.name, content }],
+        [
+          {
+            name: policy.name,
+            content,
+            documentControl: buildDocumentControlRows(policy),
+          },
+        ],
         undefined, // We'll add org header during merge
         organization.primaryColor,
         policies.length,
@@ -1657,7 +1675,13 @@ export class PoliciesService {
     ) => {
       const { content } = getEffectiveData(policy);
       const renderedBuffer = this.pdfRendererService.renderPoliciesPdfBuffer(
-        [{ name: policy.name, content }],
+        [
+          {
+            name: policy.name,
+            content,
+            documentControl: buildDocumentControlRows(policy),
+          },
+        ],
         addOrgHeader ? organizationName : undefined,
         organization.primaryColor,
         policies.length,

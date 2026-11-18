@@ -11,6 +11,7 @@ import { useDataTable } from '@/hooks/use-data-table';
 import { useJobRun } from '@/hooks/use-job-run';
 import { apiClient } from '@/lib/api-client';
 import { Button } from '@trycompai/ui/button';
+import { ExportAcknowledgementsButton } from './ExportAcknowledgementsButton';
 import type { Policy } from '@db';
 import { useParams } from 'next/navigation';
 import { getPolicyColumns } from './policies-table-columns';
@@ -178,6 +179,7 @@ export function PoliciesTable({ promises, onboardingRunId }: PoliciesTableProps)
                   )}
                 </Button>
               )}
+              {data.length > 0 && <ExportAcknowledgementsButton />}
             </DataTableToolbar>
 
             {hasActivePolicies && policyProgress && (

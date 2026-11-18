@@ -2,6 +2,7 @@ import { isOrgParticipant } from '@/lib/org-participation-rule';
 import { db } from '@db/server';
 import { Novu } from '@novu/api';
 import { logger, schedules } from '@trycompai/jobs';
+import { isPolicyReviewDue } from './policy-schedule-helpers';
 
 export const policySchedule = schedules.task({
   id: 'policy-schedule',
@@ -52,41 +53,11 @@ export const policySchedule = schedules.task({
       },
     });
 
-    // Compute next due date based on frequency and filter to overdue
-    const addMonthsToDate = (date: Date, months: number) => {
-      const result = new Date(date.getTime());
-      const originalDayOfMonth = result.getDate();
-      result.setMonth(result.getMonth() + months);
-      // Handle month rollover (e.g., Jan 31 + 1 month -> Feb 28/29)
-      if (result.getDate() < originalDayOfMonth) {
-        result.setDate(0);
-      }
-      return result;
-    };
-
-    const overduePolicies = candidatePolicies.filter((policy) => {
-      if (!policy.reviewDate || !policy.frequency) return false;
-
-      let monthsToAdd = 0;
-      switch (policy.frequency) {
-        case 'monthly':
-          monthsToAdd = 1;
-          break;
-        case 'quarterly':
-          monthsToAdd = 3;
-          break;
-        case 'yearly':
-          monthsToAdd = 12;
-          break;
-        default:
-          monthsToAdd = 0;
-      }
-
-      if (monthsToAdd === 0) return false;
-
-      const nextDueDate = addMonthsToDate(policy.reviewDate, monthsToAdd);
-      return nextDueDate <= now;
-    });
+    // reviewDate is the date the next review is due (set on publish and on
+    // every recorded review), so a policy is overdue once that date passes.
+    const overduePolicies = candidatePolicies.filter((policy) =>
+      isPolicyReviewDue({ reviewDate: policy.reviewDate, now }),
+    );
 
     logger.info(`Found ${overduePolicies.length} policies past their computed review deadline`);
 
@@ -193,7 +164,7 @@ export const policySchedule = schedules.task({
       // Log details about updated policies
       overduePolicies.forEach((policy) => {
         logger.info(
-          `Updated policy "${policy.name}" (${policy.id}) from org "${policy.organization.name}" - frequency ${policy.frequency} - last reviewed ${policy.reviewDate?.toISOString()}`,
+          `Updated policy "${policy.name}" (${policy.id}) from org "${policy.organization.name}" - frequency ${policy.frequency} - review was due ${policy.reviewDate?.toISOString()}`,
         );
       });
 

@@ -58,6 +58,7 @@ import {
 } from './dto/policy-pdf-upload-url.dto';
 import {
   CreateVersionDto,
+  PolicyApprovalDecisionDto,
   PublishVersionDto,
   SubmitForApprovalDto,
   UpdateVersionContentDto,
@@ -85,6 +86,7 @@ import {
   UPDATE_VERSION_CONTENT_RESPONSES,
 } from './schemas/version-responses';
 import { PolicyResponseDto } from './dto/policy-responses.dto';
+import { syncControlsToAllFrameworks } from '../controls/sync-framework-links';
 
 function parsePolicyIdsParam(
   raw: string | string[] | undefined,
@@ -268,10 +270,7 @@ export class PoliciesController {
     const [policy, allControls] = await Promise.all([
       db.policy.findFirst({
         where: { id, organizationId, archivedAt: null },
-        select: {
-          id: true,
-          controls: { where: { archivedAt: null }, select: controlSelect },
-        },
+        select: { id: true },
       }),
       db.control.findMany({
         where: { organizationId, archivedAt: null },
@@ -312,8 +311,24 @@ export class PoliciesController {
         };
       });
 
+    // Both link kinds: control-level and framework-scoped (made on a framework page).
+    const mappedControls = policy
+      ? await db.control.findMany({
+          where: {
+            organizationId,
+            archivedAt: null,
+            OR: [
+              { policies: { some: { id } } },
+              { frameworkPolicyLinks: { some: { policyId: id } } },
+            ],
+          },
+          select: controlSelect,
+          orderBy: { name: 'asc' },
+        })
+      : [];
+
     return {
-      mappedControls: transform(policy?.controls ?? []),
+      mappedControls: transform(mappedControls),
       allControls: transform(allControls),
       authType: authContext.authType,
       ...(authContext.userId && {
@@ -966,14 +981,17 @@ export class PoliciesController {
     @OrganizationId() organizationId: string,
     @AuthContext() authContext: AuthContextType,
   ) {
+    // Only controls of this org; the link then counts for every framework mapping them.
+    const controls = await db.control.findMany({
+      where: { id: { in: body.controlIds ?? [] }, organizationId, archivedAt: null },
+      select: { id: true },
+    });
+    const controlIds = controls.map((c) => c.id);
     await db.policy.update({
       where: { id, organizationId },
-      data: {
-        controls: {
-          connect: body.controlIds.map((cid) => ({ id: cid })),
-        },
-      },
+      data: { controls: { connect: controlIds.map((cid) => ({ id: cid })) } },
     });
+    await syncControlsToAllFrameworks({ controlIds, organizationId });
 
     return {
       success: true,
@@ -1422,20 +1440,23 @@ export class PoliciesController {
   @RequirePermission('policy', 'update')
   @ApiOperation({
     summary: 'Accept pending policy changes and publish the version',
+    description:
+      'Approves the version pending approval and publishes it. Only the assigned approver, as the authenticated member, can approve; the approval time, approver and comment are recorded on the version.',
   })
   @ApiParam(POLICY_PARAMS.policyId)
+  @ApiBody({ type: PolicyApprovalDecisionDto })
   @ApiExtension('x-speakeasy-mcp', { name: 'accept-policy-changes' })
   async acceptPolicyChanges(
     @Param('id') id: string,
-    @Body() body: { approverId: string; comment?: string },
+    @Body() body: PolicyApprovalDecisionDto,
     @OrganizationId() organizationId: string,
     @AuthContext() authContext: AuthContextType,
   ) {
     const data = await this.policiesService.acceptChanges(
       id,
       organizationId,
-      body,
-      authContext.userId,
+      { comment: body.comment },
+      authContext.memberId,
     );
 
     return {
@@ -1452,18 +1473,24 @@ export class PoliciesController {
 
   @Post(':id/deny-changes')
   @RequirePermission('policy', 'update')
-  @ApiOperation({ summary: 'Deny pending policy changes' })
+  @ApiOperation({
+    summary: 'Deny pending policy changes',
+    description:
+      'Rejects the version pending approval and returns the policy to its previous state. Only the assigned approver, as the authenticated member, can deny.',
+  })
   @ApiParam(POLICY_PARAMS.policyId)
+  @ApiBody({ type: PolicyApprovalDecisionDto })
   async denyPolicyChanges(
     @Param('id') id: string,
-    @Body() body: { approverId: string; comment?: string },
+    @Body() body: PolicyApprovalDecisionDto,
     @OrganizationId() organizationId: string,
     @AuthContext() authContext: AuthContextType,
   ) {
     const data = await this.policiesService.denyChanges(
       id,
       organizationId,
-      body,
+      { comment: body.comment },
+      authContext.memberId,
     );
 
     return {

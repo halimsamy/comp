@@ -1,6 +1,12 @@
-import { ApiProperty, ApiSchema } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, ApiSchema } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsArray, IsBoolean, IsOptional, IsString } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 
 // A second class named `CreateVersionDto` exists in tasks/automations with a
 // different, REQUIRED shape (version! + scriptKey!). Without a distinct OpenAPI
@@ -89,4 +95,26 @@ export class SubmitForApprovalDto {
   })
   @IsString()
   approverId: string;
+}
+
+export class PolicyApprovalDecisionDto {
+  @ApiPropertyOptional({
+    description: 'Optional comment explaining the approval decision',
+    example: 'Reviewed with legal, no concerns.',
+    maxLength: 2000,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  comment?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Deprecated and ignored. The approver is always the authenticated member.',
+    deprecated: true,
+    example: 'mem_abc123def456',
+  })
+  @IsOptional()
+  @IsString()
+  approverId?: string;
 }

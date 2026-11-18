@@ -23,6 +23,8 @@ interface PDFConfig {
 interface PolicyForPDF {
   name: string;
   content: any;
+  /** Optional document-control rows (owner, version, approver, dates). */
+  documentControl?: { label: string; value: string }[];
 }
 
 // Keep-together: minimum number of body lines that must fit on the same page
@@ -689,6 +691,40 @@ export class PolicyPdfRendererService {
     return `${prefix} ${body}`;
   }
 
+  /** Two-column document-control table, drawn under the policy title. */
+  private renderDocumentControl(
+    config: PDFConfig,
+    rows: { label: string; value: string }[],
+  ) {
+    const rowHeight = 6;
+    const labelWidth = 45;
+    const top = config.yPosition - 4;
+    config.doc.setDrawColor(220, 220, 220);
+    config.doc.setLineWidth(0.2);
+    config.doc.rect(
+      config.margin,
+      top,
+      config.contentWidth,
+      rows.length * rowHeight + 2,
+    );
+    config.doc.setFontSize(9);
+    rows.forEach((row, index) => {
+      const y = config.yPosition + index * rowHeight;
+      config.doc.setFont('helvetica', 'bold');
+      config.doc.setTextColor(100, 100, 100);
+      config.doc.text(this.cleanTextForPDF(row.label), config.margin + 3, y);
+      config.doc.setFont('helvetica', 'normal');
+      config.doc.setTextColor(30, 41, 59);
+      config.doc.text(
+        this.cleanTextForPDF(row.value),
+        config.margin + 3 + labelWidth,
+        y,
+      );
+    });
+    config.yPosition += rows.length * rowHeight + config.lineHeight * 2;
+    config.doc.setTextColor(0, 0, 0);
+  }
+
   renderPoliciesPdfBuffer(
     policies: PolicyForPDF[],
     organizationName?: string,
@@ -789,6 +825,10 @@ export class PolicyPdfRendererService {
         config.doc.text(policyTitle, config.margin + 10, config.yPosition + 8);
 
         config.yPosition += config.lineHeight * 4;
+      }
+
+      if (policy.documentControl?.length) {
+        this.renderDocumentControl(config, policy.documentControl);
       }
 
       if (policy.content) {

@@ -696,21 +696,25 @@ describe('PoliciesService', () => {
       };
       db.policy.findUnique.mockResolvedValueOnce(buildPendingPolicy());
       db.policyVersion.findUnique.mockResolvedValueOnce(pendingVersion);
-      db.member.findFirst.mockResolvedValueOnce({ id: 'mem_caller' });
       db.member.findMany.mockResolvedValueOnce([]);
       mockTransactionTx();
 
       const result = await service.acceptChanges(
         'pol_1',
         'org_abc',
-        { approverId: 'mem_approver' },
-        'usr_caller',
+        {},
+        'mem_approver',
       );
 
       expect(result).toEqual({ versionId: 'ver_1', version: 2, members: [] });
       expect(db.policyVersion.update).toHaveBeenCalledWith({
         where: { id: 'ver_1' },
-        data: { publishedById: 'mem_caller' },
+        data: {
+          publishedById: 'mem_approver',
+          approvedAt: expect.any(Date),
+          approvedById: 'mem_approver',
+          approvalComment: null,
+        },
       });
       const policyUpdateArg = db.policy.update.mock.calls[0][0];
       expect(policyUpdateArg.data.status).toBe('published');
@@ -730,15 +734,14 @@ describe('PoliciesService', () => {
         version: 2,
         content: [{ type: 'paragraph' }],
       });
-      db.member.findFirst.mockResolvedValueOnce({ id: 'mem_caller' });
       db.member.findMany.mockResolvedValueOnce([]);
       mockTransactionTx();
 
       await service.acceptChanges(
         'pol_1',
         'org_abc',
-        { approverId: 'mem_approver' },
-        'usr_caller',
+        {},
+        'mem_approver',
       );
 
       expect(db.policy.update.mock.invocationCallOrder[0]).toBeLessThan(
@@ -746,11 +749,9 @@ describe('PoliciesService', () => {
       );
     });
 
-    it('succeeds when called via session impersonation — caller userId differs from approverId', async () => {
-      // Simulates an admin impersonating the assigned approver:
-      // the impersonated session's userId belongs to the approver, but
-      // the authorization check only requires the body-supplied approverId
-      // to match policy.approverId — which it does.
+    it('succeeds when called via session impersonation of the approver', async () => {
+      // An impersonated session resolves to the approver's member, so the
+      // session-derived member matches policy.approverId.
       const pendingVersion = {
         id: 'ver_1',
         version: 2,
@@ -758,21 +759,20 @@ describe('PoliciesService', () => {
       };
       db.policy.findUnique.mockResolvedValueOnce(buildPendingPolicy());
       db.policyVersion.findUnique.mockResolvedValueOnce(pendingVersion);
-      db.member.findFirst.mockResolvedValueOnce({ id: 'mem_impersonated' });
       db.member.findMany.mockResolvedValueOnce([]);
       mockTransactionTx();
 
       const result = await service.acceptChanges(
         'pol_1',
         'org_abc',
-        { approverId: 'mem_approver' },
-        'usr_impersonated',
+        {},
+        'mem_approver',
       );
 
       expect(result).toEqual({ versionId: 'ver_1', version: 2, members: [] });
       expect(db.policyVersion.update).toHaveBeenCalledWith({
         where: { id: 'ver_1' },
-        data: { publishedById: 'mem_impersonated' },
+        data: expect.objectContaining({ approvedById: 'mem_approver' }),
       });
     });
 
@@ -796,7 +796,6 @@ describe('PoliciesService', () => {
         }),
       );
       db.policyVersion.findUnique.mockResolvedValueOnce(pendingVersion);
-      db.member.findFirst.mockResolvedValueOnce({ id: 'mem_caller' });
       db.member.findMany.mockResolvedValueOnce([
         {
           id: 'mem_signed',
@@ -816,8 +815,8 @@ describe('PoliciesService', () => {
       const result = await service.acceptChanges(
         'pol_1',
         orgId,
-        { approverId: 'mem_approver' },
-        'usr_caller',
+        {},
+        'mem_approver',
       );
 
       expect(result.versionId).toBe('ver_1');
@@ -861,15 +860,14 @@ describe('PoliciesService', () => {
         version: 3,
         content: [{ type: 'paragraph' }],
       });
-      db.member.findFirst.mockResolvedValueOnce({ id: 'mem_caller' });
       db.member.findMany.mockResolvedValueOnce([]);
       mockTransactionTx();
 
       await service.acceptChanges(
         'pol_1',
         orgId,
-        { approverId: 'mem_approver' },
-        'usr_caller',
+        {},
+        'mem_approver',
       );
 
       expect(db.member.findMany).toHaveBeenCalledWith(
@@ -879,14 +877,47 @@ describe('PoliciesService', () => {
       );
     });
 
-    it('rejects when the body approverId does not match the assigned approver', async () => {
+    it('rejects when the session member is not the assigned approver', async () => {
       db.policy.findUnique.mockResolvedValueOnce(buildPendingPolicy());
 
       await expect(
-        service.acceptChanges('pol_1', 'org_abc', { approverId: 'mem_wrong' }),
+        service.acceptChanges('pol_1', 'org_abc', {}, 'mem_wrong'),
       ).rejects.toThrow(/only the assigned approver/i);
 
       expect(db.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('rejects callers without a member (API key) even if they know the approver id', async () => {
+      db.policy.findUnique.mockResolvedValueOnce(buildPendingPolicy());
+
+      await expect(
+        service.acceptChanges('pol_1', 'org_abc', {}, undefined),
+      ).rejects.toThrow(/only the assigned approver/i);
+
+      expect(db.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('records the trimmed approval comment on the version', async () => {
+      db.policy.findUnique.mockResolvedValueOnce(buildPendingPolicy());
+      db.policyVersion.findUnique.mockResolvedValueOnce({
+        id: 'ver_1',
+        version: 2,
+        content: [],
+      });
+      db.member.findMany.mockResolvedValueOnce([]);
+      mockTransactionTx();
+
+      await service.acceptChanges(
+        'pol_1',
+        'org_abc',
+        { comment: '  Reviewed with legal  ' },
+        'mem_approver',
+      );
+
+      expect(db.policyVersion.update).toHaveBeenCalledWith({
+        where: { id: 'ver_1' },
+        data: expect.objectContaining({ approvalComment: 'Reviewed with legal' }),
+      });
     });
 
     it('self-heals stale approverId when no pending version exists', async () => {
@@ -902,7 +933,7 @@ describe('PoliciesService', () => {
       db.policy.update.mockResolvedValueOnce({ ...stalePolicy, approverId: null });
 
       await expect(
-        service.acceptChanges('pol_1', orgId, { approverId }),
+        service.acceptChanges('pol_1', orgId, {}, approverId),
       ).rejects.toThrow(/no pending changes/i);
 
       expect(db.policy.update).toHaveBeenCalledWith({
@@ -923,7 +954,7 @@ describe('PoliciesService', () => {
       db.policy.findUnique.mockResolvedValueOnce(cleanPolicy);
 
       await expect(
-        service.acceptChanges('pol_1', orgId, { approverId: 'mem_x' }),
+        service.acceptChanges('pol_1', orgId, {}, 'mem_x'),
       ).rejects.toThrow(/no pending version/i);
 
       expect(db.policy.update).not.toHaveBeenCalled();
@@ -931,6 +962,21 @@ describe('PoliciesService', () => {
   });
 
   describe('denyChanges', () => {
+    it('rejects when the session member is not the assigned approver', async () => {
+      db.policy.findUnique.mockResolvedValueOnce({
+        id: 'pol_1',
+        organizationId: 'org_abc',
+        pendingVersionId: 'ver_1',
+        approverId: 'mem_approver',
+        lastPublishedAt: null,
+      });
+
+      await expect(
+        service.denyChanges('pol_1', 'org_abc', {}, 'mem_other'),
+      ).rejects.toThrow(/only the assigned approver/i);
+      expect(db.policy.update).not.toHaveBeenCalled();
+    });
+
     it('reverts to draft on a successful deny when never published', async () => {
       db.policy.findUnique.mockResolvedValueOnce({
         id: 'pol_1',
@@ -941,9 +987,12 @@ describe('PoliciesService', () => {
       });
       db.policy.update.mockResolvedValueOnce({});
 
-      const result = await service.denyChanges('pol_1', 'org_abc', {
-        approverId: 'mem_approver',
-      });
+      const result = await service.denyChanges(
+        'pol_1',
+        'org_abc',
+        {},
+        'mem_approver',
+      );
 
       expect(result).toEqual({ status: 'draft' });
       expect(db.policy.update).toHaveBeenCalledWith({
@@ -966,9 +1015,12 @@ describe('PoliciesService', () => {
       });
       db.policy.update.mockResolvedValueOnce({});
 
-      const result = await service.denyChanges('pol_1', 'org_abc', {
-        approverId: 'mem_approver',
-      });
+      const result = await service.denyChanges(
+        'pol_1',
+        'org_abc',
+        {},
+        'mem_approver',
+      );
 
       expect(result).toEqual({ status: 'published' });
     });
@@ -986,7 +1038,7 @@ describe('PoliciesService', () => {
       db.policy.update.mockResolvedValueOnce({ ...stalePolicy, approverId: null });
 
       await expect(
-        service.denyChanges('pol_1', orgId, { approverId }),
+        service.denyChanges('pol_1', orgId, {}, approverId),
       ).rejects.toThrow(/no pending changes/i);
 
       expect(db.policy.update).toHaveBeenCalledWith({

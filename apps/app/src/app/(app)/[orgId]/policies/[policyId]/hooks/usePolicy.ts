@@ -104,11 +104,12 @@ export function usePolicy({ policyId, organizationId, initialData }: UsePolicyOp
   }, [policyId]);
 
   const acceptChanges = useCallback(
-    async (body: { approverId: string; comment?: string }) => {
+    async (body: { comment?: string }) => {
       // Route through the app's API (not apiClient → NestJS directly) so
       // notification emails are sent after the version is published. The email
       // task runs on the app worker, so the trigger must happen
       // server-side in the app; the route forwards to the NestJS endpoint.
+      // The API takes the approver from the session, never from the body.
       const response = await fetch(`/api/policies/${policyId}/accept-changes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -123,7 +124,7 @@ export function usePolicy({ policyId, organizationId, initialData }: UsePolicyOp
   );
 
   const denyChanges = useCallback(
-    async (body: { approverId: string; comment?: string }) => {
+    async (body: { comment?: string }) => {
       const response = await apiClient.post(`/v1/policies/${policyId}/deny-changes`, body);
       if (response.error) throw new Error(response.error);
       await mutate();

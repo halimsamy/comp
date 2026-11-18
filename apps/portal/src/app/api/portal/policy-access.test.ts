@@ -112,6 +112,7 @@ describe.each(routes)('Portal $name active membership', ({ execute, mutation }) 
         findMany: mocks.policyFindMany,
         updateMany: mocks.policyUpdateMany,
       },
+      policyAcknowledgement: { create: vi.fn().mockResolvedValue({}) },
     };
     mocks.transaction.mockImplementation(
       (callback: (client: typeof transaction) => Promise<unknown>) => callback(transaction),

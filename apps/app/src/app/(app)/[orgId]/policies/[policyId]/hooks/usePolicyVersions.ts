@@ -7,6 +7,7 @@ import useSWR from 'swr';
 
 type PolicyVersionWithPublisher = PolicyVersion & {
   publishedBy: (Member & { user: User }) | null;
+  approvedBy?: (Member & { user: User }) | null;
 };
 
 // API response includes versions in data object, plus auth info

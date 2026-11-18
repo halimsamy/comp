@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   policyFindFirst: vi.fn(),
   policyFindMany: vi.fn(),
   policyUpdateMany: vi.fn(),
+  acknowledgementCreate: vi.fn(),
   transaction: vi.fn(),
   sign: vi.fn(),
 }));
@@ -45,6 +46,7 @@ const published = {
   visibleToDepartments: new Array<string>(),
   signedBy: new Array<string>(),
   pdfUrl: 'own.pdf',
+  currentVersionId: 'pv_own',
   currentVersion: { id: 'pv_own', policyId: 'pol_own', pdfUrl: 'current.pdf' },
 };
 let policy = { ...published };
@@ -107,6 +109,7 @@ beforeEach(() => {
       findMany: mocks.policyFindMany,
       updateMany: mocks.policyUpdateMany,
     },
+    policyAcknowledgement: { create: mocks.acknowledgementCreate },
   };
   mocks.transaction.mockImplementation(
     (callback: (client: typeof transaction) => Promise<unknown>) => callback(transaction),
@@ -232,6 +235,21 @@ describe('employee portal policy authorization', () => {
     expect(mocks.transaction).toHaveBeenCalledWith(expect.any(Function), {
       isolationLevel: 'Serializable',
     });
+    expect(mocks.acknowledgementCreate).toHaveBeenCalledOnce();
+    expect(mocks.acknowledgementCreate).toHaveBeenCalledWith({
+      data: {
+        organizationId: 'org_own',
+        policyId: 'pol_own',
+        policyVersionId: 'pv_own',
+        memberId: 'mem_own',
+      },
+    });
+  });
+
+  it('does not record a second acknowledgement when the member already signed', async () => {
+    mocks.policyUpdateMany.mockResolvedValue({ count: 0 });
+    expect((await accept(request({ body }))).status).toBe(200);
+    expect(mocks.acknowledgementCreate).not.toHaveBeenCalled();
   });
 
   it('selects the member in the requested organization when completing a policy', async () => {

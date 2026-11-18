@@ -260,10 +260,8 @@ describe('PolicyAlerts', () => {
 
       await user.click(screen.getByRole('button', { name: /publish and invalidate/i }));
 
-      expect(mockAcceptChanges).toHaveBeenCalledWith({
-        approverId: 'member-1',
-        comment: undefined,
-      });
+      // The approver is taken from the session server-side, not sent in the body.
+      expect(mockAcceptChanges).toHaveBeenCalledWith({ comment: undefined });
     });
   });
 

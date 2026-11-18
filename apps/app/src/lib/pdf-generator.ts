@@ -7,6 +7,7 @@ async function createPDF(): Promise<JsPDFType> {
 import type { JSONContent as TipTapJSONContent } from '@tiptap/react';
 import { AuditLog, User, Member, Organization, Policy } from '@db';
 import { format } from 'date-fns';
+import { drawDocumentControlHeader, type PdfDocumentControl } from './pdf-document-control';
 
 // Type definition for the JSON content structure
 interface JSONContent {
@@ -699,7 +700,12 @@ const addPageNumbers = (config: PDFConfig) => {
 /**
  * Converts JSON content to a formatted PDF document
  */
-export async function generatePolicyPDF(jsonContent: TipTapJSONContent[], logs: AuditLogWithRelations[], policyTitle?: string): Promise<void> {
+export async function generatePolicyPDF(
+  jsonContent: TipTapJSONContent[],
+  logs: AuditLogWithRelations[],
+  policyTitle?: string,
+  documentControl?: PdfDocumentControl,
+): Promise<void> {
   const internalContent = convertToInternalFormat(jsonContent);
 
   const doc = await createPDF();
@@ -714,8 +720,16 @@ export async function generatePolicyPDF(jsonContent: TipTapJSONContent[], logs: 
     yPosition: 20
   };
   
-  // Add title if provided
-  if (policyTitle) {
+  if (documentControl) {
+    config.yPosition = drawDocumentControlHeader({
+      doc,
+      control: documentControl,
+      title: cleanTextForPDF(policyTitle ?? 'Policy'),
+      margin: config.margin,
+      y: config.yPosition,
+    });
+  } else if (policyTitle) {
+    // Add title if provided
     const cleanTitle = cleanTextForPDF(policyTitle);
 
     config.doc.setFontSize(16);

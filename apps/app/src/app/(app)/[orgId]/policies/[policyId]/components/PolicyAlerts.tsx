@@ -54,10 +54,7 @@ export function PolicyAlerts({ policy, isPendingApproval, onMutate }: PolicyAler
     if (policy?.id && policy.approverId) {
       setIsApproving(true);
       try {
-        await acceptChanges({
-          approverId: policy.approverId,
-          comment,
-        });
+        await acceptChanges({ comment });
         toast.success('Policy changes accepted and published!');
         setIsInvalidationDialogOpen(false);
         setPendingApproveComment(undefined);
@@ -88,10 +85,7 @@ export function PolicyAlerts({ policy, isPendingApproval, onMutate }: PolicyAler
       const comment = rejectCommentRef.current?.value?.trim() || undefined;
       setIsDenying(true);
       try {
-        await denyChanges({
-          approverId: policy.approverId,
-          comment,
-        });
+        await denyChanges({ comment });
         toast.info('Policy changes denied!');
         onMutate?.();
       } catch {

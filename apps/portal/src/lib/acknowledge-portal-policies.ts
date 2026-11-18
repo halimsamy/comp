@@ -31,18 +31,28 @@ export async function acknowledgePortalPolicies({
       const where = portalPolicyWhere({ organizationId, department: member.department });
       const policies = await transaction.policy.findMany({
         where: { ...where, id: { in: ids } },
-        select: { id: true, signedBy: true },
+        select: { id: true, signedBy: true, currentVersionId: true },
       });
       if (policies.length !== ids.length) return { success: false, status: 404 };
 
       for (const policy of policies) {
-        await transaction.policy.updateMany({
+        const { count } = await transaction.policy.updateMany({
           where: {
             ...where,
             id: policy.id,
             NOT: { signedBy: { has: member.id } },
           },
           data: { signedBy: { push: member.id } },
+        });
+        // signedBy is reset on every publish; this row is the durable history.
+        if (count === 0) continue;
+        await transaction.policyAcknowledgement.create({
+          data: {
+            organizationId,
+            policyId: policy.id,
+            policyVersionId: policy.currentVersionId,
+            memberId: member.id,
+          },
         });
       }
       return {

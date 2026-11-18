@@ -1,5 +1,6 @@
 'use client';
 
+import { fetchPolicyDocumentControl } from '@/hooks/use-policy-lifecycle';
 import { useAuditLogs } from '@/hooks/use-audit-logs';
 import { Button } from '@trycompai/ui/button';
 import { useSWRConfig } from 'swr';
@@ -180,8 +181,15 @@ export function PolicyHeaderActions({
       const approvalLogs = auditLogs.filter((log) =>
         log.description?.toLowerCase().includes('approved'),
       );
+      // Document control is best-effort: a failure must not block the download.
+      const documentControl = await fetchPolicyDocumentControl(policy.id).catch(() => undefined);
       const { generatePolicyPDF } = await import('@/lib/pdf-generator');
-      await generatePolicyPDF(policyContent, approvalLogs, policy.name || 'Policy Document');
+      await generatePolicyPDF(
+        policyContent,
+        approvalLogs,
+        policy.name || 'Policy Document',
+        documentControl,
+      );
     } catch (error) {
       console.error('Error downloading policy PDF:', error);
       toast.error('Failed to generate policy PDF');
