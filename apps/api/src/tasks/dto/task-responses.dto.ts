@@ -1,5 +1,5 @@
 import { MemberResponseDto } from '@/devices/dto/member-responses.dto';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class AttachmentResponseDto {
   @ApiProperty({
@@ -37,6 +37,27 @@ export class AttachmentResponseDto {
     example: '2024-01-15T10:30:00Z',
   })
   createdAt: Date;
+
+  @ApiPropertyOptional({
+    description: 'First moment the file is valid evidence',
+    example: '2026-01-01T00:00:00Z',
+    nullable: true,
+  })
+  validFrom?: Date | null;
+
+  @ApiPropertyOptional({
+    description: 'When the file stops being valid evidence; after it the file needs an update',
+    example: '2026-12-31T00:00:00Z',
+    nullable: true,
+  })
+  validUntil?: Date | null;
+
+  @ApiPropertyOptional({
+    description: 'Who uploaded the file',
+    example: { name: 'Jane Doe', email: 'jane@acme.com' },
+    nullable: true,
+  })
+  uploadedBy?: { name: string | null; email: string } | null;
 }
 
 export class TaskResponseDto {
@@ -88,7 +109,7 @@ export class TaskResponseDto {
 
   @ApiProperty({
     description: 'Cadence for running the integration check attached to this task',
-    enum: ['daily', 'weekly', 'monthly', 'quarterly', 'yearly'],
+    enum: ['daily', 'weekly', 'monthly', 'quarterly', 'semiannually', 'yearly'],
     example: 'daily',
   })
   integrationScheduleFrequency: string;

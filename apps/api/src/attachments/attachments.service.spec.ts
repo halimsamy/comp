@@ -7,7 +7,10 @@ jest.mock('@/app/s3', () => ({
 }));
 
 jest.mock('@db', () => ({
-  db: { attachment: { create: jest.fn() } },
+  db: {
+    attachment: { create: jest.fn() },
+    task: { findFirst: jest.fn().mockResolvedValue(null) },
+  },
   AttachmentType: {
     image: 'image',
     video: 'video',

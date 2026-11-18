@@ -5,6 +5,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  Matches,
   MaxLength,
 } from 'class-validator';
 import { IsMimeTypeField } from '../utils/mime-type.validator';
@@ -75,4 +76,24 @@ export class UploadAttachmentDto {
   @IsString()
   @IsNotEmpty()
   userId?: string;
+
+  @ApiProperty({
+    description:
+      'First day the file is valid evidence (YYYY-MM-DD). Defaults to the upload day.',
+    example: '2026-01-01',
+    required: false,
+  })
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'validFrom must be YYYY-MM-DD' })
+  validFrom?: string;
+
+  @ApiProperty({
+    description:
+      "Last day the file is valid evidence (YYYY-MM-DD). Task evidence defaults to one task cycle; after it the file needs an update.",
+    example: '2026-12-31',
+    required: false,
+  })
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'validUntil must be YYYY-MM-DD' })
+  validUntil?: string;
 }

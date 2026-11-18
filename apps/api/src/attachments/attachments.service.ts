@@ -15,6 +15,7 @@ import {
 import { randomBytes } from 'crypto';
 import { AttachmentResponseDto } from '../tasks/dto/task-responses.dto';
 import { UploadAttachmentDto } from './upload-attachment.dto';
+import { resolveUploadValidity } from './attachment-validity';
 import { UploadsService } from '../uploads/uploads.service';
 import { validateFileContent } from '../utils/file-type-validation';
 
@@ -134,6 +135,14 @@ export class AttachmentsService {
         );
       }
 
+      const validity = await resolveUploadValidity({
+        organizationId,
+        entityType,
+        entityId,
+        validFrom: uploadDto.validFrom,
+        validUntil: uploadDto.validUntil,
+      });
+
       // Validate file size
       const fileBuffer = Buffer.from(fileData, 'base64');
       if (fileBuffer.length > this.MAX_FILE_SIZE_BYTES) {
@@ -191,6 +200,8 @@ export class AttachmentsService {
           entityId,
           entityType,
           organizationId,
+          ...validity,
+          uploadedById: userId ?? null,
         },
       });
 
@@ -204,6 +215,8 @@ export class AttachmentsService {
         downloadUrl,
         createdAt: attachment.createdAt,
         size: fileBuffer.length,
+        validFrom: attachment.validFrom,
+        validUntil: attachment.validUntil,
       };
     } catch (error) {
       console.error('Error uploading attachment:', error);
@@ -233,16 +246,36 @@ export class AttachmentsService {
       },
     });
 
+    const uploaderIds = [
+      ...new Set(attachments.flatMap((a) => (a.uploadedById ? [a.uploadedById] : []))),
+    ];
+    const uploaders =
+      uploaderIds.length > 0
+        ? await db.user.findMany({
+            where: { id: { in: uploaderIds } },
+            select: { id: true, name: true, email: true },
+          })
+        : [];
+    const uploaderById = new Map(uploaders.map((u) => [u.id, u]));
+
     // Generate signed URLs for all attachments
     const attachmentsWithUrls = await Promise.all(
       attachments.map(async (attachment) => {
         const downloadUrl = await this.generateSignedUrl(attachment.url);
+        const uploader = attachment.uploadedById
+          ? uploaderById.get(attachment.uploadedById)
+          : undefined;
         return {
           id: attachment.id,
           name: attachment.name,
           type: attachment.type,
           downloadUrl,
           createdAt: attachment.createdAt,
+          validFrom: attachment.validFrom,
+          validUntil: attachment.validUntil,
+          uploadedBy: uploader
+            ? { name: uploader.name, email: uploader.email }
+            : null,
         };
       }),
     );

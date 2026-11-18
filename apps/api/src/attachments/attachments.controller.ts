@@ -4,6 +4,7 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -23,6 +24,8 @@ import type { AuthContext as AuthContextType } from '../auth/types';
 import { AttachmentResponseDto } from '../tasks/dto/task-responses.dto';
 import { AttachmentsService } from './attachments.service';
 import { CreateAttachmentDto } from './create-attachment.dto';
+import { updateAttachmentValidity } from './attachment-validity';
+import { UpdateAttachmentValidityDto } from './update-attachment-validity.dto';
 
 @ApiTags('Attachments')
 @Controller({ path: 'attachments', version: '1' })
@@ -151,5 +154,27 @@ export class AttachmentsController {
       organizationId,
       attachmentId,
     );
+  }
+
+  @Patch(':attachmentId/validity')
+  @RequirePermission('evidence', 'update')
+  @ApiOperation({
+    summary: 'Set evidence file validity',
+    description:
+      'Sets the dates an evidence file is valid. After validUntil the file shows as needing an update, and audit exports only take files valid in the audit period.',
+  })
+  @ApiParam({ name: 'attachmentId', example: 'att_abc123def456' })
+  @ApiBody({ type: UpdateAttachmentValidityDto })
+  async updateAttachmentValidity(
+    @OrganizationId() organizationId: string,
+    @Param('attachmentId') attachmentId: string,
+    @Body() body: UpdateAttachmentValidityDto,
+  ) {
+    return updateAttachmentValidity({
+      organizationId,
+      attachmentId,
+      validFrom: body.validFrom,
+      validUntil: body.validUntil,
+    });
   }
 }

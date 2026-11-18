@@ -1,4 +1,5 @@
 import type { Archiver } from 'archiver';
+import { attachmentValidInPeriod } from '../../attachments/attachment-validity';
 import {
   appendAttachmentToArchive,
   createFilenameTracker,
@@ -9,6 +10,8 @@ import {
   getAutomationHeaders,
   streamAutomationRuns,
 } from './evidence-data-loader';
+import type { AuditPeriod } from './framework-evidence-native-archive';
+import type { NormalizedEvidenceRun } from './evidence-export.types';
 import {
   generateAutomationPDFFromStream,
   generateTaskSummaryPDF,
@@ -22,17 +25,39 @@ export type TaskBundle = {
   attachments: TaskAttachment[];
 };
 
+/** True when `date` falls inside the (inclusive, day-granular) audit period. */
+export function inPeriod(date: Date | null, period: AuditPeriod): boolean {
+  if (!period.from && !period.to) return true;
+  if (!date) return false;
+  if (period.from && date < period.from) return false;
+  return !(period.to && date > period.to);
+}
+
+async function* runsInPeriod(
+  batches: AsyncIterable<NormalizedEvidenceRun[]>,
+  period: AuditPeriod,
+): AsyncGenerator<NormalizedEvidenceRun[]> {
+  for await (const batch of batches) {
+    const kept = batch.filter((run) => inPeriod(run.startedAt ?? run.completedAt, period));
+    if (kept.length > 0) yield kept;
+  }
+}
+
 export async function loadTaskBundle({
   organizationId,
   taskId,
+  period = {},
 }: {
   organizationId: string;
   taskId: string;
+  period?: AuditPeriod;
 }): Promise<TaskBundle> {
-  const [headers, attachments] = await Promise.all([
+  const [headers, allAttachments] = await Promise.all([
     getAutomationHeaders({ organizationId, taskId }),
     getTaskAttachments(organizationId, taskId),
   ]);
+  // A file counts when it was valid evidence at some point in the audit period.
+  const attachments = allAttachments.filter((a) => attachmentValidInPeriod(a, period));
 
   const automationPdfs: TaskBundle['automationPdfs'] = [];
   for (const header of headers.automations) {
@@ -42,7 +67,7 @@ export async function loadTaskBundle({
       pdf: await generateAutomationPDFFromStream(
         header,
         { organizationName: headers.organizationName, taskTitle: headers.taskTitle },
-        streamAutomationRuns({ taskId, header }),
+        runsInPeriod(streamAutomationRuns({ taskId, header }), period),
       ),
     });
   }

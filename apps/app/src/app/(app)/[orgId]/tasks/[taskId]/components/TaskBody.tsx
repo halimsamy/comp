@@ -14,6 +14,7 @@ import { Camera, FileIcon, FileText, ImageIcon, Loader2, Upload, X } from 'lucid
 import type React from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { AttachmentValidity } from './AttachmentValidity';
 
 interface TaskBodyProps {
   taskId: string;
@@ -372,6 +373,7 @@ export function TaskBody({
                     {uploadMonthYear && (
                       <span className="text-xs text-muted-foreground">({uploadMonthYear})</span>
                     )}
+                    <AttachmentValidity attachment={attachment} onChanged={refreshAttachments} />
                     <Button
                       variant="ghost"
                       size="icon"

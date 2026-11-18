@@ -19,6 +19,10 @@ export interface Attachment {
   organizationId: string;
   commentId: string | null;
   description: string | null;
+  /** Evidence validity; after validUntil the file needs an update. */
+  validFrom?: string | null;
+  validUntil?: string | null;
+  uploadedBy?: { name: string | null; email: string } | null;
 }
 
 export interface Task {

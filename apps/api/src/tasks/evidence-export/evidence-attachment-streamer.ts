@@ -17,7 +17,8 @@ const logger = new Logger('EvidenceAttachmentStreamer');
 export type TaskAttachment = Pick<
   Attachment,
   'id' | 'name' | 'url' | 'type' | 'createdAt'
->;
+> &
+  Partial<Pick<Attachment, 'validFrom' | 'validUntil'>>;
 
 /** Any S3 object to copy into the archive (`url` is the S3 key). */
 export type ArchivableFile = Pick<TaskAttachment, 'id' | 'name' | 'url'>;
@@ -43,6 +44,8 @@ export async function getTaskAttachments(
       url: true,
       type: true,
       createdAt: true,
+      validFrom: true,
+      validUntil: true,
     },
     orderBy: { createdAt: 'asc' },
   });
