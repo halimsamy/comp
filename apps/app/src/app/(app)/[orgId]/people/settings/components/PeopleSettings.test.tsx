@@ -11,6 +11,13 @@ vi.mock('@/lib/api-client', () => ({
     patch: (...args: unknown[]) => patchMock(...args),
   },
 }));
+// The checklist and training sections fetch their own data; this suite only covers the toggle.
+vi.mock('@/hooks/use-api-swr', () => ({
+  useApiSWR: () => ({ data: undefined, mutate: vi.fn() }),
+}));
+vi.mock('@/hooks/use-api', () => ({
+  useApi: () => ({ post: vi.fn(), patch: vi.fn(), delete: vi.fn() }),
+}));
 vi.mock('@/hooks/use-permissions', () => ({
   usePermissions: () => ({ hasPermission: () => true }),
 }));

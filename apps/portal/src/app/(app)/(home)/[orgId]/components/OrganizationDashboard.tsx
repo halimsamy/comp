@@ -1,4 +1,5 @@
 import { portalPolicySelect, portalPolicyWhere } from '@/lib/portal-policy-access';
+import { getPortalTrainingModules } from '@/lib/training-modules';
 import type { Device, Member, Organization, User } from '@db';
 import { db } from '@db/server';
 import { evidenceFormDefinitionList } from '@trycompai/company';
@@ -52,7 +53,7 @@ export async function OrganizationDashboard({
     },
   });
 
-  const [org, hipaaFramework] = await Promise.all([
+  const [org, hipaaFramework, trainingModules] = await Promise.all([
     db.organization.findUnique({
       where: { id: organizationId },
     }),
@@ -62,6 +63,12 @@ export async function OrganizationDashboard({
         framework: { name: 'HIPAA' },
       },
       select: { id: true },
+    }),
+    getPortalTrainingModules({
+      organizationId,
+      memberId: member.id,
+      role: member.role,
+      department: member.department,
     }),
   ]);
 
@@ -83,6 +90,7 @@ export async function OrganizationDashboard({
       whistleblowerReportEnabled={org.whistleblowerReportEnabled}
       accessRequestFormEnabled={org.accessRequestFormEnabled}
       hasHipaaFramework={!!hipaaFramework}
+      trainingModules={trainingModules}
       portalForms={portalForms}
     />
   );

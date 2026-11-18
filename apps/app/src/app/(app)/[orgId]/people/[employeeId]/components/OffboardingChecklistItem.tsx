@@ -20,6 +20,7 @@ import {
 } from '@trycompai/design-system/icons';
 import { useRef, useState } from 'react';
 import { AccessRevocationList } from './AccessRevocationList';
+import { ChecklistSlaBadges } from './ChecklistSlaBadges';
 
 interface OffboardingChecklistItemProps {
   item: ChecklistItem;
@@ -100,6 +101,7 @@ function ItemBadges({
           <Badge variant="outline">Evidence</Badge>
         </div>
       )}
+      <ChecklistSlaBadges item={item} />
     </>
   );
 }
@@ -229,7 +231,7 @@ export function OffboardingChecklistItem({
         <CollapsibleTrigger className="flex w-full items-center gap-2 px-3.5 py-3 text-left transition-colors hover:bg-muted/50">
           <ChecklistStatusCircle item={item} memberId={memberId} />
           <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <span className="text-sm font-normal">{item.title}</span>
               <ItemBadges item={item} />
             </div>

@@ -7,6 +7,7 @@ const mockMemberCreate = jest.fn();
 const mockMemberFindMany = jest.fn();
 const mockMemberUpdate = jest.fn();
 const mockOrgRoleFindMany = jest.fn();
+const mockSessionDeleteMany = jest.fn();
 
 jest.mock('@trycompai/auth', () => ({
   BUILT_IN_ROLE_PERMISSIONS: {
@@ -32,6 +33,9 @@ jest.mock('@db', () => ({
     },
     organizationRole: {
       findMany: (...args: unknown[]) => mockOrgRoleFindMany(...args),
+    },
+    session: {
+      deleteMany: (...args: unknown[]) => mockSessionDeleteMany(...args),
     },
   },
 }));
@@ -305,7 +309,7 @@ describe('GenericEmployeeSyncService role validation', () => {
       expect(mockMemberFindMany).toHaveBeenCalled();
       expect(mockMemberUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: 'mem_existing' },
+          where: { id: 'mem_existing', organizationId: 'org_1' },
           data: expect.objectContaining({
             deactivated: true,
             isActive: false,
@@ -437,12 +441,12 @@ describe('GenericEmployeeSyncService role validation', () => {
       // bob is still in the provider → must NOT be deactivated for being
       // outside the include subset.
       expect(mockMemberUpdate).not.toHaveBeenCalledWith(
-        expect.objectContaining({ where: { id: 'mem_bob' } }),
+        expect.objectContaining({ where: { id: 'mem_bob', organizationId: 'org_1' } }),
       );
       // carol is genuinely gone → still deactivated.
       expect(mockMemberUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: 'mem_carol' },
+          where: { id: 'mem_carol', organizationId: 'org_1' },
           data: expect.objectContaining({
             deactivated: true,
             isActive: false,

@@ -188,3 +188,34 @@ export async function notifyOwnerOfUnassignedItems({
     logger.error('Failed to send unassigned items notification:', emailError);
   }
 }
+
+/**
+ * The one way a member leaves an organization (manual removal and every HR
+ * sync path): marks them deactivated, stamps offboardDate so the offboarding
+ * checklist opens, and signs them out everywhere.
+ */
+export async function deactivateMember({
+  memberId,
+  organizationId,
+  userId,
+  offboardDate,
+  skipOffboarding = false,
+}: {
+  memberId: string;
+  organizationId: string;
+  userId: string;
+  offboardDate?: Date | null;
+  skipOffboarding?: boolean;
+}): Promise<void> {
+  await db.member.update({
+    where: { id: memberId, organizationId },
+    data: {
+      deactivated: true,
+      isActive: false,
+      offboardDate: skipOffboarding ? null : (offboardDate ?? new Date()),
+    },
+  });
+
+  // The API is the auth server; better-auth's revokeUserSessions does the same delete.
+  await db.session.deleteMany({ where: { userId } });
+}

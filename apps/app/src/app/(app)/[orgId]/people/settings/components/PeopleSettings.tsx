@@ -6,6 +6,7 @@ import { usePermissions } from '@/hooks/use-permissions';
 import { apiClient } from '@/lib/api-client';
 import { Section, Stack, Switch, Text } from '@trycompai/design-system';
 import { OffboardingChecklistSettings } from './OffboardingChecklistSettings';
+import { TrainingModulesSettings } from './TrainingModulesSettings';
 
 interface PeopleSettingsProps {
   backgroundCheckStepEnabled: boolean;
@@ -64,7 +65,9 @@ export function PeopleSettings({
           />
         </div>
       </Section>
+      <OffboardingChecklistSettings kind="onboarding" />
       <OffboardingChecklistSettings />
+      <TrainingModulesSettings />
     </Stack>
   );
 }

@@ -7,10 +7,11 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   Res,
   UseGuards,
 } from '@nestjs/common';
-import { ApiOperation, ApiParam, ApiSecurity, ApiTags } from '@nestjs/swagger';
+import { ApiBody, ApiOperation, ApiParam, ApiQuery, ApiSecurity, ApiTags } from '@nestjs/swagger';
 import { db } from '@db';
 import type { Response } from 'express';
 import { AuthContext, OrganizationId } from '../auth/auth-context.decorator';
@@ -62,10 +63,17 @@ export class OffboardingChecklistController {
   @ApiOperation({
     summary: 'Get the offboarding checklist template',
     description:
-      "Returns the organization's offboarding checklist template: the ordered set of items every departing member must complete during their offboarding.",
+      "Returns the organization's offboarding (default) or onboarding checklist template: the ordered items, due-day SLAs and auto-complete sources every member's checklist uses.",
   })
-  async getTemplate(@OrganizationId() organizationId: string) {
-    return this.offboardingChecklistService.getTemplate(organizationId);
+  @ApiQuery({ name: 'kind', required: false, enum: ['onboarding', 'offboarding'] })
+  async getTemplate(
+    @OrganizationId() organizationId: string,
+    @Query('kind') kind?: string,
+  ) {
+    return this.offboardingChecklistService.getTemplate(
+      organizationId,
+      kind === 'onboarding' ? 'onboarding' : 'offboarding',
+    );
   }
 
   @Post('template')
@@ -73,15 +81,18 @@ export class OffboardingChecklistController {
   @ApiOperation({
     summary: 'Add an offboarding checklist template item',
     description:
-      "Creates a new item in the organization's offboarding checklist template so it appears on every member's offboarding checklist from now on.",
+      "Creates an item in the organization's offboarding or onboarding (kind) checklist template, with an optional due-day SLA and auto-complete source, for every member's checklist.",
   })
+  @ApiBody({ type: CreateTemplateItemDto })
   async createTemplateItem(
     @OrganizationId() organizationId: string,
     @Body() dto: CreateTemplateItemDto,
   ) {
+    const { kind, ...item } = dto;
     return this.offboardingChecklistService.createTemplateItem(
       organizationId,
-      dto,
+      item,
+      kind ?? 'offboarding',
     );
   }
 
@@ -92,6 +103,7 @@ export class OffboardingChecklistController {
     description:
       "Updates an existing offboarding checklist template item by id, changing its label, description, or settings on the organization's offboarding template.",
   })
+  @ApiBody({ type: UpdateTemplateItemDto })
   async updateTemplateItem(
     @OrganizationId() organizationId: string,
     @Param('id') id: string,

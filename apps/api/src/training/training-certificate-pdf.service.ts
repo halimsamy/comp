@@ -77,6 +77,19 @@ export class TrainingCertificatePdfService {
     });
   }
 
+  /** Certificate for any training cycle (custom modules, past cycles). */
+  async generateCustomCertificatePdf(params: {
+    userName: string;
+    organizationName: string;
+    completedAt: Date;
+    title: string;
+  }): Promise<Buffer> {
+    return this.generateCertificatePdf({
+      ...params,
+      subtitle: `${params.title} program`,
+    });
+  }
+
   private async generateCertificatePdf(params: {
     userName: string;
     organizationName: string;

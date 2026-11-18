@@ -32,17 +32,29 @@ export interface ChecklistItem {
   completionId: string | null;
   notes: string | null;
   evidence: EvidenceAttachment[];
+  /** Onboarding/offboarding SLA fields (people-lifecycle endpoints). */
+  dueDate?: string | null;
+  overdue?: boolean;
+  autoCompleteSource?: string | null;
+  completedAutomatically?: boolean;
 }
 
 interface MemberChecklistResponse {
   items: ChecklistItem[];
   totalItems: number;
   completedItems: number;
+  overdueItems?: number;
+  startDate?: string | null;
 }
 
-export function useOffboardingChecklist(memberId: string) {
+/** Item mutations are kind-agnostic (keyed by template item), so onboarding reuses them. */
+export function useOffboardingChecklist(
+  memberId: string,
+  kind: 'onboarding' | 'offboarding' = 'offboarding',
+) {
   const api = useApi();
-  const endpoint = `/v1/offboarding-checklist/member/${memberId}`;
+  // People-lifecycle adds due dates, overdue flags and auto-completed items to the checklist.
+  const endpoint = `/v1/people-lifecycle/members/${memberId}/${kind}`;
 
   const { data, error, isLoading, mutate } = useApiSWR<MemberChecklistResponse>(endpoint);
   const checklist = data?.data ?? null;

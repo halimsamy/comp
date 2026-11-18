@@ -5,6 +5,7 @@ import type { Edge, Node } from '@xyflow/react';
 import { OrgChartEditor } from './OrgChartEditor';
 import { OrgChartEmptyState } from './OrgChartEmptyState';
 import { OrgChartImageView } from './OrgChartImageView';
+import { OrgChartSnapshots } from './OrgChartSnapshots';
 import type { OrgChartMember } from '../types';
 
 interface OrgChartData {
@@ -60,12 +61,15 @@ export function OrgChartContent({
   }
 
   return (
-    <OrgChartEditor
-      initialNodes={chartData.nodes}
-      initialEdges={chartData.edges}
-      members={members}
-      updatedAt={chartData.updatedAt ?? null}
-      onChartChange={onChartChange}
-    />
+    <div className="flex flex-col gap-6">
+      <OrgChartEditor
+        initialNodes={chartData.nodes}
+        initialEdges={chartData.edges}
+        members={members}
+        updatedAt={chartData.updatedAt ?? null}
+        onChartChange={onChartChange}
+      />
+      <OrgChartSnapshots name={chartData.name} nodes={chartData.nodes} edges={chartData.edges} />
+    </div>
   );
 }

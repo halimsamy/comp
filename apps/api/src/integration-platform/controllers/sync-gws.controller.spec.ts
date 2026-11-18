@@ -7,6 +7,7 @@ import { CredentialVaultService } from '../services/credential-vault.service';
 import { OAuthCredentialsService } from '../services/oauth-credentials.service';
 import { IntegrationSyncLoggerService } from '../services/integration-sync-logger.service';
 import { GenericEmployeeSyncService } from '../services/generic-employee-sync.service';
+import { GenericDeviceSyncService } from '../services/generic-device-sync.service';
 import { DynamicIntegrationRepository } from '../repositories/dynamic-integration.repository';
 import { CheckRunRepository } from '../repositories/check-run.repository';
 import { db } from '@db';
@@ -21,6 +22,7 @@ jest.mock('@db', () => ({
       create: jest.fn(),
       update: jest.fn(),
     },
+    session: { deleteMany: jest.fn() },
   },
 }));
 
@@ -104,6 +106,7 @@ describe('SyncController - Google Workspace employees', () => {
           useValue: { logSync: jest.fn() },
         },
         { provide: GenericEmployeeSyncService, useValue: {} },
+        { provide: GenericDeviceSyncService, useValue: {} },
         { provide: DynamicIntegrationRepository, useValue: {} },
         { provide: CheckRunRepository, useValue: {} },
       ],
@@ -306,7 +309,7 @@ describe('SyncController - Google Workspace employees', () => {
       expect(result.skipped).toBe(0);
       expect(mockedDb.member.update).toHaveBeenCalledWith({
         where: { id: 'mem_back' },
-        data: { deactivated: false, isActive: true },
+        data: { deactivated: false, isActive: true, offboardDate: null },
       });
     });
 
@@ -390,9 +393,10 @@ describe('SyncController - Google Workspace employees', () => {
       );
 
       expect(result.deactivated).toBe(1);
+      // Deactivation also opens offboarding and signs the user out (deactivateMember).
       expect(mockedDb.member.update).toHaveBeenCalledWith({
-        where: { id: 'mem_sus' },
-        data: { deactivated: true, isActive: false },
+        where: { id: 'mem_sus', organizationId: 'org_test123' },
+        data: { deactivated: true, isActive: false, offboardDate: expect.any(Date) },
       });
       const detail = result.details.find((d) => d.email === 'sus@example.com');
       expect(detail?.reason).toBe('User is suspended in Google Workspace');

@@ -1,5 +1,6 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsOptional, IsBoolean } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsString, IsNotEmpty, IsOptional, IsBoolean, IsIn, IsInt, Min, Max } from 'class-validator';
+import { CHECKLIST_AUTO_SOURCES, type ChecklistAutoSource } from '../default-checklist-items';
 
 export class CreateTemplateItemDto {
   @ApiProperty({
@@ -22,4 +23,30 @@ export class CreateTemplateItemDto {
   @IsOptional()
   @IsBoolean()
   evidenceRequired?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Checklist the item belongs to. Defaults to offboarding.',
+    enum: ['onboarding', 'offboarding'],
+  })
+  @IsOptional()
+  @IsIn(['onboarding', 'offboarding'])
+  kind?: 'onboarding' | 'offboarding';
+
+  @ApiPropertyOptional({
+    description: 'SLA: days after the start date (onboarding) or offboard date the item is due',
+    example: 30,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(365)
+  dueDays?: number;
+
+  @ApiPropertyOptional({
+    description: 'Complete the item automatically from platform data',
+    enum: CHECKLIST_AUTO_SOURCES,
+  })
+  @IsOptional()
+  @IsIn(CHECKLIST_AUTO_SOURCES)
+  autoCompleteSource?: ChecklistAutoSource;
 }

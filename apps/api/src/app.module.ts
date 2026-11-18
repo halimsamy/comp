@@ -43,11 +43,15 @@ import { BrowserbaseModule } from './browserbase/browserbase.module';
 import { TaskManagementModule } from './task-management/task-management.module';
 import { AssistantChatModule } from './assistant-chat/assistant-chat.module';
 import { OrgChartModule } from './org-chart/org-chart.module';
+import { OnboardingModule } from './onboarding/onboarding.module';
+import { OverviewModule } from './overview/overview.module';
+import { SearchModule } from './search/search.module';
 import { TrainingModule } from './training/training.module';
 import { EvidenceFormsModule } from './evidence-forms/evidence-forms.module';
 import { FrameworksModule } from './frameworks/frameworks.module';
 import { FrameworkVersionsModule } from './framework-editor-versions/framework-versions.module';
 import { AuditModule } from './audit/audit.module';
+import { SecuritySettingsModule } from './security-settings/security-settings.module';
 import { ControlsModule } from './controls/controls.module';
 import { RolesModule } from './roles/roles.module';
 import { McpModule } from './mcp/mcp.module';
@@ -62,6 +66,10 @@ import { TimelinesModule } from './timelines/timelines.module';
 import { BackgroundChecksModule } from './background-checks/background-checks.module';
 import { BillingModule } from './billing/billing.module';
 import { OffboardingChecklistModule } from './offboarding-checklist/offboarding-checklist.module';
+import { PeopleLifecycleModule } from './people-lifecycle/people-lifecycle.module';
+import { AccessReviewsModule } from './access-reviews/access-reviews.module';
+import { AuditsModule } from './audits/audits.module';
+import { AssetsModule } from './assets/assets.module';
 import { JobRunsModule } from './job-runs/job-runs.module';
 
 @Module({
@@ -119,11 +127,15 @@ import { JobRunsModule } from './job-runs/job-runs.module';
     AssistantChatModule,
     TrainingModule,
     OrgChartModule,
+    OnboardingModule,
+    OverviewModule,
+    SearchModule,
     EvidenceFormsModule,
     FrameworksModule,
     FrameworkVersionsModule,
     RolesModule,
     AuditModule,
+    SecuritySettingsModule,
     ControlsModule,
     EmailModule,
     SecretsModule,
@@ -135,6 +147,10 @@ import { JobRunsModule } from './job-runs/job-runs.module';
     AdminFeatureFlagsModule,
     TimelinesModule,
     OffboardingChecklistModule,
+    PeopleLifecycleModule,
+    AccessReviewsModule,
+    AuditsModule,
+    AssetsModule,
     JobRunsModule,
     McpModule,
     McpDownloadModule,

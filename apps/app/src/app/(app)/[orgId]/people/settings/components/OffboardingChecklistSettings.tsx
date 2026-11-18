@@ -33,16 +33,34 @@ interface TemplateItem {
   sortOrder: number;
   isDefault: boolean;
   isEnabled: boolean;
+  dueDays?: number | null;
+  autoCompleteSource?: string | null;
 }
+
+type ChecklistKind = 'onboarding' | 'offboarding';
 
 const TEMPLATE_ENDPOINT = '/v1/offboarding-checklist/template';
 
-export function OffboardingChecklistSettings() {
+const KIND_COPY: Record<ChecklistKind, { title: string; description: string; dueFrom: string }> = {
+  offboarding: {
+    title: 'Offboarding checklist',
+    description: 'Configure the default checklist items for employee offboarding.',
+    dueFrom: 'offboard date',
+  },
+  onboarding: {
+    title: 'Onboarding checklist',
+    description:
+      'Items every new hire completes, with a due date counted from their start date. Automatic items complete themselves from policies, training, device and background check status.',
+    dueFrom: 'start date',
+  },
+};
+
+export function OffboardingChecklistSettings({ kind = 'offboarding' }: { kind?: ChecklistKind }) {
   const { hasPermission } = usePermissions();
   const canUpdate = hasPermission('organization', 'update');
   const { post, patch, delete: deleteReq } = useApi();
 
-  const { data, mutate } = useApiSWR<TemplateItem[]>(TEMPLATE_ENDPOINT);
+  const { data, mutate } = useApiSWR<TemplateItem[]>(`${TEMPLATE_ENDPOINT}?kind=${kind}`);
   const items = Array.isArray(data?.data) ? data.data : [];
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -147,11 +165,11 @@ export function OffboardingChecklistSettings() {
   };
 
   return (
-    <Section title="Offboarding checklist">
+    <Section title={KIND_COPY[kind].title}>
       <Stack gap="md">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Text size="sm" variant="muted">
-            Configure the default checklist items for employee offboarding.
+            {KIND_COPY[kind].description}
           </Text>
           {canUpdate && (
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -160,6 +178,7 @@ export function OffboardingChecklistSettings() {
                 Add item
               </DialogTrigger>
               <AddChecklistItemDialog
+                kind={kind}
                 onCreated={() => {
                   setDialogOpen(false);
                   mutate();
@@ -181,6 +200,7 @@ export function OffboardingChecklistSettings() {
               <ChecklistItemCard
                 key={item.id}
                 item={item}
+                dueFrom={KIND_COPY[kind].dueFrom}
                 canUpdate={canUpdate}
                 onToggleEnabled={handleToggleEnabled}
                 onToggleEvidence={handleToggleEvidence}
@@ -196,12 +216,14 @@ export function OffboardingChecklistSettings() {
 
 function ChecklistItemCard({
   item,
+  dueFrom,
   canUpdate,
   onToggleEnabled,
   onToggleEvidence,
   onDelete,
 }: {
   item: TemplateItem;
+  dueFrom: string;
   canUpdate: boolean;
   onToggleEnabled: (args: { item: TemplateItem; next: boolean }) => void;
   onToggleEvidence: (args: { item: TemplateItem; next: boolean }) => void;
@@ -217,7 +239,15 @@ function ChecklistItemCard({
               Default
             </div>
           )}
+          {item.autoCompleteSource && (
+            <div className="rounded bg-primary/10 px-1.5 py-0.5 text-xs text-primary">Automatic</div>
+          )}
         </HStack>
+        {item.dueDays !== null && item.dueDays !== undefined && (
+          <Text size="xs" variant="muted">
+            Due {item.dueDays === 0 ? 'on' : `${item.dueDays} days after`} the {dueFrom}
+          </Text>
+        )}
         {item.description ? (
           <Text size="sm" variant="muted">
             {item.description}
@@ -265,14 +295,17 @@ function ChecklistItemCard({
 }
 
 function AddChecklistItemDialog({
+  kind,
   onCreated,
 }: {
+  kind: ChecklistKind;
   onCreated: () => void;
 }) {
   const { post } = useApi();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [evidenceRequired, setEvidenceRequired] = useState(false);
+  const [dueDays, setDueDays] = useState('');
   const [saving, setSaving] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -285,6 +318,8 @@ function AddChecklistItemDialog({
       title: title.trim(),
       description: description.trim() || undefined,
       evidenceRequired,
+      kind,
+      ...(dueDays.trim() ? { dueDays: Number(dueDays) } : {}),
     });
 
     setSaving(false);
@@ -298,6 +333,7 @@ function AddChecklistItemDialog({
     setTitle('');
     setDescription('');
     setEvidenceRequired(false);
+    setDueDays('');
     onCreated();
   };
 
@@ -326,6 +362,18 @@ function AddChecklistItemDialog({
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Optional details about this checklist item"
               rows={3}
+            />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="checklist-due-days">Due within (days)</Label>
+            <Input
+              id="checklist-due-days"
+              type="number"
+              min={0}
+              max={365}
+              value={dueDays}
+              onChange={(e) => setDueDays(e.target.value)}
+              placeholder="Optional, e.g. 30"
             />
           </div>
           <HStack gap="sm">

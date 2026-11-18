@@ -21,11 +21,18 @@ import { EmployeePageHeader } from './EmployeePageHeader';
 import { EmployeeAccess } from './EmployeeAccess';
 import { EmployeePolicies } from './EmployeePolicies';
 import { EmployeeHipaaTraining, EmployeeTrainingVideos } from './EmployeeTraining';
+import { EmploymentDocuments } from './EmploymentDocuments';
+import { MemberComplianceOverview } from './MemberComplianceOverview';
+import { MemberKeyDates } from './MemberKeyDates';
+import { MemberTrainingHistory } from './MemberTrainingHistory';
+import { OnboardingChecklist } from './OnboardingChecklist';
 import { isAuditorOnly } from './isAuditorOnly';
 import { OffboardingChecklist } from './OffboardingChecklist';
 
 type EmployeeTab =
+  | 'overview'
   | 'details'
+  | 'onboarding'
   | 'policies'
   | 'training'
   | 'hipaa'
@@ -82,7 +89,9 @@ export function Employee({
   const showBackgroundCheck = backgroundCheckStepEnabled && !isAuditorOnly(employee.role);
 
   const availableTabs: EmployeeTab[] = [
+    'overview',
     'details',
+    'onboarding',
     'policies',
     'training',
     ...(hasHipaaFramework ? (['hipaa'] as EmployeeTab[]) : []),
@@ -103,7 +112,7 @@ export function Employee({
     if (tabParam && availableTabs.includes(tabParam as EmployeeTab)) {
       return tabParam as EmployeeTab;
     }
-    return 'details';
+    return 'overview';
   };
 
   const activeTab = resolveTab();
@@ -111,7 +120,7 @@ export function Employee({
   const handleTabChange = useCallback(
     (value: string) => {
       const params = new URLSearchParams(searchParams.toString());
-      if (value === 'details') {
+      if (value === 'overview') {
         params.delete('tab');
       } else {
         params.set('tab', value);
@@ -151,30 +160,50 @@ export function Employee({
         }}
       >
         <Stack gap="4">
-          <TabsList variant="underline">
-            <TabsTrigger value="details">Details</TabsTrigger>
-            <TabsTrigger value="policies">Policies</TabsTrigger>
-            <TabsTrigger value="training">Training Videos</TabsTrigger>
-            {hasHipaaFramework && <TabsTrigger value="hipaa">HIPAA Training</TabsTrigger>}
-            <TabsTrigger value="device">Device</TabsTrigger>
-            <TabsTrigger value="access">Access</TabsTrigger>
-            {showBackgroundCheck && (
-              <TabsTrigger value="background-check">Background Check</TabsTrigger>
-            )}
-            {employee.offboardDate && <TabsTrigger value="offboarding">Offboarding</TabsTrigger>}
-          </TabsList>
+          <div className="overflow-x-auto">
+            <TabsList variant="underline">
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="details">Details</TabsTrigger>
+              <TabsTrigger value="onboarding">Onboarding</TabsTrigger>
+              <TabsTrigger value="policies">Policies</TabsTrigger>
+              <TabsTrigger value="training">Training</TabsTrigger>
+              {hasHipaaFramework && <TabsTrigger value="hipaa">HIPAA Training</TabsTrigger>}
+              <TabsTrigger value="device">Device</TabsTrigger>
+              <TabsTrigger value="access">Access</TabsTrigger>
+              {showBackgroundCheck && (
+                <TabsTrigger value="background-check">Background Check</TabsTrigger>
+              )}
+              {employee.offboardDate && <TabsTrigger value="offboarding">Offboarding</TabsTrigger>}
+            </TabsList>
+          </div>
+          <TabsContent value="overview">
+            <MemberComplianceOverview
+              memberId={employee.id}
+              availableTabs={availableTabs}
+              onOpenTab={handleTabChange}
+            />
+          </TabsContent>
           <TabsContent value="details">
-            <EmployeeDetails employee={employee} canEdit={canEdit} />
+            <Stack gap="4">
+              <MemberKeyDates memberId={employee.id} />
+              <EmployeeDetails employee={employee} canEdit={canEdit} />
+            </Stack>
+          </TabsContent>
+          <TabsContent value="onboarding">
+            <OnboardingChecklist memberId={employee.id} canEdit={canEdit} />
           </TabsContent>
           <TabsContent value="policies">
             <EmployeePolicies employee={employee} policies={policies} />
           </TabsContent>
           <TabsContent value="training">
-            <EmployeeTrainingVideos
-              employee={employee}
-              trainingVideos={trainingVideos}
-              organization={organization}
-            />
+            <Stack gap="6">
+              <EmployeeTrainingVideos
+                employee={employee}
+                trainingVideos={trainingVideos}
+                organization={organization}
+              />
+              <MemberTrainingHistory memberId={employee.id} />
+            </Stack>
           </TabsContent>
           {hasHipaaFramework && (
             <TabsContent value="hipaa">
@@ -198,11 +227,14 @@ export function Employee({
           </TabsContent>
           {employee.offboardDate && (
             <TabsContent value="offboarding">
-              <OffboardingChecklist
-                memberId={employee.id}
-                canEdit={canEdit}
-                offboardDate={employee.offboardDate?.toISOString() ?? ''}
-              />
+              <Stack gap="6">
+                <OffboardingChecklist
+                  memberId={employee.id}
+                  canEdit={canEdit}
+                  offboardDate={employee.offboardDate?.toISOString() ?? ''}
+                />
+                <EmploymentDocuments memberId={employee.id} eventType="offboard" canEdit={canEdit} />
+              </Stack>
             </TabsContent>
           )}
           {showBackgroundCheck && (

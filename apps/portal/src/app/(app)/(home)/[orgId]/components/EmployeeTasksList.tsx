@@ -4,15 +4,18 @@ import { useTrainingCompletions } from '@/hooks/use-training-completions';
 import { HIPAA_TRAINING_ID } from '@/lib/data/hipaa-training-content';
 import { trainingVideos } from '@/lib/data/training-videos';
 import type { PortalPolicy } from '@/lib/portal-policy-types';
+import type { PortalTrainingModule } from '@/lib/training-modules';
 import type { Device, EmployeeTrainingVideoCompletion, Member } from '@db';
 import { Accordion, Button } from '@trycompai/design-system';
 import Link from 'next/link';
+import { useState } from 'react';
 import useSWR from 'swr';
 import type { FleetPolicy, Host } from '../types';
 import { DeviceAgentAccordionItem } from './tasks/DeviceAgentAccordionItem';
 import { GeneralTrainingAccordionItem } from './tasks/GeneralTrainingAccordionItem';
 import { HipaaTrainingAccordionItem } from './tasks/HipaaTrainingAccordionItem';
 import { PoliciesAccordionItem } from './tasks/PoliciesAccordionItem';
+import { RoleTrainingAccordionItem } from './tasks/RoleTrainingAccordionItem';
 
 interface PortalForm {
   type: string;
@@ -34,6 +37,7 @@ interface EmployeeTasksListProps {
   whistleblowerReportEnabled: boolean;
   accessRequestFormEnabled: boolean;
   portalForms: PortalForm[];
+  trainingModules: PortalTrainingModule[];
 }
 
 export const EmployeeTasksList = ({
@@ -50,7 +54,9 @@ export const EmployeeTasksList = ({
   whistleblowerReportEnabled,
   accessRequestFormEnabled,
   portalForms,
+  trainingModules: initialTrainingModules,
 }: EmployeeTasksListProps) => {
+  const [trainingModules, setTrainingModules] = useState(initialTrainingModules);
   const { completions: trainingCompletions } = useTrainingCompletions({
     fallbackData: trainingVideoCompletions,
   });
@@ -94,6 +100,10 @@ export const EmployeeTasksList = ({
     return null;
   }
 
+  const handleModuleCompleted = (updated: PortalTrainingModule) =>
+    setTrainingModules((current) => current.map((m) => (m.id === updated.id ? updated : m)));
+  const hasCompletedRoleTraining = trainingModules.every((m) => m.isCurrent);
+
   const sortedAgentDevices = [...(agentDeviceResponse?.devices ?? [])].sort((a, b) => {
     if (!a.lastCheckIn && !b.lastCheckIn) return 0;
     if (!a.lastCheckIn) return 1;
@@ -136,6 +146,7 @@ export const EmployeeTasksList = ({
     ...(deviceAgentStepEnabled ? [hasCompletedDeviceSetup] : []),
     ...(securityTrainingStepEnabled ? [hasCompletedGeneralTraining] : []),
     ...(hasHipaaFramework ? [hasCompletedHipaaTraining] : []),
+    ...(trainingModules.length > 0 ? [hasCompletedRoleTraining] : []),
   ].filter(Boolean).length;
 
   const accordionItems = [
@@ -173,6 +184,20 @@ export const EmployeeTasksList = ({
           {
             title: 'Complete HIPAA security awareness training',
             content: <HipaaTrainingAccordionItem />,
+          },
+        ]
+      : []),
+    ...(trainingModules.length > 0
+      ? [
+          {
+            title: 'Complete role-based training',
+            content: (
+              <RoleTrainingAccordionItem
+                organizationId={organizationId}
+                modules={trainingModules}
+                onCompleted={handleModuleCompleted}
+              />
+            ),
           },
         ]
       : []),
@@ -214,13 +239,13 @@ export const EmployeeTasksList = ({
           {visiblePortalForms.map((form) => (
             <div
               key={form.type}
-              className="flex items-center justify-between rounded-md border border-border p-3"
+              className="flex flex-col gap-3 rounded-md border border-border p-3 sm:flex-row sm:items-center sm:justify-between"
             >
-              <div>
+              <div className="min-w-0">
                 <span className="text-sm font-medium">{form.title}</span>
                 <p className="text-xs text-muted-foreground">{form.description}</p>
               </div>
-              <div className="flex items-center gap-2 shrink-0 ml-4">
+              <div className="flex items-center gap-2 shrink-0 sm:ml-4">
                 {form.type === 'access-request' && (
                   <Link href={`/${organizationId}/documents/${form.type}/submissions`}>
                     <Button variant="ghost">My requests</Button>

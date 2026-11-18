@@ -24,6 +24,7 @@ import { RequirePermission } from '../../auth/require-permission.decorator';
 import { OrganizationId, AuthContext } from '../../auth/auth-context.decorator';
 import type { AuthContext as AuthContextType } from '../../auth/types';
 import { db } from '@db';
+import { deactivateMember } from '../../people/utils/member-deactivation';
 import type { Prisma } from '@db';
 import { ConnectionRepository } from '../repositories/connection.repository';
 import { CredentialVaultService } from '../services/credential-vault.service';
@@ -532,9 +533,11 @@ export class SyncController {
 
       if (isExcluded) {
         try {
-          await db.member.update({
-            where: { id: member.id },
-            data: { deactivated: true, isActive: false },
+          await deactivateMember({
+            memberId: member.id,
+            organizationId,
+            userId: member.userId,
+            offboardDate: member.offboardDate,
           });
           results.deactivated++;
           results.details.push({
@@ -556,9 +559,11 @@ export class SyncController {
 
       if (isSuspended || isDeleted) {
         try {
-          await db.member.update({
-            where: { id: member.id },
-            data: { deactivated: true, isActive: false },
+          await deactivateMember({
+            memberId: member.id,
+            organizationId,
+            userId: member.userId,
+            offboardDate: member.offboardDate,
           });
           results.deactivated++;
           results.details.push({
@@ -984,9 +989,11 @@ export class SyncController {
           ? 'Employee is inactive in Rippling'
           : 'Employee was removed from Rippling';
 
-        await db.member.update({
-          where: { id: member.id },
-          data: { deactivated: true, isActive: false },
+        await deactivateMember({
+          memberId: member.id,
+          organizationId,
+          userId: member.userId,
+          offboardDate: member.offboardDate,
         });
         results.deactivated++;
         results.details.push({
@@ -1531,9 +1538,11 @@ export class SyncController {
 
       if (isSuspended || isDeleted) {
         try {
-          await db.member.update({
-            where: { id: member.id },
-            data: { deactivated: true, isActive: false },
+          await deactivateMember({
+            memberId: member.id,
+            organizationId,
+            userId: member.userId,
+            offboardDate: member.offboardDate,
           });
           results.deactivated++;
           results.details.push({
