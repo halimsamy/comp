@@ -12,8 +12,8 @@ import {
   TableRow,
   Text,
 } from '@trycompai/design-system';
-import { formatDay, mfaLabel, ownerLabel } from '../lib/access-labels';
-import { AccessFlagBadges } from './AccessFlagBadges';
+import { formatDay, ownerLabel } from '../lib/access-labels';
+import { AccessFlagBadges, MfaCell } from './AccessFlagBadges';
 
 /** One system's accounts: owner, roles, MFA, last login, status and pre-flags. */
 export function AccountsTable({
@@ -70,7 +70,9 @@ export function AccountsTable({
                 <Text size="sm">{account.roles.join(', ') || '—'}</Text>
               </div>
             </TableCell>
-            <TableCell>{mfaLabel(account.mfaEnabled)}</TableCell>
+            <TableCell>
+              <MfaCell value={account.mfaEnabled} />
+            </TableCell>
             <TableCell>
               <span className="whitespace-nowrap">{formatDay(account.lastLoginAt)}</span>
             </TableCell>

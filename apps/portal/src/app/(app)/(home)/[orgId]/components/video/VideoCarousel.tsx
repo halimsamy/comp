@@ -1,13 +1,18 @@
 'use client';
 
 import { trainingVideos } from '@/lib/data/training-videos';
-import { useTrainingCompletions } from '@/hooks/use-training-completions';
+import type { EmployeeTrainingVideoCompletion } from '@db';
 import { useState } from 'react';
 import { CarouselControls } from './CarouselControls';
 import { YoutubeEmbed } from './YoutubeEmbed';
 
-export function VideoCarousel() {
-  const { completions, markVideoComplete } = useTrainingCompletions();
+export function VideoCarousel({
+  completions,
+  onMarkComplete,
+}: {
+  completions: EmployeeTrainingVideoCompletion[];
+  onMarkComplete: (videoId: string) => Promise<void>;
+}) {
   const [isExecuting, setIsExecuting] = useState(false);
 
   const completionRecordsMap = new Map(
@@ -57,7 +62,7 @@ export function VideoCarousel() {
 
     setIsExecuting(true);
     try {
-      await markVideoComplete(currentVideo.id);
+      await onMarkComplete(currentVideo.id);
     } finally {
       setIsExecuting(false);
     }

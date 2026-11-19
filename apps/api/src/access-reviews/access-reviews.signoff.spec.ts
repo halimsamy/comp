@@ -13,6 +13,7 @@ jest.mock('@db', () => ({
       update: jest.fn(),
       updateMany: jest.fn(),
     },
+    attachment: { findMany: jest.fn().mockResolvedValue([]) },
     $transaction: jest.fn(),
   },
 }));
@@ -24,6 +25,7 @@ import {
 } from '@nestjs/common';
 import { db } from '@db';
 import type { AccessAccountsService } from './access-accounts.service';
+import type { AttachmentsService } from '../attachments/attachments.service';
 import type { AccessReviewEvidenceService } from './access-review-evidence.service';
 import { AccessReviewsService } from './access-reviews.service';
 
@@ -33,9 +35,11 @@ const ORG = 'org_1';
 describe('AccessReviewsService remediation and sign-off', () => {
   const accounts = { getSystemAccounts: jest.fn() };
   const evidence = { attachToTask: jest.fn() };
+  const attachments = { uploadAttachment: jest.fn() };
   const service = new AccessReviewsService(
     accounts as unknown as AccessAccountsService,
     evidence as unknown as AccessReviewEvidenceService,
+    attachments as unknown as AttachmentsService,
   );
   const tx = {
     accessReview: { create: jest.fn() },
@@ -48,6 +52,7 @@ describe('AccessReviewsService remediation and sign-off', () => {
     mocked(db.$transaction).mockImplementation(
       (fn: (t: typeof tx) => unknown) => fn(tx),
     );
+    mocked(db.accessReviewItem.findFirst).mockResolvedValue(null);
     mocked(db.member.findFirst).mockResolvedValue({
       user: { name: 'Admin', email: 'a@x.com' },
     });
@@ -69,11 +74,12 @@ describe('AccessReviewsService remediation and sign-off', () => {
           organizationId: ORG,
           id: 'arv_1',
           itemId: 'ari_1',
+          dto: {},
         }),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
-    it('marks a revoke as done', async () => {
+    it('marks a revoke as done with a ticket link and a proof file (#90)', async () => {
       mocked(db.accessReviewItem.findFirst).mockResolvedValue({
         decision: 'revoke',
       });
@@ -81,11 +87,29 @@ describe('AccessReviewsService remediation and sign-off', () => {
         organizationId: ORG,
         id: 'arv_1',
         itemId: 'ari_1',
-        note: ' JIRA-1 ',
+        userId: 'usr_1',
+        dto: {
+          note: ' JIRA-1 ',
+          url: 'https://jira.acme.com/browse/JIRA-1',
+          fileName: 'proof.png',
+          fileType: 'image/png',
+          fileData: 'aGk=',
+        },
       });
+      expect(attachments.uploadAttachment).toHaveBeenCalledWith(
+        ORG,
+        'ari_1',
+        'access_review_item',
+        expect.objectContaining({ fileName: 'proof.png' }),
+        'usr_1',
+      );
       expect(db.accessReviewItem.update).toHaveBeenCalledWith({
         where: { id: 'ari_1' },
-        data: { remediatedAt: expect.any(Date), remediationNote: 'JIRA-1' },
+        data: {
+          remediatedAt: expect.any(Date),
+          remediationNote: 'JIRA-1',
+          remediationUrl: 'https://jira.acme.com/browse/JIRA-1',
+        },
       });
     });
   });
@@ -144,6 +168,21 @@ describe('AccessReviewsService remediation and sign-off', () => {
           userId: 'usr_1',
         }),
       );
+    });
+
+    it('403s when the caller started the review (#80)', async () => {
+      mocked(db.accessReview.findFirst).mockResolvedValue({
+        id: 'arv_1',
+        status: 'in_progress',
+        createdById: 'mem_admin',
+      });
+      await expect(signOff()).rejects.toBeInstanceOf(ForbiddenException);
+      expect(db.accessReview.update).not.toHaveBeenCalled();
+    });
+
+    it('403s when the caller owns an account in the review (#80)', async () => {
+      mocked(db.accessReviewItem.findFirst).mockResolvedValue({ id: 'ari_mine' });
+      await expect(signOff()).rejects.toThrow('Another manager must sign off');
     });
 
     it('keeps the sign-off when attaching the report fails', async () => {

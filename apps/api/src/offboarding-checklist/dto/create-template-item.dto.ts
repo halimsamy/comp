@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsOptional, IsBoolean, IsIn, IsInt, Min, Max } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsBoolean, IsIn, IsInt, Min, Max, IsArray, ArrayMaxSize } from 'class-validator';
 import { CHECKLIST_AUTO_SOURCES, type ChecklistAutoSource } from '../default-checklist-items';
 
 export class CreateTemplateItemDto {
@@ -49,4 +49,24 @@ export class CreateTemplateItemDto {
   @IsOptional()
   @IsIn(CHECKLIST_AUTO_SOURCES)
   autoCompleteSource?: ChecklistAutoSource;
+
+  @ApiPropertyOptional({
+    description: 'Member roles the item applies to; empty means everyone',
+    type: [String],
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50)
+  @IsString({ each: true })
+  appliesToRoles?: string[];
+
+  @ApiPropertyOptional({
+    description: 'Departments the item applies to; empty means every department',
+    type: [String],
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50)
+  @IsString({ each: true })
+  appliesToDepartments?: string[];
 }

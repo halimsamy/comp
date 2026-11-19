@@ -34,7 +34,24 @@ model TrainingCompletionRecord {
   moduleId       String
   completedAt    DateTime     @default(now())
   expiresAt      DateTime
+  // When the member opened the module content before completing it (portal).
+  openedAt       DateTime?
+  // Certificate or sign-in sheet for training recorded by an admin.
+  attachmentId   String?
+  // portal | admin | import
+  source         String       @default("portal")
 
   @@index([organizationId])
   @@index([memberId, moduleId])
+}
+
+// "Your security tasks" reminder email per member (off | weekly | daily).
+model EmployeeReminderSetting {
+  id             String       @id @default(dbgenerated("generate_prefixed_cuid('ers'::text)"))
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  frequency      String       @default("weekly")
+  lastSentAt     DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 }

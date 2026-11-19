@@ -3,7 +3,8 @@
 import type { EmployeeTrainingVideoCompletion } from '@db';
 import { Button, Spinner } from '@trycompai/design-system';
 import { ArrowRight, Checkmark } from '@trycompai/design-system/icons';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { useVideoEnded } from './use-video-ended';
 
 // Define our own TrainingVideo interface since we can't find the import
 interface TrainingVideo {
@@ -38,10 +39,8 @@ export function YoutubeEmbed({
   isMarkingComplete,
 }: YoutubeEmbedProps) {
   const [isRewatching, setIsRewatching] = useState(false);
-
-  const handleVideoEnded = () => {
-    setIsRewatching(false);
-  };
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const ended = useVideoEnded({ iframeRef, videoId: video.id });
 
   return (
     <div className="space-y-4">
@@ -50,7 +49,8 @@ export function YoutubeEmbed({
           <Button
             variant={isCompleted ? 'secondary' : 'default'}
             onClick={onComplete}
-            disabled={isCompleted}
+            disabled={isCompleted || !ended || isMarkingComplete}
+            title={!isCompleted && !ended ? 'Watch the video to the end to complete it' : undefined}
           >
             {isMarkingComplete ? (
               <>
@@ -60,7 +60,7 @@ export function YoutubeEmbed({
             ) : (
               <>
                 <Checkmark size={16} />
-                {isCompleted ? 'Completed' : 'Mark as Complete'}
+                {isCompleted ? 'Completed' : ended ? 'Mark as Complete' : 'Watch to the end to complete'}
               </>
             )}
           </Button>
@@ -87,12 +87,13 @@ export function YoutubeEmbed({
           </div>
         )}
         <iframe
+          key={video.id}
+          ref={iframeRef}
           className="h-full w-full"
           src={`https://www.youtube.com/embed/${video.youtubeId}?enablejsapi=1`}
           title={video.title}
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowFullScreen
-          onEnded={handleVideoEnded}
         />
       </div>
     </div>

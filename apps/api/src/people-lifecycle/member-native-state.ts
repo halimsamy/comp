@@ -5,14 +5,11 @@ import {
   HIPAA_TRAINING_ID,
   hipaaFrameworkInstanceWhere,
 } from '@trycompai/company';
-import type { TrainingModulesService } from '../training/training-modules.service';
+import { moduleStatuses } from './native-state-modules';
 
-const COMPLETED_BACKGROUND_CHECK: BackgroundCheckStatus[] = [
-  BackgroundCheckStatus.completed,
-  BackgroundCheckStatus.completed_with_flags,
-];
+const COMPLETED_BACKGROUND_CHECK: BackgroundCheckStatus[] = ['completed', 'completed_with_flags'];
 
-function isAuditorOnly(role: string): boolean {
+export function isAuditorOnly(role: string): boolean {
   const roles = role
     .split(',')
     .map((r) => r.trim())
@@ -32,130 +29,138 @@ function earliest(dates: (Date | null)[]): Date | null {
   return new Date(Math.min(...valid.map((d) => d.getTime())));
 }
 
-/** Everything the platform already knows about one member's people-security obligations. */
-export async function getMemberNativeState({
+const TRAINING_IDS = [...GENERAL_TRAINING_VIDEO_IDS, HIPAA_TRAINING_ID];
+
+/**
+ * Everything the platform already knows about members' people-security
+ * obligations, loaded in a fixed number of queries for any number of members.
+ * The single source for the member page, the People table and the overview.
+ */
+export async function loadNativeStates({
   organizationId,
-  memberId,
-  trainingModulesService,
+  memberIds,
+  now = new Date(),
 }: {
   organizationId: string;
-  memberId: string;
-  trainingModulesService: TrainingModulesService;
+  /** Omit for every member of the organization. */
+  memberIds?: string[];
+  now?: Date;
 }) {
-  const member = await db.member.findFirst({
-    where: { id: memberId, organizationId },
+  const members = await db.member.findMany({
+    where: { organizationId, ...(memberIds && { id: { in: memberIds } }) },
     include: {
-      user: { select: { name: true, email: true } },
-      organization: {
-        select: {
-          securityTrainingStepEnabled: true,
-          deviceAgentStepEnabled: true,
-          backgroundCheckStepEnabled: true,
-        },
-      },
+      user: { select: { name: true, email: true, role: true } },
       backgroundCheckRequests: {
         select: { status: true, completedAt: true },
         orderBy: { createdAt: 'desc' },
         take: 1,
       },
     },
+    orderBy: { createdAt: 'asc' },
   });
-  if (!member) throw new NotFoundException('Member not found');
-
-  const [policies, videos, devices, hipaa, modules, expiredCycle] = await Promise.all([
-    db.policy.findMany({
-      where: {
-        organizationId,
-        status: 'published',
-        isRequiredToSign: true,
-        isArchived: false,
-        OR: [
-          { visibility: 'ALL' },
-          { visibility: 'DEPARTMENT', visibleToDepartments: { has: member.department } },
-        ],
+  const ids = members.map((m) => m.id);
+  const [org, policies, videos, devices, hipaa, modules, expiredCycles] = await Promise.all([
+    db.organization.findUnique({
+      where: { id: organizationId },
+      select: {
+        securityTrainingStepEnabled: true,
+        deviceAgentStepEnabled: true,
+        backgroundCheckStepEnabled: true,
       },
-      select: { id: true, name: true, signedBy: true },
+    }),
+    db.policy.findMany({
+      where: { organizationId, status: 'published', isRequiredToSign: true, isArchived: false },
+      select: { id: true, name: true, signedBy: true, visibility: true, visibleToDepartments: true },
       orderBy: { name: 'asc' },
     }),
     db.employeeTrainingVideoCompletion.findMany({
-      where: { memberId, completedAt: { not: null } },
-      select: { videoId: true, completedAt: true },
+      where: { memberId: { in: ids }, completedAt: { not: null } },
+      select: { memberId: true, videoId: true, completedAt: true },
     }),
     db.device.findMany({
-      where: { organizationId, memberId, source: { not: 'integration' } },
-      select: { name: true, isCompliant: true },
+      where: { organizationId, memberId: { in: ids }, source: { not: 'integration' } },
+      select: { memberId: true, name: true, isCompliant: true },
     }),
     db.frameworkInstance.findFirst({
       where: hipaaFrameworkInstanceWhere(organizationId),
       select: { id: true },
     }),
-    trainingModulesService.getMemberModules({ organizationId, memberId }),
+    moduleStatuses({ organizationId, members, now }),
     // A lapsed 12-month cycle means the outstanding training is a renewal, not a first run.
-    db.trainingCompletionRecord.findFirst({
-      where: {
-        organizationId,
-        memberId,
-        moduleId: { in: [...GENERAL_TRAINING_VIDEO_IDS, HIPAA_TRAINING_ID] },
-        expiresAt: { lte: new Date() },
-      },
-      select: { id: true },
+    db.trainingCompletionRecord.findMany({
+      where: { organizationId, memberId: { in: ids }, moduleId: { in: TRAINING_IDS }, expiresAt: { lte: now } },
+      select: { memberId: true },
+      distinct: ['memberId'],
     }),
   ]);
-
-  const flags = member.organization;
-  const videoDate = (id: string) =>
-    videos.find((v) => v.videoId === id)?.completedAt ?? null;
-  const generalDates = GENERAL_TRAINING_VIDEO_IDS.map(videoDate);
-  const check = member.backgroundCheckRequests[0] ?? null;
-  const pendingPolicies = policies.filter((p) => !p.signedBy.includes(memberId));
-
-  return {
-    member,
-    policies: {
-      required: policies.length,
-      accepted: policies.length - pendingPolicies.length,
-      pending: pendingPolicies.map((p) => ({ id: p.id, name: p.name })),
-    },
-    training: {
-      generalRequired: flags.securityTrainingStepEnabled,
-      generalCompleted: generalDates.filter(Boolean).length,
-      generalTotal: GENERAL_TRAINING_VIDEO_IDS.length,
-      generalCompletedAt: generalDates.every(Boolean) ? latest(generalDates) : null,
-      // Each video expires 12 months after it was watched, so the oldest one sets the renewal date.
-      generalOldestAt: generalDates.every(Boolean) ? earliest(generalDates) : null,
-      hadExpiredCycle: expiredCycle !== null,
-      hipaaRequired: !!hipaa,
-      hipaaCompletedAt: videoDate(HIPAA_TRAINING_ID),
-      modules: modules.map((m) => ({
-        id: m.id,
-        title: m.title,
-        frameworkReference: m.frameworkReference,
-        status: m.status,
-        completedAt: m.completedAt,
-        expiresAt: m.expiresAt,
-      })),
-    },
-    device: {
-      required: flags.deviceAgentStepEnabled,
-      enrolled: devices.length > 0 || member.fleetDmLabelId !== null,
-      compliant: devices.some((d) => d.isCompliant),
-      name: devices[0]?.name ?? null,
-    },
-    backgroundCheck: {
-      required:
-        flags.backgroundCheckStepEnabled &&
-        !member.backgroundCheckExempt &&
-        !isAuditorOnly(member.role),
-      status: check?.status ?? null,
-      completed: !!check && COMPLETED_BACKGROUND_CHECK.includes(check.status),
-      completedAt: check?.completedAt ?? null,
-      exempt: member.backgroundCheckExempt,
-      exemptReason: member.backgroundCheckExemptReason,
-    },
+  const flags = org ?? {
+    securityTrainingStepEnabled: false,
+    deviceAgentStepEnabled: false,
+    backgroundCheckStepEnabled: false,
   };
+  const expired = new Set(expiredCycles.map((r) => r.memberId));
+
+  return members.map((member) => {
+    const videoDate = (id: string) =>
+      videos.find((v) => v.memberId === member.id && v.videoId === id)?.completedAt ?? null;
+    const generalDates = GENERAL_TRAINING_VIDEO_IDS.map(videoDate);
+    const memberPolicies = policies.filter(
+      (p) => p.visibility === 'ALL' || (p.visibility === 'DEPARTMENT' && (p.visibleToDepartments as string[]).includes(member.department)),
+    );
+    const pendingPolicies = memberPolicies.filter((p) => !p.signedBy.includes(member.id));
+    const memberDevices = devices.filter((d) => d.memberId === member.id);
+    const check = member.backgroundCheckRequests[0] ?? null;
+    return {
+      member: { ...member, organization: flags },
+      policies: {
+        required: memberPolicies.length,
+        accepted: memberPolicies.length - pendingPolicies.length,
+        pending: pendingPolicies.map((p) => ({ id: p.id, name: p.name })),
+      },
+      training: {
+        generalRequired: flags.securityTrainingStepEnabled,
+        generalCompleted: generalDates.filter(Boolean).length,
+        generalTotal: GENERAL_TRAINING_VIDEO_IDS.length,
+        generalCompletedAt: generalDates.every(Boolean) ? latest(generalDates) : null,
+        // Each video expires 12 months after it was watched, so the oldest one sets the renewal date.
+        generalOldestAt: generalDates.every(Boolean) ? earliest(generalDates) : null,
+        hadExpiredCycle: expired.has(member.id),
+        hipaaRequired: !!hipaa,
+        hipaaCompletedAt: videoDate(HIPAA_TRAINING_ID),
+        modules: modules.get(member.id) ?? [],
+      },
+      device: {
+        required: flags.deviceAgentStepEnabled,
+        enrolled: memberDevices.length > 0 || member.fleetDmLabelId !== null,
+        compliant: memberDevices.some((d) => d.isCompliant),
+        name: memberDevices[0]?.name ?? null,
+      },
+      backgroundCheck: {
+        required: flags.backgroundCheckStepEnabled && !member.backgroundCheckExempt && !isAuditorOnly(member.role),
+        status: check?.status ?? null,
+        completed: !!check && COMPLETED_BACKGROUND_CHECK.includes(check.status),
+        completedAt: check?.completedAt ?? null,
+        exempt: member.backgroundCheckExempt,
+        exemptReason: member.backgroundCheckExemptReason,
+      },
+    };
+  });
 }
 
-export type MemberNativeState = Awaited<ReturnType<typeof getMemberNativeState>>;
+/** One member's native state; 404 when the member is not in the organization. */
+export async function getMemberNativeState({
+  organizationId,
+  memberId,
+}: {
+  organizationId: string;
+  memberId: string;
+}) {
+  const [state] = await loadNativeStates({ organizationId, memberIds: [memberId] });
+  if (!state) throw new NotFoundException('Member not found');
+  return state;
+}
+
+export type MemberNativeState = Awaited<ReturnType<typeof loadNativeStates>>[number];
 
 export function isTrainingDone(state: MemberNativeState): boolean {
   const t = state.training;

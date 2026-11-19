@@ -13,8 +13,8 @@ import {
   TableRow,
   Text,
 } from '@trycompai/design-system';
-import { DECISION_LABEL, formatDay, mfaLabel } from '../lib/access-labels';
-import { AccessFlagBadges } from './AccessFlagBadges';
+import { DECISION_LABEL, formatDay } from '../lib/access-labels';
+import { AccessFlagBadges, MfaCell } from './AccessFlagBadges';
 
 const DECISIONS: AccessDecision[] = ['keep', 'revoke', 'modify'];
 const DECISION_VARIANT: Record<AccessDecision, 'accent' | 'destructive' | 'outline'> = {
@@ -100,7 +100,9 @@ export function ReviewItemsTable({
                   <Text size="sm">{item.roles.join(', ') || '—'}</Text>
                 </div>
               </TableCell>
-              <TableCell>{mfaLabel(item.mfaEnabled)}</TableCell>
+              <TableCell>
+                <MfaCell value={item.mfaEnabled} />
+              </TableCell>
               <TableCell>
                 <span className="whitespace-nowrap">{formatDay(item.lastLoginAt)}</span>
               </TableCell>
@@ -137,15 +139,33 @@ export function ReviewItemsTable({
                       {item.comment}
                     </Text>
                   )}
+                  {item.decision && item.decidedByName && (
+                    <Text size="xs" variant="muted">
+                      {item.decidedByName} · {formatDay(item.decidedAt)}
+                    </Text>
+                  )}
                 </div>
               </TableCell>
               <TableCell>
                 {!needsChange ? (
                   <span className="text-muted-foreground">—</span>
                 ) : item.remediatedAt ? (
-                  <span className="whitespace-nowrap" title={item.remediationNote ?? undefined}>
-                    Done {formatDay(item.remediatedAt)}
-                  </span>
+                  <div className="flex flex-col items-start gap-1">
+                    <span className="whitespace-nowrap" title={item.remediationNote ?? undefined}>
+                      Done {formatDay(item.remediatedAt)}
+                    </span>
+                    {item.remediationUrl && (
+                      <a
+                        href={item.remediationUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-primary hover:underline"
+                      >
+                        Ticket
+                      </a>
+                    )}
+                    {item.revokedStillActive && <Badge variant="destructive">Revoked but still active</Badge>}
+                  </div>
                 ) : editable ? (
                   <Button size="xs" variant="outline" onClick={() => onRemediate(item)}>
                     Mark done

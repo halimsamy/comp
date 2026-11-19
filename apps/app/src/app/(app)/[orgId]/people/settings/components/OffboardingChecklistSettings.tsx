@@ -5,65 +5,22 @@ import { toast } from 'sonner';
 import { usePermissions } from '@/hooks/use-permissions';
 import { useApi } from '@/hooks/use-api';
 import { useApiSWR } from '@/hooks/use-api-swr';
-import {
-  Button,
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  HStack,
-  Input,
-  Label,
-  Section,
-  Stack,
-  Switch,
-  Text,
-  Textarea,
-} from '@trycompai/design-system';
-import { Add, TrashCan } from '@trycompai/design-system/icons';
-
-interface TemplateItem {
-  id: string;
-  title: string;
-  description: string | null;
-  evidenceRequired: boolean;
-  sortOrder: number;
-  isDefault: boolean;
-  isEnabled: boolean;
-  dueDays?: number | null;
-  autoCompleteSource?: string | null;
-}
-
-type ChecklistKind = 'onboarding' | 'offboarding';
-
-const TEMPLATE_ENDPOINT = '/v1/offboarding-checklist/template';
-
-const KIND_COPY: Record<ChecklistKind, { title: string; description: string; dueFrom: string }> = {
-  offboarding: {
-    title: 'Offboarding checklist',
-    description: 'Configure the default checklist items for employee offboarding.',
-    dueFrom: 'offboard date',
-  },
-  onboarding: {
-    title: 'Onboarding checklist',
-    description:
-      'Items every new hire completes, with a due date counted from their start date. Automatic items complete themselves from policies, training, device and background check status.',
-    dueFrom: 'start date',
-  },
-};
+import { Button, Section, Stack, Text } from '@trycompai/design-system';
+import { Add } from '@trycompai/design-system/icons';
+import { ChecklistItemCard } from './ChecklistItemCard';
+import { ChecklistItemDialog } from './ChecklistItemDialog';
+import { type ChecklistKind, KIND_COPY, TEMPLATE_ENDPOINT, type TemplateItem } from './checklist-template';
 
 export function OffboardingChecklistSettings({ kind = 'offboarding' }: { kind?: ChecklistKind }) {
   const { hasPermission } = usePermissions();
   const canUpdate = hasPermission('organization', 'update');
-  const { post, patch, delete: deleteReq } = useApi();
+  const { patch, delete: deleteReq } = useApi();
 
   const { data, mutate } = useApiSWR<TemplateItem[]>(`${TEMPLATE_ENDPOINT}?kind=${kind}`);
   const items = Array.isArray(data?.data) ? data.data : [];
 
-  const [dialogOpen, setDialogOpen] = useState(false);
+  // null = closed, 'new' = create, otherwise the item being edited.
+  const [editing, setEditing] = useState<TemplateItem | 'new' | null>(null);
 
   const handleToggleEnabled = async ({
     item,
@@ -172,19 +129,11 @@ export function OffboardingChecklistSettings({ kind = 'offboarding' }: { kind?: 
             {KIND_COPY[kind].description}
           </Text>
           {canUpdate && (
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-              <DialogTrigger render={<Button size="sm" variant="outline" />}>
-                <Add size={16} />
+            <div className="shrink-0">
+              <Button size="sm" variant="outline" iconLeft={<Add size={16} />} onClick={() => setEditing('new')}>
                 Add item
-              </DialogTrigger>
-              <AddChecklistItemDialog
-                kind={kind}
-                onCreated={() => {
-                  setDialogOpen(false);
-                  mutate();
-                }}
-              />
-            </Dialog>
+              </Button>
+            </div>
           )}
         </div>
 
@@ -204,198 +153,20 @@ export function OffboardingChecklistSettings({ kind = 'offboarding' }: { kind?: 
                 canUpdate={canUpdate}
                 onToggleEnabled={handleToggleEnabled}
                 onToggleEvidence={handleToggleEvidence}
+                onEdit={setEditing}
                 onDelete={handleDelete}
               />
             ))}
           </Stack>
         )}
       </Stack>
+      <ChecklistItemDialog
+        open={editing !== null}
+        item={editing === 'new' ? null : editing}
+        kind={kind}
+        onOpenChange={(open) => !open && setEditing(null)}
+        onSaved={() => void mutate()}
+      />
     </Section>
-  );
-}
-
-function ChecklistItemCard({
-  item,
-  dueFrom,
-  canUpdate,
-  onToggleEnabled,
-  onToggleEvidence,
-  onDelete,
-}: {
-  item: TemplateItem;
-  dueFrom: string;
-  canUpdate: boolean;
-  onToggleEnabled: (args: { item: TemplateItem; next: boolean }) => void;
-  onToggleEvidence: (args: { item: TemplateItem; next: boolean }) => void;
-  onDelete: (args: { item: TemplateItem }) => void;
-}) {
-  return (
-    <div className="flex items-start justify-between gap-4 rounded-lg border p-4">
-      <div className="flex-1">
-        <HStack gap="sm">
-          <Text weight="medium">{item.title}</Text>
-          {item.isDefault && (
-            <div className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-              Default
-            </div>
-          )}
-          {item.autoCompleteSource && (
-            <div className="rounded bg-primary/10 px-1.5 py-0.5 text-xs text-primary">Automatic</div>
-          )}
-        </HStack>
-        {item.dueDays !== null && item.dueDays !== undefined && (
-          <Text size="xs" variant="muted">
-            Due {item.dueDays === 0 ? 'on' : `${item.dueDays} days after`} the {dueFrom}
-          </Text>
-        )}
-        {item.description ? (
-          <Text size="sm" variant="muted">
-            {item.description}
-          </Text>
-        ) : null}
-        <div className="mt-2">
-          <HStack gap="sm">
-            <Label htmlFor={`evidence-${item.id}`}>
-              <Text size="sm">Evidence required</Text>
-            </Label>
-            <Switch
-              id={`evidence-${item.id}`}
-              checked={item.evidenceRequired}
-              disabled={!canUpdate || !item.isEnabled}
-              onCheckedChange={(next) =>
-                onToggleEvidence({ item, next: Boolean(next) })
-              }
-              aria-label={`Evidence required for ${item.title}`}
-            />
-          </HStack>
-        </div>
-      </div>
-      <HStack gap="sm">
-        <Switch
-          checked={item.isEnabled}
-          disabled={!canUpdate}
-          onCheckedChange={(next) =>
-            onToggleEnabled({ item, next: Boolean(next) })
-          }
-          aria-label={`Enable ${item.title}`}
-        />
-        {!item.isDefault && canUpdate && (
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => onDelete({ item })}
-            aria-label={`Delete ${item.title}`}
-          >
-            <TrashCan size={16} />
-          </Button>
-        )}
-      </HStack>
-    </div>
-  );
-}
-
-function AddChecklistItemDialog({
-  kind,
-  onCreated,
-}: {
-  kind: ChecklistKind;
-  onCreated: () => void;
-}) {
-  const { post } = useApi();
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [evidenceRequired, setEvidenceRequired] = useState(false);
-  const [dueDays, setDueDays] = useState('');
-  const [saving, setSaving] = useState(false);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title.trim()) return;
-
-    setSaving(true);
-
-    const res = await post(TEMPLATE_ENDPOINT, {
-      title: title.trim(),
-      description: description.trim() || undefined,
-      evidenceRequired,
-      kind,
-      ...(dueDays.trim() ? { dueDays: Number(dueDays) } : {}),
-    });
-
-    setSaving(false);
-
-    if (res.error) {
-      toast.error('Failed to create checklist item');
-      return;
-    }
-
-    toast.success('Checklist item created');
-    setTitle('');
-    setDescription('');
-    setEvidenceRequired(false);
-    setDueDays('');
-    onCreated();
-  };
-
-  return (
-    <DialogContent>
-      <form onSubmit={handleSubmit}>
-        <DialogHeader>
-          <DialogTitle>Add checklist item</DialogTitle>
-        </DialogHeader>
-        <Stack gap="md">
-          <div className="grid gap-1.5">
-            <Label htmlFor="checklist-title">Title</Label>
-            <Input
-              id="checklist-title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g., Return company laptop"
-              required
-            />
-          </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="checklist-description">Description</Label>
-            <Textarea
-              id="checklist-description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Optional details about this checklist item"
-              rows={3}
-            />
-          </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="checklist-due-days">Due within (days)</Label>
-            <Input
-              id="checklist-due-days"
-              type="number"
-              min={0}
-              max={365}
-              value={dueDays}
-              onChange={(e) => setDueDays(e.target.value)}
-              placeholder="Optional, e.g. 30"
-            />
-          </div>
-          <HStack gap="sm">
-            <Label htmlFor="checklist-evidence">Evidence required</Label>
-            <Switch
-              id="checklist-evidence"
-              checked={evidenceRequired}
-              onCheckedChange={(next) =>
-                setEvidenceRequired(Boolean(next))
-              }
-            />
-          </HStack>
-        </Stack>
-        <DialogFooter>
-          <DialogClose render={<Button variant="outline" />}>
-            Cancel
-          </DialogClose>
-          <Button type="submit" disabled={saving || !title.trim()}>
-            {saving ? 'Creating...' : 'Create'}
-          </Button>
-        </DialogFooter>
-      </form>
-    </DialogContent>
   );
 }

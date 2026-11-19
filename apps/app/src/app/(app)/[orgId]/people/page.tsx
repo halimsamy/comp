@@ -10,7 +10,6 @@ import { Suspense } from 'react';
 import { TeamMembers } from './all/components/TeamMembers';
 import { TeamMembersSkeleton } from './all/components/TeamMembersSkeleton';
 import { PeoplePageTabs } from './components/PeoplePageTabs';
-import { EmployeesOverview } from './dashboard/components/EmployeesOverview';
 import { DevicesTabContent } from './devices/components/DevicesTabContent';
 import { OrgChartTabContent } from './org-chart/components/OrgChartTabContent';
 import { AccessTabContent } from './access/components/AccessTabContent';
@@ -60,7 +59,13 @@ export default async function PeoplePage({ params }: { params: Promise<{ orgId: 
   const organization = canManageOrgSettings
     ? await db.organization.findUnique({
         where: { id: orgId },
-        select: { backgroundCheckStepEnabled: true },
+        select: {
+          backgroundCheckStepEnabled: true,
+          deviceAgentStepEnabled: true,
+          securityTrainingStepEnabled: true,
+          whistleblowerReportEnabled: true,
+          accessRequestFormEnabled: true,
+        },
       })
     : null;
 
@@ -76,7 +81,6 @@ export default async function PeoplePage({ params }: { params: Promise<{ orgId: 
           />
         </Suspense>
       }
-      employeeTasksContent={<EmployeesOverview />}
       devicesContent={<DevicesTabContent isCurrentUserOwner={isCurrentUserOwner} />}
       orgChartContent={<OrgChartTabContent organizationId={orgId} />}
       accessContent={
@@ -92,10 +96,15 @@ export default async function PeoplePage({ params }: { params: Promise<{ orgId: 
             backgroundCheckStepEnabled={
               organization.backgroundCheckStepEnabled === true
             }
+            portal={{
+              deviceAgentStepEnabled: organization.deviceAgentStepEnabled,
+              securityTrainingStepEnabled: organization.securityTrainingStepEnabled,
+              whistleblowerReportEnabled: organization.whistleblowerReportEnabled,
+              accessRequestFormEnabled: organization.accessRequestFormEnabled,
+            }}
           />
         ) : null
       }
-      showEmployeeTasks
       canInviteUsers={canInviteUsers}
       canManageMembers={canManageMembers}
       allowedBuiltInRoles={allowedBuiltInRoles}

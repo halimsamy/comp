@@ -39,6 +39,10 @@ export const ACCESS_FLAGS = [
   'admin',
   'no_mfa',
   'inactive',
+  'no_activity',
+  'role_not_approved',
+  'admin_role_unapproved',
+  'type_not_allowed',
 ] as const;
 export type AccessFlag = (typeof ACCESS_FLAGS)[number];
 
@@ -103,31 +107,85 @@ export function accountFromCheckRow(row: CheckResultRow): BaseAccount {
   };
 }
 
-/** Pre-flags shown to reviewers (owner gone, unmapped, admin, no MFA, inactive). */
+export type AccountTypeKey = 'human' | 'service' | 'shared';
+export const ACCOUNT_TYPES: AccountTypeKey[] = ['human', 'service', 'shared'];
+export type AllowedAccountTypes = Partial<
+  Record<AccountTypeKey, { allowed: boolean; justification?: string | null }>
+>;
+
+const AllowedType = z
+  .object({ allowed: z.boolean(), justification: z.string().nullish() })
+  .optional()
+  .catch(undefined);
+export const AllowedAccountTypesSchema = z
+  .object({ human: AllowedType, service: AllowedType, shared: AllowedType })
+  .catch({});
+
+/** Approved roles of one system (#159). Empty = no role catalog yet, so nothing is flagged. */
+export interface SystemPolicy {
+  approvedRoles: { name: string; isPrivileged: boolean }[];
+  allowedTypes: AllowedAccountTypes;
+}
+
+const olderThan = (date: Date, now: Date) =>
+  now.getTime() - date.getTime() > INACTIVE_DAYS * 86_400_000;
+
+/** Pre-flags shown to reviewers (owner gone, unmapped, admin, no MFA, inactive, roles and types). */
 export function accountFlags({
   account,
   owner,
   isServiceAccount,
+  justification,
+  policy,
   now,
 }: {
   account: BaseAccount;
   owner: AccountOwner | null;
   isServiceAccount: boolean;
+  justification?: string | null;
+  policy?: SystemPolicy;
   now: Date;
 }): AccessFlag[] {
   const active = account.status === 'active';
   const flags: AccessFlag[] = [];
   if (active && owner?.departed) flags.push('owner_departed');
-  if (active && !owner && !isServiceAccount) flags.push('unmapped');
+  // PCI DSS 8.2.2: a service account needs an owner or a documented justification too.
+  if (active && !owner && !(isServiceAccount && justification?.trim())) {
+    flags.push('unmapped');
+  }
   if (account.isAdmin) flags.push('admin');
   if (active && account.mfaEnabled === false) flags.push('no_mfa');
-  const lastSeen = account.lastLoginAt ?? account.accountCreatedAt;
+  if (active && account.lastLoginAt && olderThan(account.lastLoginAt, now)) {
+    flags.push('inactive');
+  }
   if (
     active &&
-    lastSeen &&
-    now.getTime() - lastSeen.getTime() > INACTIVE_DAYS * 86_400_000
+    !account.lastLoginAt &&
+    account.accountCreatedAt &&
+    olderThan(account.accountCreatedAt, now)
   ) {
-    flags.push('inactive');
+    flags.push('no_activity');
+  }
+  const roles = policy?.approvedRoles ?? [];
+  if (roles.length > 0) {
+    const approved = new Map(roles.map((r) => [r.name.toLowerCase(), r]));
+    if (account.roles.some((r) => !approved.has(r.toLowerCase()))) {
+      flags.push('role_not_approved');
+    }
+    if (
+      account.isAdmin &&
+      !account.roles.some((r) => approved.get(r.toLowerCase())?.isPrivileged)
+    ) {
+      flags.push('admin_role_unapproved');
+    }
+  }
+  const type: AccountTypeKey = isServiceAccount || account.type === 'service'
+    ? 'service'
+    : account.type === 'shared'
+      ? 'shared'
+      : 'human';
+  if (policy?.allowedTypes[type]?.allowed === false) {
+    flags.push('type_not_allowed');
   }
   return flags;
 }

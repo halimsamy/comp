@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  NotFoundException,
   Controller,
   Get,
   Post,
@@ -155,12 +156,15 @@ export class OffboardingChecklistController {
   @ApiOperation({
     summary: 'Export all offboarding evidence as a zip file',
     description:
-      'Exports a zip archive containing the offboarding checklist evidence for every member in the organization, for audits, handovers, or record-keeping.',
+      'Exports a zip archive with the offboarding register (CSV) and, for everyone with an offboard date, the checklist, access removal and evidence files. 404 when nobody has an offboard date.',
   })
   async exportAllEvidence(
     @OrganizationId() organizationId: string,
     @Res() res: Response,
   ) {
+    // #85: same population as the register; nothing to zip when nobody has left.
+    const leavers = await db.member.count({ where: { organizationId, offboardDate: { not: null } } });
+    if (leavers === 0) throw new NotFoundException('Nobody has an offboard date yet');
     const org = await db.organization.findFirst({
       where: { id: organizationId },
       select: { name: true },
@@ -277,98 +281,4 @@ export class OffboardingChecklistController {
       userId: this.requireUserId(authContext),
     });
   }
-
-  @Get('member/:memberId/access-revocations')
-  @RequirePermission('member', 'read')
-  @ApiOperation({
-    summary: 'Get vendor access revocation status for a member',
-    description:
-      'Lists the vendors a departing member had access to and whether each has been revoked, so you can confirm all vendor access is removed during offboarding.',
-  })
-  @ApiParam({ name: 'memberId', description: 'Member ID' })
-  async getAccessRevocations(
-    @OrganizationId() organizationId: string,
-    @Param('memberId') memberId: string,
-  ) {
-    return this.offboardingChecklistService.getAccessRevocations(
-      organizationId,
-      memberId,
-    );
-  }
-
-  @Post('member/:memberId/access-revocations/confirm-all')
-  @RequirePermission('member', 'update')
-  @ApiOperation({
-    summary: 'Confirm all vendor access as revoked',
-    description:
-      "Marks every vendor access record for a departing member as revoked in one step, recording who confirmed it, to complete access removal during offboarding.",
-  })
-  @ApiParam({ name: 'memberId', description: 'Member ID' })
-  async revokeAllVendorAccess(
-    @OrganizationId() organizationId: string,
-    @Param('memberId') memberId: string,
-    @AuthContext() authContext: AuthContextType,
-  ) {
-    return this.offboardingChecklistService.revokeAllVendorAccess({
-      organizationId,
-      memberId,
-      revokedById: this.requireUserId(authContext),
-    });
-  }
-
-  @Post('member/:memberId/access-revocations/:vendorId')
-  @RequirePermission('member', 'update')
-  @ApiOperation({
-    summary: 'Mark vendor access as revoked',
-    description:
-      "Marks a single vendor's access for a departing member as revoked, optionally attaching evidence and notes, as part of offboarding access removal.",
-  })
-  @ApiParam({ name: 'memberId', description: 'Member ID' })
-  @ApiParam({ name: 'vendorId', description: 'Vendor ID' })
-  async revokeVendorAccess(
-    @OrganizationId() organizationId: string,
-    @Param('memberId') memberId: string,
-    @Param('vendorId') vendorId: string,
-    @AuthContext() authContext: AuthContextType,
-    @Body() body: { notes?: string; fileName?: string; fileType?: string; fileData?: string },
-  ) {
-    const evidenceFields = [body?.fileName, body?.fileType, body?.fileData];
-    const providedCount = evidenceFields.filter(Boolean).length;
-    if (providedCount > 0 && providedCount < 3) {
-      throw new BadRequestException('fileName, fileType, and fileData must all be provided together');
-    }
-    const evidence = body?.fileName && body?.fileType && body?.fileData
-      ? { fileName: body.fileName, fileType: body.fileType, fileData: body.fileData }
-      : undefined;
-    return this.offboardingChecklistService.revokeVendorAccess({
-      organizationId,
-      memberId,
-      vendorId,
-      revokedById: this.requireUserId(authContext),
-      notes: body?.notes,
-      evidence,
-    });
-  }
-
-  @Delete('member/:memberId/access-revocations/:vendorId')
-  @RequirePermission('member', 'update')
-  @ApiOperation({
-    summary: 'Undo vendor access revocation',
-    description:
-      "Reverses a vendor access revocation for a member, marking that vendor's access as not revoked again, in case it was confirmed by mistake during offboarding.",
-  })
-  @ApiParam({ name: 'memberId', description: 'Member ID' })
-  @ApiParam({ name: 'vendorId', description: 'Vendor ID' })
-  async undoVendorRevocation(
-    @OrganizationId() organizationId: string,
-    @Param('memberId') memberId: string,
-    @Param('vendorId') vendorId: string,
-  ) {
-    return this.offboardingChecklistService.undoVendorRevocation({
-      organizationId,
-      memberId,
-      vendorId,
-    });
-  }
-
 }

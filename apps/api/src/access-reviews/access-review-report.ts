@@ -9,6 +9,10 @@ export const FLAG_LABELS: Record<string, string> = {
   admin: 'Admin',
   no_mfa: 'No MFA',
   inactive: 'Inactive 90+ days',
+  no_activity: 'Never used 90+ days',
+  role_not_approved: 'Role not approved',
+  admin_role_unapproved: 'Admin without approved role',
+  type_not_allowed: 'Account type not allowed',
 };
 
 const DECISION_LABELS: Record<AccessReviewDecision, string> = {
@@ -49,7 +53,9 @@ export interface ReportItem extends SummaryItem {
   lastLoginAt: Date | null;
   comment: string | null;
   decidedByName: string | null;
+  decidedAt: Date | null;
   remediationNote: string | null;
+  remediationUrl?: string | null;
 }
 
 export interface ReportReview {
@@ -127,7 +133,7 @@ function buildSections(review: ReportReview): IsmsExportSection[] {
           'Last login',
           'Flags',
           'Decision',
-          'Note',
+          'Justification',
         ],
         rows: review.items
           .filter((i) => i.reviewSystemId === sys.id)
@@ -141,7 +147,7 @@ function buildSections(review: ReportReview): IsmsExportSection[] {
             formatExportDate(i.lastLoginAt),
             i.flags.map((f) => FLAG_LABELS[f] ?? f).join(', ') || '—',
             i.decision
-              ? `${DECISION_LABELS[i.decision]} (${i.decidedByName ?? '—'})`
+              ? `${DECISION_LABELS[i.decision]}\n${i.decidedByName ?? '—'}, ${formatExportDate(i.decidedAt)}`
               : 'Pending',
             i.comment ?? '',
           ]),
@@ -166,7 +172,7 @@ function buildSections(review: ReportReview): IsmsExportSection[] {
             i.decision ? DECISION_LABELS[i.decision] : '',
             i.comment ?? '',
             formatExportDate(i.remediatedAt),
-            i.remediationNote ?? '',
+            [i.remediationNote, i.remediationUrl].filter(Boolean).join('\n'),
           ]),
         },
       }),

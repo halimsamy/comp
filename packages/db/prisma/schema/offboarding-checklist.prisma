@@ -15,6 +15,9 @@ model OffboardingChecklistTemplate {
   dueDays            Int?
   // When set, the item completes itself from native state: policies | training | device | background_check
   autoCompleteSource String?
+  // Empty = everyone. Member role names / department values the item applies to.
+  appliesToRoles       String[] @default([])
+  appliesToDepartments String[] @default([])
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
 
@@ -53,17 +56,21 @@ model OffboardingAccessRevocation {
   id             String   @id @default(dbgenerated("generate_prefixed_cuid('oar'::text)"))
   organizationId String
   memberId       String
-  vendorId       String
+  // 'vendor:<id>' for vendor fallback rows, else the access inventory system key.
+  systemKey      String
+  systemName     String?
+  vendorId       String?
   revokedById    String?
   revokedAt      DateTime @default(now())
   notes          String?
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   member       Member       @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  vendor       Vendor       @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  vendor       Vendor?      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   revokedBy    User?        @relation("AccessRevocationRevokedBy", fields: [revokedById], references: [id], onDelete: SetNull)
 
   @@unique([memberId, vendorId])
+  @@unique([memberId, systemKey])
   @@index([organizationId])
   @@index([memberId])
 }

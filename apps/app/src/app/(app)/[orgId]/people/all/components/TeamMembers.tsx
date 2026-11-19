@@ -1,10 +1,7 @@
-import { filterComplianceMembers } from '@/lib/compliance';
-import { HIPAA_TRAINING_ID } from '@/lib/data/hipaa-training-content';
-import { trainingVideos as trainingVideosData } from '@/lib/data/training-videos';
 import { serverApi } from '@/lib/server-api-client';
 import type { Invitation, Member, User } from '@db';
-import { db } from '@db/server';
 import { getEmployeeSyncConnections } from '../data/queries';
+import { type MemberCompliance, taskCompletionFrom, tracks } from '../lib/people-compliance';
 import { TeamMembersClient } from './TeamMembersClient';
 import type { BackgroundCheckStatus } from '../../[employeeId]/components/backgroundCheckTypes';
 import {
@@ -89,95 +86,27 @@ export async function TeamMembers(props: TeamMembersProps) {
   // Fetch employee sync connections server-side
   const employeeSyncData = await getEmployeeSyncConnections(organizationId);
 
-  // Build task completion map for employees/contractors
-  const taskCompletionMap: Record<string, TaskCompletion> = {};
-
-  const employeeMembers = await filterComplianceMembers(members, organizationId);
-  const complianceMemberIds = employeeMembers.map((m) => m.id);
-
-  const [orgFlags, hipaaInstance] = await Promise.all([
-    db.organization.findUnique({
-      where: { id: organizationId },
-      select: {
-        securityTrainingStepEnabled: true,
-        backgroundCheckStepEnabled: true,
-      },
-    }),
-    db.frameworkInstance.findFirst({
-      where: { organizationId, framework: { name: 'HIPAA' } },
-      select: { id: true },
-    }),
-  ]);
-  const backgroundCheckStepEnabled = orgFlags?.backgroundCheckStepEnabled === true;
-  const hasHipaaFramework = !!hipaaInstance;
-
-  const policies = await db.policy.findMany({
-    where: {
-      organizationId,
-      isRequiredToSign: true,
-      status: 'published',
-      isArchived: false,
-    },
-  });
-
-  // Column visibility must come from ORG-LEVEL tracking, not from member data:
-  // an org with tracking enabled but no compliance members yet still shows the
-  // columns (as dashes), never silently hides them.
+  // #87: one compliance source for the table (policies, training, device,
+  // background check, checklists), computed by the API.
+  const complianceRes = await serverApi.get<{ data: MemberCompliance[] }>(
+    '/v1/people-lifecycle/compliance',
+  );
+  const compliance: MemberCompliance[] = Array.isArray(complianceRes.data?.data)
+    ? complianceRes.data.data
+    : [];
+  const complianceMap = Object.fromEntries(compliance.map((e) => [e.member.id, e]));
+  const current = compliance.filter((e) => !e.member.former);
+  const complianceMemberIds = current.map((e) => e.member.id);
+  const taskCompletionMap: Record<string, TaskCompletion> = Object.fromEntries(
+    current.map((e) => [e.member.id, taskCompletionFrom(e)]),
+  );
+  const backgroundCheckStepEnabled = tracks({ entries: current, key: 'background_check' });
+  // The training item already counts HIPAA training, so there is no separate HIPAA column.
   const requirementTracking = {
-    policies: policies.length > 0,
-    training:
-      orgFlags?.securityTrainingStepEnabled === true && trainingVideosData.length > 0,
-    hipaa: hasHipaaFramework,
+    policies: tracks({ entries: current, key: 'policies' }),
+    training: tracks({ entries: current, key: 'training' }),
+    hipaa: false,
   };
-
-  if (employeeMembers.length > 0) {
-
-    const employeeIds = employeeMembers.map((m) => m.id);
-    const trainingCompletions = orgFlags?.securityTrainingStepEnabled
-      ? await db.employeeTrainingVideoCompletion.findMany({
-          where: { memberId: { in: employeeIds } },
-        })
-      : [];
-
-    const totalPolicies = policies.length;
-    const totalTrainingVideos = orgFlags?.securityTrainingStepEnabled ? trainingVideosData.length : 0;
-    const totalHipaaTraining = hasHipaaFramework ? 1 : 0;
-    const totalTasks = totalPolicies + totalTrainingVideos + totalHipaaTraining;
-
-    for (const employee of employeeMembers) {
-      const policiesCompleted = policies.filter((p) => p.signedBy.includes(employee.id)).length;
-
-      const trainingsCompleted = orgFlags?.securityTrainingStepEnabled
-        ? trainingCompletions.filter(
-            (tc) =>
-              tc.memberId === employee.id &&
-              tc.completedAt !== null &&
-              tc.videoId !== HIPAA_TRAINING_ID,
-          ).length
-        : 0;
-
-      const hipaaCompleted =
-        hasHipaaFramework &&
-        trainingCompletions.some(
-          (tc) =>
-            tc.memberId === employee.id &&
-            tc.videoId === HIPAA_TRAINING_ID &&
-            tc.completedAt !== null,
-        )
-          ? 1
-          : 0;
-
-      taskCompletionMap[employee.id] = {
-        completed: policiesCompleted + trainingsCompleted + hipaaCompleted,
-        total: totalTasks,
-        policies: { completed: policiesCompleted, total: totalPolicies },
-        training: { completed: trainingsCompleted, total: totalTrainingVideos },
-        ...(hasHipaaFramework && {
-          hipaa: { completed: hipaaCompleted, total: 1 },
-        }),
-      };
-    }
-  }
 
   return (
     <TeamMembersClient
@@ -189,6 +118,7 @@ export async function TeamMembers(props: TeamMembersProps) {
       employeeSyncData={employeeSyncData}
       taskCompletionMap={taskCompletionMap}
       complianceMemberIds={complianceMemberIds}
+      complianceMap={complianceMap}
       backgroundCheckStepEnabled={backgroundCheckStepEnabled}
       twoFactorStatusMap={twoFactorStatusMap}
       requirementTracking={requirementTracking}

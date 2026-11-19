@@ -57,6 +57,10 @@ const COLUMNS: Record<string, keyof ImportedAccount> = {
   lastloginat: 'lastLoginAt',
   created: 'createdAt',
   createdat: 'createdAt',
+  owner: 'owner',
+  owneremail: 'owner',
+  justification: 'justification',
+  purpose: 'justification',
 };
 
 const truthy = (value: string) => /^(yes|true|1|y|on|enabled)$/i.test(value.trim());
@@ -86,7 +90,8 @@ export function parseAccountsCsv(text: string): AccountsCsvResult {
       if (key === 'roles') account.roles = value.split(/[;|]/).map((r) => r.trim()).filter(Boolean);
       else if (key === 'isAdmin') account.isAdmin = truthy(value);
       else if (key === 'mfaEnabled') account.mfaEnabled = truthy(value);
-      else if (key === 'type') account.type = /service|bot|system/i.test(value) ? 'service' : 'human';
+      else if (key === 'type')
+        account.type = /shared|generic/i.test(value) ? 'shared' : /service|bot|system/i.test(value) ? 'service' : 'human';
       else if (key === 'status') {
         account.status = /suspend/i.test(value)
           ? 'suspended'
@@ -102,26 +107,38 @@ export function parseAccountsCsv(text: string): AccountsCsvResult {
   return { accounts, error: null };
 }
 
-function cell(value: string): string {
+export function csvCell(value: string): string {
   const safe = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
   return `"${safe.replace(/"/g, '""')}"`;
 }
 
-/** The account inventory of one system as CSV (access provisioning evidence). */
-export function buildAccountsCsv({ system, accounts }: { system: string; accounts: AccessAccount[] }) {
-  const header = ['System', 'Account', 'Email', 'Owner', 'Type', 'Status', 'Roles', 'Admin', 'MFA', 'Last login', 'Flags'];
-  const rows = accounts.map((a) => [
+const HEADER = ['System', 'Account', 'Email', 'Owner', 'Justification', 'Type', 'Status', 'Roles', 'Admin', 'MFA', 'Last login', 'Flags'];
+
+function accountRow({ system, a }: { system: string; a: AccessAccount }) {
+  return [
     system,
     a.name,
     a.email ?? '',
     ownerLabel(a),
+    a.justification ?? '',
     a.isServiceAccount ? 'service' : (a.type ?? ''),
     a.status,
     a.roles.join('; '),
     a.isAdmin ? 'Yes' : 'No',
     mfaLabel(a.mfaEnabled),
     a.lastLoginAt ? a.lastLoginAt.slice(0, 10) : '',
-    a.flags.map((f) => FLAG_LABEL[f]).join('; '),
-  ]);
-  return [header, ...rows].map((row) => row.map(cell).join(',')).join('\r\n');
+    a.flags.map((f) => FLAG_LABEL[f] ?? f).join('; '),
+  ];
+}
+
+const toCsv = (rows: string[][]) => [HEADER, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n');
+
+/** The account inventory of one system as CSV (access provisioning evidence). */
+export function buildAccountsCsv({ system, accounts }: { system: string; accounts: AccessAccount[] }) {
+  return toCsv(accounts.map((a) => accountRow({ system, a })));
+}
+
+/** #97: every system's accounts in one file, or only the privileged ones. */
+export function buildAllSystemsCsv(systems: { system: string; accounts: AccessAccount[] }[]) {
+  return toCsv(systems.flatMap(({ system, accounts }) => accounts.map((a) => accountRow({ system, a }))));
 }

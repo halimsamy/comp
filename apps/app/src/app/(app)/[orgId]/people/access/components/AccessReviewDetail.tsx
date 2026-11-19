@@ -7,33 +7,18 @@ import {
   type AccessReviewItem,
 } from '@/hooks/use-access-reviews';
 import { usePermissions } from '@/hooks/use-permissions';
-import {
-  Button,
-  Input,
-  PageHeader,
-  PageLayout,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  Spinner,
-  Text,
-} from '@trycompai/design-system';
+import { Button, PageHeader, PageLayout, Spinner, Text } from '@trycompai/design-system';
 import { Checkmark, DocumentPdf, TrashCan } from '@trycompai/design-system/icons';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { ACCOUNT_FILTERS, DECISION_LABEL, filterByFlag, matchesSearch, type AccountFilter } from '../lib/access-labels';
+import { DECISION_LABEL, filterByFlag, matchesSearch, type AccountFilter } from '../lib/access-labels';
+import { ConfirmDeleteDialog } from './ConfirmDeleteDialog';
 import { NoteDialog, type NoteRequest } from './NoteDialog';
+import { RemediateDialog } from './RemediateDialog';
+import { ReviewFilters, type DecisionFilter } from './ReviewFilters';
 import { ReviewItemsTable } from './ReviewItemsTable';
 import { ReviewSummary } from './ReviewSummary';
-
-const DECISION_FILTERS = [
-  { value: 'all', label: 'All decisions' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'decided', label: 'Decided' },
-] as const;
 
 const errorMessage = (caught: unknown, fallback: string) => (caught instanceof Error ? caught.message : fallback);
 
@@ -46,10 +31,12 @@ export function AccessReviewDetail({ orgId, reviewId }: { orgId: string; reviewI
   const editable = hasPermission('member', 'update') && review?.status === 'in_progress';
   const [systemId, setSystemId] = useState('all');
   const [flag, setFlag] = useState<AccountFilter>('all');
-  const [decisionFilter, setDecisionFilter] = useState<(typeof DECISION_FILTERS)[number]['value']>('all');
+  const [decisionFilter, setDecisionFilter] = useState<DecisionFilter>('all');
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [noteRequest, setNoteRequest] = useState<NoteRequest | null>(null);
+  const [remediating, setRemediating] = useState<AccessReviewItem | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const systemNames = useMemo(() => new Map(review?.systems.map((s) => [s.id, s.systemName]) ?? []), [review]);
   const visible = useMemo(() => {
@@ -64,7 +51,8 @@ export function AccessReviewDetail({ orgId, reviewId }: { orgId: string; reviewI
 
   const decide = async ({ itemIds, decision, comment }: { itemIds: string[]; decision: AccessDecision; comment?: string }) => {
     try {
-      await mutations.decide({ reviewId, itemIds, decision, comment: comment || undefined });
+      const result = await mutations.decide({ reviewId, itemIds, decision, comment: comment || undefined });
+      if (result.skipped > 0) toast.info(`${result.skipped} already decided accounts were left as they were`);
       setSelected(new Set());
       await mutate();
     } catch (caught) {
@@ -74,43 +62,46 @@ export function AccessReviewDetail({ orgId, reviewId }: { orgId: string; reviewI
   };
 
   const handleDecide = (itemIds: string[], decision: AccessDecision) => {
-    if (decision === 'keep') {
+    const items = (review?.items ?? []).filter((i) => itemIds.includes(i.id));
+    // #79: bulk decisions only touch undecided rows; keeping a flagged account needs a justification.
+    const targets = items.length > 1 ? items.filter((i) => i.decision === null) : items;
+    const count = targets.length === 1 ? 'this account' : `${targets.length} accounts`;
+    const flagged = targets.some((i) => i.flags.length > 0);
+    if (decision === 'keep' && !flagged) {
       void decide({ itemIds, decision }).catch(() => undefined);
       return;
     }
-    const count = itemIds.length === 1 ? 'this account' : `${itemIds.length} accounts`;
     setNoteRequest({
       title: `${DECISION_LABEL[decision]} access`,
       description:
+        decision === 'keep'
+          ? `${count === 'this account' ? 'This account is' : 'Some of these accounts are'} flagged. Explain why the access is still needed.`
+          : decision === 'revoke'
+            ? `Remove ${count} from the system, then mark the change done.`
+            : `Describe how the access of ${count} should change, then mark it done once applied.`,
+      label: decision === 'revoke' ? 'Reason (optional)' : decision === 'keep' ? 'Justification' : 'Change needed',
+      placeholder:
         decision === 'revoke'
-          ? `Remove ${count} from the system, then mark the change done.`
-          : `Describe how the access of ${count} should change, then mark it done once applied.`,
-      label: decision === 'revoke' ? 'Reason (optional)' : 'Change needed',
-      placeholder: decision === 'revoke' ? 'Left the company in October' : 'Downgrade from admin to member',
+          ? 'Left the company in October'
+          : decision === 'keep'
+            ? 'Break-glass admin, used only during incidents'
+            : 'Downgrade from admin to member',
       confirmLabel: DECISION_LABEL[decision],
-      required: decision === 'modify',
+      required: decision !== 'revoke',
       onConfirm: (comment) => decide({ itemIds, decision, comment }),
     });
   };
 
-  const handleRemediate = (item: AccessReviewItem) =>
-    setNoteRequest({
-      title: 'Mark the change as done',
-      description: `Confirm that the ${item.decision} of ${item.accountName} was applied in the system.`,
-      label: 'Note (optional)',
-      placeholder: 'Ticket link or what was changed',
-      confirmLabel: 'Mark done',
-      required: false,
-      onConfirm: async (note) => {
-        try {
-          await mutations.remediate({ reviewId, itemId: item.id, note: note || undefined });
-          await mutate();
-        } catch (caught) {
-          toast.error(errorMessage(caught, 'Failed to mark the change as done'));
-          throw caught;
-        }
-      },
-    });
+  const handleRemediate = async (input: { note?: string; url?: string; file?: File }) => {
+    if (!remediating) return;
+    try {
+      await mutations.remediate({ reviewId, itemId: remediating.id, ...input });
+      await mutate();
+    } catch (caught) {
+      toast.error(errorMessage(caught, 'Failed to mark the change as done'));
+      throw caught;
+    }
+  };
 
   const handleSignOff = () =>
     setNoteRequest({
@@ -142,7 +133,6 @@ export function AccessReviewDetail({ orgId, reviewId }: { orgId: string; reviewI
   };
 
   const handleDelete = async () => {
-    if (!window.confirm('Delete this access review? Decisions made so far are lost.')) return;
     try {
       await mutations.deleteReview(reviewId);
       router.push(`/${orgId}/people?tab=access`);
@@ -176,7 +166,7 @@ export function AccessReviewDetail({ orgId, reviewId }: { orgId: string; reviewI
                 </Button>
                 {editable && (
                   <>
-                    <Button variant="outline" iconLeft={<TrashCan size={16} />} onClick={() => void handleDelete()}>
+                    <Button variant="outline" iconLeft={<TrashCan size={16} />} onClick={() => setConfirmDelete(true)}>
                       Delete
                     </Button>
                     <Button iconLeft={<Checkmark size={16} />} onClick={handleSignOff} disabled={!ready}>
@@ -202,60 +192,24 @@ export function AccessReviewDetail({ orgId, reviewId }: { orgId: string; reviewI
       ) : (
         <div className="flex flex-col gap-6">
           <ReviewSummary review={review} />
-          <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center">
-            <div className="w-full sm:w-[220px]">
-              <Select value={systemId} onValueChange={(value) => setSystemId(value ?? 'all')}>
-                <SelectTrigger aria-label="System">
-                  <SelectValue>{(value: string) => (value === 'all' ? 'All systems' : systemNames.get(value))}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All systems</SelectItem>
-                  {review.systems.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.systemName}
-                      {s.reviewerName ? ` · ${s.reviewerName}` : ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="w-full sm:w-[180px]">
-              <Select value={decisionFilter} onValueChange={(value) => setDecisionFilter(value ?? 'all')}>
-                <SelectTrigger aria-label="Decision">
-                  <SelectValue>{(value: string) => DECISION_FILTERS.find((f) => f.value === value)?.label}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {DECISION_FILTERS.map((f) => (
-                    <SelectItem key={f.value} value={f.value}>
-                      {f.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="w-full sm:w-[220px]">
-              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search accounts" aria-label="Search accounts" />
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by flag">
-            {ACCOUNT_FILTERS.map((option) => (
-              <Button
-                key={option.value}
-                size="sm"
-                variant={flag === option.value ? 'default' : 'outline'}
-                aria-pressed={flag === option.value}
-                onClick={() => setFlag(option.value)}
-              >
-                {option.label} · {filterByFlag({ rows: review.items, filter: option.value }).length}
-              </Button>
-            ))}
-          </div>
+          <ReviewFilters
+            review={review}
+            systemNames={systemNames}
+            systemId={systemId}
+            decisionFilter={decisionFilter}
+            search={search}
+            flag={flag}
+            onSystemChange={setSystemId}
+            onDecisionChange={setDecisionFilter}
+            onSearchChange={setSearch}
+            onFlagChange={setFlag}
+          />
           {editable && selected.size > 0 && (
             <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/40 p-3">
               <Text size="sm">{selected.size} selected</Text>
               {(['keep', 'revoke', 'modify'] as const).map((decision) => (
                 <Button key={decision} size="sm" variant="outline" onClick={() => handleDecide([...selected], decision)}>
-                  {DECISION_LABEL[decision]}
+                  {bulkLabel({ decision, items: review.items, selected })}
                 </Button>
               ))}
             </div>
@@ -271,12 +225,42 @@ export function AccessReviewDetail({ orgId, reviewId }: { orgId: string; reviewI
               onToggle={handleToggle}
               onToggleAll={(checked) => setSelected(checked ? new Set(visible.map((i) => i.id)) : new Set())}
               onDecide={(item, decision) => handleDecide([item.id], decision)}
-              onRemediate={handleRemediate}
+              onRemediate={setRemediating}
             />
           )}
         </div>
       )}
       <NoteDialog request={noteRequest} onOpenChange={(open) => !open && setNoteRequest(null)} />
+      <RemediateDialog
+        item={remediating}
+        onOpenChange={(open) => !open && setRemediating(null)}
+        onConfirm={handleRemediate}
+      />
+      <ConfirmDeleteDialog
+        open={confirmDelete}
+        title="Delete this access review?"
+        description="Decisions made so far are lost."
+        onOpenChange={setConfirmDelete}
+        onConfirm={handleDelete}
+      />
     </PageLayout>
   );
+}
+
+/** "Keep 12 undecided (3 skipped)": bulk actions never overwrite earlier decisions. */
+function bulkLabel({
+  decision,
+  items,
+  selected,
+}: {
+  decision: AccessDecision;
+  items: AccessReviewItem[];
+  selected: Set<string>;
+}) {
+  const chosen = items.filter((i) => selected.has(i.id));
+  const label = DECISION_LABEL[decision];
+  if (chosen.length < 2) return label;
+  const undecided = chosen.filter((i) => i.decision === null).length;
+  const skipped = chosen.length - undecided;
+  return skipped > 0 ? `${label} ${undecided} undecided (${skipped} skipped)` : `${label} ${undecided}`;
 }

@@ -70,8 +70,9 @@ export function ImportAccountsDialog({
           <DialogTitle>Import accounts: {systemName}</DialogTitle>
           <DialogDescription>
             Upload the system&apos;s user export as CSV. It replaces the current list. Columns:
-            account (or email), name, email, roles (separated by ;), admin, mfa, status, type, last
-            login.
+            account (or email), name, email, roles (separated by ;), admin, mfa, status, type (human,
+            service, shared), last login, owner (email or name) and justification (why a service or
+            shared account exists).
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-2">

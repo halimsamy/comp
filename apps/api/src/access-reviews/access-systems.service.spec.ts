@@ -1,6 +1,7 @@
 jest.mock('@db', () => ({
   db: {
-    member: { findFirst: jest.fn() },
+    member: { findFirst: jest.fn(), findMany: jest.fn() },
+    accessReviewItem: { findMany: jest.fn(), updateMany: jest.fn() },
     accessSystem: {
       findFirst: jest.fn(),
       create: jest.fn(),
@@ -19,17 +20,24 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { db } from '@db';
+import type { AccessAccountsService } from './access-accounts.service';
 import { AccessSystemsService } from './access-systems.service';
 
 const mocked = (fn: unknown) => fn as jest.Mock;
 const ORG = 'org_1';
 
 describe('AccessSystemsService', () => {
-  const service = new AccessSystemsService();
+  const service = new AccessSystemsService({
+    getSystemAccounts: jest.fn(),
+  } as unknown as AccessAccountsService);
 
   beforeEach(() => {
     jest.clearAllMocks();
     mocked(db.$transaction).mockResolvedValue([]);
+    mocked(db.accessReviewItem.findMany).mockResolvedValue([]);
+    mocked(db.member.findMany).mockResolvedValue([
+      { id: 'mem_jane', user: { name: 'Jane Doe', email: 'jane@acme.com' } },
+    ]);
   });
 
   it('rejects a duplicate system name', async () => {
@@ -58,7 +66,7 @@ describe('AccessSystemsService', () => {
         { accountId: 'svc', type: 'service' },
       ],
     });
-    expect(result).toEqual({ imported: 2 });
+    expect(result).toEqual({ imported: 2, ownersMapped: 0 });
     expect(db.accessSystemAccount.createMany).toHaveBeenCalledWith({
       data: [
         expect.objectContaining({
@@ -74,6 +82,34 @@ describe('AccessSystemsService', () => {
         }),
       ],
     });
+  });
+
+  it('maps the owner and justification columns of the CSV (#89)', async () => {
+    mocked(db.accessSystem.findFirst).mockResolvedValue({ id: 'asy_1' });
+    const result = await service.importAccounts({
+      organizationId: ORG,
+      id: 'asy_1',
+      accounts: [
+        { accountId: 'jdoe', owner: 'JANE@acme.com' },
+        { accountId: 'svc', type: 'service', justification: 'Nightly settlement batch' },
+        { accountId: 'svc2', type: 'service' },
+      ],
+    });
+    expect(result).toEqual({ imported: 3, ownersMapped: 2 });
+    expect(db.accessAccountOwner.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ accountId: 'jdoe', memberId: 'mem_jane', isServiceAccount: false }),
+      }),
+    );
+    expect(db.accessAccountOwner.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          accountId: 'svc',
+          isServiceAccount: true,
+          justification: 'Nightly settlement batch',
+        }),
+      }),
+    );
   });
 
   it('404s when importing into another organization’s system', async () => {

@@ -55,17 +55,24 @@ export class AccessAccountsController {
   @Get('accounts')
   @RequirePermission('member', 'read')
   @ApiOperation({
-    summary: 'List the accounts of one system',
+    summary: 'List the accounts of one system or one member',
     description:
-      'Returns the accounts of a system with owner, roles, MFA, last login and flags (owner left, no owner, admin, no MFA, inactive 90+ days). Use for access inventory evidence.',
+      "Returns the accounts of a system (or, with member, one person's accounts across every system) with owner, roles, MFA, last login and flags (owner left, no owner, admin, no MFA, inactive or never used for 90+ days, unapproved role, account type not allowed). Use for access inventory evidence.",
   })
   async listAccounts(
     @OrganizationId() organizationId: string,
     @Query() query: SystemAccountsQueryDto,
   ) {
+    if (query.member) {
+      const data = await this.accounts.listMemberAccounts({
+        organizationId,
+        memberId: query.member,
+      });
+      return { data, count: data.length };
+    }
     const result = await this.accounts.getSystemAccounts({
       organizationId,
-      systemKey: query.system,
+      systemKey: query.system ?? '',
     });
     return {
       system: result.system,

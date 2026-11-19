@@ -3,151 +3,132 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { AttachmentEntityType, Prisma, db } from '@db';
+import {
+  AccessAccountsService,
+  createAccessAccountsService,
+} from '../access-reviews/access-accounts.service';
 import { AttachmentsService } from '../attachments/attachments.service';
+import {
+  buildRevocationRows,
+  loadRevocationEvidence,
+  revocationKey,
+  type RevocationRow,
+} from './access-revocation-rows';
 
+export const AUTO_REVOKED_NOTE = 'Confirmed by the access inventory: no active account left';
+
+/**
+ * Offboarding access removal (#82). The list comes from the leaver's accounts
+ * in the access inventory (Comp AI, integrations, manual systems). Vendors are
+ * only a fallback for systems that have no inventory, and are optional.
+ * A system whose accounts are all gone or disabled is marked revoked by itself.
+ */
 @Injectable()
 export class AccessRevocationService {
   private readonly logger = new Logger(AccessRevocationService.name);
+  private readonly accounts: AccessAccountsService;
 
-  constructor(private readonly attachmentsService: AttachmentsService) {}
+  constructor(
+    private readonly attachmentsService: AttachmentsService,
+    @Optional() accounts?: AccessAccountsService,
+  ) {
+    this.accounts = accounts ?? createAccessAccountsService();
+  }
+
   async getAccessRevocations(organizationId: string, memberId: string) {
-    const vendors = await db.vendor.findMany({
-      where: { organizationId },
-      select: { id: true, name: true, website: true, logoUrl: true },
-      orderBy: { name: 'asc' },
+    const member = await db.member.findFirst({
+      where: { id: memberId, organizationId },
+      select: { id: true, offboardDate: true },
     });
-
-    const revocations = await db.offboardingAccessRevocation.findMany({
-      where: { organizationId, memberId },
-      include: {
-        revokedBy: { select: { id: true, name: true, email: true } },
-      },
-    });
-
-    const revocationMap = new Map(
-      revocations.map((r) => [r.vendorId, r]),
-    );
-
-    const revocationIds = revocations.map((r) => r.id);
-    const allAttachments =
-      revocationIds.length > 0
-        ? await db.attachment.findMany({
-            where: {
-              organizationId,
-              entityId: { in: revocationIds },
-              entityType: AttachmentEntityType.offboarding_checklist,
-            },
-            orderBy: { createdAt: 'asc' },
-          })
-        : [];
-
-    const attachmentsByRevocation = new Map<string, typeof allAttachments>();
-    for (const attachment of allAttachments) {
-      const existing = attachmentsByRevocation.get(attachment.entityId) ?? [];
-      existing.push(attachment);
-      attachmentsByRevocation.set(attachment.entityId, existing);
-    }
-
-    const vendorList = await Promise.all(
-      vendors.map(async (vendor) => {
-        const revocation = revocationMap.get(vendor.id);
-        const domain = vendor.website?.replace(/^https?:\/\//, '').replace(/\/.*$/, '') ?? null;
-        const rawAttachments = revocation
-          ? (attachmentsByRevocation.get(revocation.id) ?? [])
-          : [];
-        const evidence = await Promise.all(
-          rawAttachments.map(async (attachment) => ({
-            id: attachment.id,
-            name: attachment.name,
-            type: attachment.type,
-            downloadUrl: await this.attachmentsService.getPresignedDownloadUrl(attachment.url),
-            createdAt: attachment.createdAt,
-          })),
-        );
-        return {
-          vendorId: vendor.id,
-          vendorName: vendor.name,
-          logoUrl: vendor.logoUrl ?? (domain ? `https://img.logo.dev/${domain}?token=pk_X-1ZO13GSgeOoUrIuJ6GMQ&size=64` : null),
-          revoked: !!revocation,
-          revokedAt: revocation?.revokedAt ?? null,
-          revokedBy: revocation?.revokedBy ?? null,
-          notes: revocation?.notes ?? null,
-          evidence,
-        };
-      }),
-    );
-
+    if (!member) throw new NotFoundException('Member not found in this organization');
+    const rows = await this.syncFromInventory({ organizationId, memberId, offboarding: !!member.offboardDate });
+    const required = rows.filter((r) => !r.optional);
     return {
-      vendors: vendorList,
-      totalVendors: vendors.length,
-      revokedCount: revocations.length,
+      systems: required,
+      vendors: rows.filter((r) => r.optional),
+      totalSystems: required.length,
+      revokedCount: required.filter((r) => r.revoked).length,
+      stillActiveCount: required.filter((r) => r.stillActive).length,
     };
   }
 
-  async revokeVendorAccess({
+  /**
+   * For a leaver, inventory systems whose accounts are all gone or disabled are
+   * recorded as revoked and the checklist item follows. Returns the current rows.
+   */
+  async syncFromInventory({
     organizationId,
     memberId,
-    vendorId,
+    offboarding,
+  }: {
+    organizationId: string;
+    memberId: string;
+    offboarding: boolean;
+  }): Promise<RevocationRow[]> {
+    const rows = await this.loadRows({ organizationId, memberId });
+    if (!offboarding) return rows;
+    const gone = rows.filter((r) => !r.optional && !r.revoked && r.accounts.length > 0 && r.activeAccounts === 0);
+    if (gone.length === 0) {
+      await this.syncCompletion({ organizationId, memberId, rows });
+      return rows;
+    }
+    await db.offboardingAccessRevocation.createMany({
+      data: gone.map((r) => ({
+        organizationId,
+        memberId,
+        systemKey: r.systemKey,
+        systemName: r.name,
+        notes: AUTO_REVOKED_NOTE,
+      })),
+      skipDuplicates: true,
+    });
+    const fresh = await this.loadRows({ organizationId, memberId });
+    await this.syncCompletion({ organizationId, memberId, rows: fresh });
+    return fresh;
+  }
+
+  async revokeSystemAccess({
+    organizationId,
+    memberId,
+    systemKey: rawKey,
     revokedById,
     notes,
     evidence,
   }: {
     organizationId: string;
     memberId: string;
-    vendorId: string;
+    systemKey: string;
     revokedById: string;
     notes?: string;
     evidence?: { fileName: string; fileType: string; fileData: string };
   }) {
-    const member = await db.member.findFirst({
-      where: { id: memberId, organizationId },
-    });
-
-    if (!member) {
-      throw new NotFoundException('Member not found in this organization');
-    }
-
-    const vendor = await db.vendor.findFirst({
-      where: { id: vendorId, organizationId },
-    });
-
-    if (!vendor) {
-      throw new NotFoundException('Vendor not found in this organization');
-    }
-
-    const existing = await db.offboardingAccessRevocation.findUnique({
-      where: { memberId_vendorId: { memberId, vendorId } },
-    });
-
-    if (existing) {
-      throw new BadRequestException(
-        'Vendor access has already been revoked for this member',
-      );
-    }
-
-    let revocation: Awaited<ReturnType<typeof db.offboardingAccessRevocation.create>>;
+    const systemKey = revocationKey(rawKey);
+    const rows = await this.loadRows({ organizationId, memberId });
+    const row = rows.find((r) => r.systemKey === systemKey);
+    if (!row) throw new NotFoundException('System not found for this member');
+    if (row.revoked) throw new BadRequestException('Access to this system is already revoked');
+    let revocation: { id: string };
     try {
       revocation = await db.offboardingAccessRevocation.create({
         data: {
           organizationId,
           memberId,
-          vendorId,
+          systemKey,
+          systemName: row.name,
+          vendorId: row.vendorId,
           revokedById,
           notes,
-        },
-        include: {
-          revokedBy: { select: { id: true, name: true, email: true } },
         },
       });
     } catch (err) {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
-        throw new BadRequestException('Vendor access has already been revoked for this member');
+        throw new BadRequestException('Access to this system is already revoked');
       }
       throw err;
     }
-
     if (evidence) {
       try {
         await this.attachmentsService.uploadAttachment(
@@ -162,61 +143,38 @@ export class AccessRevocationService {
         throw err;
       }
     }
-
-    try {
-      await this.syncAccessRevocationCompletion(
-        organizationId,
-        memberId,
-        revokedById,
-      );
-    } catch (err) {
-      this.logger.warn(`Failed to sync access revocation completion for member ${memberId}`, err);
-    }
-
+    await this.syncCompletionSafely({ organizationId, memberId, completedById: revokedById });
     return revocation;
   }
 
-  async undoVendorRevocation({
+  async undoRevocation({
     organizationId,
     memberId,
-    vendorId,
+    systemKey,
   }: {
     organizationId: string;
     memberId: string;
-    vendorId: string;
+    systemKey: string;
   }) {
     const revocation = await db.offboardingAccessRevocation.findFirst({
-      where: { memberId, vendorId, organizationId },
+      where: { memberId, organizationId, systemKey: revocationKey(systemKey) },
     });
-
-    if (!revocation) {
-      throw new NotFoundException('Revocation record not found');
-    }
-
+    if (!revocation) throw new NotFoundException('Revocation record not found');
     const attachments = await this.attachmentsService.getAttachments(
       organizationId,
       revocation.id,
       AttachmentEntityType.offboarding_checklist,
     );
-
     for (const attachment of attachments) {
       await this.attachmentsService.deleteAttachment(organizationId, attachment.id);
     }
-
-    await db.offboardingAccessRevocation.delete({
-      where: { id: revocation.id },
-    });
-
-    try {
-      await this.syncAccessRevocationCompletion(organizationId, memberId);
-    } catch (err) {
-      this.logger.warn(`Failed to sync access revocation completion for member ${memberId}`, err);
-    }
-
+    await db.offboardingAccessRevocation.delete({ where: { id: revocation.id } });
+    await this.syncCompletionSafely({ organizationId, memberId });
     return { success: true };
   }
 
-  async revokeAllVendorAccess({
+  /** Confirms every required (inventory) system at once; optional vendors stay as they are. */
+  async revokeAll({
     organizationId,
     memberId,
     revokedById,
@@ -225,88 +183,113 @@ export class AccessRevocationService {
     memberId: string;
     revokedById: string;
   }) {
-    const member = await db.member.findFirst({
-      where: { id: memberId, organizationId },
-    });
-
-    if (!member) {
-      throw new NotFoundException('Member not found in this organization');
-    }
-
-    const vendors = await db.vendor.findMany({
-      where: { organizationId },
-      select: { id: true },
-    });
-
-    const existing = await db.offboardingAccessRevocation.findMany({
-      where: { organizationId, memberId },
-      select: { vendorId: true },
-    });
-
-    const existingSet = new Set(existing.map((r) => r.vendorId));
-    const toCreate = vendors.filter((v) => !existingSet.has(v.id));
-
-    if (toCreate.length > 0) {
+    const rows = await this.loadRows({ organizationId, memberId });
+    const pending = rows.filter((r) => !r.optional && !r.revoked);
+    if (pending.length > 0) {
       await db.offboardingAccessRevocation.createMany({
-        data: toCreate.map((v) => ({
+        data: pending.map((r) => ({
           organizationId,
           memberId,
-          vendorId: v.id,
+          systemKey: r.systemKey,
+          systemName: r.name,
+          vendorId: r.vendorId,
           revokedById,
         })),
         skipDuplicates: true,
       });
     }
-
-    try {
-      await this.syncAccessRevocationCompletion(organizationId, memberId, revokedById);
-    } catch (err) {
-      this.logger.warn(`Failed to sync access revocation completion for member ${memberId}`, err);
-    }
-
-    return { confirmed: toCreate.length };
+    await this.syncCompletionSafely({ organizationId, memberId, completedById: revokedById });
+    return { confirmed: pending.length };
   }
 
-  private async syncAccessRevocationCompletion(
-    organizationId: string,
-    memberId: string,
-    completedById?: string,
-  ) {
-    const templateItem = await db.offboardingChecklistTemplate.findFirst({
-      where: { organizationId, isAccessRevocation: true, isEnabled: true },
-    });
-
-    if (!templateItem) {
-      return;
-    }
-
-    const [totalVendors, revokedCount] = await Promise.all([
-      db.vendor.count({ where: { organizationId } }),
-      db.offboardingAccessRevocation.count({ where: { organizationId, memberId } }),
+  private async loadRows({
+    organizationId,
+    memberId,
+  }: {
+    organizationId: string;
+    memberId: string;
+  }): Promise<RevocationRow[]> {
+    const [inventory, vendors, revocations] = await Promise.all([
+      this.accounts.listAllAccounts(organizationId),
+      db.vendor.findMany({
+        where: {
+          organizationId,
+          archivedAt: null,
+          category: { in: ['software_as_a_service', 'cloud', 'infrastructure'] },
+        },
+        select: { id: true, name: true, website: true, logoUrl: true },
+        orderBy: { name: 'asc' },
+      }),
+      db.offboardingAccessRevocation.findMany({
+        where: { organizationId, memberId },
+        include: { revokedBy: { select: { id: true, name: true, email: true } } },
+      }),
     ]);
+    const evidence = await loadRevocationEvidence({
+      organizationId,
+      revocationIds: revocations.map((r) => r.id),
+      attachments: this.attachmentsService,
+    });
+    const accounts = inventory.flatMap(({ system, accounts: rows }) =>
+      rows.filter((a) => a.owner?.memberId === memberId).map((a) => ({ ...a, system })),
+    );
+    return buildRevocationRows({
+      accounts,
+      inventoryNames: inventory.map((i) => i.system.name),
+      vendors,
+      revocations,
+      evidence,
+    });
+  }
 
-    const allRevoked = totalVendors > 0 && revokedCount === totalVendors;
+  private async syncCompletionSafely(params: {
+    organizationId: string;
+    memberId: string;
+    completedById?: string;
+  }) {
+    try {
+      await this.syncCompletion(params);
+    } catch (err) {
+      this.logger.warn(`Failed to sync access revocation completion for member ${params.memberId}`, err);
+    }
+  }
 
-    const existingCompletion =
-      await db.offboardingChecklistCompletion.findFirst({
-        where: { organizationId, memberId, templateItemId: templateItem.id },
-      });
-
-    if (allRevoked && !existingCompletion && completedById) {
+  /** "Revoke system access" is complete when every inventory system is revoked. */
+  private async syncCompletion({
+    organizationId,
+    memberId,
+    completedById,
+    rows,
+  }: {
+    organizationId: string;
+    memberId: string;
+    completedById?: string;
+    rows?: RevocationRow[];
+  }) {
+    const templateItem = await db.offboardingChecklistTemplate.findFirst({
+      where: { organizationId, isAccessRevocation: true, isEnabled: true, kind: 'offboarding' },
+    });
+    if (!templateItem) return;
+    const required = (rows ?? (await this.loadRows({ organizationId, memberId }))).filter((r) => !r.optional);
+    // Nothing in the inventory: the item stays a manual confirmation.
+    if (required.length === 0) return;
+    const allRevoked = required.length > 0 && required.every((r) => r.revoked && !r.stillActive);
+    const existing = await db.offboardingChecklistCompletion.findFirst({
+      where: { organizationId, memberId, templateItemId: templateItem.id },
+    });
+    if (allRevoked && !existing) {
       await db.offboardingChecklistCompletion.create({
         data: {
           organizationId,
           memberId,
           templateItemId: templateItem.id,
-          completedById,
+          completedById: completedById ?? null,
+          notes: completedById ? null : AUTO_REVOKED_NOTE,
         },
       });
     }
-
-    if (!allRevoked && existingCompletion) {
-      await db.offboardingChecklistCompletion.delete({
-        where: { id: existingCompletion.id },
-      });
+    if (!allRevoked && existing) {
+      await db.offboardingChecklistCompletion.delete({ where: { id: existing.id } });
     }
   }
 }

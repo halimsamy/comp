@@ -57,7 +57,8 @@ export const EmployeeTasksList = ({
   trainingModules: initialTrainingModules,
 }: EmployeeTasksListProps) => {
   const [trainingModules, setTrainingModules] = useState(initialTrainingModules);
-  const { completions: trainingCompletions } = useTrainingCompletions({
+  // #63: one source of training completions, passed down to every training item.
+  const { completions: trainingCompletions, markVideoComplete } = useTrainingCompletions({
     fallbackData: trainingVideoCompletions,
   });
 
@@ -175,7 +176,12 @@ export const EmployeeTasksList = ({
       ? [
           {
             title: 'Complete general security awareness training',
-            content: <GeneralTrainingAccordionItem />,
+            content: (
+              <GeneralTrainingAccordionItem
+                completions={trainingCompletions}
+                onMarkComplete={markVideoComplete}
+              />
+            ),
           },
         ]
       : []),
@@ -183,7 +189,12 @@ export const EmployeeTasksList = ({
       ? [
           {
             title: 'Complete HIPAA security awareness training',
-            content: <HipaaTrainingAccordionItem />,
+            content: (
+              <HipaaTrainingAccordionItem
+                completions={trainingCompletions}
+                onMarkComplete={markVideoComplete}
+              />
+            ),
           },
         ]
       : []),

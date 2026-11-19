@@ -1,21 +1,30 @@
 'use client';
 
 import { useOrganizationMembers } from '@/hooks/use-organization-members';
+import { useRoles } from '../../../settings/roles/hooks/useRoles';
+import { canReviewAccess } from '../lib/reviewers';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@trycompai/design-system';
 import { useMemo } from 'react';
 import type { OwnerOption } from './AccountOwnerDialog';
 import { AccessReviewsPanel } from './AccessReviewsPanel';
 import { AccountsPanel } from './AccountsPanel';
+import { RolesPanel } from './RolesPanel';
 
 /** People > Access: access reviews and the account inventory per system. */
 export function AccessTabContent({ orgId }: { orgId: string }) {
   const { members } = useOrganizationMembers();
+  const { roles: customRoles } = useRoles();
+  const active = useMemo(() => (Array.isArray(members) ? members : []).filter((m) => !m.deactivated), [members]);
   const options = useMemo<OwnerOption[]>(
+    () => active.map((m) => ({ id: m.id, label: m.user.name || m.user.email })),
+    [active],
+  );
+  const reviewers = useMemo<OwnerOption[]>(
     () =>
-      (Array.isArray(members) ? members : [])
-        .filter((m) => !m.deactivated)
+      active
+        .filter((m) => canReviewAccess({ role: m.role, customRoles }))
         .map((m) => ({ id: m.id, label: m.user.name || m.user.email })),
-    [members],
+    [active, customRoles],
   );
 
   return (
@@ -24,12 +33,16 @@ export function AccessTabContent({ orgId }: { orgId: string }) {
         <TabsList>
           <TabsTrigger value="reviews">Access reviews</TabsTrigger>
           <TabsTrigger value="accounts">Accounts</TabsTrigger>
+          <TabsTrigger value="roles">Roles</TabsTrigger>
         </TabsList>
         <TabsContent value="reviews">
-          <AccessReviewsPanel orgId={orgId} members={options} />
+          <AccessReviewsPanel orgId={orgId} members={reviewers} />
         </TabsContent>
         <TabsContent value="accounts">
           <AccountsPanel members={options} />
+        </TabsContent>
+        <TabsContent value="roles">
+          <RolesPanel />
         </TabsContent>
       </div>
     </Tabs>

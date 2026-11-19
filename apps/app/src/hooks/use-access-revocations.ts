@@ -19,11 +19,20 @@ interface EvidenceFile {
   createdAt: string;
 }
 
-export interface VendorRevocationItem {
-  vendorId: string;
-  vendorName: string;
+/** One system to remove the leaver from: an access-inventory system, or a vendor fallback. */
+export interface RevocationSystem {
+  systemKey: string;
+  name: string;
+  kind: 'inventory' | 'vendor';
   logoUrl: string | null;
+  vendorId: string | null;
+  /** Vendor fallbacks don't hold the checklist item open. */
+  optional: boolean;
+  accounts: { accountId: string; name: string; status: string; roles: string[] }[];
+  activeAccounts: number;
   revoked: boolean;
+  /** Marked revoked, but the inventory still shows an active account. */
+  stillActive: boolean;
   revokedAt: string | null;
   revokedBy: RevokedBy | null;
   notes: string | null;
@@ -31,9 +40,11 @@ export interface VendorRevocationItem {
 }
 
 interface AccessRevocationsResponse {
-  vendors: VendorRevocationItem[];
-  totalVendors: number;
+  systems: RevocationSystem[];
+  vendors?: RevocationSystem[];
+  totalSystems: number;
   revokedCount: number;
+  stillActiveCount: number;
 }
 
 export function useAccessRevocations(memberId: string) {
@@ -44,14 +55,14 @@ export function useAccessRevocations(memberId: string) {
   const revocations = data?.data ?? null;
 
   const revokeAccess = useCallback(
-    async (vendorId: string, opts?: { notes?: string; file?: File }) => {
+    async (systemKey: string, opts?: { notes?: string; file?: File }) => {
       let body: Record<string, unknown> = {};
       if (opts?.notes) body.notes = opts.notes;
       if (opts?.file) {
         const base64 = await fileToBase64(opts.file);
         body = { ...body, fileName: opts.file.name, fileType: opts.file.type || 'application/octet-stream', fileData: base64 };
       }
-      const response = await api.post(`${endpoint}/${vendorId}`, body);
+      const response = await api.post(`${endpoint}/${encodeURIComponent(systemKey)}`, body);
       if (response.error) throw new Error(response.error);
       await mutate();
     },
@@ -59,8 +70,8 @@ export function useAccessRevocations(memberId: string) {
   );
 
   const undoRevocation = useCallback(
-    async (vendorId: string) => {
-      const response = await api.delete(`${endpoint}/${vendorId}`);
+    async (systemKey: string) => {
+      const response = await api.delete(`${endpoint}/${encodeURIComponent(systemKey)}`);
       if (response.error) throw new Error(response.error);
       await mutate();
     },

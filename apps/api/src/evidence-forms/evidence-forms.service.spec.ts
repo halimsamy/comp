@@ -49,6 +49,7 @@ jest.mock('@db', () => {
         findMany: jest.fn(),
         upsert: jest.fn(),
       },
+      organization: { findUnique: jest.fn() },
     },
   };
 });
@@ -103,6 +104,18 @@ describe('EvidenceFormsService', () => {
   });
 
   describe('getFormStatuses', () => {
+    it('marks access-request and whistleblower forms not relevant when their portal switch is off', async () => {
+      mockedDb.evidenceSubmission.groupBy.mockResolvedValue([]);
+      mockedDb.evidenceFormSetting.findMany.mockResolvedValue([]);
+      (mockedDb as unknown as { organization: { findUnique: jest.Mock } }).organization.findUnique.mockResolvedValueOnce({
+        accessRequestFormEnabled: false,
+        whistleblowerReportEnabled: true,
+      });
+      const result = await service.getFormStatuses('org_123');
+      expect(result['access-request'].isNotRelevant).toBe(true);
+      expect(result['whistleblower-report'].isNotRelevant).toBe(false);
+    });
+
     it('includes relevance settings alongside latest submission dates', async () => {
       mockedDb.evidenceSubmission.groupBy.mockResolvedValue([
         {

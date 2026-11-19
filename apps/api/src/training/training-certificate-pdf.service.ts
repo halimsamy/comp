@@ -83,6 +83,7 @@ export class TrainingCertificatePdfService {
     organizationName: string;
     completedAt: Date;
     title: string;
+    details?: CertificateDetails;
   }): Promise<Buffer> {
     return this.generateCertificatePdf({
       ...params,
@@ -96,8 +97,9 @@ export class TrainingCertificatePdfService {
     completedAt: Date;
     title: string;
     subtitle: string;
+    details?: CertificateDetails;
   }): Promise<Buffer> {
-    const { userName, organizationName, completedAt, title, subtitle } = params;
+    const { userName, organizationName, completedAt, title, subtitle, details } = params;
 
     const doc = new jsPDF({
       orientation: 'landscape',
@@ -226,6 +228,7 @@ export class TrainingCertificatePdfService {
     doc.text(`Completed on ${formattedDate}`, pageWidth / 2, 140, {
       align: 'center',
     });
+    if (details) this.drawDetails({ doc, details, pageWidth });
 
     // Certified by section
     doc.setFont('helvetica', 'normal');
@@ -263,4 +266,44 @@ export class TrainingCertificatePdfService {
     const pdfOutput = doc.output('arraybuffer');
     return Buffer.from(pdfOutput);
   }
+
+  /** #75: validity, certificate ID, requirement and the modules covered, for auditors. */
+  private drawDetails({
+    doc,
+    details,
+    pageWidth,
+  }: {
+    doc: jsPDF;
+    details: CertificateDetails;
+    pageWidth: number;
+  }) {
+    const validUntil = details.validUntil.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(80, 80, 80);
+    const line = [
+      `Valid until ${validUntil}`,
+      `Certificate ID ${details.certificateId}`,
+      ...(details.requirement ? [`Requirement: ${details.requirement}`] : []),
+    ].join('   |   ');
+    doc.text(this.cleanTextForPDF(line), pageWidth / 2, 147, { align: 'center' });
+    if (details.modules.length > 0) {
+      const modules = doc.splitTextToSize(
+        this.cleanTextForPDF(`Modules: ${details.modules.join('; ')}`),
+        pageWidth - 80,
+      );
+      doc.text(modules.slice(0, 2), pageWidth / 2, 152, { align: 'center' });
+    }
+  }
+}
+
+export interface CertificateDetails {
+  validUntil: Date;
+  certificateId: string;
+  requirement: string | null;
+  modules: string[];
 }

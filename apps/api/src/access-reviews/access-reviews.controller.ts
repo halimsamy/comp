@@ -92,7 +92,7 @@ export class AccessReviewsController {
   @ApiOperation({
     summary: 'Record access review decisions',
     description:
-      'Sets keep, revoke or modify on one or more accounts of an open access review. Modify needs a note describing the change.',
+      'Sets keep, revoke or modify on accounts of an open access review. With several ids only undecided accounts change. Modify, and keeping a flagged account, need a note. Reviewers cannot decide on their own account or on a system assigned to someone else. Every decision is written to the audit log.',
   })
   @ApiParam({ name: 'id', description: 'Access review id' })
   @ApiBody({ type: DecideAccessReviewItemsDto })
@@ -106,6 +106,7 @@ export class AccessReviewsController {
       organizationId,
       id,
       callerMemberId: authContext.memberId,
+      userId: authContext.userId,
       dto: body,
     });
   }
@@ -115,13 +116,14 @@ export class AccessReviewsController {
   @ApiOperation({
     summary: 'Mark an access change as done',
     description:
-      'Records that a revoke or modify decision was carried out in the system, with an optional note such as a ticket link.',
+      'Records that a revoke or modify decision was carried out in the system, with an optional note, ticket link and proof file.',
   })
   @ApiParam({ name: 'id', description: 'Access review id' })
   @ApiParam({ name: 'itemId', description: 'Access review item id' })
   @ApiBody({ type: RemediateAccessReviewItemDto })
   async remediate(
     @OrganizationId() organizationId: string,
+    @AuthContext() authContext: AuthContextType,
     @Param('id') id: string,
     @Param('itemId') itemId: string,
     @Body() body: RemediateAccessReviewItemDto,
@@ -130,7 +132,8 @@ export class AccessReviewsController {
       organizationId,
       id,
       itemId,
-      note: body.note,
+      userId: authContext.userId,
+      dto: body,
     });
   }
 
@@ -139,7 +142,7 @@ export class AccessReviewsController {
   @ApiOperation({
     summary: 'Sign off an access review',
     description:
-      'Management acknowledges access remains appropriate. Needs every account decided and every change done; attaches the PDF to the Access Review Log task.',
+      'Management acknowledges access remains appropriate. Needs every account decided and every change done, and a signer who neither started the review nor owns an account in it. Attaches the PDF to the Access Review Log task (sent for approval when the task has an approver).',
   })
   @ApiParam({ name: 'id', description: 'Access review id' })
   @ApiBody({ type: SignOffAccessReviewDto })

@@ -2,8 +2,6 @@ import { AttachmentsService } from '@/attachments/attachments.service';
 import type { AuthContext } from '@/auth/types';
 import { db, EvidenceFormType as DbEvidenceFormType } from '@db';
 import {
-  evidenceFormNextDueAt,
-  isEvidenceFormFresh,
   toDbEvidenceFormType,
   toExternalEvidenceFormType,
 } from '@trycompai/company';
@@ -26,6 +24,8 @@ import { getCsvFieldValue, toCsvRow } from './evidence-forms-csv';
 import { checkAutoCompletePhases } from '../frameworks/frameworks-timeline.helper';
 import { TimelinesService } from '../timelines/timelines.service';
 import { EvidenceFormsNotifierService } from './evidence-forms-notifier.service';
+import { assertActiveMember } from './form-settings';
+import { listFormDeadlines } from './form-deadlines';
 
 const listQuerySchema = z.object({
   search: z.string().trim().optional(),
@@ -51,9 +51,15 @@ const reviewSchema = z.object({
   reason: z.string().trim().optional(),
 });
 
-const formSettingSchema = z.object({
-  isNotRelevant: z.boolean(),
-});
+const formSettingSchema = z
+  .object({
+    isNotRelevant: z.boolean().optional(),
+    ownerMemberId: z.string().min(1).nullable().optional(),
+    cadenceMonthsOverride: z.number().int().min(1).max(36).nullable().optional(),
+  })
+  .refine((v) => Object.values(v).some((x) => x !== undefined), {
+    message: 'Nothing to update',
+  });
 
 const EVIDENCE_FORM_REVIEWER_ROLES = ['owner', 'admin', 'auditor'] as const;
 const EVIDENCE_FORM_DELETE_ROLES = ['owner', 'admin'] as const;
@@ -226,52 +232,23 @@ export class EvidenceFormsService {
   }
 
   async getFormStatuses(organizationId: string) {
-    const [results, settings] = await Promise.all([
-      db.evidenceSubmission.groupBy({
-        by: ['formType'],
-        where: { organizationId, status: { not: 'rejected' } },
-        _max: { submittedAt: true },
-      }),
-      db.evidenceFormSetting.findMany({
-        where: { organizationId },
-        select: { formType: true, isNotRelevant: true },
-      }),
-    ]);
-
-    const notRelevantFormTypes = new Set(
-      settings
-        .filter((setting) => setting.isNotRelevant)
-        .map((setting) => setting.formType),
+    const deadlines = await listFormDeadlines(organizationId);
+    return Object.fromEntries(
+      deadlines.map((form) => [
+        form.formType,
+        {
+          lastSubmittedAt: form.lastSubmittedAt?.toISOString() ?? null,
+          isNotRelevant: form.isNotRelevant,
+          cadenceMonths: form.cadenceMonths,
+          cadenceMonthsOverride: form.cadenceMonthsOverride,
+          nextDueAt: form.nextDueAt?.toISOString() ?? null,
+          isFresh: form.isFresh,
+          status: form.status,
+          ownerMemberId: form.ownerMemberId,
+          frameworks: form.frameworks,
+        },
+      ]),
     );
-
-    const statuses: Record<
-      string,
-      {
-        lastSubmittedAt: string | null;
-        isNotRelevant: boolean;
-        cadenceMonths: number;
-        nextDueAt: string | null;
-        isFresh: boolean;
-      }
-    > = {};
-
-    for (const form of evidenceFormDefinitionList) {
-      const match = results.find(
-        (r) => r.formType === toDbEvidenceFormType(form.type),
-      );
-      const dbFormType = toDbEvidenceFormType(form.type);
-      const lastSubmittedAt = match?._max.submittedAt ?? null;
-      statuses[form.type] = {
-        lastSubmittedAt: lastSubmittedAt?.toISOString() ?? null,
-        isNotRelevant: notRelevantFormTypes.has(dbFormType),
-        cadenceMonths: form.cadenceMonths,
-        nextDueAt:
-          evidenceFormNextDueAt({ formType: form.type, lastSubmittedAt })?.toISOString() ?? null,
-        isFresh: isEvidenceFormFresh({ formType: form.type, lastSubmittedAt }),
-      };
-    }
-
-    return statuses;
   }
 
   async getFormSettings(organizationId: string) {
@@ -310,6 +287,10 @@ export class EvidenceFormsService {
     }
 
     const dbFormType = toDbEvidenceFormType(parsedType.data);
+    const { ownerMemberId } = parsedPayload.data;
+    if (ownerMemberId) {
+      await assertActiveMember({ organizationId: params.organizationId, memberId: ownerMemberId });
+    }
     const setting = await db.evidenceFormSetting.upsert({
       where: {
         organizationId_formType: {
@@ -320,14 +301,14 @@ export class EvidenceFormsService {
       create: {
         organizationId: params.organizationId,
         formType: dbFormType,
-        isNotRelevant: parsedPayload.data.isNotRelevant,
+        ...parsedPayload.data,
       },
-      update: {
-        isNotRelevant: parsedPayload.data.isNotRelevant,
-      },
+      update: parsedPayload.data,
       select: {
         formType: true,
         isNotRelevant: true,
+        ownerMemberId: true,
+        cadenceMonthsOverride: true,
         updatedAt: true,
       },
     });
@@ -335,6 +316,8 @@ export class EvidenceFormsService {
     return {
       formType: toExternalEvidenceFormType(setting.formType),
       isNotRelevant: setting.isNotRelevant,
+      ownerMemberId: setting.ownerMemberId,
+      cadenceMonthsOverride: setting.cadenceMonthsOverride,
       updatedAt: setting.updatedAt.toISOString(),
     };
   }

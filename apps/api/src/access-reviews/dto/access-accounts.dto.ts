@@ -17,13 +17,21 @@ import {
 const SYSTEM_KEY = /^(compai|connection:[\w-]+|manual:[\w-]+)$/;
 
 export class SystemAccountsQueryDto {
-  @ApiProperty({
+  @ApiPropertyOptional({
     description:
-      "System key: 'compai', 'connection:<connectionId>' or 'manual:<systemId>'",
+      "System key: 'compai', 'connection:<connectionId>' or 'manual:<systemId>'. Required unless member is given.",
     example: 'compai',
   })
+  @ValidateIf((o: SystemAccountsQueryDto) => !o.member)
   @Matches(SYSTEM_KEY)
-  system: string;
+  system?: string;
+
+  @ApiPropertyOptional({
+    description: "Member id: returns that member's accounts across every system",
+  })
+  @IsOptional()
+  @IsString()
+  member?: string;
 }
 
 export class CreateAccessSystemDto {
@@ -64,10 +72,26 @@ export class ImportAccountDto {
   @MaxLength(320)
   email?: string;
 
-  @ApiPropertyOptional({ enum: ['human', 'service'] })
+  @ApiPropertyOptional({ enum: ['human', 'service', 'shared'] })
   @IsOptional()
-  @IsIn(['human', 'service'])
-  type?: 'human' | 'service';
+  @IsIn(['human', 'service', 'shared'])
+  type?: 'human' | 'service' | 'shared';
+
+  @ApiPropertyOptional({
+    description: 'Owner email or member name (maps the account to a member)',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(320)
+  owner?: string;
+
+  @ApiPropertyOptional({
+    description: 'Why a service or shared account exists',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  justification?: string;
 
   @ApiPropertyOptional({ enum: ['active', 'suspended', 'deactivated'] })
   @IsOptional()

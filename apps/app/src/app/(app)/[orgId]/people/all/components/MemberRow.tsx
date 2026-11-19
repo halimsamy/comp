@@ -50,6 +50,7 @@ import {
 } from './RequirementCell';
 
 export type RequirementColumnKey =
+  | 'compliance'
   | 'policies'
   | 'training'
   | 'hipaa'
@@ -58,6 +59,7 @@ export type RequirementColumnKey =
   | 'twoFactor';
 
 export const ALL_REQUIREMENT_COLUMNS: RequirementColumnKey[] = [
+  'compliance',
   'policies',
   'training',
   'hipaa',
@@ -65,7 +67,9 @@ export const ALL_REQUIREMENT_COLUMNS: RequirementColumnKey[] = [
   'background',
   'twoFactor',
 ];
+import { COMPLIANCE_LABEL, type ComplianceStatus, type MemberCompliance } from '../lib/people-compliance';
 import { RemoveMemberAlert } from './RemoveMemberAlert';
+
 import type { CustomRoleOption } from './MultiRoleCombobox';
 import type {
   BackgroundCheckStatus,
@@ -73,6 +77,15 @@ import type {
   TaskCompletion,
   TwoFactorStatus,
 } from './TeamMembers';
+
+const COMPLIANCE_VARIANT: Record<ComplianceStatus, 'accent' | 'destructive' | 'secondary' | 'outline'> = {
+  complete: 'accent',
+  in_progress: 'outline',
+  incomplete: 'secondary',
+  overdue: 'destructive',
+  expired: 'destructive',
+  not_required: 'outline',
+};
 
 interface MemberRowProps {
   member: MemberWithUser;
@@ -93,6 +106,10 @@ interface MemberRowProps {
   twoFactorStatus?: TwoFactorStatus;
   /** Which requirement columns the table is rendering, in order. */
   requirementColumns?: RequirementColumnKey[];
+  /** People compliance from /v1/people-lifecycle/compliance (#86). */
+  compliance?: MemberCompliance;
+  /** Emails "Your security tasks" to this member (#162). */
+  onSendReminder?: (memberId: string) => Promise<void>;
 }
 
 function getInitials(name?: string | null, email?: string | null): string {
@@ -147,6 +164,8 @@ export function MemberRow({
   backgroundCheckStepEnabled = true,
   twoFactorStatus,
   requirementColumns = ALL_REQUIREMENT_COLUMNS,
+  compliance,
+  onSendReminder,
 }: MemberRowProps) {
   const { orgId } = useParams<{ orgId: string }>();
 
@@ -180,6 +199,14 @@ export function MemberRow({
   // apply to this member (org flag off, exempt, auditor-only, admin, 0 total).
   const renderRequirementCell = (key: RequirementColumnKey) => {
     switch (key) {
+      case 'compliance':
+        return compliance && compliance.overall !== 'not_required' ? (
+          <span title={`${compliance.completedItems} of ${compliance.totalItems} done`}>
+            <Badge variant={COMPLIANCE_VARIANT[compliance.overall]}>{COMPLIANCE_LABEL[compliance.overall]}</Badge>
+          </span>
+        ) : (
+          <RequirementDash />
+        );
       case 'policies':
         return taskCompletion && taskCompletion.policies.total > 0 ? (
           <RequirementCount
@@ -358,11 +385,14 @@ export function MemberRow({
 
         {/* STATUS */}
         <TableCell>
-          {isDeactivated ? (
-            <Badge variant="destructive">Inactive</Badge>
-          ) : (
-            <Badge variant="secondary">Active</Badge>
-          )}
+          <div className="flex flex-wrap gap-1">
+            {isDeactivated ? (
+              <Badge variant="destructive">Inactive</Badge>
+            ) : (
+              <Badge variant="secondary">Active</Badge>
+            )}
+            {compliance?.member.former && <Badge variant="outline">Former</Badge>}
+          </div>
         </TableCell>
 
         {/* ROLE */}
@@ -438,6 +468,12 @@ export function MemberRow({
                   >
                     <Email size={16} className="mr-2" />
                     <span>{isSendingInvite ? 'Sending...' : 'Resend Portal Invite'}</span>
+                  </DropdownMenuItem>
+                )}
+                {!isDeactivated && canEdit && onSendReminder && (
+                  <DropdownMenuItem onClick={() => void onSendReminder(memberId)}>
+                    <Email size={16} className="mr-2" />
+                    <span>Send reminder</span>
                   </DropdownMenuItem>
                 )}
                 {!isDeactivated &&

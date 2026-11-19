@@ -9,9 +9,16 @@ type ChecklistItems = Awaited<
   ReturnType<OffboardingChecklistService['getMemberChecklist']>
 >['items'];
 
-type VendorList = Awaited<
+type Revocations = Awaited<
   ReturnType<AccessRevocationService['getAccessRevocations']>
->['vendors'];
+>;
+type VendorList = Revocations['systems'];
+
+/** Inventory systems, plus vendor rows someone actually confirmed. */
+const revocationRows = (r: Revocations): VendorList => [
+  ...r.systems,
+  ...r.vendors.filter((v) => v.revoked),
+];
 
 @Injectable()
 export class OffboardingExportService {
@@ -51,11 +58,11 @@ export class OffboardingExportService {
       );
 
     this.appendSummaryCsv(archive, checklist.items);
-    this.appendVendorRevocationsCsv(archive, revocations.vendors);
+    this.appendVendorRevocationsCsv(archive, revocationRows(revocations));
     await this.appendVendorEvidence(
       archive,
       organizationId,
-      revocations.vendors,
+      revocationRows(revocations),
     );
     await this.appendChecklistEvidence(
       archive,
@@ -91,18 +98,23 @@ export class OffboardingExportService {
     prefix = '',
   ) {
     const rows = [
-      'Vendor,Confirmed By,Date,Has Evidence',
+      'System,Source,Accounts,Status,Confirmed By,Date,Notes,Has Evidence',
       ...vendors.map((v) => {
-        const confirmedBy = v.revokedBy?.name ?? '';
+        const confirmedBy = v.revokedBy?.name ?? (v.revoked ? 'Access inventory' : '');
         const date = v.revokedAt
           ? new Date(v.revokedAt).toISOString().split('T')[0]
           : '';
+        const status = v.stillActive ? 'Revoked but still active' : v.revoked ? 'Revoked' : 'Pending';
+        const accounts = v.accounts.map((a) => `${a.name} (${a.status})`).join('; ');
         const hasEvidence = (v.evidence?.length ?? 0) > 0 ? 'Yes' : 'No';
-        return `"${escapeCsvField(v.vendorName)}","${escapeCsvField(confirmedBy)}",${date},${hasEvidence}`;
+        return [v.name, v.kind === 'vendor' ? 'Vendor' : 'Access inventory', accounts, status, confirmedBy]
+          .map((f) => `"${escapeCsvField(f)}"`)
+          .concat(date, `"${escapeCsvField(v.notes ?? '')}"`, hasEvidence)
+          .join(',');
       }),
     ];
     archive.append(rows.join('\n'), {
-      name: `${prefix}vendor-access-revocations/vendor-access-revocations.csv`,
+      name: `${prefix}access-revocations/access-revocations.csv`,
     });
   }
 
@@ -119,7 +131,7 @@ export class OffboardingExportService {
         if (!buffer) continue;
         const safeName = sanitizeFileName(file.name);
         archive.append(buffer, {
-          name: `${prefix}vendor-access-revocations/evidence/${file.id}-${safeName}`,
+          name: `${prefix}access-revocations/evidence/${file.id}-${safeName}`,
         });
       }
     }
@@ -186,10 +198,14 @@ export class OffboardingExportService {
   }) {
     const BATCH_SIZE = 50;
     let cursor: string | undefined;
+    const register = [
+      'Name,Email,Offboard date,Account,Checklist completed,Systems revoked,Revoked but still active',
+    ];
 
     while (true) {
       const batch = await db.member.findMany({
-        where: { organizationId, offboardDate: { not: null }, deactivated: true },
+        // #85: everyone with an offboard date, the same population as the register.
+        where: { organizationId, offboardDate: { not: null } },
         include: { user: { select: { name: true, email: true } } },
         orderBy: [{ offboardDate: 'desc' }, { id: 'asc' }],
         take: BATCH_SIZE,
@@ -213,14 +229,28 @@ export class OffboardingExportService {
         );
 
         this.appendSummaryCsv(archive, checklist.items, memberPrefix);
-        this.appendVendorRevocationsCsv(archive, revocations.vendors, memberPrefix);
-        await this.appendVendorEvidence(archive, organizationId, revocations.vendors, memberPrefix);
+        this.appendVendorRevocationsCsv(archive, revocationRows(revocations), memberPrefix);
+        await this.appendVendorEvidence(archive, organizationId, revocationRows(revocations), memberPrefix);
+        register.push(
+          [
+            member.user.name ?? '',
+            member.user.email,
+            member.offboardDate ? member.offboardDate.toISOString().slice(0, 10) : '',
+            member.deactivated ? 'Deactivated' : 'Active',
+            `${checklist.completedItems}/${checklist.totalItems}`,
+            `${revocations.revokedCount}/${revocations.totalSystems}`,
+            String(revocations.stillActiveCount),
+          ]
+            .map((f) => `"${escapeCsvField(f)}"`)
+            .join(','),
+        );
         await this.appendChecklistEvidence(archive, organizationId, checklist.items, memberPrefix);
       }
 
       if (batch.length < BATCH_SIZE) break;
       cursor = batch[batch.length - 1]!.id;
     }
+    archive.append(register.join('\n'), { name: `${prefix}offboarding-register.csv` });
   }
 
   private async getAttachmentBuffer(

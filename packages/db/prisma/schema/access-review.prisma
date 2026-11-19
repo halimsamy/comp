@@ -17,6 +17,8 @@ model AccessSystem {
   name        String
   description String?
   importedAt  DateTime?
+  // Allowed account types (PCI DSS 7.2.2, 8.2.2): { human|service|shared: { allowed: boolean, justification?: string } }.
+  allowedAccountTypes Json?
 
   accounts AccessSystemAccount[]
 
@@ -45,6 +47,32 @@ model AccessSystemAccount {
   accountCreatedAt DateTime?
 
   @@unique([systemId, externalId])
+}
+
+// Approved role per system (replaces the RBAC Matrix / Account Types forms;
+// ISO 27001 A.5.15, A.8.2; PCI DSS 7.2.1, 7.2.2). Keyed by system key so it
+// covers Comp AI, integrations and manual systems alike.
+model AccessSystemRole {
+  id String @id @default(dbgenerated("generate_prefixed_cuid('asr'::text)"))
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  systemKey        String
+  systemName       String
+  name             String
+  permissionsScope String?
+  isPrivileged     Boolean   @default(false)
+  approvedById     String?
+  approvedByName   String?
+  approvedAt       DateTime?
+  lastReviewedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, systemKey, name])
+  @@index([organizationId])
 }
 
 // Manual owner mapping for accounts that email matching can't place.
@@ -154,6 +182,8 @@ model AccessReviewItem {
   decidedAt       DateTime?
   remediatedAt    DateTime?
   remediationNote String?
+  // Proof of the change: a ticket link and/or an attachment (entity access_review_item).
+  remediationUrl  String?
 
   @@index([reviewId])
   @@index([organizationId])

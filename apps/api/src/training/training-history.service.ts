@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { db } from '@db';
 import { TrainingCertificatePdfService } from './training-certificate-pdf.service';
+import { certificateDetails } from './certificate-details';
 import { computeTrainingCycles, type TrainingCycle } from './training-cycles';
 
 @Injectable()
@@ -70,13 +71,19 @@ export class TrainingHistoryService {
     );
     if (!cycle) throw new BadRequestException('No completed training cycle matches');
 
-    const member = await db.member.findFirst({
-      where: { id: memberId, organizationId },
-      select: {
-        user: { select: { name: true } },
-        organization: { select: { name: true } },
-      },
-    });
+    const [member, module] = await Promise.all([
+      db.member.findFirst({
+        where: { id: memberId, organizationId },
+        select: {
+          user: { select: { name: true } },
+          organization: { select: { name: true } },
+        },
+      }),
+      db.trainingModule.findFirst({
+        where: { id: moduleId, organizationId },
+        select: { frameworkReference: true, title: true },
+      }),
+    ]);
     const userName = member?.user.name || 'Team Member';
 
     const pdf = await this.certificatePdfService.generateCustomCertificatePdf({
@@ -84,6 +91,7 @@ export class TrainingHistoryService {
       organizationName: member?.organization.name || 'Organization',
       completedAt: cycle.completedAt,
       title: cycle.title,
+      details: certificateDetails({ cycle, memberId, module }),
     });
     const slug = (value: string) => value.replace(/[^a-zA-Z0-9]+/g, '-').toLowerCase();
     const date = cycle.completedAt.toISOString().slice(0, 10);

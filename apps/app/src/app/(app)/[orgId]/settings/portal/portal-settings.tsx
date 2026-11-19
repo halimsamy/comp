@@ -3,6 +3,7 @@
 import { useOrganizationMutations } from '@/hooks/use-organization-mutations';
 import { usePermissions } from '@/hooks/use-permissions';
 import { SettingGroup, SettingRow, Switch } from '@trycompai/design-system';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -22,6 +23,7 @@ export function PortalSettings({
   const { hasPermission } = usePermissions();
   const { updateOrganization } = useOrganizationMutations();
   const [updatingField, setUpdatingField] = useState<string | null>(null);
+  const router = useRouter();
 
   const handleToggle = async (
     field: string,
@@ -33,6 +35,7 @@ export function PortalSettings({
     try {
       await updateOrganization({ [field]: value });
       toast.success(successMessage);
+      router.refresh();
     } catch {
       toast.error(errorMessage);
     } finally {

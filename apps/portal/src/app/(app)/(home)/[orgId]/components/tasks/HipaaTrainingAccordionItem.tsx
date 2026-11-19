@@ -5,7 +5,7 @@ import {
   hipaaAcknowledgements,
   hipaaTrainingSections,
 } from '@/lib/data/hipaa-training-content';
-import { useTrainingCompletions } from '@/hooks/use-training-completions';
+import type { EmployeeTrainingVideoCompletion } from '@db';
 import {
   AccordionContent,
   AccordionItem,
@@ -16,8 +16,13 @@ import {
 import { CheckmarkFilled, CircleDash } from '@trycompai/design-system/icons';
 import { useState } from 'react';
 
-export function HipaaTrainingAccordionItem() {
-  const { completions, markVideoComplete } = useTrainingCompletions();
+export function HipaaTrainingAccordionItem({
+  completions,
+  onMarkComplete,
+}: {
+  completions: EmployeeTrainingVideoCompletion[];
+  onMarkComplete: (videoId: string) => Promise<void>;
+}) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [allChecked, setAllChecked] = useState(false);
   const [checkedItems, setCheckedItems] = useState<Record<number, boolean>>({});
@@ -39,7 +44,7 @@ export function HipaaTrainingAccordionItem() {
     if (!allChecked || isSubmitting) return;
     setIsSubmitting(true);
     try {
-      await markVideoComplete(HIPAA_TRAINING_ID);
+      await onMarkComplete(HIPAA_TRAINING_ID);
     } finally {
       setIsSubmitting(false);
     }

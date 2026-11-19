@@ -10,6 +10,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  IsUrl,
   Matches,
   MaxLength,
   ValidateNested,
@@ -80,11 +81,37 @@ export class DecideAccessReviewItemsDto {
 }
 
 export class RemediateAccessReviewItemDto {
-  @ApiPropertyOptional({ description: 'What was done, e.g. a ticket link' })
+  @ApiPropertyOptional({ description: 'What was done' })
   @IsOptional()
   @IsString()
   @MaxLength(1000)
   note?: string;
+
+  @ApiPropertyOptional({
+    description: 'Ticket or change link as proof',
+    example: 'https://acme.atlassian.net/browse/IT-42',
+  })
+  @IsOptional()
+  @IsUrl({ require_protocol: true })
+  @MaxLength(2000)
+  url?: string;
+
+  @ApiPropertyOptional({ description: 'Proof file name (with fileType and fileData)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  fileName?: string;
+
+  @ApiPropertyOptional({ description: 'Proof file MIME type' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  fileType?: string;
+
+  @ApiPropertyOptional({ description: 'Proof file content, base64' })
+  @IsOptional()
+  @IsString()
+  fileData?: string;
 }
 
 export class SignOffAccessReviewDto {

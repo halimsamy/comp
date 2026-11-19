@@ -1,11 +1,18 @@
 import { metadata, schemaTask } from '@trycompai/jobs';
 import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { createElement } from 'react';
 import { z } from 'zod';
+import { EvidenceExportReadyEmail } from '@/email/templates/evidence-export-ready';
+import { triggerEmail } from '@/email/trigger-email';
 import { AttachmentsService } from '@/attachments/attachments.service';
 import { AccessRevocationService } from '@/offboarding-checklist/access-revocation.service';
 import { OffboardingChecklistService } from '@/offboarding-checklist/offboarding-checklist.service';
 import { OffboardingExportService } from '@/offboarding-checklist/offboarding-export.service';
+import {
+  frameworkExportKey,
+  periodSlug,
+} from '@/tasks/evidence-export/framework-evidence-export.dto';
 import { FrameworkEvidenceExportService } from '@/tasks/evidence-export/framework-evidence-export.service';
 import { REGISTER_KEYS } from '@/tasks/evidence-export/registers/registers';
 import { PolicyPdfRendererService } from '@/trust-portal/policy-pdf-renderer.service';
@@ -30,7 +37,7 @@ const accessRevocations = new AccessRevocationService(attachments);
 const offboardingExport = new OffboardingExportService(
   attachments,
   accessRevocations,
-  new OffboardingChecklistService(attachments, accessRevocations),
+  new OffboardingChecklistService(attachments),
 );
 
 /**
@@ -55,8 +62,14 @@ export const exportFrameworkEvidenceTask = schemaTask({
     period: z
       .object({ from: z.string().datetime().optional(), to: z.string().datetime().optional() })
       .default({}),
+    auditId: z.string().optional(),
+    /** The requester; emailed the download link when the ZIP is ready. */
+    notifyEmail: z.string().email().optional(),
   }),
-  run: async ({ organizationId, frameworkInstanceId, access, period }) => {
+  run: async (
+    { organizationId, frameworkInstanceId, access, period, auditId, notifyEmail },
+    { ctx },
+  ) => {
     metadata.set('status', 'generating');
 
     const framework = await exportService.loadFramework(
@@ -65,8 +78,8 @@ export const exportFrameworkEvidenceTask = schemaTask({
     );
     const s3Client = createS3Client();
     const bucket = getBucketName();
-    // One object per framework, overwritten by each export, so storage stays bounded.
-    const s3Key = `${organizationId}/exports/framework-evidence-${frameworkInstanceId}.zip`;
+    const s3Key = frameworkExportKey({ organizationId, frameworkInstanceId, runId: ctx.run.id });
+    const fileName = `${framework.root}_${periodSlug(period)}.zip`;
 
     await streamArchiveToS3({
       s3Client,
@@ -83,6 +96,7 @@ export const exportFrameworkEvidenceTask = schemaTask({
             to: period.to ? new Date(period.to) : undefined,
           },
           offboardingExport,
+          auditId,
         }),
     });
 
@@ -91,12 +105,29 @@ export const exportFrameworkEvidenceTask = schemaTask({
       new GetObjectCommand({
         Bucket: bucket,
         Key: s3Key,
-        ResponseContentDisposition: `attachment; filename="${framework.root}.zip"`,
+        ResponseContentDisposition: `attachment; filename="${fileName}"`,
       }),
       { expiresIn: DOWNLOAD_URL_EXPIRY },
     );
 
+    if (notifyEmail) {
+      // A lost email must not fail the export: the UI still downloads from the run output.
+      await triggerEmail({
+        to: notifyEmail,
+        subject: `Your ${framework.frameworkName} evidence export is ready`,
+        system: true,
+        react: createElement(EvidenceExportReadyEmail, {
+          email: notifyEmail,
+          organizationName: framework.organizationName,
+          frameworkName: framework.frameworkName,
+          periodLabel: periodSlug(period).replace(/_/g, ' ').replace('all-time', 'all time'),
+          downloadUrl,
+          expiresInHours: DOWNLOAD_URL_EXPIRY / 3600,
+        }),
+      }).catch(() => undefined);
+    }
+
     metadata.set('status', 'completed');
-    return { downloadUrl, s3Key };
+    return { downloadUrl, s3Key, fileName };
   },
 });

@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PeopleService } from './people.service';
 import { PeopleInviteService } from './people-invite.service';
-import { PeopleAccessService } from './people-access.service';
 import { AttachmentsService } from '../attachments/attachments.service';
 import type { AuthContext } from '../auth/types';
 import { HybridAuthGuard } from '../auth/hybrid-auth.guard';
@@ -91,10 +90,6 @@ describe('PeopleController', () => {
     deleteAttachment: jest.fn(),
   };
 
-  const mockPeopleAccessService = {
-    getMemberAccess: jest.fn(),
-  };
-
   const mockGuard = { canActivate: jest.fn().mockReturnValue(true) };
 
   const mockAuthContext: AuthContext = {
@@ -113,7 +108,6 @@ describe('PeopleController', () => {
       providers: [
         { provide: PeopleService, useValue: mockPeopleService },
         { provide: PeopleInviteService, useValue: mockPeopleInviteService },
-        { provide: PeopleAccessService, useValue: mockPeopleAccessService },
         { provide: AttachmentsService, useValue: mockAttachmentsService },
       ],
     })

@@ -23,11 +23,12 @@ import {
 } from '@trycompai/design-system';
 import { Controller, useForm } from 'react-hook-form';
 import { z } from 'zod';
+import { nextReviewName } from '../lib/access-labels';
 import type { OwnerOption } from './AccountOwnerDialog';
 
 const reviewSchema = z.object({
   name: z.string().trim().min(1, 'Name the review').max(200),
-  dueDate: z.string().min(1, 'Pick a due date'),
+  dueDate: z.string().min(1, 'Pick an end date'),
   systems: z
     .array(
       z.object({
@@ -40,11 +41,18 @@ const reviewSchema = z.object({
 });
 export type ReviewValues = z.infer<typeof reviewSchema>;
 
-function defaults(systems: AccessSystem[], now = new Date()): ReviewValues {
-  const half = now.getMonth() < 6 ? 'H1' : 'H2';
+function defaults({
+  systems,
+  existingNames,
+  now = new Date(),
+}: {
+  systems: AccessSystem[];
+  existingNames: string[];
+  now?: Date;
+}): ReviewValues {
   const due = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 30);
   return {
-    name: `${half} ${now.getFullYear()} user access review`,
+    name: nextReviewName({ existing: existingNames, now }),
     dueDate: due.toISOString().slice(0, 10),
     systems: systems.map((s) => ({ systemKey: s.key, selected: s.accountCount > 0, reviewerMemberId: '' })),
   };
@@ -55,12 +63,15 @@ export function StartReviewSheet({
   open,
   systems,
   members,
+  existingNames = [],
   onOpenChange,
   onStart,
 }: {
   open: boolean;
   systems: AccessSystem[];
   members: OwnerOption[];
+  /** Names already used, so the suggested half-year name is unique. */
+  existingNames?: string[];
   onOpenChange: (open: boolean) => void;
   onStart: (values: ReviewValues) => Promise<void>;
 }) {
@@ -68,7 +79,7 @@ export function StartReviewSheet({
     control,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<ReviewValues>({ resolver: zodResolver(reviewSchema), values: defaults(systems) });
+  } = useForm<ReviewValues>({ resolver: zodResolver(reviewSchema), values: defaults({ systems, existingNames }) });
 
   const handleStart = handleSubmit(async (values) => {
     await onStart(values);
@@ -82,7 +93,9 @@ export function StartReviewSheet({
           <SheetTitle>Start an access review</SheetTitle>
           <SheetDescription>
             The accounts of each system are snapshotted now. Reviewers keep, revoke or modify each
-            one, then management signs off. PCI DSS 7.2.4 requires this at least every six months.
+            one, then another manager signs off. Reviewers are emailed now and three days before the
+            end date. Only people who can manage members can review. PCI DSS 7.2.4 requires this at
+            least every six months.
           </SheetDescription>
         </SheetHeader>
         <SheetBody>
@@ -100,13 +113,24 @@ export function StartReviewSheet({
                 </span>
               )}
             </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="review-due">Due date</Label>
-              <Controller
-                control={control}
-                name="dueDate"
-                render={({ field: { ref: _ref, ...field } }) => <Input {...field} id="review-due" type="date" />}
-              />
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="review-start">Start date</Label>
+                <Input id="review-start" type="date" value={new Date().toISOString().slice(0, 10)} disabled readOnly />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="review-due">End date</Label>
+                <Controller
+                  control={control}
+                  name="dueDate"
+                  render={({ field: { ref: _ref, ...field } }) => <Input {...field} id="review-due" type="date" />}
+                />
+                {errors.dueDate && (
+                  <span role="alert" className="text-xs text-destructive">
+                    {errors.dueDate.message}
+                  </span>
+                )}
+              </div>
             </div>
             <div className="flex flex-col gap-3">
               <Label>Systems and reviewers</Label>

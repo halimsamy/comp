@@ -43,7 +43,7 @@ export class AccessReviewEvidenceService {
   }) {
     const task = await db.task.findFirst({
       where: { organizationId, taskTemplateId: TASK_TEMPLATES.accessReviewLog },
-      select: { id: true, frequency: true, status: true },
+      select: { id: true, frequency: true, status: true, approverId: true },
     });
     if (!task) return;
     const { buffer, filename } = await this.report({ organizationId, id });
@@ -65,7 +65,10 @@ export class AccessReviewEvidenceService {
         : [
             db.task.update({
               where: { id: task.id },
-              data: completedTaskData(task.frequency, signedOffAt),
+              // With an approver the evidence waits for their approval (#80).
+              data: task.approverId
+                ? { status: 'in_review' }
+                : completedTaskData(task.frequency, signedOffAt),
             }),
           ]),
       db.accessReview.update({

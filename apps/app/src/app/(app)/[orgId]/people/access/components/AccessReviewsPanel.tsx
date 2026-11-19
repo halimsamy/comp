@@ -116,7 +116,7 @@ export function AccessReviewsPanel({ orgId, members }: { orgId: string; members:
               <TableHead>Status</TableHead>
               <TableHead>Progress</TableHead>
               <TableHead>Flagged</TableHead>
-              <TableHead>Due</TableHead>
+              <TableHead>End date</TableHead>
               <TableHead>Signed off</TableHead>
             </TableRow>
           </TableHeader>
@@ -165,6 +165,7 @@ export function AccessReviewsPanel({ orgId, members }: { orgId: string; members:
         open={sheetOpen}
         systems={systems}
         members={members}
+        existingNames={reviews.map((r) => r.name)}
         onOpenChange={setSheetOpen}
         onStart={handleStart}
       />

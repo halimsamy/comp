@@ -22,17 +22,16 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { useCallback, useState } from 'react';
 import { InviteMembersModal } from '../all/components/InviteMembersModal';
+import { exportOffboardingEvidence } from './export-offboarding-evidence';
 
 interface PeoplePageTabsProps {
   peopleContent: ReactNode;
-  employeeTasksContent: ReactNode | null;
   devicesContent: ReactNode;
   orgChartContent: ReactNode;
   accessContent?: ReactNode;
   findingsContent?: ReactNode | null;
   roleMappingContent: ReactNode | null;
   showRoleMapping: boolean;
-  showEmployeeTasks: boolean;
   settingsContent: ReactNode | null;
   showSettings: boolean;
   canInviteUsers: boolean;
@@ -44,15 +43,15 @@ interface PeoplePageTabsProps {
 /** ?tab= value → Radix tab value */
 function tabParamToInternal(
   tabParam: string | null,
-  showEmployeeTasks: boolean,
   showRoleMapping: boolean,
   showSettings: boolean,
 ): string {
   if (!tabParam || tabParam === 'people') {
     return 'people';
   }
+  // The Tasks tab became the People table's Compliance column (#86); old links land on People.
   if (tabParam === 'tasks') {
-    return showEmployeeTasks ? 'employee-tasks' : 'people';
+    return 'people';
   }
   if (tabParam === 'devices') {
     return 'devices';
@@ -75,8 +74,6 @@ function tabParamToInternal(
 /** Radix tab value → ?tab= query param */
 function internalValueToTabParam(value: string): string {
   switch (value) {
-    case 'employee-tasks':
-      return 'tasks';
     case 'org-chart':
       return 'chart';
     case 'people':
@@ -92,14 +89,12 @@ function internalValueToTabParam(value: string): string {
 
 export function PeoplePageTabs({
   peopleContent,
-  employeeTasksContent,
   devicesContent,
   orgChartContent,
   accessContent,
   findingsContent,
   roleMappingContent,
   showRoleMapping,
-  showEmployeeTasks,
   settingsContent,
   showSettings,
   canInviteUsers,
@@ -117,7 +112,6 @@ export function PeoplePageTabs({
 
   const activeTab = tabParamToInternal(
     searchParams.get('tab'),
-    showEmployeeTasks,
     showRoleMapping,
     showSettings,
   );
@@ -146,7 +140,6 @@ export function PeoplePageTabs({
             tabs={
               <TabsList variant="underline">
                 <TabsTrigger value="people">People</TabsTrigger>
-                {showEmployeeTasks && <TabsTrigger value="employee-tasks">Tasks</TabsTrigger>}
                 <TabsTrigger value="devices">Devices</TabsTrigger>
                 <TabsTrigger value="org-chart">Chart</TabsTrigger>
                 {accessContent && <TabsTrigger value="access">Access</TabsTrigger>}
@@ -172,16 +165,12 @@ export function PeoplePageTabs({
                     <OverflowMenuVertical size={16} />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      onClick={() => {
-                        window.open('/api/offboarding-export?all=true', '_blank', 'noopener,noreferrer');
-                      }}
-                    >
-                      <Download size={14} className="mr-2" />
-                      Export offboarding
-                    </DropdownMenuItem>
                     {canExportPeople && (
                       <>
+                        <DropdownMenuItem onClick={() => void exportOffboardingEvidence()}>
+                          <Download size={14} className="mr-2" />
+                          Export offboarding evidence
+                        </DropdownMenuItem>
                         <DropdownMenuItem
                           disabled={exporting !== null}
                           onClick={() => handleExport('people')}
@@ -196,13 +185,6 @@ export function PeoplePageTabs({
                           <Download size={14} className="mr-2" />
                           Export devices (CSV)
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                          disabled={exporting !== null}
-                          onClick={() => handleExport('offboarding')}
-                        >
-                          <Download size={14} className="mr-2" />
-                          Export offboarding records (CSV)
-                        </DropdownMenuItem>
                       </>
                     )}
                   </DropdownMenuContent>
@@ -213,9 +195,6 @@ export function PeoplePageTabs({
         }
       >
         <TabsContent value="people">{peopleContent}</TabsContent>
-        {showEmployeeTasks && (
-          <TabsContent value="employee-tasks">{employeeTasksContent}</TabsContent>
-        )}
         <TabsContent value="devices">{devicesContent}</TabsContent>
         <TabsContent value="org-chart">{orgChartContent}</TabsContent>
         {accessContent && <TabsContent value="access">{accessContent}</TabsContent>}

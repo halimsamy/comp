@@ -28,6 +28,9 @@ export function RoleTrainingAccordionItem({
   onCompleted,
 }: RoleTrainingAccordionItemProps) {
   const [submittingId, setSubmittingId] = useState<string | null>(null);
+  // #64: a module with content can only be marked complete after it was opened.
+  const [openedIds, setOpenedIds] = useState<Set<string>>(() => new Set());
+  const handleOpen = (id: string) => setOpenedIds((current) => new Set(current).add(id));
   const isCompleted = modules.every((m) => m.isCurrent);
 
   const handleComplete = async (module: PortalTrainingModule) => {
@@ -100,7 +103,12 @@ export function RoleTrainingAccordionItem({
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
                   {module.contentUrl && (
-                    <a href={module.contentUrl} target="_blank" rel="noopener noreferrer">
+                    <a
+                      href={module.contentUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => handleOpen(module.id)}
+                    >
                       <Button variant="outline" iconRight={<Launch size={16} />}>
                         Open
                       </Button>
@@ -110,7 +118,9 @@ export function RoleTrainingAccordionItem({
                     <Button
                       onClick={() => handleComplete(module)}
                       loading={submittingId === module.id}
-                      disabled={submittingId !== null}
+                      disabled={
+                        submittingId !== null || (!!module.contentUrl && !openedIds.has(module.id))
+                      }
                     >
                       Mark as complete
                     </Button>

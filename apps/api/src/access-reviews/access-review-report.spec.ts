@@ -17,6 +17,7 @@ const item = (partial: Partial<ReportItem>): ReportItem => ({
   remediatedAt: null,
   comment: null,
   decidedByName: 'Admin',
+  decidedAt: new Date('2026-11-10'),
   remediationNote: null,
   ...partial,
 });

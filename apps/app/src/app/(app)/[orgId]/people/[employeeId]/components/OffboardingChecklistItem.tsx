@@ -79,7 +79,7 @@ function AccessRevocationStatusCircle({ memberId }: { memberId: string }) {
   return (
     <StatusCircle
       done={revocations.revokedCount}
-      total={revocations.totalVendors}
+      total={revocations.totalSystems}
     />
   );
 }
@@ -138,13 +138,13 @@ function AccessRevocationProgress({ memberId }: { memberId: string }) {
   const { revocations } = useAccessRevocations(memberId);
   if (!revocations) return null;
   const pct =
-    revocations.totalVendors > 0
-      ? revocations.revokedCount / revocations.totalVendors
+    revocations.totalSystems > 0
+      ? revocations.revokedCount / revocations.totalSystems
       : 0;
   return (
     <div className="flex items-center gap-2">
       <span className="min-w-[56px] text-right font-mono text-xs tabular-nums text-muted-foreground">
-        {revocations.revokedCount}/{revocations.totalVendors}
+        {revocations.revokedCount}/{revocations.totalSystems}
       </span>
       <div className="h-1 w-[60px] overflow-hidden rounded-full bg-muted">
         <div

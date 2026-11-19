@@ -13,6 +13,7 @@ jest.mock('@db', () => ({
       update: jest.fn(),
       updateMany: jest.fn(),
     },
+    auditLog: { createMany: jest.fn() },
     $transaction: jest.fn(),
   },
 }));
@@ -24,6 +25,7 @@ import {
 } from '@nestjs/common';
 import { db } from '@db';
 import type { AccessAccountsService } from './access-accounts.service';
+import type { AttachmentsService } from '../attachments/attachments.service';
 import type { AccessReviewEvidenceService } from './access-review-evidence.service';
 import { AccessReviewsService } from './access-reviews.service';
 
@@ -36,6 +38,7 @@ describe('AccessReviewsService', () => {
   const service = new AccessReviewsService(
     accounts as unknown as AccessAccountsService,
     evidence as unknown as AccessReviewEvidenceService,
+    {} as AttachmentsService,
   );
   const tx = {
     accessReview: { create: jest.fn() },
@@ -46,7 +49,8 @@ describe('AccessReviewsService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mocked(db.$transaction).mockImplementation(
-      (fn: (t: typeof tx) => unknown) => fn(tx),
+      (arg: ((t: typeof tx) => unknown) | Promise<unknown>[]) =>
+        Array.isArray(arg) ? Promise.all(arg) : arg(tx),
     );
     mocked(db.member.findFirst).mockResolvedValue({
       user: { name: 'Admin', email: 'a@x.com' },
@@ -159,27 +163,117 @@ describe('AccessReviewsService', () => {
   });
 
   describe('decide', () => {
-    it('updates only items of this review in this organization', async () => {
-      mocked(db.accessReviewItem.updateMany).mockResolvedValue({ count: 2 });
+    const item = (id: string, extra: Record<string, unknown> = {}) => ({
+      id,
+      accountName: id,
+      decision: null,
+      flags: [],
+      ownerMemberId: 'mem_other',
+      reviewSystem: { reviewerId: null, systemName: 'Bank' },
+      ...extra,
+    });
+
+    it('updates only items of this review in this organization and logs each decision', async () => {
+      mocked(db.accessReviewItem.findMany).mockResolvedValue([item('ari_1'), item('ari_2')]);
       const result = await service.decide({
         organizationId: ORG,
         id: 'arv_1',
         callerMemberId: 'mem_admin',
+        userId: 'usr_admin',
         dto: { itemIds: ['ari_1', 'ari_2'], decision: 'keep' },
       });
-      expect(result).toEqual({ updated: 2 });
+      expect(result).toEqual({ updated: 2, skipped: 0 });
+      expect(db.accessReviewItem.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: { in: ['ari_1', 'ari_2'] }, reviewId: 'arv_1', organizationId: ORG },
+        }),
+      );
       expect(db.accessReviewItem.updateMany).toHaveBeenCalledWith({
-        where: {
-          id: { in: ['ari_1', 'ari_2'] },
-          reviewId: 'arv_1',
-          organizationId: ORG,
-        },
+        where: { id: { in: ['ari_1', 'ari_2'] } },
         data: expect.objectContaining({
           decision: 'keep',
           decidedById: 'mem_admin',
           decidedByName: 'Admin',
         }),
       });
+      const logged = mocked(db.auditLog.createMany).mock.calls[0][0].data;
+      expect(logged).toHaveLength(2);
+      expect(logged[0]).toMatchObject({
+        organizationId: ORG,
+        userId: 'usr_admin',
+        data: expect.objectContaining({ action: 'access_review_decision', newValue: 'keep' }),
+      });
+    });
+
+    it('bulk decide skips rows that already have a decision and never clears their remediation (#79)', async () => {
+      mocked(db.accessReviewItem.findMany).mockResolvedValue([
+        item('ari_1'),
+        item('ari_2', { decision: 'revoke' }),
+      ]);
+      const result = await service.decide({
+        organizationId: ORG,
+        id: 'arv_1',
+        callerMemberId: 'mem_admin',
+        dto: { itemIds: ['ari_1', 'ari_2'], decision: 'keep' },
+      });
+      expect(result).toEqual({ updated: 1, skipped: 1 });
+      const touched = mocked(db.accessReviewItem.updateMany).mock.calls.flatMap(
+        (c) => c[0].where.id.in,
+      );
+      expect(touched).toEqual(['ari_1']);
+    });
+
+    it('re-deciding one row with the same decision keeps its remediation', async () => {
+      mocked(db.accessReviewItem.findMany).mockResolvedValue([item('ari_1', { decision: 'revoke' })]);
+      await service.decide({
+        organizationId: ORG,
+        id: 'arv_1',
+        callerMemberId: 'mem_admin',
+        dto: { itemIds: ['ari_1'], decision: 'revoke', comment: 'ticket' },
+      });
+      const [clearing, noteOnly] = mocked(db.accessReviewItem.updateMany).mock.calls.map((c) => c[0]);
+      expect(clearing.where.id.in).toEqual([]);
+      expect(noteOnly.where.id.in).toEqual(['ari_1']);
+      expect(noteOnly.data).not.toHaveProperty('remediatedAt');
+    });
+
+    it('requires a justification to keep a flagged account', async () => {
+      mocked(db.accessReviewItem.findMany).mockResolvedValue([item('ari_1', { flags: ['inactive'] })]);
+      await expect(
+        service.decide({
+          organizationId: ORG,
+          id: 'arv_1',
+          callerMemberId: 'mem_admin',
+          dto: { itemIds: ['ari_1'], decision: 'keep' },
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('403s when deciding on your own account (#80)', async () => {
+      mocked(db.accessReviewItem.findMany).mockResolvedValue([item('ari_1', { ownerMemberId: 'mem_admin' })]);
+      await expect(
+        service.decide({
+          organizationId: ORG,
+          id: 'arv_1',
+          callerMemberId: 'mem_admin',
+          dto: { itemIds: ['ari_1'], decision: 'keep', comment: 'mine' },
+        }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+      expect(db.accessReviewItem.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('403s when the system is assigned to another reviewer (#81)', async () => {
+      mocked(db.accessReviewItem.findMany).mockResolvedValue([
+        item('ari_1', { reviewSystem: { reviewerId: 'mem_rev', systemName: 'Bank' } }),
+      ]);
+      await expect(
+        service.decide({
+          organizationId: ORG,
+          id: 'arv_1',
+          callerMemberId: 'mem_admin',
+          dto: { itemIds: ['ari_1'], decision: 'keep' },
+        }),
+      ).rejects.toThrow('assigned to another reviewer');
     });
 
     it('requires a note for modify decisions', async () => {

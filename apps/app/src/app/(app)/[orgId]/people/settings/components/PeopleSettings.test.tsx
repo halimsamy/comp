@@ -10,6 +10,7 @@ vi.mock('@/lib/api-client', () => ({
   apiClient: {
     patch: (...args: unknown[]) => patchMock(...args),
   },
+  api: { put: vi.fn() },
 }));
 // The checklist and training sections fetch their own data; this suite only covers the toggle.
 vi.mock('@/hooks/use-api-swr', () => ({

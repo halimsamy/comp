@@ -5,10 +5,14 @@ import {
 } from '@nestjs/common';
 import { db } from '@db';
 import { TASK_TEMPLATES } from '@trycompai/integration-platform';
+import { CheckRunRepository } from '../integration-platform/repositories/check-run.repository';
+import { ConnectionRepository } from '../integration-platform/repositories/connection.repository';
 import { CheckResultsService } from '../integration-platform/services/check-results.service';
 import {
   accountFromCheckRow,
+  AllowedAccountTypesSchema,
   parseSystemKey,
+  type AllowedAccountTypes,
   type BaseAccount,
   type InventoryAccount,
   type SystemKind,
@@ -22,12 +26,15 @@ export interface AccessSystemInfo {
   logoUrl: string | null;
   description: string | null;
   lastSyncAt: string | null;
+  /** Manual systems only: which account types are allowed (#177). */
+  allowedAccountTypes?: AllowedAccountTypes;
 }
 
 interface SystemSource extends AccessSystemInfo {
   connectionId?: string;
   checkIds?: string[];
   manualId?: string;
+  importedAt?: Date | null;
 }
 
 const PRIVILEGED_ROLES = new Set(['owner', 'admin']);
@@ -43,25 +50,49 @@ export class AccessAccountsService {
   constructor(private readonly checkResults: CheckResultsService) {}
 
   async listSystems(organizationId: string) {
+    const all = await this.listAllAccounts(organizationId);
+    return all.map(({ system, accounts }) => ({
+      ...system,
+      accountCount: accounts.length,
+      flaggedCount: accounts.filter((a) => a.flags.length > 0).length,
+    }));
+  }
+
+  /** Every system with its decorated accounts (exports, offboarding, revocation checks). */
+  async listAllAccounts(
+    organizationId: string,
+  ): Promise<{ system: AccessSystemInfo; accounts: InventoryAccount[] }[]> {
     const [systems, owners] = await Promise.all([
       this.loadSystems(organizationId),
       loadOwnerContext(organizationId),
     ]);
     const now = new Date();
     return Promise.all(
-      systems.map(async (system) => {
-        const accounts = decorateAccounts({
+      systems.map(async (system) => ({
+        system: publicInfo(system),
+        accounts: decorateAccounts({
           systemKey: system.key,
           accounts: await this.loadAccounts({ organizationId, system }),
           owners,
           now,
-        });
-        return {
-          ...publicInfo(system),
-          accountCount: accounts.length,
-          flaggedCount: accounts.filter((a) => a.flags.length > 0).length,
-        };
-      }),
+        }),
+      })),
+    );
+  }
+
+  /** One member's accounts across every system (#83, #82). */
+  async listMemberAccounts({
+    organizationId,
+    memberId,
+  }: {
+    organizationId: string;
+    memberId: string;
+  }) {
+    const all = await this.listAllAccounts(organizationId);
+    return all.flatMap(({ system, accounts }) =>
+      accounts
+        .filter((a) => a.owner?.memberId === memberId)
+        .map((account) => ({ ...account, system })),
     );
   }
 
@@ -140,6 +171,8 @@ export class AccessAccountsService {
         description: m.description,
         lastSyncAt: m.importedAt?.toISOString() ?? null,
         manualId: m.id,
+        importedAt: m.importedAt,
+        allowedAccountTypes: AllowedAccountTypesSchema.parse(m.allowedAccountTypes ?? {}),
       })),
     ];
   }
@@ -168,7 +201,8 @@ export class AccessAccountsService {
         isAdmin: r.isAdmin,
         mfaEnabled: r.mfaEnabled,
         lastLoginAt: r.lastLoginAt,
-        accountCreatedAt: r.accountCreatedAt,
+        // No creation date in the export: the import date starts the 90-day no-activity clock.
+        accountCreatedAt: r.accountCreatedAt ?? system.importedAt ?? null,
       }));
     }
     const { connectionId, checkIds = [] } = system;
@@ -235,7 +269,14 @@ export class AccessAccountsService {
   }
 }
 
+/** For trigger jobs and exports, outside Nest's injector. */
+export function createAccessAccountsService(): AccessAccountsService {
+  return new AccessAccountsService(
+    new CheckResultsService(new CheckRunRepository(), new ConnectionRepository()),
+  );
+}
+
 function publicInfo(system: SystemSource): AccessSystemInfo {
-  const { key, name, kind, logoUrl, description, lastSyncAt } = system;
-  return { key, name, kind, logoUrl, description, lastSyncAt };
+  const { key, name, kind, logoUrl, description, lastSyncAt, allowedAccountTypes } = system;
+  return { key, name, kind, logoUrl, description, lastSyncAt, ...(allowedAccountTypes && { allowedAccountTypes }) };
 }

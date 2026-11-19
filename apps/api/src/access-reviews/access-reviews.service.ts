@@ -5,17 +5,22 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { db } from '@db';
+import { AttachmentsService } from '../attachments/attachments.service';
 import { AccessAccountsService } from './access-accounts.service';
-import { AccessReviewEvidenceService } from './access-review-evidence.service';
 import {
-  findMemberName,
-  findOpenReview,
-  requireMemberName,
-} from './access-review-guards';
+  assertIndependentSignOff,
+  decideItems,
+} from './access-review-decide';
+import { AccessReviewEvidenceService } from './access-review-evidence.service';
+import { findOpenReview, requireMemberName } from './access-review-guards';
+import { createReview } from './access-review-create';
+import { notifyReviewers } from './access-review-notify';
+import { reconcileRevocations } from './access-review-reconcile';
 import { summarizeItems } from './access-review-report';
 import type {
   CreateAccessReviewDto,
   DecideAccessReviewItemsDto,
+  RemediateAccessReviewItemDto,
 } from './dto/access-reviews.dto';
 
 /**
@@ -31,6 +36,7 @@ export class AccessReviewsService {
   constructor(
     private readonly accounts: AccessAccountsService,
     private readonly evidence: AccessReviewEvidenceService,
+    private readonly attachments: AttachmentsService,
   ) {}
 
   async list(organizationId: string) {
@@ -49,6 +55,18 @@ export class AccessReviewsService {
   }
 
   async get({ organizationId, id }: { organizationId: string; id: string }) {
+    const open = await db.accessReview.findFirst({
+      where: { id, organizationId, status: 'in_progress' },
+      select: { id: true },
+    });
+    // Reconciling is best effort: an unreachable integration must not hide the review.
+    const stillActive = open
+      ? await reconcileRevocations({
+          organizationId,
+          accounts: this.accounts,
+          reviewId: id,
+        }).catch(() => new Set<string>())
+      : new Set<string>();
     const review = await db.accessReview.findFirst({
       where: { id, organizationId },
       include: {
@@ -57,7 +75,25 @@ export class AccessReviewsService {
       },
     });
     if (!review) throw new NotFoundException('Access review not found');
-    return { ...review, progress: summarizeItems(review.items) };
+    const proofs = await db.attachment.findMany({
+      where: {
+        organizationId,
+        entityType: 'access_review_item',
+        entityId: { in: review.items.map((i) => i.id) },
+      },
+      select: { id: true, name: true, entityId: true },
+    });
+    return {
+      ...review,
+      items: review.items.map((i) => ({
+        ...i,
+        revokedStillActive: stillActive.has(i.id),
+        proofFiles: proofs
+          .filter((p) => p.entityId === i.id)
+          .map(({ id, name }) => ({ id, name })),
+      })),
+      progress: summarizeItems(review.items),
+    };
   }
 
   async create({
@@ -69,143 +105,52 @@ export class AccessReviewsService {
     callerMemberId?: string;
     dto: CreateAccessReviewDto;
   }) {
-    const keys = dto.systems.map((s) => s.systemKey);
-    if (new Set(keys).size !== keys.length) {
-      throw new BadRequestException('Each system can only be added once');
-    }
-    const reviewerIds = [
-      ...new Set(
-        dto.systems
-          .map((s) => s.reviewerMemberId)
-          .filter((id): id is string => !!id),
-      ),
-    ];
-    const reviewers = await db.member.findMany({
-      where: { id: { in: reviewerIds }, organizationId, deactivated: false },
-      select: { id: true, user: { select: { name: true, email: true } } },
+    const review = await createReview({
+      organizationId,
+      callerMemberId,
+      dto,
+      accounts: this.accounts,
     });
-    if (reviewers.length !== reviewerIds.length) {
-      throw new BadRequestException(
-        'Reviewers must be active members of this organization',
-      );
-    }
-    const reviewerName = new Map(
-      reviewers.map((r) => [r.id, r.user.name || r.user.email]),
-    );
-    const caller = callerMemberId
-      ? await findMemberName({ organizationId, memberId: callerMemberId })
-      : null;
-
-    const snapshots = await Promise.all(
-      keys.map((systemKey) =>
-        this.accounts.getSystemAccounts({ organizationId, systemKey }),
-      ),
-    );
-    if (snapshots.every((s) => s.accounts.length === 0)) {
-      throw new BadRequestException(
-        'The selected systems have no accounts to review',
-      );
-    }
-
-    return db.$transaction(
-      async (tx) => {
-        const review = await tx.accessReview.create({
-          data: {
-            organizationId,
-            name: dto.name.trim(),
-            dueDate: new Date(dto.dueDate),
-            createdById: callerMemberId ?? null,
-            createdByName: caller,
-          },
-        });
-        for (const [index, input] of dto.systems.entries()) {
-          const { system, accounts } = snapshots[index];
-          const reviewSystem = await tx.accessReviewSystem.create({
-            data: {
-              reviewId: review.id,
-              systemKey: system.key,
-              systemName: system.name,
-              reviewerId: input.reviewerMemberId ?? null,
-              reviewerName: input.reviewerMemberId
-                ? (reviewerName.get(input.reviewerMemberId) ?? null)
-                : null,
-            },
-          });
-          await tx.accessReviewItem.createMany({
-            data: accounts.map((a) => ({
-              reviewId: review.id,
-              reviewSystemId: reviewSystem.id,
-              organizationId,
-              accountId: a.accountId,
-              accountName: a.name,
-              email: a.email,
-              ownerMemberId: a.owner?.memberId ?? null,
-              ownerName:
-                a.owner?.name ??
-                (a.isServiceAccount ? 'Service account' : null),
-              accountType: a.isServiceAccount ? 'service' : a.type,
-              accountStatus: a.status,
-              roles: a.roles,
-              isAdmin: a.isAdmin,
-              mfaEnabled: a.mfaEnabled,
-              lastLoginAt: a.lastLoginAt,
-              flags: a.flags,
-            })),
-          });
-        }
-        return review;
-      },
-      { timeout: 30_000 },
-    );
+    await notifyReviewers({ organizationId, reviewId: review.id, kind: 'started' });
+    return review;
   }
 
   async decide({
     organizationId,
     id,
     callerMemberId,
+    userId,
     dto,
   }: {
     organizationId: string;
     id: string;
     callerMemberId?: string;
+    userId?: string;
     dto: DecideAccessReviewItemsDto;
   }) {
     await findOpenReview({ organizationId, id });
-    const comment = dto.comment?.trim() || null;
-    if (dto.decision === 'modify' && !comment) {
-      throw new BadRequestException(
-        'Describe the access change for modify decisions',
-      );
-    }
-    const name = await requireMemberName({
+    return decideItems({
       organizationId,
-      memberId: callerMemberId,
+      reviewId: id,
+      callerMemberId,
+      userId,
+      dto,
     });
-    const result = await db.accessReviewItem.updateMany({
-      where: { id: { in: dto.itemIds }, reviewId: id, organizationId },
-      data: {
-        decision: dto.decision,
-        comment,
-        decidedById: callerMemberId,
-        decidedByName: name,
-        decidedAt: new Date(),
-        remediatedAt: null,
-        remediationNote: null,
-      },
-    });
-    return { updated: result.count };
   }
 
+  /** Mark a revoke/modify as carried out, with an optional ticket link and/or file as proof. */
   async remediate({
     organizationId,
     id,
     itemId,
-    note,
+    userId,
+    dto,
   }: {
     organizationId: string;
     id: string;
     itemId: string;
-    note?: string;
+    userId?: string;
+    dto: RemediateAccessReviewItemDto;
   }) {
     await findOpenReview({ organizationId, id });
     const item = await db.accessReviewItem.findFirst({
@@ -218,9 +163,27 @@ export class AccessReviewsService {
         'Only revoke or modify decisions need remediation',
       );
     }
+    if (dto.fileName && dto.fileType && dto.fileData) {
+      await this.attachments.uploadAttachment(
+        organizationId,
+        itemId,
+        'access_review_item',
+        {
+          fileName: dto.fileName,
+          fileType: dto.fileType,
+          fileData: dto.fileData,
+          description: 'Access change proof',
+        },
+        userId,
+      );
+    }
     return db.accessReviewItem.update({
       where: { id: itemId },
-      data: { remediatedAt: new Date(), remediationNote: note?.trim() || null },
+      data: {
+        remediatedAt: new Date(),
+        remediationNote: dto.note?.trim() || null,
+        remediationUrl: dto.url?.trim() || null,
+      },
     });
   }
 
@@ -241,6 +204,11 @@ export class AccessReviewsService {
     const name = await requireMemberName({
       organizationId,
       memberId: callerMemberId,
+    });
+    await assertIndependentSignOff({
+      organizationId,
+      reviewId: id,
+      callerMemberId,
     });
     const items = await db.accessReviewItem.findMany({
       where: { reviewId: id, organizationId },

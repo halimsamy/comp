@@ -3,8 +3,18 @@
 import { useApi } from '@/hooks/use-api';
 import { useApiSWR } from '@/hooks/use-api-swr';
 import { api as apiClient, type ApiResponse } from '@/lib/api-client';
+import { fileToBase64 } from '@/lib/file-utils';
 
-export type AccessFlag = 'owner_departed' | 'unmapped' | 'admin' | 'no_mfa' | 'inactive';
+export type AccessFlag =
+  | 'owner_departed'
+  | 'unmapped'
+  | 'admin'
+  | 'no_mfa'
+  | 'inactive'
+  | 'no_activity'
+  | 'role_not_approved'
+  | 'admin_role_unapproved'
+  | 'type_not_allowed';
 export type AccessDecision = 'keep' | 'revoke' | 'modify';
 
 export interface AccessSystem {
@@ -16,6 +26,10 @@ export interface AccessSystem {
   lastSyncAt: string | null;
   accountCount: number;
   flaggedCount: number;
+  /** Manual systems: which account types are allowed (#177). */
+  allowedAccountTypes?: Partial<
+    Record<'human' | 'service' | 'shared', { allowed: boolean; justification?: string | null }>
+  >;
 }
 
 export interface AccessAccount {
@@ -80,11 +94,23 @@ export interface AccessReviewItem {
   decidedAt: string | null;
   remediatedAt: string | null;
   remediationNote: string | null;
+  remediationUrl?: string | null;
+  ownerMemberId?: string | null;
+  /** Marked done, but the inventory still shows the account active (#90). */
+  revokedStillActive?: boolean;
+  proofFiles?: { id: string; name: string }[];
 }
 
 export interface AccessReviewDetail extends Omit<AccessReviewSummary, 'systems'> {
   signOffNote: string | null;
-  systems: { id: string; systemKey: string; systemName: string; reviewerName: string | null }[];
+  createdById?: string | null;
+  systems: {
+    id: string;
+    systemKey: string;
+    systemName: string;
+    reviewerId?: string | null;
+    reviewerName: string | null;
+  }[];
   items: AccessReviewItem[];
 }
 
@@ -92,13 +118,17 @@ export interface ImportedAccount {
   accountId: string;
   name?: string;
   email?: string;
-  type?: 'human' | 'service';
+  type?: 'human' | 'service' | 'shared';
   status?: 'active' | 'suspended' | 'deactivated';
   roles?: string[];
   isAdmin?: boolean;
   mfaEnabled?: boolean;
   lastLoginAt?: string;
   createdAt?: string;
+  /** Owner email or name (#89). */
+  owner?: string;
+  /** Why a service or shared account exists. */
+  justification?: string;
 }
 
 const list = <T>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : []);
@@ -152,7 +182,9 @@ export function useAccessMutations() {
       call(api.delete(`/v1/access/systems/${id}`), 'Failed to delete the system'),
     importAccounts: ({ id, accounts }: { id: string; accounts: ImportedAccount[] }) =>
       call(
-        api.post<{ imported: number }>(`/v1/access/systems/${id}/accounts`, { accounts }),
+        api.post<{ imported: number; ownersMapped?: number }>(`/v1/access/systems/${id}/accounts`, {
+          accounts,
+        }),
         'Failed to import accounts',
       ),
     createReview: (body: {
@@ -170,14 +202,34 @@ export function useAccessMutations() {
       comment?: string;
     }) =>
       call(
-        api.post(`/v1/access-reviews/${reviewId}/decisions`, body),
+        api.post<{ updated: number; skipped: number }>(`/v1/access-reviews/${reviewId}/decisions`, body),
         'Failed to save the decision',
       ),
-    remediate: ({ reviewId, itemId, note }: { reviewId: string; itemId: string; note?: string }) =>
-      call(
-        api.post(`/v1/access-reviews/${reviewId}/items/${itemId}/remediation`, { note }),
+    remediate: async ({
+      reviewId,
+      itemId,
+      note,
+      url,
+      file,
+    }: {
+      reviewId: string;
+      itemId: string;
+      note?: string;
+      url?: string;
+      file?: File;
+    }) => {
+      const proof = file
+        ? { fileName: file.name, fileType: file.type || 'application/octet-stream', fileData: await fileToBase64(file) }
+        : {};
+      return call(
+        api.post(`/v1/access-reviews/${reviewId}/items/${itemId}/remediation`, {
+          note,
+          ...(url && { url }),
+          ...proof,
+        }),
         'Failed to mark the change as done',
-      ),
+      );
+    },
     signOff: ({ reviewId, note }: { reviewId: string; note?: string }) =>
       call(api.post(`/v1/access-reviews/${reviewId}/sign-off`, { note }), 'Failed to sign off'),
     deleteReview: (reviewId: string) =>

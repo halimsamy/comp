@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { db, Departments, type Prisma } from '@db';
 import type {
   CreateTrainingModuleDto,
@@ -147,6 +147,9 @@ export class TrainingModulesService {
     moduleId: string;
     completedAt?: Date;
   }) {
+    if (completedAt.getTime() > Date.now()) {
+      throw new BadRequestException('The completion date cannot be in the future');
+    }
     const member = await this.findMember({ organizationId, memberId });
     const module = await db.trainingModule.findFirst({
       where: {

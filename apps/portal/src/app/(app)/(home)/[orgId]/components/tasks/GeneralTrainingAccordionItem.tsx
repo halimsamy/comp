@@ -1,24 +1,31 @@
 'use client';
 
 import { trainingVideos } from '@/lib/data/training-videos';
-import { useTrainingCompletions } from '@/hooks/use-training-completions';
+import type { EmployeeTrainingVideoCompletion } from '@db';
 import {
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
   Badge,
+  Button,
   cn,
 } from '@trycompai/design-system';
-import { CheckmarkFilled, CircleDash } from '@trycompai/design-system/icons';
+import { Certificate, CheckmarkFilled, CircleDash } from '@trycompai/design-system/icons';
+import { useState } from 'react';
+import { downloadMyCertificate } from './download-my-certificate';
 import { VideoCarousel } from '../video/VideoCarousel';
 
 const generalTrainingVideoIds = trainingVideos
   .filter((video) => video.id.startsWith('sat-'))
   .map((video) => video.id);
 
-export function GeneralTrainingAccordionItem() {
-  const { completions } = useTrainingCompletions();
-
+export function GeneralTrainingAccordionItem({
+  completions,
+  onMarkComplete,
+}: {
+  completions: EmployeeTrainingVideoCompletion[];
+  onMarkComplete: (videoId: string) => Promise<void>;
+}) {
   const completedVideoIds = new Set(
     completions
       .filter(
@@ -32,6 +39,13 @@ export function GeneralTrainingAccordionItem() {
   const hasCompletedGeneralTraining = generalTrainingVideoIds.every(
     (videoId) => completedVideoIds.has(videoId),
   );
+
+  const [downloading, setDownloading] = useState(false);
+  const handleDownloadCertificate = async () => {
+    setDownloading(true);
+    await downloadMyCertificate('general');
+    setDownloading(false);
+  };
 
   const completedCount = completedVideoIds.size;
   const totalCount = generalTrainingVideoIds.length;
@@ -74,7 +88,17 @@ export function GeneralTrainingAccordionItem() {
               Complete the security awareness training videos to learn about
               best practices for keeping company data secure.
             </p>
-            <VideoCarousel />
+            <VideoCarousel completions={completions} onMarkComplete={onMarkComplete} />
+            {hasCompletedGeneralTraining && (
+              <Button
+                variant="outline"
+                iconLeft={<Certificate size={16} />}
+                loading={downloading}
+                onClick={() => void handleDownloadCertificate()}
+              >
+                Download certificate
+              </Button>
+            )}
           </div>
         </AccordionContent>
       </AccordionItem>

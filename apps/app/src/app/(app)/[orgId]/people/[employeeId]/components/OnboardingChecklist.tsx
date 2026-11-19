@@ -2,6 +2,8 @@
 
 import { useOffboardingChecklist } from '@/hooks/use-offboarding-checklist';
 import { Section, Stack, Text } from '@trycompai/design-system';
+import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import { useCallback } from 'react';
 import { toast } from 'sonner';
 import { EmploymentDocuments } from './EmploymentDocuments';
@@ -12,10 +14,19 @@ interface OnboardingChecklistProps {
   canEdit: boolean;
 }
 
+// #88: automatic items reflect platform state; the tab where that state lives.
+const AUTO_SOURCE_TAB: Record<string, { tab: string; label: string }> = {
+  background_check: { tab: 'background-check', label: 'Open background check' },
+  policies: { tab: 'policies', label: 'Open policies' },
+  training: { tab: 'training', label: 'Open training' },
+  device: { tab: 'overview', label: 'Open device status' },
+};
+
 const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
 export function OnboardingChecklist({ memberId, canEdit }: OnboardingChecklistProps) {
+  const { orgId } = useParams<{ orgId: string }>();
   const { checklist, isLoading, completeItem, uncompleteItem, uploadEvidence, getDownloadUrl } =
     useOffboardingChecklist(memberId, 'onboarding');
 
@@ -98,24 +109,38 @@ export function OnboardingChecklist({ memberId, canEdit }: OnboardingChecklistPr
               />
             </div>
             <div className="flex flex-col gap-2">
-              {checklist?.items.map((item) => (
-                <OffboardingChecklistItem
-                  key={item.templateItemId}
-                  item={item}
-                  memberId={memberId}
-                  // Automatic items stay manually completable for state the platform can't see (e.g. Fleet-only devices).
-                  canEdit={canEdit && !item.completedAutomatically}
-                  onComplete={handleComplete}
-                  onUncomplete={handleUncomplete}
-                  onUploadEvidence={handleUploadEvidence}
-                  onDownload={handleDownload}
-                />
-              ))}
+              {checklist?.items.map((item) => {
+                const auto = item.autoCompleteSource ? AUTO_SOURCE_TAB[item.autoCompleteSource] : undefined;
+                // Devices stay manually completable for state the platform can't see (e.g. Fleet-only devices).
+                const manual = !auto || (item.autoCompleteSource === 'device' && !item.completedAutomatically);
+                return (
+                  <div key={item.templateItemId} className="flex flex-col gap-1">
+                    <OffboardingChecklistItem
+                      item={item}
+                      memberId={memberId}
+                      canEdit={canEdit && manual && !item.completedAutomatically}
+                      onComplete={handleComplete}
+                      onUncomplete={handleUncomplete}
+                      onUploadEvidence={handleUploadEvidence}
+                      onDownload={handleDownload}
+                    />
+                    {auto && (
+                      <Link
+                        href={`/${orgId}/people/${memberId}?tab=${auto.tab}`}
+                        className="self-end text-xs font-medium text-primary hover:underline"
+                      >
+                        Automatic · {auto.label}
+                      </Link>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </Stack>
         )}
       </Section>
-      <EmploymentDocuments memberId={memberId} eventType="onboard" canEdit={canEdit} />
+      {/* #88: documents are uploaded on checklist items; this list only shows earlier uploads. */}
+      <EmploymentDocuments memberId={memberId} eventType="onboard" canEdit={false} />
     </Stack>
   );
 }

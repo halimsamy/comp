@@ -2,6 +2,7 @@ jest.mock('@db', () => ({
   db: {
     member: { findMany: jest.fn() },
     accessAccountOwner: { findMany: jest.fn() },
+    accessSystemRole: { findMany: jest.fn().mockResolvedValue([]) },
     accessSystem: { findMany: jest.fn() },
     accessSystemAccount: { findMany: jest.fn() },
   },

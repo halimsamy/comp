@@ -1,5 +1,6 @@
 'use client';
 
+import { fileToBase64 } from '@/lib/file-utils';
 import { useApiSWR } from '@/hooks/use-api-swr';
 import { apiClient } from '@/lib/api-client';
 import { useCallback } from 'react';
@@ -54,6 +55,20 @@ export function useMemberTraining(memberId: string) {
     [memberId, mutateCycles, mutateModules],
   );
 
+  /** #94: training taken outside the portal (classroom, other LMS), with an optional certificate. */
+  const recordTraining = useCallback(
+    async ({ module, completedAt, file }: { module: string; completedAt: string; file?: File }) => {
+      const res = await apiClient.post(`/v1/training/members/${memberId}/records`, {
+        module,
+        completedAt,
+        ...(file && { fileName: file.name, fileType: file.type || 'application/octet-stream', fileData: await fileToBase64(file) }),
+      });
+      if (res.error) throw new Error(res.error);
+      await Promise.all([mutateCycles(), mutateModules()]);
+    },
+    [memberId, mutateCycles, mutateModules],
+  );
+
   const downloadCertificate = useCallback(
     async (cycle: TrainingCycle) => {
       const res = await apiClient.raw(`/v1/training/members/${memberId}/cycles/certificate`, {
@@ -74,6 +89,7 @@ export function useMemberTraining(memberId: string) {
     modules: Array.isArray(modulesRes.data?.data) ? modulesRes.data.data : [],
     isLoading: cyclesRes.isLoading || modulesRes.isLoading,
     recordCompletion,
+    recordTraining,
     downloadCertificate,
   };
 }

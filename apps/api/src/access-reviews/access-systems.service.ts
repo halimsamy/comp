@@ -6,6 +6,9 @@ import {
 } from '@nestjs/common';
 import { db } from '@db';
 import { parseDate, parseSystemKey } from './access-accounts.lib';
+import { AccessAccountsService } from './access-accounts.service';
+import { reconcileRevocations } from './access-review-reconcile';
+import { importedOwnerMappings } from './import-owner-mappings';
 import type { ImportAccountDto } from './dto/access-accounts.dto';
 
 /**
@@ -14,6 +17,8 @@ import type { ImportAccountDto } from './dto/access-accounts.dto';
  */
 @Injectable()
 export class AccessSystemsService {
+  constructor(private readonly accounts: AccessAccountsService) {}
+
   async create({
     organizationId,
     name,
@@ -78,6 +83,11 @@ export class AccessSystemsService {
       lastLoginAt: parseDate(a.lastLoginAt),
       accountCreatedAt: parseDate(a.createdAt),
     }));
+    const mappings = await importedOwnerMappings({
+      organizationId,
+      systemKey: `manual:${system.id}`,
+      accounts: [...unique.entries()],
+    });
     await db.$transaction([
       db.accessSystemAccount.deleteMany({ where: { systemId: system.id } }),
       db.accessSystemAccount.createMany({ data: rows }),
@@ -85,8 +95,11 @@ export class AccessSystemsService {
         where: { id: system.id },
         data: { importedAt: new Date() },
       }),
+      ...mappings,
     ]);
-    return { imported: rows.length };
+    // A fresh inventory confirms (or contradicts) pending revocations; the import itself is already saved.
+    await reconcileRevocations({ organizationId, accounts: this.accounts }).catch(() => undefined);
+    return { imported: rows.length, ownersMapped: mappings.length };
   }
 
   /** Map an account to a member, mark it a service account, or clear the mapping. */

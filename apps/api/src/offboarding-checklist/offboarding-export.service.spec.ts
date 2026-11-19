@@ -29,6 +29,20 @@ jest.mock('archiver', () => {
 import archiver from 'archiver';
 import { OffboardingExportService } from './offboarding-export.service';
 
+const row = (over: Record<string, unknown>) => ({
+  systemKey: 'connection:slack',
+  name: 'Slack',
+  kind: 'inventory',
+  accounts: [{ accountId: 'u1', name: 'bob', status: 'suspended', roles: [] }],
+  revoked: true,
+  stillActive: false,
+  revokedAt: new Date('2026-05-01'),
+  revokedBy: { name: 'Jane Doe' },
+  notes: null,
+  evidence: [],
+  ...over,
+});
+
 describe('OffboardingExportService', () => {
   const mockAttachmentsService = {
     getObjectBuffer: jest.fn(),
@@ -79,16 +93,10 @@ describe('OffboardingExportService', () => {
     });
 
     mockAccessRevocationService.getAccessRevocations.mockResolvedValue({
+      systems: [row({})],
       vendors: [
-        {
-          vendorName: 'Slack',
-          revokedBy: { name: 'Jane Doe' },
-          revokedAt: new Date('2026-05-01'),
-          evidence: [],
-        },
+        row({ systemKey: 'vendor:v1', name: 'Zoom', kind: 'vendor', accounts: [], revoked: false }),
       ],
-      totalVendors: 1,
-      revokedCount: 1,
     });
 
     const output = new PassThrough();
@@ -113,12 +121,15 @@ describe('OffboardingExportService', () => {
     expect(summaryCsv).toContain('"Recover devices",Pending,""');
     expect(appendCalls[0][1]).toEqual({ name: 'summary.csv' });
 
-    // Vendor revocations CSV
-    const vendorCsv = appendCalls[1][0] as string;
-    expect(vendorCsv).toContain('Vendor,Confirmed By,Date,Has Evidence');
-    expect(vendorCsv).toContain('"Slack","Jane Doe",2026-05-01,No');
+    // Access revocations CSV: inventory systems; unconfirmed vendor fallbacks are left out.
+    const accessCsv = appendCalls[1][0] as string;
+    expect(accessCsv).toContain('System,Source,Accounts,Status,Confirmed By,Date,Notes,Has Evidence');
+    expect(accessCsv).toContain(
+      '"Slack","Access inventory","bob (suspended)","Revoked","Jane Doe",2026-05-01,"",No',
+    );
+    expect(accessCsv).not.toContain('Zoom');
     expect(appendCalls[1][1]).toEqual({
-      name: 'vendor-access-revocations/vendor-access-revocations.csv',
+      name: 'access-revocations/access-revocations.csv',
     });
   });
 
@@ -130,16 +141,8 @@ describe('OffboardingExportService', () => {
     });
 
     mockAccessRevocationService.getAccessRevocations.mockResolvedValue({
-      vendors: [
-        {
-          vendorName: 'AWS',
-          revokedBy: { name: 'Jane' },
-          revokedAt: new Date('2026-05-01'),
-          evidence: [{ id: 'att_1', name: 'aws-disable.png' }],
-        },
-      ],
-      totalVendors: 1,
-      revokedCount: 1,
+      systems: [row({ name: 'AWS', evidence: [{ id: 'att_1', name: 'aws-disable.png' }] })],
+      vendors: [],
     });
 
     mockDb.attachment.findFirst.mockResolvedValue({
@@ -161,7 +164,7 @@ describe('OffboardingExportService', () => {
     const evidenceCall = appendCalls.find(
       (c: unknown[]) =>
         (c[1] as { name: string }).name ===
-        'vendor-access-revocations/evidence/att_1-aws-disable.png',
+        'access-revocations/evidence/att_1-aws-disable.png',
     );
     expect(evidenceCall).toBeDefined();
     expect(Buffer.isBuffer(evidenceCall[0])).toBe(true);
@@ -185,9 +188,8 @@ describe('OffboardingExportService', () => {
     });
 
     mockAccessRevocationService.getAccessRevocations.mockResolvedValue({
+      systems: [],
       vendors: [],
-      totalVendors: 0,
-      revokedCount: 0,
     });
 
     mockDb.attachment.findFirst.mockResolvedValue({
@@ -232,9 +234,8 @@ describe('OffboardingExportService', () => {
     });
 
     mockAccessRevocationService.getAccessRevocations.mockResolvedValue({
+      systems: [],
       vendors: [],
-      totalVendors: 0,
-      revokedCount: 0,
     });
 
     mockDb.attachment.findFirst.mockResolvedValue(null);
@@ -246,7 +247,7 @@ describe('OffboardingExportService', () => {
       output,
     });
 
-    // Should have only 2 appends: summary CSV + vendor CSV (no evidence files)
+    // Should have only 2 appends: summary CSV + access revocations CSV (no evidence files)
     const appendCalls = (mockArchive.append as jest.Mock).mock.calls;
     expect(appendCalls).toHaveLength(2);
     expect(mockArchive.finalize).toHaveBeenCalled();
@@ -254,10 +255,15 @@ describe('OffboardingExportService', () => {
 
   it('appends every offboarding under a prefix into an archive it does not own', async () => {
     mockDb.member.findMany.mockResolvedValue([
-      { id: 'mem_1', user: { name: 'Bob Smith', email: 'bob@test' } },
+      {
+        id: 'mem_1',
+        deactivated: false,
+        offboardDate: new Date('2026-05-01'),
+        user: { name: 'Bob Smith', email: 'bob@test' },
+      },
     ]);
     mockChecklistService.getMemberChecklist.mockResolvedValue({ items: [] });
-    mockAccessRevocationService.getAccessRevocations.mockResolvedValue({ vendors: [] });
+    mockAccessRevocationService.getAccessRevocations.mockResolvedValue({ systems: [], vendors: [] });
 
     await service.appendAllOffboardings({
       archive: mockArchive,
@@ -267,7 +273,7 @@ describe('OffboardingExportService', () => {
 
     expect(mockDb.member.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { organizationId: 'org_1', offboardDate: { not: null }, deactivated: true },
+        where: { organizationId: 'org_1', offboardDate: { not: null } },
       }),
     );
     const names = (mockArchive.append as jest.Mock).mock.calls.map(
@@ -275,8 +281,12 @@ describe('OffboardingExportService', () => {
     );
     expect(names).toEqual([
       'root/Offboarding evidence/offboarded-employees/bob-smith-mem_1/summary.csv',
-      'root/Offboarding evidence/offboarded-employees/bob-smith-mem_1/vendor-access-revocations/vendor-access-revocations.csv',
+      'root/Offboarding evidence/offboarded-employees/bob-smith-mem_1/access-revocations/access-revocations.csv',
+      'root/Offboarding evidence/offboarding-register.csv',
     ]);
+    // #85: everyone with an offboard date is in the register, deactivated or not yet.
+    const register = (mockArchive.append as jest.Mock).mock.calls.at(-1)[0] as string;
+    expect(register).toContain('"Bob Smith","bob@test","2026-05-01","Active"');
     expect(mockArchive.finalize).not.toHaveBeenCalled();
   });
 });

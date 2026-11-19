@@ -60,12 +60,10 @@ function renderTabs() {
   render(
     <PeoplePageTabs
       peopleContent={null}
-      employeeTasksContent={null}
       devicesContent={null}
       orgChartContent={null}
       roleMappingContent={null}
       showRoleMapping={false}
-      showEmployeeTasks={false}
       settingsContent={null}
       showSettings={false}
       canInviteUsers
@@ -81,24 +79,23 @@ const items = () => screen.queryAllByRole('menuitem').map((i) => i.textContent);
 describe('PeoplePageTabs register exports', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('offers people, device and offboarding CSVs to members readers', () => {
+  it('offers people and device CSVs and one offboarding evidence export to members readers (#85)', () => {
     setMockPermissions(ADMIN_PERMISSIONS);
     renderTabs();
 
     expect(items()).toEqual([
-      'Export offboarding',
+      'Export offboarding evidence',
       'Export people (CSV)',
       'Export devices (CSV)',
-      'Export offboarding records (CSV)',
     ]);
     fireEvent.click(screen.getByRole('menuitem', { name: 'Export devices (CSV)' }));
     expect(mockExport).toHaveBeenCalledWith('devices');
   });
 
-  it('hides the register exports without member read access', () => {
+  it('hides every export without member read access', () => {
     setMockPermissions(EMPLOYEE_PERMISSIONS);
     renderTabs();
 
-    expect(items()).toEqual(['Export offboarding']);
+    expect(items()).toEqual([]);
   });
 });

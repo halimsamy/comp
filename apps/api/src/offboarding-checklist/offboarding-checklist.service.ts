@@ -5,8 +5,11 @@ import {
 } from '@nestjs/common';
 import { AttachmentEntityType, type ChecklistKind, db } from '@db';
 import { AttachmentsService } from '../attachments/attachments.service';
-import { AccessRevocationService } from './access-revocation.service';
-import { DEFAULT_CHECKLIST_ITEMS } from './default-checklist-items';
+import {
+  loadMemberChecklist,
+  pendingOffboardings,
+  seedChecklistDefaults,
+} from './member-checklist';
 
 interface CompleteChecklistItemDto {
   notes?: string;
@@ -27,16 +30,13 @@ interface UploadEvidenceDto {
 
 @Injectable()
 export class OffboardingChecklistService {
-  constructor(
-    private readonly attachmentsService: AttachmentsService,
-    private readonly accessRevocationService: AccessRevocationService,
-  ) {}
+  constructor(private readonly attachmentsService: AttachmentsService) {}
 
   async getTemplate(
     organizationId: string,
     kind: ChecklistKind = 'offboarding',
   ) {
-    await this.seedDefaultsIfNeeded(organizationId, kind);
+    await seedChecklistDefaults(organizationId, kind);
 
     return db.offboardingChecklistTemplate.findMany({
       where: { organizationId, kind },
@@ -52,6 +52,8 @@ export class OffboardingChecklistService {
       evidenceRequired?: boolean;
       dueDays?: number;
       autoCompleteSource?: string;
+      appliesToRoles?: string[];
+      appliesToDepartments?: string[];
     },
     kind: ChecklistKind = 'offboarding',
   ) {
@@ -68,6 +70,8 @@ export class OffboardingChecklistService {
         evidenceRequired: dto.evidenceRequired ?? false,
         dueDays: dto.dueDays,
         autoCompleteSource: dto.autoCompleteSource,
+        appliesToRoles: dto.appliesToRoles ?? [],
+        appliesToDepartments: dto.appliesToDepartments ?? [],
         kind,
         sortOrder: (maxSortOrder._max.sortOrder ?? 0) + 1,
         isDefault: false,
@@ -87,6 +91,8 @@ export class OffboardingChecklistService {
       isEnabled?: boolean;
       dueDays?: number | null;
       autoCompleteSource?: string | null;
+      appliesToRoles?: string[];
+      appliesToDepartments?: string[];
     },
   ) {
     const item = await db.offboardingChecklistTemplate.findFirst({
@@ -124,80 +130,21 @@ export class OffboardingChecklistService {
     });
   }
 
-  async getMemberChecklist(
+  getMemberChecklist(
     organizationId: string,
     memberId: string,
     kind: ChecklistKind = 'offboarding',
   ) {
-    await this.seedDefaultsIfNeeded(organizationId, kind);
-
-    const templateItems = await db.offboardingChecklistTemplate.findMany({
-      where: { organizationId, isEnabled: true, kind },
-      orderBy: { sortOrder: 'asc' },
+    return loadMemberChecklist({
+      organizationId,
+      memberId,
+      kind,
+      attachments: this.attachmentsService,
     });
+  }
 
-    const completions = await db.offboardingChecklistCompletion.findMany({
-      where: { organizationId, memberId, templateItem: { kind } },
-      include: { completedBy: { select: { id: true, name: true } } },
-    });
-
-    const completionMap = new Map(
-      completions.map((c) => [c.templateItemId, c]),
-    );
-
-    const completionIds = completions.map((c) => c.id);
-
-    const allAttachments =
-      completionIds.length > 0
-        ? await db.attachment.findMany({
-            where: {
-              organizationId,
-              entityId: { in: completionIds },
-              entityType: AttachmentEntityType.offboarding_checklist,
-            },
-            orderBy: { createdAt: 'asc' },
-          })
-        : [];
-
-    const attachmentsByCompletion = new Map<string, typeof allAttachments>();
-    for (const attachment of allAttachments) {
-      const existing = attachmentsByCompletion.get(attachment.entityId) ?? [];
-      existing.push(attachment);
-      attachmentsByCompletion.set(attachment.entityId, existing);
-    }
-
-    const items = await Promise.all(
-      templateItems.map(async (template) => {
-        const completion = completionMap.get(template.id);
-        const rawAttachments = completion
-          ? (attachmentsByCompletion.get(completion.id) ?? [])
-          : [];
-
-        const evidence = await Promise.all(
-          rawAttachments.map(async (attachment) => ({
-            id: attachment.id,
-            name: attachment.name,
-            type: attachment.type,
-            downloadUrl: await this.attachmentsService.getPresignedDownloadUrl(attachment.url),
-            createdAt: attachment.createdAt,
-          })),
-        );
-
-        return {
-          ...template,
-          templateItemId: template.id,
-          completed: !!completion,
-          completion: completion ?? null,
-          evidence,
-        };
-      }),
-    );
-
-    return {
-      items,
-      totalItems: items.length,
-      completedItems: items.filter((i) => i.completed).length,
-    };
+  getPendingOffboardings(organizationId: string) {
+    return pendingOffboardings(organizationId);
   }
 
   async completeItem({
@@ -344,122 +291,4 @@ export class OffboardingChecklistService {
     );
   }
 
-  async getAccessRevocations(organizationId: string, memberId: string) {
-    return this.accessRevocationService.getAccessRevocations(
-      organizationId,
-      memberId,
-    );
-  }
-
-  async revokeVendorAccess(params: {
-    organizationId: string;
-    memberId: string;
-    vendorId: string;
-    revokedById: string;
-    notes?: string;
-    evidence?: { fileName: string; fileType: string; fileData: string };
-  }) {
-    return this.accessRevocationService.revokeVendorAccess(params);
-  }
-
-  async undoVendorRevocation(params: {
-    organizationId: string;
-    memberId: string;
-    vendorId: string;
-  }) {
-    return this.accessRevocationService.undoVendorRevocation(params);
-  }
-
-  async revokeAllVendorAccess(params: {
-    organizationId: string;
-    memberId: string;
-    revokedById: string;
-  }) {
-    return this.accessRevocationService.revokeAllVendorAccess(params);
-  }
-
-  async getPendingOffboardings(organizationId: string) {
-    await this.seedDefaultsIfNeeded(organizationId, 'offboarding');
-
-    const totalEnabled = await db.offboardingChecklistTemplate.count({
-      where: { organizationId, isEnabled: true, kind: 'offboarding' },
-    });
-
-    const offboardedMembers = await db.member.findMany({
-      where: {
-        organizationId,
-        offboardDate: { not: null },
-        deactivated: true,
-      },
-      include: {
-        user: { select: { id: true, name: true, email: true, image: true } },
-        offboardingChecklistCompletions: {
-          where: {
-            templateItem: { organizationId, isEnabled: true, kind: 'offboarding' },
-          },
-          select: { id: true },
-        },
-      },
-      orderBy: { offboardDate: 'desc' },
-    });
-
-    return {
-      members: offboardedMembers
-        .filter((m) => m.offboardingChecklistCompletions.length < totalEnabled)
-        .map((m) => ({
-          memberId: m.id,
-          name: m.user.name,
-          email: m.user.email,
-          image: m.user.image,
-          offboardDate: m.offboardDate,
-          completedItems: m.offboardingChecklistCompletions.length,
-          totalItems: totalEnabled,
-        })),
-    };
-  }
-
-  private async seedDefaultsIfNeeded(
-    organizationId: string,
-    kind: ChecklistKind,
-  ) {
-    const count = await db.offboardingChecklistTemplate.count({
-      where: { organizationId, kind },
-    });
-
-    if (count > 0) {
-      return;
-    }
-
-    try {
-      await db.$transaction(async (tx) => {
-        const recheck = await tx.offboardingChecklistTemplate.count({
-          where: { organizationId, kind },
-        });
-
-        if (recheck > 0) {
-          return;
-        }
-
-        await tx.offboardingChecklistTemplate.createMany({
-          data: DEFAULT_CHECKLIST_ITEMS[kind].map((item) => ({
-            organizationId,
-            kind,
-            title: item.title,
-            description: item.description,
-            evidenceRequired: item.evidenceRequired,
-            dueDays: item.dueDays,
-            autoCompleteSource: item.autoCompleteSource,
-          isAccessRevocation: item.isAccessRevocation,
-          sortOrder: item.sortOrder,
-          isDefault: true,
-          isEnabled: true,
-        })),
-        });
-      });
-    } catch (err) {
-      const isPrismaConflict =
-        err instanceof Error && 'code' in err && (err as { code: string }).code === 'P2002';
-      if (!isPrismaConflict) throw err;
-    }
-  }
 }

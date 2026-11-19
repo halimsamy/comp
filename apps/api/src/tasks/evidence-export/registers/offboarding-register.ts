@@ -15,7 +15,7 @@ export async function buildOffboardingRegisterCsv({
           select: { completedAt: true },
         },
         offboardingAccessRevocations: {
-          select: { vendor: { select: { name: true } } },
+          select: { systemName: true, vendor: { select: { name: true } } },
         },
       },
       orderBy: { offboardDate: 'asc' },
@@ -51,7 +51,7 @@ export async function buildOffboardingRegisterCsv({
         `${done.length}/${checklistSize}`,
         done.length >= checklistSize && checklistSize > 0 ? lastDone : null,
         m.offboardingAccessRevocations.length,
-        m.offboardingAccessRevocations.map((r) => r.vendor.name).join('; '),
+        m.offboardingAccessRevocations.map((r) => r.systemName ?? r.vendor?.name ?? '').join('; '),
       ];
     }),
   });

@@ -31,6 +31,8 @@ import { buildAccountsCsv } from '../lib/accounts-csv';
 import { AccountOwnerDialog, type OwnerOption, type OwnerValues } from './AccountOwnerDialog';
 import { AccountsTable } from './AccountsTable';
 import { AddSystemDialog, type SystemValues } from './AddSystemDialog';
+import { ConfirmDeleteDialog } from './ConfirmDeleteDialog';
+import { ExportAccessButtons } from './ExportAccessButtons';
 import { ImportAccountsDialog } from './ImportAccountsDialog';
 
 /** Vanta-style account inventory: pick a system, filter by flag, map owners, export. */
@@ -48,6 +50,7 @@ export function AccountsPanel({ members }: { members: OwnerOption[] }) {
   const [ownerTarget, setOwnerTarget] = useState<AccessAccount | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const visible = useMemo(
     () =>
@@ -95,9 +98,11 @@ export function AccountsPanel({ members }: { members: OwnerOption[] }) {
   const handleImport = async (rows: Parameters<typeof mutations.importAccounts>[0]['accounts']) => {
     if (!manualId) return;
     try {
-      const { imported } = await mutations.importAccounts({ id: manualId, accounts: rows });
+      const { imported, ownersMapped } = await mutations.importAccounts({ id: manualId, accounts: rows });
       await refresh();
-      toast.success(`${imported} accounts imported`);
+      toast.success(
+        ownersMapped ? `${imported} accounts imported, ${ownersMapped} owners mapped` : `${imported} accounts imported`,
+      );
     } catch (caught) {
       toast.error(caught instanceof Error ? caught.message : 'Failed to import accounts');
       throw caught;
@@ -105,7 +110,7 @@ export function AccountsPanel({ members }: { members: OwnerOption[] }) {
   };
 
   const handleDeleteSystem = async () => {
-    if (!manualId || !system || !window.confirm(`Delete ${system.name} and its accounts?`)) return;
+    if (!manualId || !system) return;
     try {
       await mutations.deleteSystem(manualId);
       setSelectedKey(null);
@@ -168,12 +173,13 @@ export function AccountsPanel({ members }: { members: OwnerOption[] }) {
           <Button variant="outline" iconLeft={<Download size={16} />} onClick={handleExport} disabled={visible.length === 0}>
             Export CSV
           </Button>
+          <ExportAccessButtons systems={systems} />
           {canUpdate && manualId && (
             <>
               <Button variant="outline" iconLeft={<Upload size={16} />} onClick={() => setImportOpen(true)}>
                 Import CSV
               </Button>
-              <Button variant="outline" iconLeft={<TrashCan size={16} />} onClick={() => void handleDeleteSystem()}>
+              <Button variant="outline" iconLeft={<TrashCan size={16} />} onClick={() => setConfirmDelete(true)}>
                 Delete system
               </Button>
             </>
@@ -235,6 +241,13 @@ export function AccountsPanel({ members }: { members: OwnerOption[] }) {
         onSave={handleSaveOwner}
       />
       <AddSystemDialog open={addOpen} onOpenChange={setAddOpen} onSave={handleAddSystem} />
+      <ConfirmDeleteDialog
+        open={confirmDelete}
+        title={`Delete ${system?.name ?? 'this system'}?`}
+        description="The system, its accounts and owner mappings are deleted. Past access reviews keep their snapshot."
+        onOpenChange={setConfirmDelete}
+        onConfirm={handleDeleteSystem}
+      />
       <ImportAccountsDialog
         systemName={system?.name ?? ''}
         open={importOpen}
