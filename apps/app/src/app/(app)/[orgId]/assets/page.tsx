@@ -1,24 +1,34 @@
-import type { Asset } from '@/hooks/use-assets';
+import type { AssetsResponse } from '@/hooks/use-assets';
 import { serverApi } from '@/lib/api-server';
 import { PageLayout } from '@trycompai/design-system';
 import type { Metadata } from 'next';
 import { AssetsClient } from './components/AssetsClient';
-import { fetchMemberOptions } from './lib/member-options';
+import { fetchMemberOptions, fetchVendorOptions } from './lib/member-options';
 
 export const metadata: Metadata = { title: 'Assets' };
 
 export default async function AssetsPage() {
-  const [assetsRes, memberOptions] = await Promise.all([
-    serverApi.get<{ data: Asset[] }>('/v1/assets'),
+  const [assetsRes, memberOptions, vendorOptions] = await Promise.all([
+    serverApi.get<AssetsResponse>('/v1/assets'),
     fetchMemberOptions(),
+    fetchVendorOptions(),
   ]);
-  const assets = assetsRes.data?.data;
+  const initial = assetsRes.data;
 
   return (
     <PageLayout>
       <AssetsClient
-        initialAssets={Array.isArray(assets) ? assets : undefined}
+        initialData={
+          initial && Array.isArray(initial.data)
+            ? {
+                data: initial.data,
+                review: initial.review ?? { lastReviewedAt: null, reviewedBy: null },
+                formImport: initial.formImport ?? null,
+              }
+            : undefined
+        }
         memberOptions={memberOptions}
+        vendorOptions={vendorOptions}
       />
     </PageLayout>
   );

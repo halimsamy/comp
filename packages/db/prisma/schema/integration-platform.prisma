@@ -222,8 +222,16 @@ model IntegrationPlatformFinding {
   resolvedAt  DateTime?
   /// Snapshotted at first detection so later SLA changes never rewrite history
   slaDueAt    DateTime?
-  /// Why a finding was ignored (accepted risk / false positive) or how it was fixed
+  /// Why a finding is a false positive / accepted risk, or how it was fixed
   statusNote  String?
+  /// Risk acceptance (status risk_accepted): expiry and the approving member (never the requester)
+  acceptedUntil DateTime?
+  acceptedById  String?
+  /// Imported scan this finding was last reported by
+  scanId        String?
+  scan          VulnerabilityScan? @relation(fields: [scanId], references: [id], onDelete: SetNull)
+  /// ASV finding scoring CVSS >= 4.0: fails the quarterly ASV scan (PCI DSS 11.3.2)
+  asvFail       Boolean            @default(false)
 
   /// Resource classification
   resourceType String
@@ -251,6 +259,7 @@ model IntegrationPlatformFinding {
   @@unique([organizationId, source, externalId])
   @@index([organizationId, status])
   @@index([assetId])
+  @@index([scanId])
   @@index([connectionId])
   @@index([runId])
   @@index([resourceType, resourceId])
@@ -269,7 +278,8 @@ enum IntegrationFindingSeverity {
 enum IntegrationFindingStatus {
   open
   resolved
-  ignored
+  false_positive
+  risk_accepted
 }
 
 /// Stores OAuth state for CSRF protection during OAuth flow

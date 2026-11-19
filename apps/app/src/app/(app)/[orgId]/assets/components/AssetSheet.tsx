@@ -34,6 +34,7 @@ interface AssetSheetProps {
   /** null = add a manual asset. */
   asset: Asset | null;
   memberOptions: MemberOption[];
+  vendorOptions: MemberOption[];
   canEdit: boolean;
   canDelete: boolean;
   onSubmit: (payload: AssetPayload) => Promise<void>;
@@ -47,6 +48,7 @@ export function AssetSheet({
   onOpenChange,
   asset,
   memberOptions,
+  vendorOptions,
   canEdit,
   canDelete,
   onSubmit,
@@ -118,6 +120,14 @@ export function AssetSheet({
                     First seen {formatDate(asset.firstSeenAt)}
                     {isSynced ? ` · last seen ${formatDate(asset.lastSeenAt)}` : ''}
                   </Text>
+                  <Text size="xs" variant="muted">
+                    {asset.lastReviewedAt
+                      ? `Last reviewed ${formatDate(asset.lastReviewedAt)}`
+                      : 'Not reviewed yet'}
+                    {asset.lastScannedAt
+                      ? ` · last scanned ${formatDate(asset.lastScannedAt)}`
+                      : ''}
+                  </Text>
                 </Stack>
               </div>
             ) : null}
@@ -126,6 +136,7 @@ export function AssetSheet({
                 <AssetFormFields
                   control={form.control}
                   memberOptions={memberOptions}
+                  vendorOptions={vendorOptions}
                   isSynced={isSynced}
                 />
               </fieldset>

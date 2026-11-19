@@ -38,6 +38,10 @@ enum AttachmentEntityType {
   employment_offboard
   offboarding_checklist
   audit_request
+  vulnerability_scan
+  vulnerability
+  access_review_item
+  training_record
 }
 
 enum AttachmentType {

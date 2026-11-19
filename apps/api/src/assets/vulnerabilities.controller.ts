@@ -67,16 +67,20 @@ export class VulnerabilitiesController {
     @OrganizationId() organizationId: string,
     @AuthContext() authContext: AuthContextType,
   ) {
-    const row = await this.vulnerabilities.create({ organizationId, dto });
+    const row = await this.vulnerabilities.create({
+      organizationId,
+      dto,
+      actor: authContext,
+    });
     return { ...row, ...authMeta(authContext) };
   }
 
   @Post('import')
   @RequirePermission('integration', 'create')
   @ApiOperation({
-    summary: 'Import ASV or pentest findings from CSV',
+    summary: 'Import a scan or pentest from CSV',
     description:
-      'Imports an ASV scan (PCI DSS 11.3.2) or penetration test (11.4) CSV export. Rows dedupe per host and CVE or title; a rescan updates them and can resolve findings no longer listed.',
+      'Imports an ASV scan (PCI DSS 11.3.2), internal scan (11.3.1) or penetration test (11.4) CSV export and records the scan with its date, vendor, verdict and optional report. Rows link to assets by IP, DNS name or host (unknown hosts are added to the inventory) and dedupe per host and CVE or title; a rescan updates them and can resolve findings no longer listed. ASV rows at CVSS 4.0 or above are flagged as ASV failures, due before the next quarterly scan.',
   })
   @ApiBody({ type: ImportVulnerabilitiesDto })
   async importVulnerabilities(
@@ -89,6 +93,13 @@ export class VulnerabilitiesController {
       source: dto.source,
       csv: dto.csv,
       resolveMissing: dto.resolveMissing ?? false,
+      scannedAt: dto.scannedAt
+        ? new Date(`${dto.scannedAt}T00:00:00Z`)
+        : new Date(),
+      vendor: dto.vendor,
+      passed: dto.passed,
+      report: dto.report,
+      userId: authContext.userId,
     });
     return { ...result, ...authMeta(authContext) };
   }
@@ -98,7 +109,7 @@ export class VulnerabilitiesController {
   @ApiOperation({
     summary: 'Update a vulnerability',
     description:
-      'Assigns a remediation owner or changes status: resolve a manual or imported finding, or ignore any finding as accepted risk or false positive with a reason.',
+      'Assigns a remediation owner or asset, or changes status: resolve a manual or imported finding, mark a false positive (with a note and optional evidence file), or accept the risk until a date with another member as approver (not allowed for critical/high findings on in-scope or connected assets).',
   })
   @ApiParam({
     name: 'id',
@@ -116,6 +127,7 @@ export class VulnerabilitiesController {
       organizationId,
       vulnerabilityId,
       dto,
+      actor: authContext,
     });
     return { ...row, ...authMeta(authContext) };
   }

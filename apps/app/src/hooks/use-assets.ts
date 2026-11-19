@@ -37,6 +37,14 @@ export interface Asset {
   ownerId: string | null;
   owner: { id: string; name: string | null; email: string } | null;
   description: string | null;
+  scopeJustification: string | null;
+  location: string | null;
+  vendorId: string | null;
+  vendor: { id: string; name: string } | null;
+  version: string | null;
+  endOfSupportAt: string | null;
+  lastReviewedAt: string | null;
+  lastScannedAt: string | null;
   firstSeenAt: string;
   lastSeenAt: string;
   archivedAt: string | null;
@@ -51,6 +59,35 @@ export interface AssetPayload {
   dataClassification?: AssetDataClassification;
   ownerId?: string | null;
   description?: string | null;
+  scopeJustification?: string | null;
+  location?: string | null;
+  vendorId?: string | null;
+  version?: string | null;
+  endOfSupportAt?: string | null;
+}
+
+export interface InventoryReview {
+  lastReviewedAt: string | null;
+  reviewedBy: { id: string; name: string | null; email: string } | null;
+}
+
+/** Rows of the latest Infrastructure Inventory form submission available to import. */
+export interface FormImportPreview {
+  rows: number;
+  submittedAt: string;
+  imported: number;
+}
+
+export interface AssetsResponse {
+  data: Asset[];
+  review: InventoryReview;
+  formImport: FormImportPreview | null;
+}
+
+export interface AssetImportResult {
+  created: number;
+  updated: number;
+  total: number;
 }
 
 export const assetsKey = '/v1/assets';
@@ -61,13 +98,19 @@ async function unwrap<T>(promise: Promise<{ data?: T; error?: string }>): Promis
   return res.data;
 }
 
-/** The system inventory with create / update / delete and "refresh from integrations". */
-export function useAssets({ initialData }: { initialData?: Asset[] } = {}) {
+const EMPTY_REVIEW: InventoryReview = { lastReviewedAt: null, reviewedBy: null };
+
+/** The system inventory with create / update / delete, imports, review and "refresh from integrations". */
+export function useAssets({ initialData }: { initialData?: AssetsResponse } = {}) {
   const { data, error, isLoading, mutate } = useSWR(
     assetsKey,
-    async () => {
-      const res = await unwrap(apiClient.get<{ data: Asset[] }>(assetsKey));
-      return Array.isArray(res?.data) ? res.data : [];
+    async (): Promise<AssetsResponse> => {
+      const res = await unwrap(apiClient.get<AssetsResponse>(assetsKey));
+      return {
+        data: Array.isArray(res?.data) ? res.data : [],
+        review: res?.review ?? EMPTY_REVIEW,
+        formImport: res?.formImport ?? null,
+      };
     },
     { fallbackData: initialData, revalidateOnMount: !initialData, revalidateOnFocus: false },
   );
@@ -92,13 +135,33 @@ export function useAssets({ initialData }: { initialData?: Asset[] } = {}) {
     return result;
   };
 
+  const importFromForm = async () => {
+    const result = await unwrap(apiClient.post<AssetImportResult>(`${assetsKey}/import-from-form`));
+    await mutate();
+    return result;
+  };
+  const importCsv = async (csv: string) => {
+    const result = await unwrap(apiClient.post<AssetImportResult>(`${assetsKey}/import`, { csv }));
+    await mutate();
+    return result;
+  };
+  const markReviewed = async () => {
+    await unwrap(apiClient.post<InventoryReview>(`${assetsKey}/review`));
+    await mutate();
+  };
+
   return {
-    assets: Array.isArray(data) ? data : [],
+    assets: Array.isArray(data?.data) ? data.data : [],
+    review: data?.review ?? EMPTY_REVIEW,
+    formImport: data?.formImport ?? null,
     isLoading: isLoading && !data,
     error: error as Error | undefined,
     create,
     update,
     remove,
     sync,
+    importFromForm,
+    importCsv,
+    markReviewed,
   };
 }

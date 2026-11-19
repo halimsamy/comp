@@ -10,6 +10,7 @@ jest.mock('@db', () => ({
       updateMany: jest.fn(),
     },
     device: { findMany: jest.fn() },
+    vulnerabilitySlaPolicy: { findUnique: jest.fn().mockResolvedValue(null) },
     integrationPlatformFinding: {
       findMany: jest.fn(),
       create: jest.fn(),
@@ -183,12 +184,12 @@ describe('AssetSyncService.syncOrganization', () => {
     });
   });
 
-  it('leaves an ignored vulnerability ignored', async () => {
+  it('leaves a false positive marked as such', async () => {
     mockDb.integrationPlatformFinding.findMany.mockResolvedValue([
       {
         id: 'ipf_1',
         externalId: 'icn_gh:dependabot_enabled:acme/api-prod',
-        status: 'ignored',
+        status: 'false_positive',
       },
     ]);
     await service.syncOrganization(ORG);

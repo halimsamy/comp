@@ -26,7 +26,7 @@ export function FilterSelect<T extends string>({
   onChange: (value: T) => void;
 }) {
   return (
-    <div className="w-full sm:w-[170px]">
+    <div className="w-full min-w-0 sm:w-[170px]">
       <Select value={value} onValueChange={(next) => next && onChange(next as T)}>
         <SelectTrigger aria-label={label}>
           <SelectValue>{options.find((option) => option.value === value)?.label}</SelectValue>

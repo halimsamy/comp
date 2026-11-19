@@ -1,4 +1,5 @@
 import {
+  classifyAssetName,
   classifyEnvironment,
   classifyResourceType,
   displayNameFromResourceId,
@@ -10,6 +11,76 @@ import {
   vulnerabilityResourceKey,
 } from './vulnerability-signals';
 import { slaDueDate, slaStatus } from './vulnerability-sla';
+import { statusChangeError } from './vulnerability-status-rules';
+
+jest.mock('@db', () => ({ db: {} }));
+
+describe('classifyAssetName', () => {
+  it.each([
+    ['AWS Secrets Manager', 'key_secret'],
+    ['ECR repositories', 'repository'],
+    ['Aurora MySQL 8.0 cluster', 'database'],
+    ['Step Functions state machine spare-prod-rds-export', 'serverless'],
+    ['Application Load Balancer spare-server', 'network'],
+    ['IAM', 'other'],
+  ])('%s → %s', (name, expected) => {
+    expect(classifyAssetName(name)).toBe(expected);
+  });
+});
+
+describe('vulnerability status rules', () => {
+  const now = new Date('2026-11-18T00:00:00Z');
+  const base = {
+    note: 'Compensating control',
+    source: 'asv_scan' as const,
+    severity: 'medium' as const,
+    assetScope: null,
+    acceptedUntil: new Date('2027-01-01T00:00:00Z'),
+    acceptedById: 'mem_cto',
+    requesterMemberId: 'mem_me',
+    now,
+  };
+
+  it('allows a justified, time-boxed acceptance approved by someone else', () => {
+    expect(statusChangeError({ ...base, status: 'risk_accepted' })).toBeNull();
+  });
+
+  it.each([
+    [{ acceptedById: 'mem_me' }, 'Someone other than you'],
+    [{ acceptedById: null }, 'Choose who approves'],
+    [{ acceptedUntil: new Date('2026-11-01') }, 'future date'],
+    [{ acceptedUntil: new Date('2028-01-01') }, 'at most one year'],
+    [{ note: null }, 'Explain why'],
+    [
+      { severity: 'high' as const, assetScope: 'connected' as const },
+      'cannot be risk-accepted',
+    ],
+  ])('rejects %o', (over, message) => {
+    expect(
+      statusChangeError({ ...base, ...over, status: 'risk_accepted' }),
+    ).toContain(message);
+  });
+
+  it('lets a high finding on an out-of-scope asset be accepted', () => {
+    expect(
+      statusChangeError({
+        ...base,
+        status: 'risk_accepted',
+        severity: 'high',
+        assetScope: 'out_of_scope',
+      }),
+    ).toBeNull();
+  });
+
+  it('needs a note for a false positive and blocks resolving integration findings', () => {
+    expect(
+      statusChangeError({ ...base, note: null, status: 'false_positive' }),
+    ).toContain('false positive');
+    expect(
+      statusChangeError({ ...base, source: 'integration', status: 'resolved' }),
+    ).toContain('resolve automatically');
+  });
+});
 
 describe('classifyResourceType', () => {
   it.each([
@@ -170,6 +241,21 @@ describe('remediation SLA', () => {
       '2027-01-30T00:00:00.000Z',
     );
     expect(slaDueDate({ severity: 'info', firstSeenAt })).toBeNull();
+  });
+
+  it('uses the org policy days and caps ASV failures at the next quarterly scan', () => {
+    const days = { critical: 7, high: 14, medium: 120, low: 180, info: null };
+    expect(slaDueDate({ severity: 'critical', firstSeenAt, days })).toEqual(
+      new Date('2026-11-08T00:00:00Z'),
+    );
+    expect(
+      slaDueDate({
+        severity: 'medium',
+        firstSeenAt,
+        days,
+        asvScannedAt: firstSeenAt,
+      }),
+    ).toEqual(new Date('2027-01-30T00:00:00Z'));
   });
 
   it('classifies SLA status', () => {

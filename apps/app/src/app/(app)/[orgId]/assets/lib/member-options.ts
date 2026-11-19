@@ -20,3 +20,12 @@ export async function fetchMemberOptions(): Promise<MemberOption[]> {
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
 }
+
+/** Vendors for the asset vendor picker; empty without vendor:read. */
+export async function fetchVendorOptions(): Promise<MemberOption[]> {
+  const res = await serverApi.get<{ data: Array<{ id: string; name: string }> }>('/v1/vendors');
+  const vendors = Array.isArray(res.data?.data) ? res.data.data : [];
+  return vendors
+    .map((vendor) => ({ id: vendor.id, name: vendor.name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}

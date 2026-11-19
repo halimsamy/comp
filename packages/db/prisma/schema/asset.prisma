@@ -23,6 +23,21 @@ model Asset {
   ownerId            String?
   owner              Member?                 @relation("AssetOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   description        String?
+  /// Where it runs: region, data centre, SaaS ("AWS eu-central-1", "Vercel").
+  location           String?
+  /// Third-party provider that hosts or supplies it (ISO 27001 A.5.19, PCI DSS 12.8).
+  vendorId           String?
+  vendor             Vendor?                 @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  version            String?
+  /// Vendor end of support / end of life (PCI DSS 6.3.3, 12.3.4).
+  endOfSupportAt     DateTime?
+  /// Why the asset is out of PCI DSS scope (required when cdeScope = out_of_scope).
+  scopeJustification String?
+  /// Last inventory review that confirmed this asset (PCI DSS 12.5.1/12.5.2 annual scope confirmation).
+  lastReviewedAt     DateTime?
+  lastReviewedById   String?
+  /// Last time a vulnerability scan import referenced this asset (scan coverage, PCI DSS 11.3).
+  lastScannedAt      DateTime?
 
   firstSeenAt DateTime  @default(now())
   lastSeenAt  DateTime  @default(now())
@@ -38,6 +53,7 @@ model Asset {
   @@index([organizationId, archivedAt])
   @@index([connectionId])
   @@index([ownerId])
+  @@index([vendorId])
 }
 
 enum AssetSource {
@@ -89,6 +105,50 @@ enum AssetDataClassification {
 enum VulnerabilitySource {
   integration
   asv_scan
+  internal_scan
   pentest
   manual
+}
+
+/// One imported scan or test report (PCI DSS 11.3.1 internal, 11.3.2 ASV, 11.4 pentest; ISO 27001 A.8.8).
+model VulnerabilityScan {
+  id             String                @id @default(dbgenerated("generate_prefixed_cuid('vscan'::text)"))
+  organizationId String
+  organization   Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  kind           VulnerabilityScanKind
+  /// Scanning vendor / tester ("Qualys ASV", "Acme Security").
+  vendor         String?
+  scannedAt      DateTime
+  /// null = not a pass/fail report (pentest); ASV passes when nothing scores CVSS >= 4.0.
+  passed         Boolean?
+  /// Attachment (entityType vulnerability_scan) holding the original report.
+  attachmentId   String?
+  findingCount   Int                   @default(0)
+  createdById    String?
+  createdAt      DateTime              @default(now())
+
+  findings IntegrationPlatformFinding[]
+
+  @@index([organizationId, kind, scannedAt])
+}
+
+enum VulnerabilityScanKind {
+  internal
+  external_asv
+  pentest
+}
+
+/// Per-org remediation SLA in days per severity (PCI DSS 6.3.1/6.3.3, ISO 27001 A.8.8).
+/// Absent row = the defaults below. Changes are kept in AuditLog.
+model VulnerabilitySlaPolicy {
+  id             String       @id @default(dbgenerated("generate_prefixed_cuid('vsla'::text)"))
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  criticalDays   Int          @default(30)
+  highDays       Int          @default(30)
+  mediumDays     Int          @default(90)
+  lowDays        Int          @default(180)
+  updatedById    String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 }

@@ -78,3 +78,27 @@ export function displayNameFromResourceId(resourceId: string): string {
   const tail = resourceId.split(/[/:]/).filter(Boolean).pop();
   return tail && tail.length > 0 ? tail : resourceId;
 }
+
+/** Product names a free-text inventory line uses that resource-type slugs never do. */
+const NAME_PATTERNS: Array<[RegExp, AssetType]> = [
+  [/\b(secrets? manager|kms|key vault|vault)\b/i, 'key_secret'],
+  [/\b(bitbucket|github|gitlab|ecr)\b/i, 'repository'],
+  [
+    /\b(aurora|mysql|postgres(ql)?|documentdb|docdb|redshift|elasticache|redis|valkey|mongo(db)?|dynamodb)\b/i,
+    'database',
+  ],
+  [/\b(spaces|blob storage|object storage)\b/i, 'storage'],
+];
+
+/**
+ * Type for a manually imported inventory line ("ECS Fargate service api",
+ * "AWS Secrets Manager"): product names first, then the resource-type rules
+ * on a slug of the name. Anything else, including IAM or logging services,
+ * is "other".
+ */
+export function classifyAssetName(name: string): AssetType {
+  const hit = NAME_PATTERNS.find(([pattern]) => pattern.test(name));
+  if (hit) return hit[1];
+  const slug = name.trim().toLowerCase().replace(/\s+/g, '-');
+  return classifyResourceType(slug) ?? 'other';
+}

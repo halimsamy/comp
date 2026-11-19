@@ -1,7 +1,7 @@
 import { mockHasPermission, setMockPermissions } from '@/test-utils/mocks/permissions';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { VULNERABILITIES } from '../lib/vulnerabilities.fixtures';
+import { makeVulnerability, VULNERABILITIES } from '../lib/vulnerabilities.fixtures';
 import { VulnerabilitiesClient } from './VulnerabilitiesClient';
 
 vi.mock('@/hooks/use-permissions', () => ({
@@ -17,6 +17,19 @@ const state = {
   sync: vi.fn(),
 };
 vi.mock('@/hooks/use-vulnerabilities', () => ({ useVulnerabilities: () => state }));
+vi.mock('@/hooks/use-vulnerability-program', () => ({
+  useSlaPolicy: () => ({
+    policy: { criticalDays: 14, highDays: 30, mediumDays: 60, lowDays: 120 },
+    isLoading: false,
+    save: vi.fn(),
+  }),
+  useVulnerabilityScans: () => ({ scans: undefined, isLoading: true }),
+  openVulnerabilityFile: vi.fn(),
+}));
+vi.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(),
+  useParams: () => ({ orgId: 'org_1' }),
+}));
 vi.mock('@/lib/evidence-download', () => ({ downloadRegisterCsv: vi.fn() }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
@@ -51,14 +64,14 @@ describe('VulnerabilitiesClient', () => {
 
   it('lets admins import and log findings', () => {
     renderClient();
-    expect(screen.getByRole('button', { name: /Import CSV/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Import scan/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Log vulnerability/ })).toBeInTheDocument();
   });
 
   it('hides mutations for read-only users', () => {
     setMockPermissions({ integration: ['read'] });
     renderClient();
-    expect(screen.queryByRole('button', { name: /Import CSV/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Import scan/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Log vulnerability/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Refresh/ })).not.toBeInTheDocument();
   });
@@ -67,5 +80,29 @@ describe('VulnerabilitiesClient', () => {
     state.vulnerabilities = [];
     renderClient();
     expect(screen.getByText('No vulnerabilities tracked yet')).toBeInTheDocument();
+  });
+
+  it('shows the org SLA in the header', () => {
+    renderClient();
+    expect(
+      screen.getByText(/critical within 14 days, high 30, medium 60, low 120/),
+    ).toBeInTheDocument();
+  });
+
+  it('lists false positives and accepted risks together', () => {
+    renderClient();
+    fireEvent.click(screen.getByRole('tab', { name: /False positive \/ accepted/ }));
+    expect(screen.getByText('Accepted')).toBeInTheDocument();
+    expect(screen.queryByText('OpenSSL overflow')).not.toBeInTheDocument();
+  });
+
+  it('flags ASV failures in the list', () => {
+    state.vulnerabilities = [
+      ...VULNERABILITIES,
+      makeVulnerability({ id: 'ipf_asv', title: 'TLS 1.0', source: 'asv_scan', asvFail: true }),
+    ];
+    renderClient();
+    const row = screen.getByText('TLS 1.0').closest('tr') as HTMLElement;
+    expect(within(row).getByText('ASV fail')).toBeInTheDocument();
   });
 });

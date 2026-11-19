@@ -27,6 +27,11 @@ export function makeVulnerability(over: Partial<Vulnerability> = {}): Vulnerabil
       environment: 'production',
     },
     owner: null,
+    acceptedUntil: null,
+    acceptedBy: null,
+    asvFail: false,
+    scan: null,
+    evidence: [],
     ...over,
   };
 }
@@ -55,7 +60,7 @@ export const VULNERABILITIES: Vulnerability[] = [
   makeVulnerability({
     id: 'ipf_4',
     title: 'Accepted',
-    status: 'ignored',
+    status: 'false_positive',
     slaStatus: 'closed',
     statusNote: 'False positive',
   }),

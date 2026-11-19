@@ -3,9 +3,11 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { db, type Prisma } from '@db';
+import { db, type AssetCdeScope, type Prisma } from '@db';
 import { randomUUID } from 'node:crypto';
 import { resolveActiveMember } from '../isms/utils/resolve-active-member';
+import { OwnershipNotifier } from '../notifications/ownership-notifier.service';
+import { logScopeChange } from './asset-review';
 import type { CreateAssetDto, UpdateAssetDto } from './dto/asset.dto';
 
 const ASSET_SELECT = {
@@ -18,12 +20,20 @@ const ASSET_SELECT = {
   resourceType: true,
   environment: true,
   cdeScope: true,
+  scopeJustification: true,
   dataClassification: true,
   ownerId: true,
   owner: {
     select: { id: true, user: { select: { name: true, email: true } } },
   },
   description: true,
+  location: true,
+  vendorId: true,
+  vendor: { select: { id: true, name: true } },
+  version: true,
+  endOfSupportAt: true,
+  lastReviewedAt: true,
+  lastScannedAt: true,
   firstSeenAt: true,
   lastSeenAt: true,
   archivedAt: true,
@@ -44,8 +54,24 @@ function toResponse({ _count, owner, ...asset }: AssetRow) {
 
 export type AssetResponse = ReturnType<typeof toResponse>;
 
+interface Actor {
+  userId?: string;
+  memberId?: string;
+}
+
+const dayOrNull = (value: string | null | undefined) =>
+  value === undefined
+    ? undefined
+    : value
+      ? new Date(`${value}T00:00:00Z`)
+      : null;
+const textOrNull = (value: string | null | undefined) =>
+  value === undefined ? undefined : value?.trim() || null;
+
 @Injectable()
 export class AssetsService {
+  constructor(private readonly ownership: OwnershipNotifier) {}
+
   async list({
     organizationId,
     includeArchived,
@@ -67,14 +93,18 @@ export class AssetsService {
   async create({
     organizationId,
     dto,
+    actor = {},
   }: {
     organizationId: string;
     dto: CreateAssetDto;
+    actor?: Actor;
   }): Promise<AssetResponse> {
-    const ownerId = await resolveActiveMember({
-      memberId: dto.ownerId,
-      organizationId,
-    });
+    const scopeJustification = textOrNull(dto.scopeJustification) ?? null;
+    assertJustified({ cdeScope: dto.cdeScope, scopeJustification });
+    const [ownerId, vendorId] = await Promise.all([
+      resolveActiveMember({ memberId: dto.ownerId, organizationId }),
+      resolveVendor({ vendorId: dto.vendorId, organizationId }),
+    ]);
     const row = await db.asset.create({
       data: {
         organizationId,
@@ -84,12 +114,18 @@ export class AssetsService {
         type: dto.type,
         environment: dto.environment,
         cdeScope: dto.cdeScope,
+        scopeJustification,
         dataClassification: dto.dataClassification,
         ownerId: ownerId ?? null,
-        description: dto.description?.trim() || null,
+        vendorId: vendorId ?? null,
+        description: textOrNull(dto.description) ?? null,
+        location: textOrNull(dto.location) ?? null,
+        version: textOrNull(dto.version) ?? null,
+        endOfSupportAt: dayOrNull(dto.endOfSupportAt) ?? null,
       },
       select: ASSET_SELECT,
     });
+    if (row.ownerId) await this.notifyOwner({ organizationId, row, actor });
     return toResponse(row);
   }
 
@@ -97,16 +133,27 @@ export class AssetsService {
     organizationId,
     assetId,
     dto,
+    actor = {},
   }: {
     organizationId: string;
     assetId: string;
     dto: UpdateAssetDto;
+    actor?: Actor;
   }): Promise<AssetResponse> {
-    await this.findOrThrow({ organizationId, assetId });
-    const ownerId = await resolveActiveMember({
-      memberId: dto.ownerId,
-      organizationId,
-    });
+    const current = await this.findOrThrow({ organizationId, assetId });
+    const cdeScope = dto.cdeScope ?? current.cdeScope;
+    const justification = textOrNull(dto.scopeJustification);
+    const scopeJustification =
+      cdeScope !== 'out_of_scope'
+        ? null
+        : justification === undefined
+          ? current.scopeJustification
+          : justification;
+    assertJustified({ cdeScope, scopeJustification });
+    const [ownerId, vendorId] = await Promise.all([
+      resolveActiveMember({ memberId: dto.ownerId, organizationId }),
+      resolveVendor({ vendorId: dto.vendorId, organizationId }),
+    ]);
     const row = await db.asset.update({
       where: { id: assetId, organizationId },
       data: {
@@ -114,15 +161,30 @@ export class AssetsService {
         type: dto.type,
         environment: dto.environment,
         cdeScope: dto.cdeScope,
+        scopeJustification,
         dataClassification: dto.dataClassification,
         ownerId,
-        description:
-          dto.description === undefined
-            ? undefined
-            : dto.description?.trim() || null,
+        vendorId,
+        description: textOrNull(dto.description),
+        location: textOrNull(dto.location),
+        version: textOrNull(dto.version),
+        endOfSupportAt: dayOrNull(dto.endOfSupportAt),
       },
       select: ASSET_SELECT,
     });
+    if (cdeScope !== current.cdeScope) {
+      await logScopeChange({
+        organizationId,
+        actor,
+        asset: { id: row.id, name: row.name },
+        from: current.cdeScope,
+        to: cdeScope,
+        justification: scopeJustification,
+      });
+    }
+    if (row.ownerId && row.ownerId !== current.ownerId) {
+      await this.notifyOwner({ organizationId, row, actor });
+    }
     return toResponse(row);
   }
 
@@ -144,6 +206,26 @@ export class AssetsService {
     return { id: assetId };
   }
 
+  private notifyOwner({
+    organizationId,
+    row,
+    actor,
+  }: {
+    organizationId: string;
+    row: { id: string; name: string; ownerId: string | null };
+    actor: Actor;
+  }) {
+    if (!row.ownerId) return Promise.resolve(false);
+    return this.ownership.notify({
+      organizationId,
+      memberId: row.ownerId,
+      entityType: 'asset',
+      entityName: row.name,
+      url: `/assets?id=${row.id}`,
+      assignedByUserId: actor.userId ?? null,
+    });
+  }
+
   private async findOrThrow({
     organizationId,
     assetId,
@@ -153,9 +235,48 @@ export class AssetsService {
   }) {
     const asset = await db.asset.findFirst({
       where: { id: assetId, organizationId },
-      select: { id: true, source: true },
+      select: {
+        id: true,
+        source: true,
+        cdeScope: true,
+        scopeJustification: true,
+        ownerId: true,
+      },
     });
     if (!asset) throw new NotFoundException('Asset not found');
     return asset;
   }
+}
+
+/** PCI DSS 12.5.2: excluding a system from scope must be justified. */
+function assertJustified({
+  cdeScope,
+  scopeJustification,
+}: {
+  cdeScope: AssetCdeScope | undefined;
+  scopeJustification: string | null | undefined;
+}) {
+  if (cdeScope === 'out_of_scope' && !scopeJustification) {
+    throw new BadRequestException(
+      'Explain why the asset is out of PCI DSS scope (for example, no network path to the CDE).',
+    );
+  }
+}
+
+/** Three-state vendor reference: undefined = leave, null/blank = clear, else a vendor of the org. */
+async function resolveVendor({
+  vendorId,
+  organizationId,
+}: {
+  vendorId: string | null | undefined;
+  organizationId: string;
+}): Promise<string | null | undefined> {
+  if (vendorId === undefined) return undefined;
+  if (!vendorId?.trim()) return null;
+  const vendor = await db.vendor.findFirst({
+    where: { id: vendorId, organizationId },
+    select: { id: true },
+  });
+  if (!vendor) throw new NotFoundException('Vendor not found');
+  return vendor.id;
 }

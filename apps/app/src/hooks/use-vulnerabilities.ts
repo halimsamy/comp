@@ -1,12 +1,17 @@
 'use client';
 
 import { apiClient } from '@/lib/api-client';
-import useSWR from 'swr';
+import { fileToBase64 } from '@/lib/file-utils';
+import useSWR, { mutate as globalMutate } from 'swr';
 import type { AssetCdeScope, AssetEnvironment, AssetType } from './use-assets';
+import { scansKey } from './use-vulnerability-program';
 
 export type VulnerabilitySeverity = 'critical' | 'high' | 'medium' | 'low' | 'info';
-export type VulnerabilityStatus = 'open' | 'resolved' | 'ignored';
-export type VulnerabilitySource = 'integration' | 'asv_scan' | 'pentest' | 'manual';
+export type VulnerabilityStatus = 'open' | 'resolved' | 'false_positive' | 'risk_accepted';
+export type VulnerabilitySource =
+  'integration' | 'asv_scan' | 'internal_scan' | 'pentest' | 'manual';
+export type ScanKind = 'internal' | 'external_asv' | 'pentest';
+export type ImportSource = 'asv_scan' | 'internal_scan' | 'pentest';
 export type SlaStatus = 'overdue' | 'due_soon' | 'due_later' | 'no_sla' | 'closed';
 
 export interface Vulnerability {
@@ -26,6 +31,11 @@ export interface Vulnerability {
   resolvedAt: string | null;
   slaDueAt: string | null;
   slaStatus: SlaStatus;
+  acceptedUntil: string | null;
+  acceptedBy: { id: string; name: string | null; email: string } | null;
+  asvFail: boolean;
+  scan: { id: string; kind: ScanKind; scannedAt: string; vendor: string | null } | null;
+  evidence: { id: string; name: string }[];
   provider: { slug: string; name: string } | null;
   asset: {
     id: string;
@@ -50,16 +60,32 @@ export interface CreateVulnerabilityPayload {
 export interface UpdateVulnerabilityPayload {
   status?: VulnerabilityStatus;
   ownerId?: string | null;
+  assetId?: string | null;
   statusNote?: string | null;
+  acceptedUntil?: string;
+  acceptedById?: string;
+  evidence?: File;
 }
 
 export interface ImportVulnerabilitiesPayload {
-  source: 'asv_scan' | 'pentest';
+  source: ImportSource;
   csv: string;
   resolveMissing: boolean;
+  scannedAt: string;
+  vendor?: string;
+  passed?: boolean;
+  report?: File;
 }
 
+const toUpload = async (file: File) => ({
+  fileName: file.name,
+  fileType: file.type || 'application/octet-stream',
+  fileData: await fileToBase64(file),
+});
+
 export interface ImportResult {
+  scanId: string;
+  passed: boolean | null;
   created: number;
   updated: number;
   reopened: number;
@@ -91,14 +117,24 @@ export function useVulnerabilities({ initialData }: { initialData?: Vulnerabilit
     await mutate();
   };
   const update = async ({ id, payload }: { id: string; payload: UpdateVulnerabilityPayload }) => {
-    await unwrap(apiClient.patch(`${vulnerabilitiesKey}/${id}`, payload));
+    const { evidence, ...rest } = payload;
+    await unwrap(
+      apiClient.patch(`${vulnerabilitiesKey}/${id}`, {
+        ...rest,
+        ...(evidence ? { evidence: await toUpload(evidence) } : {}),
+      }),
+    );
     await mutate();
   };
   const importCsv = async (payload: ImportVulnerabilitiesPayload) => {
+    const { report, ...rest } = payload;
     const result = await unwrap(
-      apiClient.post<ImportResult>(`${vulnerabilitiesKey}/import`, payload),
+      apiClient.post<ImportResult>(`${vulnerabilitiesKey}/import`, {
+        ...rest,
+        ...(report ? { report: await toUpload(report) } : {}),
+      }),
     );
-    await mutate();
+    await Promise.all([mutate(), globalMutate(scansKey), globalMutate('/v1/assets')]);
     return result;
   };
 

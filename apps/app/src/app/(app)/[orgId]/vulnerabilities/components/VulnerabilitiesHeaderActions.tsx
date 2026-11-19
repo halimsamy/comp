@@ -1,13 +1,13 @@
 'use client';
 
-import { ExportRegisterButton } from '@/components/register-export/ExportRegisterButton';
+import { useRegisterExport } from '@/components/register-export/ExportRegisterButton';
 import { usePermissions } from '@/hooks/use-permissions';
-import { Button } from '@trycompai/design-system';
-import { Add, Renew, Upload } from '@trycompai/design-system/icons';
+import { Add, Download, Renew, Upload } from '@trycompai/design-system/icons';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { type HeaderAction, HeaderActions } from '../../assets/components/HeaderActions';
 
-/** Refresh, CSV import / export and manual logging, each gated by permission. */
+/** Refresh, scan import, CSV export and manual logging, each gated by permission. */
 export function VulnerabilitiesHeaderActions({
   onSync,
   onImport,
@@ -18,6 +18,7 @@ export function VulnerabilitiesHeaderActions({
   onCreate: () => void;
 }) {
   const { hasPermission } = usePermissions();
+  const { exporting, handleExport } = useRegisterExport();
   const [isSyncing, setIsSyncing] = useState(false);
   const canCreate = hasPermission('integration', 'create');
 
@@ -33,29 +34,31 @@ export function VulnerabilitiesHeaderActions({
     }
   };
 
-  return (
-    <div className="flex flex-wrap gap-2">
-      {hasPermission('integration', 'update') ? (
-        <Button
-          variant="outline"
-          iconLeft={<Renew size={16} />}
-          loading={isSyncing}
-          onClick={() => void handleSync()}
-        >
-          Refresh
-        </Button>
-      ) : null}
-      <ExportRegisterButton options={[{ register: 'vulnerabilities', label: 'Vulnerabilities' }]} />
-      {canCreate ? (
-        <Button variant="outline" iconLeft={<Upload size={16} />} onClick={onImport}>
-          Import CSV
-        </Button>
-      ) : null}
-      {canCreate ? (
-        <Button iconLeft={<Add size={16} />} onClick={onCreate}>
-          Log vulnerability
-        </Button>
-      ) : null}
-    </div>
-  );
+  const actions: HeaderAction[] = [];
+  if (hasPermission('integration', 'update')) {
+    actions.push({
+      label: 'Refresh',
+      icon: <Renew size={16} />,
+      loading: isSyncing,
+      onClick: () => void handleSync(),
+    });
+  }
+  if (hasPermission('integration', 'read')) {
+    actions.push({
+      label: 'Export CSV',
+      icon: <Download size={16} />,
+      loading: exporting !== null,
+      onClick: () => void handleExport('vulnerabilities'),
+    });
+  }
+  if (canCreate) {
+    actions.push({ label: 'Import scan', icon: <Upload size={16} />, onClick: onImport });
+    actions.push({
+      label: 'Log vulnerability',
+      icon: <Add size={16} />,
+      primary: true,
+      onClick: onCreate,
+    });
+  }
+  return <HeaderActions actions={actions} />;
 }

@@ -67,9 +67,14 @@ export function VulnerabilitiesTable({
                 </button>
               </TableCell>
               <TableCell>
-                <Badge variant={severityBadgeVariant(v.severity)}>
-                  {SEVERITY_LABELS[v.severity]}
-                </Badge>
+                <div className="flex flex-wrap gap-1">
+                  <Badge variant={severityBadgeVariant(v.severity)}>
+                    {SEVERITY_LABELS[v.severity]}
+                  </Badge>
+                  {v.asvFail && v.status === 'open' ? (
+                    <Badge variant="destructive">ASV fail</Badge>
+                  ) : null}
+                </div>
               </TableCell>
               <TableCell>
                 <div className="min-w-32 max-w-xs truncate">

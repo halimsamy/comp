@@ -40,7 +40,9 @@ export function matchesAsset({
   const q = filters.search.trim().toLowerCase();
   if (
     q &&
-    !`${asset.name} ${asset.externalId} ${asset.description ?? ''}`.toLowerCase().includes(q)
+    !`${asset.name} ${asset.externalId} ${asset.description ?? ''} ${asset.location ?? ''} ${asset.vendor?.name ?? ''}`
+      .toLowerCase()
+      .includes(q)
   ) {
     return false;
   }

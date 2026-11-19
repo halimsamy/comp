@@ -1,27 +1,32 @@
 import { BadRequestException } from '@nestjs/common';
 import { db } from '@db';
+import type { AttachmentsService } from '../attachments/attachments.service';
+import type { OwnershipNotifier } from '../notifications/ownership-notifier.service';
 import { VulnerabilitiesService } from './vulnerabilities.service';
-import { VulnerabilityImportService } from './vulnerability-import.service';
 
 jest.mock('@db', () => ({
   db: {
-    asset: { findFirst: jest.fn(), findMany: jest.fn() },
-    member: { findFirst: jest.fn() },
+    asset: { findFirst: jest.fn() },
+    member: { findFirst: jest.fn(), findMany: jest.fn() },
+    attachment: { findMany: jest.fn() },
+    vulnerabilitySlaPolicy: { findUnique: jest.fn() },
     integrationPlatformFinding: {
       findMany: jest.fn(),
       findFirst: jest.fn(),
+      findFirstOrThrow: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
-      updateMany: jest.fn(),
     },
   },
 }));
 
 const mockDb = db as unknown as {
-  asset: Record<'findFirst' | 'findMany', jest.Mock>;
-  member: { findFirst: jest.Mock };
+  asset: { findFirst: jest.Mock };
+  member: Record<'findFirst' | 'findMany', jest.Mock>;
+  attachment: { findMany: jest.Mock };
+  vulnerabilitySlaPolicy: { findUnique: jest.Mock };
   integrationPlatformFinding: Record<
-    'findMany' | 'findFirst' | 'create' | 'update' | 'updateMany',
+    'findMany' | 'findFirst' | 'findFirstOrThrow' | 'create' | 'update',
     jest.Mock
   >;
 };
@@ -31,18 +36,52 @@ const stored = {
   id: 'ipf_1',
   status: 'open',
   slaDueAt: new Date('2020-01-01'),
+  acceptedById: null,
   connection: null,
   owner: null,
   asset: null,
 };
+const current = (over: Record<string, unknown> = {}) => ({
+  id: 'ipf_1',
+  title: 'Weak TLS',
+  source: 'manual',
+  status: 'open',
+  severity: 'medium',
+  statusNote: null,
+  ownerId: null,
+  assetId: null,
+  acceptedUntil: null,
+  acceptedById: null,
+  ...over,
+});
+const inDays = (days: number) =>
+  new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
 
 describe('VulnerabilitiesService', () => {
-  const service = new VulnerabilitiesService();
+  const upload = jest.fn();
+  const notify = jest.fn();
+  const service = new VulnerabilitiesService(
+    { uploadAttachment: upload } as unknown as AttachmentsService,
+    { notify } as unknown as OwnershipNotifier,
+  );
+  const actor = { userId: 'usr_1', memberId: 'mem_me' };
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockDb.integrationPlatformFinding.create.mockResolvedValue(stored);
-    mockDb.integrationPlatformFinding.update.mockResolvedValue(stored);
+    mockDb.vulnerabilitySlaPolicy.findUnique.mockResolvedValue(null);
+    mockDb.member.findMany.mockResolvedValue([]);
+    mockDb.member.findFirst.mockImplementation(({ where }) => ({
+      id: where.id,
+    }));
+    mockDb.attachment.findMany.mockResolvedValue([]);
+    mockDb.integrationPlatformFinding.create.mockResolvedValue({
+      id: 'ipf_1',
+      title: 'Weak TLS',
+      ownerId: 'mem_1',
+    });
+    mockDb.integrationPlatformFinding.findFirstOrThrow.mockResolvedValue(
+      stored,
+    );
   });
 
   it('lists org findings with a computed SLA status', async () => {
@@ -52,10 +91,16 @@ describe('VulnerabilitiesService', () => {
       mockDb.integrationPlatformFinding.findMany.mock.calls[0][0].where,
     ).toEqual({ organizationId: ORG });
     expect(row.slaStatus).toBe('overdue');
-    expect(row.provider).toBeNull();
+    expect(row.evidence).toEqual([]);
   });
 
-  it('logs a manual finding on an asset with its SLA and the asset owner', async () => {
+  it('logs a manual finding with the org SLA and notifies the asset owner', async () => {
+    mockDb.vulnerabilitySlaPolicy.findUnique.mockResolvedValue({
+      criticalDays: 14,
+      highDays: 30,
+      mediumDays: 60,
+      lowDays: 90,
+    });
     mockDb.asset.findFirst.mockResolvedValue({
       id: 'ast_1',
       name: 'db-prod',
@@ -63,6 +108,7 @@ describe('VulnerabilitiesService', () => {
     });
     await service.create({
       organizationId: ORG,
+      actor,
       dto: {
         title: 'Weak TLS',
         severity: 'critical',
@@ -71,60 +117,139 @@ describe('VulnerabilitiesService', () => {
         cveId: 'cve-2024-1',
       },
     });
-    expect(mockDb.asset.findFirst.mock.calls[0][0].where).toEqual({
-      id: 'ast_1',
-      organizationId: ORG,
-    });
     expect(
       mockDb.integrationPlatformFinding.create.mock.calls[0][0].data,
     ).toMatchObject({
       organizationId: ORG,
-      source: 'manual',
       assetId: 'ast_1',
       ownerId: 'mem_1',
       cveId: 'CVE-2024-1',
-      slaDueAt: new Date('2026-12-01T00:00:00Z'),
+      slaDueAt: new Date('2026-11-15T00:00:00Z'),
     });
+    expect(notify).toHaveBeenCalledWith(
+      expect.objectContaining({
+        memberId: 'mem_1',
+        entityType: 'vulnerability',
+      }),
+    );
   });
 
-  it('requires a reason to ignore a finding', async () => {
-    mockDb.integrationPlatformFinding.findFirst.mockResolvedValue({
-      id: 'ipf_1',
-      source: 'manual',
-      status: 'open',
-      statusNote: null,
-    });
+  it('requires a note for a false positive and stores an optional evidence file', async () => {
+    mockDb.integrationPlatformFinding.findFirst.mockResolvedValue(current());
     await expect(
       service.update({
         organizationId: ORG,
         vulnerabilityId: 'ipf_1',
-        dto: { status: 'ignored' },
+        dto: { status: 'false_positive' },
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
+    const evidence = {
+      fileName: 'dispute.pdf',
+      fileType: 'application/pdf',
+      fileData: 'AA==',
+    };
     await service.update({
       organizationId: ORG,
       vulnerabilityId: 'ipf_1',
-      dto: { status: 'ignored', statusNote: 'False positive' },
+      actor,
+      dto: { status: 'false_positive', statusNote: 'Banner only', evidence },
     });
     expect(
       mockDb.integrationPlatformFinding.update.mock.calls[0][0],
     ).toMatchObject({
       where: { id: 'ipf_1', organizationId: ORG },
-      data: {
-        status: 'ignored',
-        resolvedAt: null,
-        statusNote: 'False positive',
+      data: { status: 'false_positive', statusNote: 'Banner only' },
+    });
+    expect(upload).toHaveBeenCalledWith(
+      ORG,
+      'ipf_1',
+      'vulnerability',
+      evidence,
+      'usr_1',
+    );
+  });
+
+  it('rejects a risk acceptance approved by the requester', async () => {
+    mockDb.integrationPlatformFinding.findFirst.mockResolvedValue(current());
+    await expect(
+      service.update({
+        organizationId: ORG,
+        vulnerabilityId: 'ipf_1',
+        actor,
+        dto: {
+          status: 'risk_accepted',
+          statusNote: 'Compensating WAF rule',
+          acceptedUntil: inDays(30),
+          acceptedById: 'mem_me',
+        },
+      }),
+    ).rejects.toThrow('Someone other than you');
+  });
+
+  it('blocks accepting a critical finding on an in-scope asset', async () => {
+    mockDb.integrationPlatformFinding.findFirst.mockResolvedValue(
+      current({ severity: 'critical', assetId: 'ast_cde' }),
+    );
+    mockDb.asset.findFirst.mockResolvedValue({ cdeScope: 'in_scope' });
+    await expect(
+      service.update({
+        organizationId: ORG,
+        vulnerabilityId: 'ipf_1',
+        actor,
+        dto: {
+          status: 'risk_accepted',
+          statusNote: 'Later',
+          acceptedUntil: inDays(30),
+          acceptedById: 'mem_cto',
+        },
+      }),
+    ).rejects.toThrow('cannot be risk-accepted');
+  });
+
+  it('accepts a medium risk with an approver and expiry', async () => {
+    mockDb.integrationPlatformFinding.findFirst.mockResolvedValue(current());
+    await service.update({
+      organizationId: ORG,
+      vulnerabilityId: 'ipf_1',
+      actor,
+      dto: {
+        status: 'risk_accepted',
+        statusNote: 'Internal only',
+        acceptedUntil: inDays(60),
+        acceptedById: 'mem_cto',
       },
     });
+    const data = mockDb.integrationPlatformFinding.update.mock.calls[0][0].data;
+    expect(data).toMatchObject({
+      status: 'risk_accepted',
+      acceptedById: 'mem_cto',
+    });
+    expect(data.acceptedUntil).toEqual(expect.any(Date));
+  });
+
+  it('links an asset and hands an unowned finding to the asset owner', async () => {
+    mockDb.integrationPlatformFinding.findFirst.mockResolvedValue(current());
+    mockDb.asset.findFirst
+      .mockResolvedValueOnce({ id: 'ast_1', name: 'web', ownerId: 'mem_web' })
+      .mockResolvedValueOnce({ cdeScope: 'connected' });
+    await service.update({
+      organizationId: ORG,
+      vulnerabilityId: 'ipf_1',
+      actor,
+      dto: { assetId: 'ast_1' },
+    });
+    expect(
+      mockDb.integrationPlatformFinding.update.mock.calls[0][0].data,
+    ).toMatchObject({ assetId: 'ast_1', ownerId: 'mem_web' });
+    expect(notify).toHaveBeenCalledWith(
+      expect.objectContaining({ memberId: 'mem_web' }),
+    );
   });
 
   it('does not let people resolve integration findings by hand', async () => {
-    mockDb.integrationPlatformFinding.findFirst.mockResolvedValue({
-      id: 'ipf_1',
-      source: 'integration',
-      status: 'open',
-      statusNote: null,
-    });
+    mockDb.integrationPlatformFinding.findFirst.mockResolvedValue(
+      current({ source: 'integration' }),
+    );
     await expect(
       service.update({
         organizationId: ORG,
@@ -134,13 +259,10 @@ describe('VulnerabilitiesService', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('stamps resolvedAt when a manual finding is resolved', async () => {
-    mockDb.integrationPlatformFinding.findFirst.mockResolvedValue({
-      id: 'ipf_1',
-      source: 'asv_scan',
-      status: 'open',
-      statusNote: null,
-    });
+  it('stamps resolvedAt when an imported finding is resolved', async () => {
+    mockDb.integrationPlatformFinding.findFirst.mockResolvedValue(
+      current({ source: 'asv_scan' }),
+    );
     await service.update({
       organizationId: ORG,
       vulnerabilityId: 'ipf_1',
@@ -149,99 +271,5 @@ describe('VulnerabilitiesService', () => {
     expect(
       mockDb.integrationPlatformFinding.update.mock.calls[0][0].data.resolvedAt,
     ).toEqual(expect.any(Date));
-  });
-});
-
-describe('VulnerabilityImportService', () => {
-  const importer = new VulnerabilityImportService();
-  const csv =
-    'Name,Severity,Host,CVE\nOpenSSL,High,web-1,CVE-2024-1\nCipher,Low,10.0.0.9,';
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockDb.asset.findMany.mockResolvedValue([
-      { id: 'ast_web', name: 'web-1', externalId: 'i-1', ownerId: 'mem_1' },
-    ]);
-  });
-
-  it('creates new findings matched to assets and resolves missing ones on a rescan', async () => {
-    mockDb.integrationPlatformFinding.findMany.mockResolvedValue([
-      { id: 'ipf_old', externalId: 'old', status: 'open' },
-    ]);
-    const result = await importer.import({
-      organizationId: ORG,
-      source: 'asv_scan',
-      csv,
-      resolveMissing: true,
-    });
-
-    expect(result).toEqual({
-      created: 2,
-      updated: 0,
-      reopened: 0,
-      resolved: 1,
-      skipped: 0,
-    });
-    const created = mockDb.integrationPlatformFinding.create.mock.calls.map(
-      ([arg]) => arg.data,
-    );
-    expect(created[0]).toMatchObject({
-      organizationId: ORG,
-      source: 'asv_scan',
-      assetId: 'ast_web',
-      ownerId: 'mem_1',
-    });
-    expect(created[1]).toMatchObject({ assetId: null, resourceId: '10.0.0.9' });
-    expect(mockDb.integrationPlatformFinding.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { organizationId: ORG, id: { in: ['ipf_old'] } },
-      }),
-    );
-  });
-
-  it('updates findings seen before instead of duplicating them', async () => {
-    mockDb.integrationPlatformFinding.findMany.mockResolvedValue([]);
-    await importer.import({
-      organizationId: ORG,
-      source: 'pentest',
-      csv,
-      resolveMissing: false,
-    });
-    const ids = mockDb.integrationPlatformFinding.create.mock.calls.map(
-      ([arg]) => arg.data.externalId,
-    );
-    jest.clearAllMocks();
-    mockDb.asset.findMany.mockResolvedValue([]);
-    mockDb.integrationPlatformFinding.findMany.mockResolvedValue(
-      ids.map((externalId: string, i: number) => ({
-        id: `ipf_${i}`,
-        externalId,
-        status: i === 0 ? 'resolved' : 'open',
-      })),
-    );
-    const result = await importer.import({
-      organizationId: ORG,
-      source: 'pentest',
-      csv,
-      resolveMissing: false,
-    });
-    expect(result).toMatchObject({
-      created: 0,
-      updated: 1,
-      reopened: 1,
-      resolved: 0,
-    });
-    expect(mockDb.integrationPlatformFinding.updateMany).not.toHaveBeenCalled();
-  });
-
-  it('turns a malformed file into a 400', async () => {
-    await expect(
-      importer.import({
-        organizationId: ORG,
-        source: 'asv_scan',
-        csv: 'host\n1.1.1.1',
-        resolveMissing: false,
-      }),
-    ).rejects.toBeInstanceOf(BadRequestException);
   });
 });

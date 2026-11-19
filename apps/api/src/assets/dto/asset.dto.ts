@@ -10,8 +10,11 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  Matches,
   MaxLength,
 } from 'class-validator';
+
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Attributes people set on an asset; null clears an optional field. */
 class AssetAttributesDto {
@@ -55,6 +58,50 @@ class AssetAttributesDto {
   @IsString()
   @MaxLength(2000)
   description?: string | null;
+
+  @ApiPropertyOptional({
+    description:
+      'Why the asset is out of PCI DSS scope; required when cdeScope is out_of_scope',
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2000)
+  scopeJustification?: string | null;
+
+  @ApiPropertyOptional({
+    description: 'Where it runs (region, data centre, SaaS)',
+    example: 'AWS eu-central-1',
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  location?: string | null;
+
+  @ApiPropertyOptional({
+    description: 'Hosting or supplying vendor id',
+    example: 'vnd_abc123',
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  vendorId?: string | null;
+
+  @ApiPropertyOptional({ description: 'Software / OS version', nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  version?: string | null;
+
+  @ApiPropertyOptional({
+    description: 'Vendor end of support date (YYYY-MM-DD)',
+    example: '2027-06-30',
+    nullable: true,
+  })
+  @IsOptional()
+  @Matches(DATE_ONLY)
+  endOfSupportAt?: string | null;
 }
 
 export class CreateAssetDto extends AssetAttributesDto {
@@ -70,3 +117,14 @@ export class CreateAssetDto extends AssetAttributesDto {
 }
 
 export class UpdateAssetDto extends PartialType(CreateAssetDto) {}
+
+export class ImportAssetsDto {
+  @ApiProperty({
+    description:
+      'CSV text with a header row. Recognised columns: name/asset/system (required), description, type, environment, location/region, owner (name or email), vendor/provider, version, end of support, last reviewed.',
+  })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(5_000_000)
+  csv!: string;
+}

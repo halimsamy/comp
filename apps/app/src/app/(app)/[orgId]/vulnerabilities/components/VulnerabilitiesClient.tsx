@@ -4,10 +4,8 @@ import { IsmsSummaryRow } from '@/app/(app)/[orgId]/documents/isms/components/sh
 import type { Asset } from '@/hooks/use-assets';
 import { usePermissions } from '@/hooks/use-permissions';
 import { useVulnerabilities, type Vulnerability } from '@/hooks/use-vulnerabilities';
+import { useSlaPolicy } from '@/hooks/use-vulnerability-program';
 import {
-  DataTableFilters,
-  DataTableHeader,
-  DataTableSearch,
   Empty,
   EmptyDescription,
   EmptyHeader,
@@ -21,33 +19,29 @@ import {
   Text,
 } from '@trycompai/design-system';
 import { CheckmarkFilled, Misuse, Time, WarningAltFilled } from '@trycompai/design-system/icons';
+import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import type { MemberOption } from '../../assets/components/AssetFormFields';
-import { FilterSelect, optionsFrom } from '../../assets/components/FilterSelect';
-import { CDE_SCOPE_LABELS } from '../../assets/lib/asset-labels';
-import {
-  DEFAULT_VULNERABILITY_FILTERS,
-  matchesVulnerability,
-  slaCounts,
-  VIEW_MATCHERS,
-  type VulnerabilityFilters,
-  type VulnerabilityView,
-} from '../lib/vulnerability-filters';
-import { SEVERITY_LABELS, SLA_LABELS, SOURCE_LABELS } from '../lib/vulnerability-labels';
+import { slaCounts, VIEW_MATCHERS, type VulnerabilityView } from '../lib/vulnerability-filters';
+import { slaDaysFrom } from '../lib/vulnerability-labels';
 import { CreateVulnerabilitySheet } from './CreateVulnerabilitySheet';
 import { ImportVulnerabilitiesDialog } from './ImportVulnerabilitiesDialog';
+import { ScansTab } from './ScansTab';
+import { SlaPolicyTab } from './SlaPolicyTab';
 import { VulnerabilitiesHeaderActions } from './VulnerabilitiesHeaderActions';
-import { VulnerabilitiesTable } from './VulnerabilitiesTable';
+import { VulnerabilityListView } from './VulnerabilityListView';
 import { VulnerabilitySheet } from './VulnerabilitySheet';
+
+type Tab = VulnerabilityView | 'scans' | 'sla';
 
 const VIEWS: { value: VulnerabilityView; label: string }[] = [
   { value: 'open', label: 'Open' },
   { value: 'overdue', label: 'Overdue' },
-  { value: 'ignored', label: 'Ignored' },
+  { value: 'accepted', label: 'False positive / accepted' },
   { value: 'resolved', label: 'Resolved' },
 ];
 
-/** Findings from integrations, ASV scans, pentests and manual entry, tracked against SLAs. */
+/** Findings from integrations, scans, pentests and manual entry, tracked against the org SLA. */
 export function VulnerabilitiesClient({
   initialVulnerabilities,
   assets,
@@ -59,24 +53,20 @@ export function VulnerabilitiesClient({
 }) {
   const { hasPermission } = usePermissions();
   const { vulnerabilities, isLoading, error, create, update, importCsv, sync } = useVulnerabilities(
-    {
-      initialData: initialVulnerabilities,
-    },
+    { initialData: initialVulnerabilities },
   );
-  const [view, setView] = useState<VulnerabilityView>('open');
-  const [filters, setFilters] = useState<VulnerabilityFilters>(DEFAULT_VULNERABILITY_FILTERS);
-  const [selected, setSelected] = useState<Vulnerability | null>(null);
+  const { policy } = useSlaPolicy();
+  const searchParams = useSearchParams();
+  const [tab, setTab] = useState<Tab>('open');
+  // Deep link from owner and SLA emails (/vulnerabilities?id=ipf_…) opens that finding.
+  const [selectedId, setSelectedId] = useState<string | null>(
+    () => searchParams?.get('id') ?? null,
+  );
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const selected = vulnerabilities.find((v) => v.id === selectedId) ?? null;
+  const days = slaDaysFrom(policy);
 
-  const setFilter =
-    <K extends keyof VulnerabilityFilters>(key: K) =>
-    (value: VulnerabilityFilters[K]) =>
-      setFilters((current) => ({ ...current, [key]: value }));
-  const inView = vulnerabilities.filter(VIEW_MATCHERS[view]);
-  const visible = inView.filter((vulnerability) =>
-    matchesVulnerability({ vulnerability, filters }),
-  );
   const counts = slaCounts(vulnerabilities);
   const openCriticalHigh = vulnerabilities.filter(
     (v) => v.status === 'open' && (v.severity === 'critical' || v.severity === 'high'),
@@ -94,9 +84,7 @@ export function VulnerabilitiesClient({
       }
     >
       <PageHeaderDescription>
-        Findings from your scanners, ASV scans and penetration tests with a remediation SLA from
-        first detection: critical and high within 30 days (PCI DSS 6.3.3, 11.3.1), medium 90, low
-        180 (ISO 27001 A.8.8).
+        {`Findings from your scanners, ASV scans and penetration tests with a remediation SLA from first detection: critical within ${days.critical} days, high ${days.high}, medium ${days.medium}, low ${days.low} (PCI DSS 6.3.3, 11.3; ISO 27001 A.8.8).`}
       </PageHeaderDescription>
     </PageHeader>
   );
@@ -114,6 +102,7 @@ export function VulnerabilitiesClient({
     );
   }
 
+  const isListTab = tab !== 'scans' && tab !== 'sla';
   return (
     <Stack gap="6">
       {header}
@@ -140,78 +129,45 @@ export function VulnerabilitiesClient({
           },
         ]}
       />
-      {vulnerabilities.length === 0 ? (
+      <div className="min-w-0 overflow-x-auto">
+        <Tabs value={tab} onValueChange={(next) => setTab(next as Tab)}>
+          <TabsList variant="underline">
+            {VIEWS.map((item) => (
+              <TabsTrigger key={item.value} value={item.value}>
+                {item.label} ({vulnerabilities.filter(VIEW_MATCHERS[item.value]).length})
+              </TabsTrigger>
+            ))}
+            <TabsTrigger value="scans">Scans</TabsTrigger>
+            <TabsTrigger value="sla">SLA policy</TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
+      {tab === 'scans' ? <ScansTab /> : null}
+      {tab === 'sla' ? <SlaPolicyTab canEdit={hasPermission('integration', 'update')} /> : null}
+      {isListTab && vulnerabilities.length === 0 ? (
         <Empty>
           <EmptyHeader>
             <EmptyTitle>No vulnerabilities tracked yet</EmptyTitle>
             <EmptyDescription>
               Connect GitHub (Dependabot), Aikido or AWS (Inspector via Security Hub) and refresh,
-              import your quarterly ASV scan or penetration test CSV, or log a finding by hand.
+              import your quarterly ASV scan, internal scan or penetration test, or log a finding by
+              hand.
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
-      ) : (
-        <Stack gap="4">
-          <div className="overflow-x-auto">
-            <Tabs value={view} onValueChange={(next) => setView(next as VulnerabilityView)}>
-              <TabsList variant="underline">
-                {VIEWS.map((item) => (
-                  <TabsTrigger key={item.value} value={item.value}>
-                    {item.label} ({vulnerabilities.filter(VIEW_MATCHERS[item.value]).length})
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
-          </div>
-          <DataTableHeader>
-            <DataTableSearch
-              placeholder="Search title, CVE or asset"
-              value={filters.search}
-              onChange={setFilter('search')}
-            />
-            <DataTableFilters>
-              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
-                <FilterSelect
-                  label="Severity"
-                  value={filters.severity}
-                  options={optionsFrom({ allLabel: 'All severities', labels: SEVERITY_LABELS })}
-                  onChange={setFilter('severity')}
-                />
-                <FilterSelect
-                  label="Source"
-                  value={filters.source}
-                  options={optionsFrom({ allLabel: 'All sources', labels: SOURCE_LABELS })}
-                  onChange={setFilter('source')}
-                />
-                <FilterSelect
-                  label="SLA status"
-                  value={filters.sla}
-                  options={optionsFrom({ allLabel: 'All SLA statuses', labels: SLA_LABELS })}
-                  onChange={setFilter('sla')}
-                />
-                <FilterSelect
-                  label="PCI scope"
-                  value={filters.cdeScope}
-                  options={optionsFrom({ allLabel: 'All scopes', labels: CDE_SCOPE_LABELS })}
-                  onChange={setFilter('cdeScope')}
-                />
-              </div>
-            </DataTableFilters>
-          </DataTableHeader>
-          {visible.length === 0 ? (
-            <Text size="sm" variant="muted">
-              {inView.length === 0 ? 'Nothing here.' : 'No vulnerabilities match these filters.'}
-            </Text>
-          ) : (
-            <VulnerabilitiesTable vulnerabilities={visible} onOpen={setSelected} />
-          )}
-        </Stack>
-      )}
+      ) : null}
+      {isListTab && vulnerabilities.length > 0 ? (
+        <VulnerabilityListView
+          vulnerabilities={vulnerabilities.filter(VIEW_MATCHERS[tab])}
+          onOpen={(v) => setSelectedId(v.id)}
+        />
+      ) : null}
       <VulnerabilitySheet
         open={selected !== null}
-        onOpenChange={(open) => !open && setSelected(null)}
+        onOpenChange={(open) => !open && setSelectedId(null)}
         vulnerability={selected}
         memberOptions={memberOptions}
+        assets={assets}
         canEdit={hasPermission('integration', 'update')}
         onSubmit={(payload) =>
           selected ? update({ id: selected.id, payload }) : Promise.resolve()
@@ -221,6 +177,7 @@ export function VulnerabilitiesClient({
         open={isCreateOpen}
         onOpenChange={setIsCreateOpen}
         assets={assets}
+        slaDays={days}
         onSubmit={create}
       />
       <ImportVulnerabilitiesDialog
