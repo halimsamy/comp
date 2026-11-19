@@ -25,20 +25,21 @@ import { useMemo } from 'react';
 import useSWR from 'swr';
 import { usePermissions } from '@/hooks/use-permissions';
 import { api } from '@/lib/api-client';
-import { useIso27001FrameworkId } from '../../isms/hooks/useIso27001FrameworkId';
-import { useIsmsReadiness } from '../../isms/hooks/useIsmsReadiness';
+import { useIso27001FrameworkId } from '../../hooks/useIso27001FrameworkId';
+import { useIsmsReadiness } from '../../hooks/useIsmsReadiness';
 import {
   ISMS_TYPE_META,
   ismsTypeToSlug,
   type IsmsDriftResult,
   type IsmsEnsureSetupResponse,
-} from '../../isms/isms-types';
+} from '../../isms-types';
 import {
   IsmsDocumentCard,
   IsmsEmptyState,
   IsmsSummaryRow,
   type IsmsSummaryStat,
-} from '../../isms/components/shared';
+} from '../shared';
+import { SOAOverviewCard } from '../SOAOverviewCard';
 import { IsmsReadinessPanel } from './IsmsReadinessPanel';
 
 export function IsmsOverview({ organizationId }: { organizationId: string }) {
@@ -219,6 +220,13 @@ export function IsmsOverview({ organizationId }: { organizationId: string }) {
             );
           })}
         </Grid>
+      </Section>
+
+      <Section
+        title="Statement of Applicability"
+        description="Which Annex A controls apply, and why. Auditors read it next to the documents above."
+      >
+        <SOAOverviewCard organizationId={organizationId} iso27001FrameworkId={iso27001FrameworkId} />
       </Section>
     </Stack>
   );

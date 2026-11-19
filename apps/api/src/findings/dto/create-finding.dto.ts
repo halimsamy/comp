@@ -109,6 +109,24 @@ export class CreateFindingDto {
   @IsOptional()
   templateId?: string;
 
+  @ApiProperty({
+    description: 'Audit engagement the finding was raised in (from the audit workspace)',
+    required: false,
+  })
+  @IsString()
+  @IsNotEmpty()
+  @IsOptional()
+  auditId?: string;
+
+  @ApiProperty({
+    description: 'Requirement of that audit the finding is about (needs auditId)',
+    required: false,
+  })
+  @IsString()
+  @IsNotEmpty()
+  @IsOptional()
+  requirementId?: string;
+
   @ApiProperty({ description: 'Finding content/message', maxLength: 5000 })
   @IsString()
   @IsNotEmpty()

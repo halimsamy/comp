@@ -18,7 +18,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
   TableCell,
   TableRow,
   Textarea,
@@ -38,6 +37,7 @@ import {
   toActionPayload,
   type ReviewActionFormValues,
 } from './management-review-schema';
+import { SelectLabel, optionLabels } from './shared';
 
 const NO_OWNER = 'no-owner';
 
@@ -183,7 +183,7 @@ export function ReviewActionRow({
                 onValueChange={(next) => field.onChange(next === NO_OWNER ? '' : next)}
               >
                 <SelectTrigger aria-label="Action owner">
-                  <SelectValue placeholder="Unassigned" />
+                  <SelectLabel labels={optionLabels(memberOptions)} placeholder="Unassigned" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NO_OWNER}>Unassigned</SelectItem>
@@ -261,7 +261,7 @@ export function ReviewActionRow({
             disabled={isSavingStatus}
           >
             <SelectTrigger aria-label={`Status for ${reference}`}>
-              <SelectValue />
+              <SelectLabel labels={REVIEW_ACTION_STATUS_LABELS} />
             </SelectTrigger>
             <SelectContent>
               {REVIEW_ACTION_STATUSES.map((status) => (

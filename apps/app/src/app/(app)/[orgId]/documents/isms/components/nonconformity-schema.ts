@@ -10,6 +10,12 @@ export const NONCONFORMITY_SOURCES = [
   'other',
 ] as const;
 
+/**
+ * Sources a person picks when logging by hand. External audit findings are
+ * logged under Audits → Findings and listed here automatically (#171).
+ */
+export const MANUAL_SOURCES = NONCONFORMITY_SOURCES.filter((source) => source !== 'external_audit');
+
 export const SOURCE_LABELS: Record<string, string> = {
   incident: 'Security incident',
   external_audit: 'External audit',

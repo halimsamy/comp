@@ -26,6 +26,7 @@ vi.mock('../hooks/useNonconformities', () => ({
     isLoading: false,
     create: vi.fn(),
     update: vi.fn(),
+    importMany: vi.fn(),
   }),
 }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
@@ -85,9 +86,30 @@ describe('NonconformityRegisterClient', () => {
     expect(screen.getAllByText('Dana').length).toBeGreaterThan(0);
   });
 
+  it('lists external audit findings read-only, linking to Audits → Findings (#171)', () => {
+    state.rows = [
+      row({
+        id: 'fnd_abc123',
+        kind: 'external_finding',
+        reference: 'FND-ABC123',
+        source: 'external_audit',
+        sourceRef: 'ISO 27001 stage 2',
+        severity: 'high',
+        ownerMemberId: null,
+      }),
+    ];
+    render(<NonconformityRegisterClient {...props} />);
+    expect(screen.getByRole('link', { name: /FND-ABC123/ })).toHaveAttribute(
+      'href',
+      '/org_1/audits?tab=findings&open=fnd_abc123',
+    );
+    expect(screen.getByText(/ISO 27001 stage 2/)).toBeInTheDocument();
+  });
+
   it('lets an editor log a nonconformity', () => {
     render(<NonconformityRegisterClient {...props} />);
     expect(screen.getByText('Log nonconformity')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Import CSV/ })).toBeInTheDocument();
     expect(mockHasPermission).toHaveBeenCalledWith('evidence', 'update');
   });
 
@@ -95,6 +117,7 @@ describe('NonconformityRegisterClient', () => {
     setMockPermissions(AUDITOR_PERMISSIONS);
     render(<NonconformityRegisterClient {...props} />);
     expect(screen.queryByText('Log nonconformity')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Import CSV/ })).not.toBeInTheDocument();
   });
 });
 

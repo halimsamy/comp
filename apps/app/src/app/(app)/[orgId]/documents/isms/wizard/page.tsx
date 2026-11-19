@@ -23,9 +23,9 @@ export default async function IsmsWizardPage({
     <Breadcrumb
       items={[
         {
-          label: 'Documents',
-          href: `/${orgId}/documents?tab=iso-27001`,
-          props: { render: <Link href={`/${orgId}/documents?tab=iso-27001`} /> },
+          label: 'ISMS',
+          href: `/${orgId}/documents/isms`,
+          props: { render: <Link href={`/${orgId}/documents/isms`} /> },
         },
         { label: 'Setup wizard', isCurrent: true },
       ]}

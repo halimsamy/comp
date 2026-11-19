@@ -80,6 +80,13 @@ model Finding {
   deviceId             String?
   device               Device?             @relation(fields: [deviceId], references: [id], onDelete: Cascade)
 
+  // Raised in an audit engagement's workspace (one issue register, #171). The
+  // requirement is the audit's requirement page key (FrameworkEditorRequirement
+  // or CustomRequirement id), so it is a plain id like AuditComment.requirementId.
+  auditId       String?
+  audit         AuditEngagement? @relation(fields: [auditId], references: [id], onDelete: SetNull)
+  requirementId String?
+
   // Metadata
   templateId       String?
   template         FindingTemplate? @relation(fields: [templateId], references: [id])
@@ -98,6 +105,7 @@ model Finding {
   @@index([riskId])
   @@index([memberId])
   @@index([deviceId])
+  @@index([auditId])
   @@index([organizationId, status])
   @@index([organizationId, severity])
 }

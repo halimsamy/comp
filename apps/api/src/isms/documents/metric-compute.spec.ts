@@ -5,6 +5,7 @@ import {
   taskOnTimeRate,
   trainingCompletion,
   vendorReviewCurrency,
+  vulnerabilityRemediationWithinSla,
 } from './metric-compute';
 
 const now = new Date('2026-11-18T00:00:00.000Z');
@@ -108,5 +109,29 @@ describe('computed 9.1 metrics', () => {
       tasks: [{ reviewDate: daysAgo(-10) }, { reviewDate: null }, { reviewDate: daysAgo(3) }],
     });
     expect(result.value).toBe('66.7%');
+  });
+
+  it('vulnerability remediation counts fixes by the SLA due date (#49)', () => {
+    const result = vulnerabilityRemediationWithinSla({
+      vulnerabilities: [
+        { resolvedAt: daysAgo(2), slaDueAt: daysAgo(5) }, // closed late
+        { resolvedAt: daysAgo(20), slaDueAt: daysAgo(5) }, // met
+        { resolvedAt: null, slaDueAt: daysAgo(1) }, // open past due
+        { resolvedAt: null, slaDueAt: daysAgo(-10) }, // open, not due yet
+        { resolvedAt: null, slaDueAt: null }, // no SLA
+      ],
+      now,
+    });
+    expect(result.value).toBe('33.3%');
+    expect(result.note).toContain('1 of 3');
+  });
+
+  it('vulnerability remediation is n/a before anything is due', () => {
+    expect(
+      vulnerabilityRemediationWithinSla({
+        vulnerabilities: [{ resolvedAt: null, slaDueAt: daysAgo(-3) }],
+        now,
+      }).value,
+    ).toBe('n/a');
   });
 });

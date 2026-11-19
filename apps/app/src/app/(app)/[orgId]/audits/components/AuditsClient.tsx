@@ -12,20 +12,28 @@ import {
   PageHeaderDescription,
   Stack,
   Tabs,
+  TabsContent,
   TabsList,
   TabsTrigger,
   Text,
 } from '@trycompai/design-system';
 import { Add } from '@trycompai/design-system/icons';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { isActiveAudit } from '../lib/audit-labels';
 import { AuditCard } from './AuditCard';
 import type { Option } from './AuditFormFields';
 import { AuditFormSheet } from './AuditFormSheet';
+import { FindingsTab } from './findings/FindingsTab';
+import { InternalAuditsSection } from './InternalAuditsSection';
 
 type Tab = 'active' | 'completed';
+type PageTab = 'audits' | 'internal' | 'findings';
 
-/** Audits list: active / completed engagements with progress, plus add and edit. */
+/**
+ * Audits: external engagements (active / completed, with progress), the ISMS
+ * internal audits, and Findings, the one issue register (#171).
+ */
 export function AuditsClient({
   orgId,
   initialAudits,
@@ -48,20 +56,56 @@ export function AuditsClient({
   });
   const canCreate = hasPermission('audit', 'create');
   const canEdit = hasPermission('audit', 'update');
+  const canReadFindings = hasPermission('finding', 'read');
+  const canCreateFinding = hasPermission('finding', 'create');
+  const canReadIsms = hasPermission('evidence', 'read');
+  const [findingSheetOpen, setFindingSheetOpen] = useState(false);
+
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const tabParam = searchParams?.get('tab');
+  const pageTab: PageTab =
+    tabParam === 'findings' && canReadFindings
+      ? 'findings'
+      : tabParam === 'internal' && canReadIsms
+        ? 'internal'
+        : 'audits';
+  const handlePageTabChange = (value: string) => {
+    const params = new URLSearchParams(searchParams?.toString() ?? '');
+    if (value === 'audits') params.delete('tab');
+    else params.set('tab', value);
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  };
 
   const active = audits.filter(isActiveAudit);
   const completed = audits.filter((a) => !isActiveAudit(a));
   const visible = tab === 'active' ? active : completed;
 
+  const headerAction =
+    pageTab === 'findings' ? (
+      canCreateFinding ? (
+        <Button iconLeft={<Add size={16} />} onClick={() => setFindingSheetOpen(true)}>
+          Add finding
+        </Button>
+      ) : undefined
+    ) : pageTab === 'audits' && canCreate ? (
+      <Button iconLeft={<Add size={16} />} onClick={() => setSheet({ open: true, audit: null })}>
+        Add audit
+      </Button>
+    ) : undefined;
+
   const header = (
     <PageHeader
       title="Audits"
-      actions={
-        canCreate ? (
-          <Button iconLeft={<Add size={16} />} onClick={() => setSheet({ open: true, audit: null })}>
-            Add audit
-          </Button>
-        ) : undefined
+      actions={headerAction}
+      tabs={
+        <TabsList variant="underline">
+          <TabsTrigger value="audits">External audits</TabsTrigger>
+          {canReadIsms ? <TabsTrigger value="internal">Internal audits</TabsTrigger> : null}
+          {canReadFindings ? <TabsTrigger value="findings">Findings</TabsTrigger> : null}
+        </TabsList>
       }
     >
       <PageHeaderDescription>
@@ -102,7 +146,10 @@ export function AuditsClient({
     }
     return (
       <Stack gap="4">
-        <Tabs value={tab} onValueChange={(next) => setTab(next === 'completed' ? 'completed' : 'active')}>
+        <Tabs
+          value={tab}
+          onValueChange={(next) => setTab(next === 'completed' ? 'completed' : 'active')}
+        >
           <TabsList>
             <TabsTrigger value="active">Active ({active.length})</TabsTrigger>
             <TabsTrigger value="completed">Completed ({completed.length})</TabsTrigger>
@@ -128,22 +175,38 @@ export function AuditsClient({
   };
 
   return (
-    <Stack gap="6">
-      {header}
-      {body()}
-      {canCreate || canEdit ? (
-        <AuditFormSheet
-          open={sheet.open}
-          onOpenChange={(open) => setSheet((current) => ({ ...current, open }))}
-          audit={sheet.audit}
-          frameworks={frameworks}
-          auditors={auditors}
-          onSubmit={(payload) =>
-            sheet.audit ? update({ id: sheet.audit.id, payload }) : create(payload)
-          }
-          onDelete={(audit) => remove(audit.id)}
-        />
-      ) : null}
-    </Stack>
+    <Tabs value={pageTab} onValueChange={handlePageTabChange}>
+      <Stack gap="6">
+        {header}
+        <TabsContent value="audits">{body()}</TabsContent>
+        {canReadIsms ? (
+          <TabsContent value="internal">
+            <InternalAuditsSection orgId={orgId} />
+          </TabsContent>
+        ) : null}
+        {canReadFindings ? (
+          <TabsContent value="findings">
+            <FindingsTab
+              organizationId={orgId}
+              createOpen={findingSheetOpen}
+              onCreateOpenChange={setFindingSheetOpen}
+            />
+          </TabsContent>
+        ) : null}
+        {canCreate || canEdit ? (
+          <AuditFormSheet
+            open={sheet.open}
+            onOpenChange={(open) => setSheet((current) => ({ ...current, open }))}
+            audit={sheet.audit}
+            frameworks={frameworks}
+            auditors={auditors}
+            onSubmit={(payload) =>
+              sheet.audit ? update({ id: sheet.audit.id, payload }) : create(payload)
+            }
+            onDelete={(audit) => remove(audit.id)}
+          />
+        ) : null}
+      </Stack>
+    </Tabs>
   );
 }

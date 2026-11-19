@@ -71,13 +71,13 @@ describe('IsmsAutomationController', () => {
     });
   });
 
-  it('records computed metrics for the current period by default', async () => {
+  it('records computed metrics for the last closed period by default (#39)', async () => {
     await controller.recordMetrics('doc_1', {}, 'org_1', 'mem_1');
     expect(recordComputedMetrics).toHaveBeenCalledWith({
       documentId: 'doc_1',
       organizationId: 'org_1',
       memberId: 'mem_1',
-      period: 'current',
+      period: 'previous',
     });
     await controller.previewMetrics('doc_1', 'org_1');
     expect(previewComputedMetrics).toHaveBeenCalledWith({

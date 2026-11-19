@@ -1,5 +1,16 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { IsEnum, IsNotEmpty, IsOptional, IsString, Matches } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Matches,
+  ValidateNested,
+} from 'class-validator';
 
 export const NONCONFORMITY_SOURCES = [
   'incident',
@@ -78,3 +89,16 @@ export class CreateNonconformityDto extends NonconformityFieldsDto {
 }
 
 export class UpdateNonconformityDto extends PartialType(CreateNonconformityDto) {}
+
+export class ImportNonconformitiesDto {
+  @ApiProperty({
+    type: [CreateNonconformityDto],
+    description: 'Rows of an existing nonconformity log (e.g. a CSV export), logged in order',
+  })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(500)
+  @ValidateNested({ each: true })
+  @Type(() => CreateNonconformityDto)
+  rows!: CreateNonconformityDto[];
+}

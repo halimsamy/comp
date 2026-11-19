@@ -18,6 +18,8 @@ import {
   Stack,
 } from '@trycompai/design-system';
 import { Edit, TrashCan } from '@trycompai/design-system/icons';
+import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import type { IsmsAudit, IsmsAuditFinding } from '../isms-types';
@@ -61,6 +63,7 @@ export function AuditFindingRow({
   onUpdateFinding,
   onDeleteFinding,
 }: AuditFindingRowProps) {
+  const params = useParams<{ orgId: string }>();
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -205,6 +208,21 @@ export function AuditFindingRow({
               {finding.closureEvidence || '—'}
             </IsmsRegisterField>
           </Grid>
+          {finding.type === 'nc_major' || finding.type === 'nc_minor' ? (
+            // One register (#13): the corrective action is kept in 10.2, shown here read-only.
+            <Grid cols={{ base: '1', md: '2' }} gap="3">
+              <IsmsRegisterField label="Root cause">{finding.rootCause || '—'}</IsmsRegisterField>
+              <IsmsRegisterField label="Corrective action">
+                {finding.correctiveAction || '—'}{' '}
+                <Link
+                  href={`/${params?.orgId ?? ''}/documents/isms/nonconformities`}
+                  className="text-xs text-primary hover:underline"
+                >
+                  Edit in 10.2
+                </Link>
+              </IsmsRegisterField>
+            </Grid>
+          ) : null}
         </Stack>
       )}
 

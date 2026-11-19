@@ -31,11 +31,11 @@ vi.mock('@/hooks/use-findings-api', async () => {
   };
 });
 
-vi.mock('./CreateFindingSheet', () => ({
+vi.mock('@/app/(app)/[orgId]/overview/components/CreateFindingSheet', () => ({
   CreateFindingSheet: () => <div data-testid="create-sheet" />,
 }));
 
-vi.mock('./FindingDetailSheet', () => ({
+vi.mock('@/app/(app)/[orgId]/overview/components/FindingDetailSheet', () => ({
   FindingDetailSheet: () => <div data-testid="detail-sheet" />,
 }));
 

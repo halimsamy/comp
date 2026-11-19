@@ -42,6 +42,11 @@ export function AuditRequestCard({
   const [busy, setBusy] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const isOpen = request.status !== 'accepted';
+  // Team-logged requests come from a list the auditor sent outside Comp AI (#109).
+  const askedBy =
+    request.source === 'team'
+      ? 'logged by the team'
+      : `asked by ${request.requestedBy?.name || request.requestedBy?.email || 'an auditor'}`;
 
   const run = async (key: string, action: () => Promise<void>, success: string) => {
     setBusy(key);
@@ -75,9 +80,7 @@ export function AuditRequestCard({
               {request.title}
             </Text>
             <Text size="xs" variant="muted">
-              {requirementLabel ?? 'Whole audit'} · asked by{' '}
-              {request.requestedBy?.name || request.requestedBy?.email || 'an auditor'} on{' '}
-              {formatDay(request.createdAt)}
+              {requirementLabel ?? 'Whole audit'} · {askedBy} on {formatDay(request.createdAt)}
               {request.dueDate ? ` · due ${formatDay(request.dueDate)}` : ''}
             </Text>
           </Stack>

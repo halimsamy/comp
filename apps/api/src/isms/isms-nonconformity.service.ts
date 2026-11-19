@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { db } from '@db';
-import type { IsmsAuditFindingStatus, Prisma } from '@db';
+import type { FindingStatus, IsmsAuditFindingStatus, Prisma } from '@db';
 import type {
   CreateNonconformityDto,
   UpdateNonconformityDto,
@@ -12,7 +12,7 @@ import { resolveActiveMember } from './utils/resolve-active-member';
 /** One row of the 10.2 register, whichever table it lives in. */
 export interface NonconformityRow {
   id: string;
-  kind: 'standalone' | 'audit_finding';
+  kind: 'standalone' | 'audit_finding' | 'external_finding';
   reference: string;
   source: string;
   sourceRef: string | null;
@@ -30,20 +30,30 @@ export interface NonconformityRow {
   createdAt: Date;
 }
 
+/** Auditor findings (Finding) on the register's open / in progress / closed scale. */
+const FINDING_STATUS: Record<FindingStatus, IsmsAuditFindingStatus> = {
+  open: 'open',
+  needs_revision: 'open',
+  ready_for_review: 'in_progress',
+  closed: 'closed',
+};
+
 function trimOrNull(value: string | null | undefined): string | null | undefined {
   return value === undefined ? undefined : value?.trim() || null;
 }
 
 /**
- * Nonconformity & corrective action register (ISO 27001 10.2). Internal-audit
- * nonconformities stay on IsmsAuditFinding (so the 9.2 report keeps them) and
- * are listed here next to standalone ones raised from incidents, external
- * audits, management reviews, monitoring or complaints.
+ * Nonconformity & corrective action register (ISO 27001 10.2), the one issue
+ * register (#171). Internal-audit nonconformities stay on IsmsAuditFinding (so
+ * the 9.2 report keeps them) and auditor findings stay on Finding (so the
+ * auditor's review workflow keeps them); both are listed here, read-only, next
+ * to standalone ones raised from incidents, management reviews, monitoring,
+ * complaints or an imported log.
  */
 @Injectable()
 export class IsmsNonconformityService {
   async list({ organizationId }: { organizationId: string }) {
-    const [standalone, findings] = await Promise.all([
+    const [standalone, findings, auditorFindings] = await Promise.all([
       db.ismsNonconformity.findMany({
         where: { organizationId },
         orderBy: { createdAt: 'desc' },
@@ -54,6 +64,18 @@ export class IsmsNonconformityService {
           audit: { document: { organizationId, type: 'internal_audit' } },
         },
         include: { audit: { select: { reference: true } } },
+        orderBy: { createdAt: 'desc' },
+      }),
+      db.finding.findMany({
+        where: { organizationId },
+        select: {
+          id: true,
+          status: true,
+          severity: true,
+          content: true,
+          createdAt: true,
+          audit: { select: { title: true } },
+        },
         orderBy: { createdAt: 'desc' },
       }),
     ]);
@@ -80,6 +102,25 @@ export class IsmsNonconformityService {
         effectivenessReviewedAt: finding.effectivenessReviewedAt,
         effectivenessReviewedById: finding.effectivenessReviewedById,
         effectivenessNotes: finding.effectivenessNotes,
+        createdAt: finding.createdAt,
+      })),
+      ...auditorFindings.map((finding) => ({
+        id: finding.id,
+        kind: 'external_finding' as const,
+        reference: `FND-${finding.id.slice(-6).toUpperCase()}`,
+        source: 'external_audit',
+        sourceRef: finding.audit?.title ?? null,
+        severity: finding.severity,
+        description: finding.content,
+        rootCause: null,
+        correctiveAction: null,
+        ownerMemberId: null,
+        dueDate: null,
+        status: FINDING_STATUS[finding.status],
+        closureEvidence: null,
+        effectivenessReviewedAt: null,
+        effectivenessReviewedById: null,
+        effectivenessNotes: null,
         createdAt: finding.createdAt,
       })),
     ];
@@ -116,6 +157,39 @@ export class IsmsNonconformityService {
           effectivenessNotes: trimOrNull(dto.effectivenessNotes) ?? null,
         },
       });
+    });
+  }
+
+  /** Log many rows at once (an imported nonconformity log), numbered in order. */
+  async importMany({
+    organizationId,
+    rows,
+  }: {
+    organizationId: string;
+    rows: CreateNonconformityDto[];
+  }) {
+    const members = await Promise.all(
+      rows.map((dto) => this.resolveMembers({ organizationId, dto })),
+    );
+    return db.$transaction(async (tx) => {
+      await lockDocument(tx, `isms_nc:${organizationId}`);
+      const start = await this.lastNumber({ tx, organizationId });
+      const created = await tx.ismsNonconformity.createMany({
+        data: rows.map((dto, index) => ({
+          organizationId,
+          reference: `NC-${String(start + index + 1).padStart(2, '0')}`,
+          source: dto.source,
+          description: dto.description.trim(),
+          sourceRef: trimOrNull(dto.sourceRef) ?? null,
+          rootCause: trimOrNull(dto.rootCause) ?? null,
+          correctiveAction: trimOrNull(dto.correctiveAction) ?? null,
+          ownerMemberId: members[index].ownerMemberId ?? null,
+          dueDate: parseOptionalDate(dto.dueDate) ?? null,
+          status: dto.status ?? 'open',
+          closureEvidence: trimOrNull(dto.closureEvidence) ?? null,
+        })),
+      });
+      return { count: created.count };
     });
   }
 
@@ -180,6 +254,17 @@ export class IsmsNonconformityService {
     tx: Prisma.TransactionClient;
     organizationId: string;
   }): Promise<string> {
+    const max = await this.lastNumber({ tx, organizationId });
+    return `NC-${String(max + 1).padStart(2, '0')}`;
+  }
+
+  private async lastNumber({
+    tx,
+    organizationId,
+  }: {
+    tx: Prisma.TransactionClient;
+    organizationId: string;
+  }): Promise<number> {
     const existing = await tx.ismsNonconformity.findMany({
       where: { organizationId },
       select: { reference: true },
@@ -188,7 +273,7 @@ export class IsmsNonconformityService {
       const match = /^NC-(\d+)$/.exec(row.reference);
       return match ? Math.max(acc, Number.parseInt(match[1], 10)) : acc;
     }, 0);
-    return `NC-${String(max + 1).padStart(2, '0')}`;
+    return max;
   }
 
   private async requireRow({ id, organizationId }: { id: string; organizationId: string }) {

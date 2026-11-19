@@ -4,9 +4,9 @@ import { IsIn, IsOptional } from 'class-validator';
 export class RecordComputedMetricsDto {
   @ApiPropertyOptional({
     description:
-      'Period to record: the current one, or the one that just ended. Periods that already have a value are skipped.',
+      'previous (default) records the period that just ended; current takes a provisional snapshot of the running period, which the close-of-period value later replaces. Periods with a final value are skipped.',
     enum: ['current', 'previous'],
-    example: 'current',
+    example: 'previous',
   })
   @IsOptional()
   @IsIn(['current', 'previous'])

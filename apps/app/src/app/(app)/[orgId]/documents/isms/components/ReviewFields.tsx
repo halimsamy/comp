@@ -14,13 +14,15 @@ import {
 } from '@trycompai/design-system';
 import { Controller, type Control } from 'react-hook-form';
 import {
+  MEETING_TYPES,
+  MEETING_TYPE_LABELS,
   REVIEW_CONCLUSION_VERDICTS,
   REVIEW_CONCLUSION_VERDICT_LABELS,
   REVIEW_STATUSES,
   REVIEW_STATUS_LABELS,
 } from './management-review-constants';
 import type { ReviewDetailsFormValues } from './management-review-schema';
-import { IsmsFieldLabel } from './shared';
+import { IsmsFieldLabel, SelectLabel } from './shared';
 
 const NO_VERDICT = 'no-verdict';
 const NO_CHAIR = 'no-chair';
@@ -89,6 +91,26 @@ function ChairSelect({
 export function ReviewFields({ control, chairOptions }: ReviewFieldsProps) {
   return (
     <Stack gap="3">
+      <IsmsFieldLabel label="Meeting">
+        <Controller
+          control={control}
+          name="meetingType"
+          render={({ field }) => (
+            <Select value={field.value} onValueChange={field.onChange}>
+              <SelectTrigger aria-label="Meeting type">
+                <SelectLabel labels={MEETING_TYPE_LABELS} />
+              </SelectTrigger>
+              <SelectContent>
+                {MEETING_TYPES.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {MEETING_TYPE_LABELS[type]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        />
+      </IsmsFieldLabel>
       <Grid cols={{ base: '1', md: '2' }} gap="3">
         <IsmsFieldLabel label="Meeting date — when the review was held (can be backdated)">
           <Controller
@@ -106,7 +128,7 @@ export function ReviewFields({ control, chairOptions }: ReviewFieldsProps) {
             render={({ field }) => (
               <Select value={field.value} onValueChange={field.onChange}>
                 <SelectTrigger aria-label="Review status">
-                  <SelectValue />
+                  <SelectLabel labels={REVIEW_STATUS_LABELS} />
                 </SelectTrigger>
                 <SelectContent>
                   {REVIEW_STATUSES.map((status) => (

@@ -125,7 +125,13 @@ export class IsmsService {
    */
   private async countOverdueMetrics(documentId: string): Promise<number> {
     const metrics = await db.ismsMetric.findMany({
-      where: { documentId, isActive: true, cadence: { not: null } },
+      // Computed metrics are recorded by Comp AI, so they are never "due" (#49).
+      where: {
+        documentId,
+        isActive: true,
+        cadence: { not: null },
+        dataSource: { not: 'computed' },
+      },
       select: {
         cadence: true,
         createdAt: true,
@@ -325,7 +331,25 @@ export class IsmsService {
         contextIssues: { orderBy: { position: 'asc' } },
         interestedParties: { orderBy: { position: 'asc' } },
         interestedPartyRequirements: { orderBy: { position: 'asc' } },
-        objectives: { orderBy: { position: 'asc' } },
+        objectives: {
+          orderBy: { position: 'asc' },
+          // 6.2 progress: the latest value of each 9.1 metric linked to the objective (#49).
+          include: {
+            metrics: {
+              where: { isActive: true },
+              select: {
+                id: true,
+                name: true,
+                target: true,
+                measurements: {
+                  orderBy: [{ periodStart: 'desc' }, { recordedAt: 'desc' }],
+                  take: 1,
+                  select: { value: true, periodStart: true, provisional: true },
+                },
+              },
+            },
+          },
+        },
         roles: {
           orderBy: { position: 'asc' },
           include: { assignments: { orderBy: { position: 'asc' } } },

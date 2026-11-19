@@ -27,6 +27,7 @@ const mockDb = {
   device: { findFirst: jest.fn(), findUnique: jest.fn() },
   user: { findUnique: jest.fn() },
   findingTemplate: { findUnique: jest.fn() },
+  auditEngagement: { findFirst: jest.fn() },
   finding: {
     findFirst: jest.fn(),
     findMany: jest.fn(),
@@ -146,6 +147,42 @@ describe('FindingsService.create (target validator)', () => {
     const createArgs = mockDb.finding.create.mock.calls[0][0];
     expect(createArgs.data.area).toBe('people');
     expect(createArgs.data.taskId).toBeNull();
+  });
+
+  it('links a finding raised from a flagged audit requirement (#171)', async () => {
+    mockDb.auditEngagement.findFirst.mockResolvedValue({ id: 'aud_1' });
+    mockDb.finding.create.mockResolvedValue({
+      id: 'fnd_audit',
+      content: 'Example finding',
+      createdBy: null,
+      createdByAdmin: null,
+    });
+
+    await svc.create('org_1', 'mem_1', 'usr_1', {
+      ...baseDto,
+      area: 'compliance' as never,
+      auditId: 'aud_1',
+      requirementId: 'req_1',
+    });
+
+    expect(mockDb.auditEngagement.findFirst).toHaveBeenCalledWith({
+      where: { id: 'aud_1', organizationId: 'org_1' },
+      select: { id: true },
+    });
+    const createArgs = mockDb.finding.create.mock.calls[0][0];
+    expect(createArgs.data).toMatchObject({ auditId: 'aud_1', requirementId: 'req_1' });
+  });
+
+  it("rejects an audit from another organization", async () => {
+    mockDb.auditEngagement.findFirst.mockResolvedValue(null);
+    await expect(
+      svc.create('org_1', 'mem_1', 'usr_1', {
+        ...baseDto,
+        area: 'compliance' as never,
+        auditId: 'aud_other',
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(mockDb.finding.create).not.toHaveBeenCalled();
   });
 });
 

@@ -193,10 +193,10 @@ export function MonitoringRow({
                   : '—')}
             </IsmsRegisterField>
             <IsmsRegisterField label="Source">
-              {metric.dataSource === 'manual' ? 'Manual entry' : metric.dataSource}
+              {metric.dataSource === 'computed' ? 'Computed by Comp AI' : 'Manual entry'}
             </IsmsRegisterField>
             <IsmsRegisterField label="Latest value">
-              {latest ? latest.value : '—'}
+              {latest ? `${latest.value}${latest.provisional ? ' (provisional)' : ''}` : '—'}
             </IsmsRegisterField>
           </Grid>
 

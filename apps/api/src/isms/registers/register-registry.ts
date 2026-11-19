@@ -50,6 +50,13 @@ const AUDIT_CONTROL_RESULT = [
 const AUDIT_FINDING_TYPE = ['nc_major', 'nc_minor', 'ofi', 'observation'] as const;
 const AUDIT_FINDING_STATUS = ['open', 'in_progress', 'closed'] as const;
 const REVIEW_STATUS = ['planned', 'in_progress', 'complete'] as const;
+const MEETING_TYPES = [
+  'management_review',
+  'board',
+  'it_leadership',
+  'risk_committee',
+  'pci_bau',
+] as const;
 const REVIEW_CONCLUSION_VERDICT = ['suitable', 'adequate', 'effective'] as const;
 const REVIEW_ACTION_STATUS = ['open', 'in_progress', 'closed'] as const;
 
@@ -293,6 +300,7 @@ const schemas = {
   // chair/attendees default to the Roles (5.3) Top Management + SPO holders and
   // the outputs default to the clause-9.3 template text when omitted.
   reviewCreate: z.object({
+    meetingType: z.enum(MEETING_TYPES).optional(),
     meetingDate: z.string().nullish(), // ISO date string
     chairName: z.string().nullish(),
     attendees: z.array(reviewAttendeeSchema).optional(),
@@ -300,6 +308,7 @@ const schemas = {
   }),
   reviewUpdate: z.object({
     // Nullish: undefined = leave as-is, null = clear.
+    meetingType: z.enum(MEETING_TYPES).optional(),
     meetingDate: z.string().nullish(),
     chairName: z.string().nullish(),
     attendees: z.array(reviewAttendeeSchema).optional(),

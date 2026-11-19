@@ -1,6 +1,7 @@
 import { db } from '@db';
 import { GENERAL_TRAINING_VIDEO_IDS } from '@trycompai/company';
 import { filterComplianceMembers } from '../../utils/compliance-filters';
+import { loadSlaDays, slaDueDate } from '../../assets/vulnerability-sla';
 import {
   findingAgeing,
   policyAcknowledgement,
@@ -8,24 +9,13 @@ import {
   taskOnTimeRate,
   trainingCompletion,
   vendorReviewCurrency,
+  vulnerabilityRemediationWithinSla,
+  type ComputedMetricKey,
   type ComputedMetricValue,
 } from './metric-compute';
 
-/** Seeded metric keys Comp AI measures from its own data. */
-export const COMPUTED_METRIC_KEYS = [
-  'training_completion',
-  'policy_acknowledgement',
-  'finding_ageing',
-  'risk_treatment_status',
-  'vendor_review_currency',
-  'task_on_time',
-] as const;
-
-export type ComputedMetricKey = (typeof COMPUTED_METRIC_KEYS)[number];
-
-export function isComputedMetricKey(key: string | null): key is ComputedMetricKey {
-  return COMPUTED_METRIC_KEYS.some((computed) => computed === key);
-}
+export { COMPUTED_METRIC_KEYS, isComputedMetricKey } from './metric-compute';
+export type { ComputedMetricKey } from './metric-compute';
 
 /** Current value of every computable 9.1 metric for one organization. */
 export async function computePlatformMetrics({
@@ -35,8 +25,18 @@ export async function computePlatformMetrics({
   organizationId: string;
   now?: Date;
 }): Promise<Record<ComputedMetricKey, ComputedMetricValue>> {
-  const [members, policies, findings, nonconformities, risks, vendors, tasks] =
-    await Promise.all([
+  const [
+    members,
+    policies,
+    findings,
+    nonconformities,
+    risks,
+    vendors,
+    tasks,
+    issues,
+    vulnerabilities,
+    slaDays,
+  ] = await Promise.all([
       db.member.findMany({
         where: { organizationId, deactivated: false },
         select: { id: true, role: true, user: { select: { role: true } } },
@@ -88,6 +88,20 @@ export async function computePlatformMetrics({
         },
         select: { reviewDate: true },
       }),
+      // Auditor findings share the one issue register with the 10.2 NCs.
+      db.finding.findMany({
+        where: { organizationId, status: { not: 'closed' } },
+        select: { createdAt: true },
+      }),
+      db.integrationPlatformFinding.findMany({
+        where: {
+          organizationId,
+          severity: { in: ['critical', 'high'] },
+          status: { in: ['open', 'resolved'] },
+        },
+        select: { severity: true, firstSeenAt: true, slaDueAt: true, resolvedAt: true },
+      }),
+      loadSlaDays(organizationId),
     ]);
 
   const inScope = await filterComplianceMembers(members, organizationId);
@@ -114,7 +128,11 @@ export async function computePlatformMetrics({
       requiredPolicies: policies,
     }),
     finding_ageing: findingAgeing({
-      openItems: [...findings, ...nonconformities],
+      openItems: [
+        ...findings,
+        ...nonconformities,
+        ...issues.map((issue) => ({ ...issue, dueDate: null })),
+      ],
       now,
     }),
     risk_treatment_status: riskTreatmentStatus({ risks }),
@@ -126,5 +144,15 @@ export async function computePlatformMetrics({
       now,
     }),
     task_on_time: taskOnTimeRate({ tasks, now }),
+    vulnerability_remediation: vulnerabilityRemediationWithinSla({
+      // Rows from before the SLA snapshot existed get their due date from the policy.
+      vulnerabilities: vulnerabilities.map((row) => ({
+        resolvedAt: row.resolvedAt,
+        slaDueAt:
+          row.slaDueAt ??
+          slaDueDate({ severity: row.severity, firstSeenAt: row.firstSeenAt, days: slaDays }),
+      })),
+      now,
+    }),
   };
 }

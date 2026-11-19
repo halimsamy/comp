@@ -127,7 +127,15 @@ function wizardRegulatorRequirements({
   data: IsmsPlatformData;
   startPosition: number;
 }): DerivedRequirement[] {
-  const regulators = data.wizardAnswers.sectorRegulators ?? [];
+  // A regulator that is also an active framework (e.g. "PCI DSS") already has
+  // its party row from the framework, so listing it again would duplicate it.
+  const frameworks = data.frameworkNames.map((name) => name.toLowerCase());
+  const regulators = (data.wizardAnswers.sectorRegulators ?? []).filter(
+    (regulator) =>
+      !frameworks.some((name) =>
+        name.includes(formatRegulatorLabel(regulator).toLowerCase()),
+      ),
+  );
 
   return regulators.map((regulator, index) => {
     const label = formatRegulatorLabel(regulator);

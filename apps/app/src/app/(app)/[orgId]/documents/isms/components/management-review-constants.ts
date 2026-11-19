@@ -13,6 +13,23 @@ import type {
  * sync.
  */
 
+export const MEETING_TYPES = [
+  'management_review',
+  'board',
+  'it_leadership',
+  'risk_committee',
+  'pci_bau',
+] as const;
+
+/** Every forum where top management reviews the ISMS counts toward 9.3 (#176). */
+export const MEETING_TYPE_LABELS: Record<(typeof MEETING_TYPES)[number], string> = {
+  management_review: 'Management review',
+  board: 'Board meeting',
+  it_leadership: 'IT leadership',
+  risk_committee: 'Risk committee',
+  pci_bau: 'PCI BAU review',
+};
+
 export const REVIEW_STATUSES = ['planned', 'in_progress', 'complete'] as const;
 
 export const REVIEW_STATUS_LABELS: Record<IsmsReviewStatus, string> = {

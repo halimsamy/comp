@@ -22,16 +22,25 @@ describe('IsmsSourceBadge', () => {
     expect(screen.getByText('Interested party')).toBeInTheDocument();
   });
 
-  it('shows the framework name for framework provenance', () => {
+  it('labels generated rows "Generated" with the source in the tooltip', () => {
     render(<IsmsSourceBadge source="derived" derivedFrom="framework:ISO 27001" />);
 
-    expect(screen.getByText('ISO 27001')).toBeInTheDocument();
+    expect(screen.getByText('Generated')).toBeInTheDocument();
+    expect(screen.getByTitle('Source: ISO 27001')).toBeInTheDocument();
   });
 
-  it('maps known provenance keys to friendly labels', () => {
-    render(<IsmsSourceBadge source="derived" derivedFrom="vendors" />);
+  it('never shows a raw seed key', () => {
+    render(<IsmsSourceBadge source="derived" derivedFrom="seed:top_management" />);
 
-    expect(screen.getByText('Vendor register')).toBeInTheDocument();
+    expect(screen.getByText('Generated')).toBeInTheDocument();
+    expect(screen.queryByText(/seed/i)).not.toBeInTheDocument();
+  });
+
+  it('labels an edited generated row "Edited"', () => {
+    render(<IsmsSourceBadge source="manual" derivedFrom="vendors" />);
+
+    expect(screen.getByText('Edited')).toBeInTheDocument();
+    expect(screen.getByTitle('Source: Vendor register')).toBeInTheDocument();
   });
 
   it('labels manual rows "Manual"', () => {

@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   ArrayMaxSize,
   IsArray,
+  IsEmail,
   IsIn,
   IsNotEmpty,
   IsOptional,
@@ -57,6 +58,17 @@ export class CreateAuditDto {
   @ArrayMaxSize(20)
   @IsString({ each: true })
   auditorMemberIds?: string[];
+
+  @ApiPropertyOptional({
+    description:
+      'Emails of auditors invited to the organization who have not joined yet; each is assigned to this audit when they first sign in',
+    type: [String],
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsEmail({}, { each: true })
+  pendingAuditorEmails?: string[];
 }
 
 export class UpdateAuditDto {
@@ -103,4 +115,15 @@ export class UpdateAuditDto {
   @ArrayMaxSize(20)
   @IsString({ each: true })
   auditorMemberIds?: string[];
+
+  @ApiPropertyOptional({
+    description:
+      'Emails of auditors invited to the organization who have not joined yet; each is assigned to this audit when they first sign in',
+    type: [String],
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsEmail({}, { each: true })
+  pendingAuditorEmails?: string[];
 }

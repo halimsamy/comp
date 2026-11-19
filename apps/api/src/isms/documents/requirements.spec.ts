@@ -73,6 +73,19 @@ describe('deriveRequirements', () => {
     expect(regulatorRows[0].position).toBe(parties.length);
     expect(regulatorRows.every((r) => r.interestedPartyId === null)).toBe(true);
   });
+
+  it('skips a wizard regulator that is already an active framework (#51)', () => {
+    const rows = deriveRequirements({
+      parties: [],
+      data: {
+        ...data,
+        frameworkNames: ['ISO 27001', 'PCI DSS Level 1'],
+        wizardAnswers: { sectorRegulators: ['PCI DSS', 'FCA'] },
+      },
+    });
+    const regulatorRows = rows.filter((r) => r.derivedFrom === 'wizard:regulator');
+    expect(regulatorRows.map((r) => r.partyName)).toEqual(['Regulator (FCA)']);
+  });
 });
 
 describe('buildRequirementsSections', () => {

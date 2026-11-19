@@ -19,22 +19,28 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { ITEM_STATUS_LABELS, formatDay, itemBadgeVariant, itemStatus } from '../../lib/audit-labels';
 import { AuditCommentsThread } from './AuditCommentsThread';
+import { RaiseFindingForm } from './RaiseFindingForm';
 import { RequirementEvidence } from './RequirementEvidence';
 
 /** Requirement drawer: evidence, the auditor's assessment and the comment thread. */
 export function RequirementSheet({
   orgId,
   auditId,
+  frameworkName,
   requirement,
   canAssess,
+  canRaiseFinding,
   onOpenChange,
   onReview,
 }: {
   orgId: string;
   auditId: string;
+  frameworkName: string;
   requirement: AuditRequirement | null;
   /** The viewer is one of this audit's auditors. */
   canAssess: boolean;
+  /** The viewer has finding:create. */
+  canRaiseFinding: boolean;
   onOpenChange: (open: boolean) => void;
   onReview: (input: { status: AuditReviewStatus | null; note?: string }) => Promise<void>;
 }) {
@@ -117,6 +123,18 @@ export function RequirementSheet({
                     </Stack>
                   ) : null}
                 </div>
+                {status === 'flagged' && canRaiseFinding ? (
+                  <div className="rounded-md border border-border p-3">
+                    <RaiseFindingForm
+                      key={requirement.id}
+                      orgId={orgId}
+                      auditId={auditId}
+                      frameworkName={frameworkName}
+                      requirement={requirement}
+                      defaultContent={review?.note ?? ''}
+                    />
+                  </div>
+                ) : null}
                 <RequirementEvidence orgId={orgId} requirement={requirement} />
                 <Stack gap="2">
                   <Text size="sm" weight="semibold">

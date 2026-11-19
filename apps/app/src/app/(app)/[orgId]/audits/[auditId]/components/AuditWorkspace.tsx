@@ -21,6 +21,7 @@ import {
 } from '@trycompai/design-system';
 import { ArrowLeft } from '@trycompai/design-system/icons';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { AuditProgressBar } from '../../components/AuditProgressBar';
 import {
@@ -30,7 +31,9 @@ import {
   itemStatus,
   type ItemStatus,
 } from '../../lib/audit-labels';
+import type { CompanyContext } from '../lib/company-context';
 import { AuditBanner } from './AuditBanner';
+import { AuditCompanyTab } from './AuditCompanyTab';
 import { AuditExportButton } from './AuditExportButton';
 import { AuditRequestsPanel } from './AuditRequestsPanel';
 import { RequirementSheet } from './RequirementSheet';
@@ -43,7 +46,15 @@ const matches = ({ requirement, search }: { requirement: AuditRequirement; searc
 };
 
 /** The auditor workspace: banner, progress, requirement table with status tabs, and requests. */
-export function AuditWorkspace({ orgId, initialAudit }: { orgId: string; initialAudit: Audit }) {
+export function AuditWorkspace({
+  orgId,
+  initialAudit,
+  company,
+}: {
+  orgId: string;
+  initialAudit: Audit;
+  company: CompanyContext;
+}) {
   const { hasPermission } = usePermissions();
   const { audit = initialAudit, mutate: refreshAudit } = useAudit({
     auditId: initialAudit.id,
@@ -53,6 +64,8 @@ export function AuditWorkspace({ orgId, initialAudit }: { orgId: string; initial
   const [status, setStatus] = useState<ItemStatus | 'all'>('all');
   const [search, setSearch] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
+  // Request-owner emails link to ?tab=requests.
+  const initialTab = useSearchParams()?.get('tab') === 'requests' ? 'requests' : 'requirements';
 
   const counts = countByStatus(requirements);
   const searched = requirements.filter((requirement) => matches({ requirement, search }));
@@ -81,10 +94,11 @@ export function AuditWorkspace({ orgId, initialAudit }: { orgId: string; initial
           <AuditProgressBar progress={audit.progress} />
         </Stack>
       </div>
-      <Tabs defaultValue="requirements">
+      <Tabs defaultValue={initialTab}>
         <TabsList>
           <TabsTrigger value="requirements">Requirements ({requirements.length})</TabsTrigger>
           <TabsTrigger value="requests">Evidence requests ({audit.openRequests} open)</TabsTrigger>
+          <TabsTrigger value="company">Company</TabsTrigger>
         </TabsList>
         <TabsContent value="requirements">
           <Stack gap="4">
@@ -121,6 +135,9 @@ export function AuditWorkspace({ orgId, initialAudit }: { orgId: string; initial
             )}
           </Stack>
         </TabsContent>
+        <TabsContent value="company">
+          <AuditCompanyTab company={company} />
+        </TabsContent>
         <TabsContent value="requests">
           <AuditRequestsPanel
             auditId={audit.id}
@@ -133,8 +150,10 @@ export function AuditWorkspace({ orgId, initialAudit }: { orgId: string; initial
       <RequirementSheet
         orgId={orgId}
         auditId={audit.id}
+        frameworkName={audit.frameworkName}
         requirement={open}
         canAssess={audit.viewerIsAuditor}
+        canRaiseFinding={hasPermission('finding', 'create')}
         onOpenChange={(next) => (next ? undefined : setOpenId(null))}
         onReview={handleReview}
       />

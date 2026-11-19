@@ -5,7 +5,7 @@ import { computePlatformMetrics } from './metric-compute-data';
 jest.mock('@db', () => {
   const db = {
     ismsMetric: { findMany: jest.fn() },
-    ismsMeasurement: { findMany: jest.fn(), createMany: jest.fn() },
+    ismsMeasurement: { findMany: jest.fn(), createMany: jest.fn(), deleteMany: jest.fn() },
     $executeRaw: jest.fn(),
     $transaction: jest.fn((cb: (tx: unknown) => unknown) => cb(db)),
   };
@@ -43,6 +43,7 @@ describe('computed metric automation', () => {
       documentId: 'doc_1',
       organizationId: 'org_1',
       now,
+      period: 'current',
     });
     expect(rows.map((row) => row.metricKey)).toEqual(['training_completion', 'task_on_time']);
     expect(rows[0]).toMatchObject({ periodStart: '2026-11-01', value: '80%', recordedForPeriod: false });
@@ -86,16 +87,65 @@ describe('computed metric automation', () => {
         measurements: [{ periodStart: new Date('2026-11-01T00:00:00.000Z') }],
       },
     ]);
-    const result = await recordComputedMetrics({ documentId: 'doc_1', organizationId: 'org_1', now });
+    const result = await recordComputedMetrics({
+      documentId: 'doc_1',
+      organizationId: 'org_1',
+      now,
+      period: 'current',
+    });
     expect(result).toEqual({ count: 0 });
     expect(mockDb.ismsMeasurement.createMany).not.toHaveBeenCalled();
   });
 
   it('re-checks under the lock to avoid racing another run', async () => {
     (mockDb.ismsMeasurement.findMany as jest.Mock).mockResolvedValue([
-      { metricId: 'm1', periodStart: new Date('2026-11-01T00:00:00.000Z') },
+      { metricId: 'm1', periodStart: new Date('2026-10-01T00:00:00.000Z') },
     ]);
     const result = await recordComputedMetrics({ documentId: 'doc_1', organizationId: 'org_1', now });
     expect(result).toEqual({ count: 0 });
+  });
+
+  it('defaults to the last closed period (#39)', async () => {
+    await recordComputedMetrics({ documentId: 'doc_1', organizationId: 'org_1', now });
+    const { data } = (mockDb.ismsMeasurement.createMany as jest.Mock).mock.calls[0][0];
+    expect(data[0]).toMatchObject({
+      periodStart: new Date('2026-10-01T00:00:00.000Z'),
+      provisional: false,
+    });
+  });
+
+  it('a snapshot of the running period is provisional', async () => {
+    await recordComputedMetrics({
+      documentId: 'doc_1',
+      organizationId: 'org_1',
+      now,
+      period: 'current',
+    });
+    const { data } = (mockDb.ismsMeasurement.createMany as jest.Mock).mock.calls[0][0];
+    expect(data[0]).toMatchObject({
+      periodStart: new Date('2026-11-01T00:00:00.000Z'),
+      provisional: true,
+    });
+  });
+
+  it('the final value replaces a provisional snapshot', async () => {
+    (mockDb.ismsMetric.findMany as jest.Mock).mockResolvedValue([
+      {
+        id: 'm1',
+        metricKey: 'training_completion',
+        name: 'Training',
+        cadence: 'monthly',
+        measurements: [{ periodStart: new Date('2026-10-01T00:00:00.000Z'), provisional: true }],
+      },
+    ]);
+    const result = await recordComputedMetrics({ documentId: 'doc_1', organizationId: 'org_1', now });
+    expect(result).toEqual({ count: 1 });
+    expect(mockDb.ismsMeasurement.deleteMany).toHaveBeenCalledWith({
+      where: {
+        OR: [{ metricId: 'm1', periodStart: new Date('2026-10-01T00:00:00.000Z') }],
+        provisional: true,
+        source: 'computed',
+      },
+    });
   });
 });

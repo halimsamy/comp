@@ -39,6 +39,7 @@ import {
   carriedForwardActions,
   isReviewSigned,
   reviewConclusionSentence,
+  MEETING_TYPE_LABELS,
 } from './management-review-constants';
 import {
   reviewDetailsSchema,
@@ -76,6 +77,7 @@ interface ReviewCardProps extends ReviewHandlers {
 
 function toFormValues(review: IsmsManagementReview): ReviewDetailsFormValues {
   return {
+    meetingType: review.meetingType ?? 'management_review',
     meetingDate: review.meetingDate?.slice(0, 10) ?? '',
     chairName: review.chairName ?? '',
     status: review.status,
@@ -215,6 +217,7 @@ export function ReviewCard({
         <HStack align="center" gap="2" wrap="wrap">
           <Heading level="4">{review.reference}</Heading>
           <Badge variant="secondary">{REVIEW_STATUS_LABELS[review.status]}</Badge>
+          <Badge variant="outline">{MEETING_TYPE_LABELS[review.meetingType ?? 'management_review']}</Badge>
           {locked ? <Badge variant="secondary">Signed</Badge> : null}
         </HStack>
       }

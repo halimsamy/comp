@@ -171,6 +171,22 @@ export function ObjectivesRow({
           {objective.measurementMethod ?? '—'}
         </IsmsRegisterField>
         <IsmsRegisterField label="Plan">{objective.plan ?? '—'}</IsmsRegisterField>
+        <IsmsRegisterField label="Progress (9.1)">
+          {objective.metrics?.length
+            ? objective.metrics.map((metric) => {
+                const latest = metric.measurements[0];
+                return (
+                  <div key={metric.id}>
+                    {metric.name}:{' '}
+                    {latest
+                      ? `${latest.value}${latest.provisional ? ' (provisional)' : ''}`
+                      : 'not measured yet'}
+                    {metric.target ? ` · target ${metric.target}` : ''}
+                  </div>
+                );
+              })
+            : 'No metric linked. Link one in Monitoring (9.1).'}
+        </IsmsRegisterField>
       </Grid>
     </IsmsRegisterCard>
   );

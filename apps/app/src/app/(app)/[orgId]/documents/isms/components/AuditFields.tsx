@@ -22,7 +22,7 @@ import {
   CONCLUSION_VERDICTS,
   CONCLUSION_VERDICT_LABELS,
 } from './internal-audit-constants';
-import { IsmsFieldLabel } from './shared';
+import { IsmsFieldLabel, SelectLabel } from './shared';
 
 const NO_VERDICT = 'no-verdict';
 
@@ -132,7 +132,7 @@ export function AuditFields({ control, auditorOptions }: AuditFieldsProps) {
             render={({ field }) => (
               <Select value={field.value} onValueChange={field.onChange}>
                 <SelectTrigger aria-label="Audit status">
-                  <SelectValue />
+                  <SelectLabel labels={AUDIT_STATUS_LABELS} />
                 </SelectTrigger>
                 <SelectContent>
                   {AUDIT_STATUSES.map((status) => (

@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import type { IsmsReadiness } from '../../isms/hooks/useIsmsReadiness';
+import type { IsmsReadiness } from '../../hooks/useIsmsReadiness';
 import { IsmsReadinessPanel } from './IsmsReadinessPanel';
 
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));

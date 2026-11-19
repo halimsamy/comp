@@ -273,6 +273,9 @@ export function ismsSharedMock() {
         {children}
       </div>
     ),
+    SelectLabel: () => <span />,
+    optionLabels: (options: ReadonlyArray<{ id: string; name: string }>) =>
+      Object.fromEntries(options.map((option) => [option.id, option.name])),
     IsmsCardActions: ({
       isEditing,
       onEdit,

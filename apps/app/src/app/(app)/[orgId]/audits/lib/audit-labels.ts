@@ -6,6 +6,7 @@ import type {
   AuditReviewStatus,
   AuditStatus,
 } from '@/hooks/use-audits';
+import { tz } from '@date-fns/tz';
 import { format } from 'date-fns';
 
 type BadgeVariant = 'default' | 'accent' | 'secondary' | 'destructive' | 'outline';
@@ -75,7 +76,8 @@ export const REQUEST_STATUS_LABELS: Record<AuditRequestStatus, string> = {
 export const requestBadgeVariant = (status: AuditRequestStatus): BadgeVariant =>
   status === 'accepted' ? 'default' : status === 'submitted' ? 'accent' : 'outline';
 
-export const formatDay = (value: string) => format(new Date(value), 'MMM d, yyyy');
+/** Audit dates are stored as UTC days, so format them in UTC, not the viewer's zone (#99). */
+export const formatDay = (value: string) => format(value, 'MMM d, yyyy', { in: tz('UTC') });
 
 export const formatPeriod = (audit: Pick<Audit, 'periodStart' | 'periodEnd'>) =>
   `${formatDay(audit.periodStart)} – ${formatDay(audit.periodEnd)}`;
@@ -91,4 +93,28 @@ export function accessLabel(audit: Pick<Audit, 'accessEndsAt'>, now = new Date()
   return end < now
     ? `Auditor access ended ${formatDay(audit.accessEndsAt)}`
     : `Auditor access until ${formatDay(audit.accessEndsAt)}`;
+}
+
+export const plural = ({ count, word }: { count: number; word: string }) =>
+  `${count} ${word}${count === 1 ? '' : 's'}`;
+
+/** "5/7 tasks done · 1/6 policies published · 0/1 documents in period" (#108). */
+export function evidenceProgress(r: Pick<AuditRequirement, 'tasks' | 'policies' | 'documents'>): string {
+  const done = r.tasks.filter((t) => t.status === 'done' || t.status === 'not_relevant').length;
+  const published = r.policies.filter((p) => p.status === 'published').length;
+  const submitted = r.documents.filter((d) => d.submissionsInPeriod > 0).length;
+  const parts = [
+    r.tasks.length ? `${done}/${r.tasks.length} tasks done` : null,
+    r.policies.length ? `${published}/${r.policies.length} policies published` : null,
+    r.documents.length ? `${submitted}/${r.documents.length} documents in period` : null,
+  ].filter(Boolean);
+  return parts.length ? parts.join(' · ') : 'No evidence linked';
+}
+
+/** "Blocked by A, B +3 more", or null when nothing blocks the requirement. */
+export function blockedByLabel(blockedBy: string[] | undefined, shown = 2): string | null {
+  if (!blockedBy?.length) return null;
+  const head = blockedBy.slice(0, shown).join(', ');
+  const rest = blockedBy.length - shown;
+  return `Blocked by ${head}${rest > 0 ? ` +${rest} more` : ''}`;
 }

@@ -14,6 +14,7 @@ export const auditSchema = z
     periodEnd: day,
     accessEndsAt: z.union([day, z.literal('')]),
     auditorMemberIds: z.array(z.string()),
+    pendingAuditorEmails: z.array(z.string().email()),
   })
   .refine((v) => v.periodStart <= v.periodEnd, {
     message: 'The audit period must start before it ends',
@@ -32,6 +33,7 @@ export function toAuditFormValues(audit: Audit | null): AuditFormValues {
     periodEnd: toDay(audit?.periodEnd ?? null),
     accessEndsAt: toDay(audit?.accessEndsAt ?? null),
     auditorMemberIds: audit?.auditors.map((a) => a.memberId) ?? [],
+    pendingAuditorEmails: audit?.pendingAuditorEmails ?? [],
   };
 }
 
@@ -47,6 +49,7 @@ export function toAuditPayload({
     periodStart: values.periodStart,
     periodEnd: values.periodEnd,
     auditorMemberIds: values.auditorMemberIds,
+    pendingAuditorEmails: values.pendingAuditorEmails,
   };
   if (!audit) {
     return {

@@ -134,7 +134,7 @@ vi.mock('next/link', () => ({
 }));
 
 import { IsmsOverview } from './IsmsOverview';
-import { ISMS_TYPE_META } from '../../isms/isms-types';
+import { ISMS_TYPE_META } from '../../isms-types';
 
 describe('IsmsOverview', () => {
   beforeEach(() => {
@@ -154,10 +154,12 @@ describe('IsmsOverview', () => {
     expect(screen.getByText('Foundational Documents')).toBeInTheDocument();
   });
 
-  it('does not render the Statement of Applicability (it lives in general documents)', () => {
+  it('shows the Statement of Applicability on the ISMS page (#196)', () => {
     render(<IsmsOverview organizationId="org-1" />);
-    // SOA was moved out of the ISMS tab back into the general documents list.
-    expect(screen.queryByText('Statement of Applicability')).not.toBeInTheDocument();
+    const soaLink = screen
+      .getAllByRole('link')
+      .find((link) => link.getAttribute('href') === '/org-1/documents/statement-of-applicability');
+    expect(soaLink).toBeDefined();
   });
 
   it('links the Context of the Organization card to its detail page', () => {

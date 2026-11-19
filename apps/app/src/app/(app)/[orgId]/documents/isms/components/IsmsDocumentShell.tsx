@@ -176,7 +176,7 @@ export function IsmsDocumentShell({
         description={description}
         status={document?.status ?? null}
         isStale={isStale}
-        backHref={`/${organizationId}/documents?tab=iso-27001`}
+        backHref={`/${organizationId}/documents/isms`}
         actions={
           <>
             {canManage && (

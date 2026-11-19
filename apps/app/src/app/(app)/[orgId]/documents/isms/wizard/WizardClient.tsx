@@ -151,7 +151,7 @@ export function WizardClient({ organizationId, frameworkId, fallbackData }: Wiza
       await complete(getValues());
       await generateAll();
       toast.success('ISMS documents generated');
-      router.push(`/${organizationId}/documents?tab=iso-27001`);
+      router.push(`/${organizationId}/documents/isms`);
     } catch (caught) {
       toast.error(caught instanceof Error ? caught.message : 'Failed to finish setup');
       setIsFinishing(false);

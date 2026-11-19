@@ -5,9 +5,13 @@ import { Button, Empty, EmptyDescription, EmptyHeader, EmptyTitle, Stack, Text }
 import { Add } from '@trycompai/design-system/icons';
 import { useState } from 'react';
 import { AuditRequestCard } from './AuditRequestCard';
+import { ImportRequestsButton } from './ImportRequestsButton';
 import { NewAuditRequestForm } from './NewAuditRequestForm';
 
-/** Evidence requests: auditors ask, the team answers with text and files. */
+/**
+ * Evidence requests: auditors ask, the team answers with text and files. The
+ * team can also log a request list the auditor sent by email (#109).
+ */
 export function AuditRequestsPanel({
   auditId,
   requirements,
@@ -21,7 +25,8 @@ export function AuditRequestsPanel({
   /** The viewer can answer requests (audit:update, not an auditor). */
   canRespond: boolean;
 }) {
-  const { requests, isLoading, error, create, respond, decide, upload } = useAuditRequests(auditId);
+  const { requests, isLoading, error, create, createTeam, respond, decide, upload } =
+    useAuditRequests(auditId);
   const [isAdding, setIsAdding] = useState(false);
   const labels = new Map(requirements.map((r) => [r.id, `${r.identifier} ${r.name}`.trim()]));
 
@@ -34,8 +39,22 @@ export function AuditRequestsPanel({
           </Button>
         </div>
       ) : null}
+      {canRespond && !isAdding ? (
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" iconLeft={<Add size={16} />} onClick={() => setIsAdding(true)}>
+            Add request
+          </Button>
+          <ImportRequestsButton requirements={requirements} onImport={createTeam} />
+        </div>
+      ) : null}
       {isAdding ? (
-        <NewAuditRequestForm requirements={requirements} onSubmit={create} onCancel={() => setIsAdding(false)} />
+        <NewAuditRequestForm
+          requirements={requirements}
+          onSubmit={
+            isAuditor ? create : async (payload) => void (await createTeam([payload]))
+          }
+          onCancel={() => setIsAdding(false)}
+        />
       ) : null}
       {error ? (
         <Text size="sm" variant="destructive">

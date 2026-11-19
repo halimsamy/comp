@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  Badge,
   Button,
   HStack,
   Stack,
@@ -159,7 +160,14 @@ export function MeasurementHistory({
                 ) : (
                   <TableRow key={row.measurement.id}>
                     <TableCell>{row.periodText}</TableCell>
-                    <TableCell>{row.measurement.value}</TableCell>
+                    <TableCell>
+                      {row.measurement.value}
+                      {row.measurement.provisional ? (
+                        <span className="ml-2 inline-block align-middle">
+                          <Badge variant="outline">Provisional</Badge>
+                        </span>
+                      ) : null}
+                    </TableCell>
                     <TableCell>{formatDate(row.measurement.recordedAt)}</TableCell>
                     <TableCell>
                       {row.measurement.enteredById

@@ -275,7 +275,7 @@ describe('WizardClient', () => {
     });
     expect(mockGenerateAll).toHaveBeenCalledTimes(1);
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith('/org-1/documents?tab=iso-27001');
+      expect(mockPush).toHaveBeenCalledWith('/org-1/documents/isms');
     });
 
     // Completion sends the full set of answers.

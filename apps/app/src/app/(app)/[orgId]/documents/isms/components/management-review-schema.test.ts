@@ -13,6 +13,7 @@ import {
 describe('reviewDetailsSchema / toReviewPayload', () => {
   it('accepts empty optional fields and the empty verdict', () => {
     const parsed = reviewDetailsSchema.safeParse({
+      meetingType: 'management_review',
       meetingDate: '',
       chairName: '',
       status: 'planned',
@@ -24,6 +25,7 @@ describe('reviewDetailsSchema / toReviewPayload', () => {
 
   it('rejects an unknown verdict', () => {
     const parsed = reviewDetailsSchema.safeParse({
+      meetingType: 'management_review',
       meetingDate: '',
       chairName: '',
       status: 'planned',
@@ -36,6 +38,7 @@ describe('reviewDetailsSchema / toReviewPayload', () => {
   it('maps empty strings to null (the register "clear" contract)', () => {
     expect(
       toReviewPayload({
+        meetingType: 'board',
         meetingDate: '',
         chairName: '',
         status: 'complete',
@@ -43,6 +46,7 @@ describe('reviewDetailsSchema / toReviewPayload', () => {
         conclusionNotes: '',
       }),
     ).toEqual({
+      meetingType: 'board',
       meetingDate: null,
       chairName: null,
       status: 'complete',

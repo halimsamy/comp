@@ -29,8 +29,10 @@ import {
   WarningAltFilled,
 } from '@trycompai/design-system/icons';
 import { format } from 'date-fns';
+import Link from 'next/link';
 import { useState } from 'react';
 import { useNonconformities, type IsmsNonconformityRow } from '../hooks/useNonconformities';
+import { ImportNonconformitiesButton } from './ImportNonconformitiesButton';
 import type { ApproverOption } from './IsmsApprovalSection';
 import { NC_STATUS_LABELS, SOURCE_LABELS } from './nonconformity-schema';
 import { NonconformitySheet } from './NonconformitySheet';
@@ -59,6 +61,21 @@ const FILTERS: Record<Filter, (row: IsmsNonconformityRow) => boolean> = {
   closed: (row) => row.status === 'closed',
 };
 
+function ReferenceCell({ row }: { row: IsmsNonconformityRow }) {
+  return (
+    <>
+      <Text size="sm" weight="medium">
+        {row.reference}
+      </Text>
+      <Text size="xs" variant="muted">
+        {SOURCE_LABELS[row.source] ?? row.source}
+        {row.sourceRef && row.kind === 'external_finding' ? ` · ${row.sourceRef}` : ''}
+        {row.severity ? ` · ${row.severity}` : ''}
+      </Text>
+    </>
+  );
+}
+
 export function NonconformityRegisterClient({
   organizationId,
   fallbackData,
@@ -70,7 +87,7 @@ export function NonconformityRegisterClient({
 }) {
   const { hasPermission } = usePermissions();
   const canEdit = hasPermission('evidence', 'update');
-  const { rows, hasData, error, create, update } = useNonconformities({
+  const { rows, hasData, error, create, update, importMany } = useNonconformities({
     organizationId,
     fallbackData,
   });
@@ -131,9 +148,12 @@ export function NonconformityRegisterClient({
         description="Every nonconformity, from internal audits, incidents, external audits, management reviews and monitoring, with its root cause, corrective action and effectiveness review (ISO 27001 10.2)."
         actions={
           canEdit ? (
-            <Button type="button" iconLeft={<Add size={16} />} onClick={() => handleOpen(null)}>
-              Log nonconformity
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <ImportNonconformitiesButton memberOptions={memberOptions} onImport={importMany} />
+              <Button type="button" iconLeft={<Add size={16} />} onClick={() => handleOpen(null)}>
+                Log nonconformity
+              </Button>
+            </div>
           ) : undefined
         }
       >
@@ -142,8 +162,9 @@ export function NonconformityRegisterClient({
             <EmptyHeader>
               <EmptyTitle>No nonconformities logged</EmptyTitle>
               <EmptyDescription>
-                Major and minor findings from internal audits appear here automatically. Log the
-                ones raised by incidents, external audits, management reviews or missed metrics.
+                Findings from internal and external audits appear here automatically. Log the ones
+                raised by incidents, management reviews or missed metrics, or import your existing
+                log as CSV.
               </EmptyDescription>
             </EmptyHeader>
           </Empty>
@@ -176,19 +197,23 @@ export function NonconformityRegisterClient({
                   {visible.map((row) => (
                     <TableRow key={row.id}>
                       <TableCell>
-                        <button
-                          type="button"
-                          onClick={() => handleOpen(row)}
-                          className="min-w-28 rounded-sm text-left outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                        >
-                          <Text size="sm" weight="medium">
-                            {row.reference}
-                          </Text>
-                          <Text size="xs" variant="muted">
-                            {SOURCE_LABELS[row.source] ?? row.source}
-                            {row.severity ? ` · ${row.severity}` : ''}
-                          </Text>
-                        </button>
+                        {row.kind === 'external_finding' ? (
+                          // One register (#171): external findings are edited under Audits → Findings.
+                          <Link
+                            href={`/${organizationId}/audits?tab=findings&open=${row.id}`}
+                            className="block min-w-28 rounded-sm hover:underline"
+                          >
+                            <ReferenceCell row={row} />
+                          </Link>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleOpen(row)}
+                            className="min-w-28 rounded-sm text-left outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                          >
+                            <ReferenceCell row={row} />
+                          </button>
+                        )}
                       </TableCell>
                       <TableCell>
                         <div className="line-clamp-2 min-w-48 max-w-md">

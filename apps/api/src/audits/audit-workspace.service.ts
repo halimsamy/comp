@@ -7,7 +7,7 @@ import { loadMappings } from '../tasks/evidence-export/framework-evidence-mappin
 import { planRequirementFolders } from '../tasks/evidence-export/framework-evidence-plan';
 import { assertAssignedAuditor, getVisibleAudit } from './audit-access';
 import { loadAuditEvidence } from './audit-evidence';
-import { computeReadiness } from './audit-readiness';
+import { computeReadiness, readinessBlockers } from './audit-readiness';
 import { auditFrameworkSelect, loadAuditRequirements } from './audit-scope';
 import type { CreateAuditCommentDto, ReviewRequirementDto } from './dto/audit-workspace.dto';
 
@@ -88,6 +88,7 @@ export class AuditWorkspaceService {
         })),
       };
       const review = reviewById.get(requirement.id);
+      const applicable = !notApplicable.has(requirement.id);
       return {
         id: requirement.id,
         identifier: requirement.identifier,
@@ -95,10 +96,8 @@ export class AuditWorkspaceService {
         description: requirement.description,
         controls: controlNames,
         ...requirementEvidence,
-        readiness: computeReadiness({
-          applicable: !notApplicable.has(requirement.id),
-          evidence: requirementEvidence,
-        }),
+        readiness: computeReadiness({ applicable, evidence: requirementEvidence }),
+        blockedBy: applicable ? readinessBlockers(requirementEvidence) : [],
         review: review
           ? {
               status: review.status,

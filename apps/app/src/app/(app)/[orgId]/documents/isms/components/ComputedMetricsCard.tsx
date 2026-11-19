@@ -20,9 +20,10 @@ export interface ComputedMetricPreview {
 
 /**
  * 9.1 metrics Comp AI measures from its own data (training, policy sign-off,
- * findings, risk treatment, vendor reviews, task on-time rate). A monthly job
- * records them at period close; this card shows the live values and lets a
- * manager record the current period now.
+ * findings, risk treatment, vendor reviews, task on-time rate, vulnerability
+ * SLAs). A monthly job records them at period close. This card shows the last
+ * closed period and lets a manager record it now, or take a provisional
+ * snapshot of the open period that the close replaces (#39).
  */
 export function ComputedMetricsCard({
   organizationId,
@@ -44,7 +45,7 @@ export function ComputedMetricsCard({
       return Array.isArray(response.data) ? response.data : [];
     },
   );
-  const [isRecording, setIsRecording] = useState(false);
+  const [recording, setRecording] = useState<'previous' | 'current' | null>(null);
 
   if (error) {
     return (
@@ -58,40 +59,53 @@ export function ComputedMetricsCard({
 
   const pending = rows.filter((row) => !row.recordedForPeriod && row.value !== 'n/a').length;
 
-  const handleRecord = async () => {
-    setIsRecording(true);
+  const handleRecord = async (period: 'previous' | 'current') => {
+    setRecording(period);
     try {
       const response = await api.post<{ count: number }>(
         `${endpoint}/record`,
-        { period: 'current' },
+        { period },
         organizationId,
       );
       if (response.error) throw new Error(response.error);
       const count = response.data?.count ?? 0;
-      toast.success(count === 1 ? 'Recorded 1 measurement' : `Recorded ${count} measurements`);
+      const noun = count === 1 ? '1 measurement' : `${count} measurements`;
+      toast.success(period === 'current' ? `Saved ${noun} as a provisional snapshot` : `Recorded ${noun}`);
       await Promise.all([mutate(), onRecorded()]);
     } catch (caught) {
       toast.error(caught instanceof Error ? caught.message : 'Failed to record metrics');
     } finally {
-      setIsRecording(false);
+      setRecording(null);
     }
   };
 
   return (
     <Section
       title="Computed by Comp AI"
-      description="Measured from your platform data and recorded automatically when each period closes. Periods you have already recorded are never overwritten."
+      description="Measured from your platform data and recorded automatically when each period closes. Recorded periods are never overwritten; a provisional snapshot is replaced when its period closes."
       actions={
-        canRecord && pending > 0 ? (
-          <Button
-            type="button"
-            variant="outline"
-            loading={isRecording}
-            iconLeft={<Calculator size={16} />}
-            onClick={() => void handleRecord()}
-          >
-            Record {pending} for this period
-          </Button>
+        canRecord ? (
+          <div className="flex flex-wrap gap-2">
+            {pending > 0 ? (
+              <Button
+                type="button"
+                variant="outline"
+                loading={recording === 'previous'}
+                iconLeft={<Calculator size={16} />}
+                onClick={() => void handleRecord('previous')}
+              >
+                Record {pending} for the last closed period
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              variant="ghost"
+              loading={recording === 'current'}
+              onClick={() => void handleRecord('current')}
+            >
+              Snapshot now (provisional)
+            </Button>
+          </div>
         ) : undefined
       }
     >

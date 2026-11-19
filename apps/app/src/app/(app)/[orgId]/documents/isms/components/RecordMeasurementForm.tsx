@@ -46,6 +46,8 @@ interface RecordMeasurementFormProps {
  */
 export function RecordMeasurementForm({ metric, onRecord }: RecordMeasurementFormProps) {
   const cadence = metric.cadence;
+  // Default to the last closed period: the one a measurement is usually for (#39).
+  const lastClosed = cadence ? addPeriods(cadence, periodStartFor(cadence, new Date()), -1) : '';
   const {
     control,
     handleSubmit,
@@ -53,7 +55,7 @@ export function RecordMeasurementForm({ metric, onRecord }: RecordMeasurementFor
     formState: { isSubmitting, errors },
   } = useForm<RecordMeasurementValues>({
     resolver: zodResolver(recordSchema),
-    defaultValues: { periodStart: '', value: '', note: '' },
+    defaultValues: { periodStart: lastClosed, value: '', note: '' },
   });
 
   if (!cadence) return null;
@@ -70,7 +72,7 @@ export function RecordMeasurementForm({ metric, onRecord }: RecordMeasurementFor
       // Keep the user's input when the save fails.
       return;
     }
-    reset({ periodStart: '', value: '', note: '' });
+    reset({ periodStart: lastClosed, value: '', note: '' });
   });
 
   return (

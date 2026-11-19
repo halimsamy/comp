@@ -40,9 +40,9 @@ export default async function IsmsNonconformitiesPage({
       <Breadcrumb
         items={[
           {
-            label: 'Documents',
-            href: `/${orgId}/documents`,
-            props: { render: <Link href={`/${orgId}/documents?tab=iso-27001`} /> },
+            label: 'ISMS',
+            href: `/${orgId}/documents/isms`,
+            props: { render: <Link href={`/${orgId}/documents/isms`} /> },
           },
           { label: 'Nonconformities', isCurrent: true },
         ]}
@@ -52,7 +52,7 @@ export default async function IsmsNonconformitiesPage({
           clause="10.2"
           title="Nonconformity & Corrective Action"
           description="Log each nonconformity, fix its cause and check the fix worked. Internal audit findings are included automatically."
-          backHref={`/${orgId}/documents?tab=iso-27001`}
+          backHref={`/${orgId}/documents/isms`}
         />
         <NonconformityRegisterClient
           organizationId={orgId}

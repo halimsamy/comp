@@ -18,7 +18,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
   TableCell,
   TableRow,
   Textarea,
@@ -36,6 +35,7 @@ import {
   CONTROL_RESULTS,
   CONTROL_RESULT_LABELS,
 } from './internal-audit-constants';
+import { SelectLabel } from './shared';
 
 const NO_RESULT = 'no-result';
 
@@ -224,7 +224,7 @@ export function AuditControlRow({
             disabled={isSavingResult}
           >
             <SelectTrigger aria-label={`Result for ${controlRow.controlRef}`}>
-              <SelectValue placeholder="Not set" />
+              <SelectLabel labels={CONTROL_RESULT_LABELS} placeholder="Not set" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={NO_RESULT}>Not set</SelectItem>

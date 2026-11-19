@@ -55,7 +55,9 @@ export function RequirementsClient(props: RequirementsClientProps) {
 
         const handleUpdate = async ({ id, values }: { id: string; values: RequirementRowValues }) => {
           try {
-            await hook.updateRow({ register: REGISTER, id, data: toPayload(values) });
+            // The party link is never edited in the row, so leave it out of the update.
+            const { interestedPartyId: _unchanged, ...data } = toPayload(values);
+            await hook.updateRow({ register: REGISTER, id, data });
             toast.success('Requirement updated');
           } catch (caught) {
             toast.error(caught instanceof Error ? caught.message : 'Failed to update requirement');

@@ -26,7 +26,7 @@ import {
   FINDING_TYPE_DESCRIPTIONS,
   FINDING_TYPE_LABELS,
 } from './internal-audit-constants';
-import { IsmsFieldLabel } from './shared';
+import { IsmsFieldLabel, SelectLabel, optionLabels } from './shared';
 
 const NONE = 'none';
 
@@ -59,7 +59,7 @@ export function AuditFindingFields({
               render={({ field }) => (
                 <Select value={field.value} onValueChange={field.onChange}>
                   <SelectTrigger aria-label="Finding type">
-                    <SelectValue />
+                    <SelectLabel labels={FINDING_TYPE_LABELS} />
                   </SelectTrigger>
                   <SelectContent>
                     {FINDING_TYPES.map((type) => (
@@ -131,7 +131,7 @@ export function AuditFindingFields({
                 onValueChange={(next) => field.onChange(next === NONE ? '' : next)}
               >
                 <SelectTrigger aria-label="Finding owner">
-                  <SelectValue placeholder="Unassigned" />
+                  <SelectLabel labels={optionLabels(memberOptions)} placeholder="Unassigned" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NONE}>Unassigned</SelectItem>
@@ -161,7 +161,7 @@ export function AuditFindingFields({
             render={({ field }) => (
               <Select value={field.value} onValueChange={field.onChange}>
                 <SelectTrigger aria-label="Finding status">
-                  <SelectValue />
+                  <SelectLabel labels={FINDING_STATUS_LABELS} />
                 </SelectTrigger>
                 <SelectContent>
                   {FINDING_STATUSES.map((status) => (

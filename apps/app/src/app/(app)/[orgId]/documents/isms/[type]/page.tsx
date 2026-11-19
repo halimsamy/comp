@@ -91,9 +91,9 @@ export default async function IsmsDocumentPage({
     <Breadcrumb
       items={[
         {
-          label: 'Documents',
-          href: `/${orgId}/documents`,
-          props: { render: <Link href={`/${orgId}/documents?tab=iso-27001`} /> },
+          label: 'ISMS',
+          href: `/${orgId}/documents/isms`,
+          props: { render: <Link href={`/${orgId}/documents/isms`} /> },
         },
         { label: meta.title, isCurrent: true },
       ]}

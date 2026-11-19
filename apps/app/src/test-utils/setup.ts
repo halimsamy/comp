@@ -34,6 +34,7 @@ vi.mock('next/navigation', () => ({
   })),
   usePathname: vi.fn(() => '/'),
   useSearchParams: vi.fn(() => new URLSearchParams()),
+  useParams: vi.fn(() => ({ orgId: 'org_1' })),
   redirect: vi.fn(),
 }));
 

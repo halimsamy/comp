@@ -7,7 +7,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
   Stack,
   Text,
   Textarea,
@@ -17,11 +16,11 @@ import type { ApproverOption } from './IsmsApprovalSection';
 import {
   NC_STATUSES,
   NC_STATUS_LABELS,
-  NONCONFORMITY_SOURCES,
+  MANUAL_SOURCES,
   SOURCE_LABELS,
   type NonconformityFormValues,
 } from './nonconformity-schema';
-import { IsmsFieldLabel } from './shared';
+import { IsmsFieldLabel, SelectLabel, optionLabels } from './shared';
 
 const NONE = 'none';
 
@@ -100,7 +99,7 @@ function MemberField({
               disabled={disabled}
             >
               <SelectTrigger aria-label={label}>
-                <SelectValue placeholder="Unassigned" />
+                <SelectLabel labels={optionLabels(memberOptions)} placeholder="Unassigned" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={NONE}>Unassigned</SelectItem>
@@ -172,10 +171,14 @@ export function NonconformityFields({
               render={({ field }) => (
                 <Select value={field.value} onValueChange={field.onChange}>
                   <SelectTrigger aria-label="Source">
-                    <SelectValue />
+                    <SelectLabel labels={SOURCE_LABELS} />
                   </SelectTrigger>
                   <SelectContent>
-                    {NONCONFORMITY_SOURCES.map((source) => (
+                    {/* Older rows logged as "External audit" keep their source. */}
+                    {(field.value === 'external_audit'
+                      ? [field.value, ...MANUAL_SOURCES]
+                      : MANUAL_SOURCES
+                    ).map((source) => (
                       <SelectItem key={source} value={source}>
                         {SOURCE_LABELS[source]}
                       </SelectItem>
@@ -231,7 +234,7 @@ export function NonconformityFields({
             render={({ field }) => (
               <Select value={field.value} onValueChange={field.onChange} disabled={isAuditFinding}>
                 <SelectTrigger aria-label="Status">
-                  <SelectValue />
+                  <SelectLabel labels={NC_STATUS_LABELS} />
                 </SelectTrigger>
                 <SelectContent>
                   {NC_STATUSES.map((status) => (

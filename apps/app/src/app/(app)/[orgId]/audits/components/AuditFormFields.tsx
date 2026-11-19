@@ -17,6 +17,7 @@ import type { ReactNode } from 'react';
 import { Controller, type Control } from 'react-hook-form';
 import { AUDIT_STATUS_LABELS } from '../lib/audit-labels';
 import type { AuditFormValues } from '../lib/audit-schema';
+import { InviteAuditorField } from './InviteAuditorField';
 
 export interface Option {
   id: string;
@@ -148,7 +149,7 @@ export function AuditFormFields({
           render={({ field }) =>
             auditors.length === 0 ? (
               <Text size="sm" variant="muted">
-                Invite your auditors under People with the Auditor role, then assign them here.
+                No one has the Auditor role yet. Invite your auditors by email below.
               </Text>
             ) : (
               <div className="space-y-2 rounded-md border border-border p-3">
@@ -173,6 +174,13 @@ export function AuditFormFields({
               </div>
             )
           }
+        />
+      </Field>
+      <Field label="Invite an auditor by email">
+        <Controller
+          control={control}
+          name="pendingAuditorEmails"
+          render={({ field }) => <InviteAuditorField value={field.value} onChange={field.onChange} />}
         />
       </Field>
     </Stack>

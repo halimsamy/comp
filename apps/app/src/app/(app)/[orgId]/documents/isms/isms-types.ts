@@ -130,6 +130,14 @@ export interface IsmsObjective {
   source: IsmsContextSource;
   derivedFrom: string | null;
   position: number;
+  /** 9.1 metrics measuring this objective, with their latest value (#49). */
+  metrics?: Array<{
+    id: string;
+    name: string;
+    target: string | null;
+    /** The latest measurement only. */
+    measurements: Array<{ value: string; periodStart: string; provisional: boolean }>;
+  }>;
 }
 
 /** A member assigned to an ISMS role, with competence evidence (clauses 5.3/7.2). */
@@ -183,6 +191,8 @@ export interface IsmsMeasurement {
   recordedAt: string;
   enteredById: string | null;
   source: string;
+  /** A Comp AI snapshot of an open period, replaced when the period closes (#39). */
+  provisional?: boolean;
 }
 
 /** The Objectives-Plan row a metric's target may link to (clause 6.2 → 9.1). */
@@ -207,7 +217,7 @@ export interface IsmsMetric {
   target: string | null;
   objectiveId: string | null;
   objective: IsmsMetricObjectiveRef | null;
-  /** Where values come from — always 'manual' in v1. */
+  /** 'computed' when Comp AI measures it from platform data, else 'manual'. */
   dataSource: string;
   isActive: boolean;
   source: IsmsContextSource;
@@ -330,11 +340,20 @@ export interface IsmsReviewAction {
   position: number;
 }
 
+export type IsmsMeetingType =
+  | 'management_review'
+  | 'board'
+  | 'it_leadership'
+  | 'risk_committee'
+  | 'pci_bau';
+
 /** Register: one management review instance (clause 9.3). */
 export interface IsmsManagementReview {
   id: string;
   /** Server-generated "MR-YYYY-NN", immutable. */
   reference: string;
+  /** Which forum held it; all count as 9.3 inputs (#176). */
+  meetingType: IsmsMeetingType;
   /** The date the review was held (backdatable, customer-entered). */
   meetingDate: string | null;
   /** Server-set at creation, immutable — the honest-backdating guardrail. */

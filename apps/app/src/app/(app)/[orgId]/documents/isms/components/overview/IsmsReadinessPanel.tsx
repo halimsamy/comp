@@ -5,7 +5,7 @@ import { ArrowRight, Renew } from '@trycompai/design-system/icons';
 import Link from 'next/link';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import type { IsmsReadiness } from '../../isms/hooks/useIsmsReadiness';
+import type { IsmsReadiness } from '../../hooks/useIsmsReadiness';
 
 interface IsmsReadinessPanelProps {
   organizationId: string;

@@ -86,7 +86,8 @@ export function computeDueEntries({
 }): DueEntry[] {
   const entries: DueEntry[] = [];
   for (const metric of metrics) {
-    if (!metric.isActive || !metric.cadence) continue;
+    // Computed metrics are recorded by Comp AI at period close, never "due" (#49).
+    if (!metric.isActive || !metric.cadence || metric.dataSource === 'computed') continue;
     const cadence = metric.cadence;
     const measured = measuredKeys(metric);
     const missing = listMissingPeriods({

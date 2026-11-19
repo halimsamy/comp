@@ -1,6 +1,7 @@
 import type { Prisma } from '@db';
 import type { IsmsExportSection } from '../utils/export-shared';
 import type { DocumentExportInput } from './types';
+import { COMPUTED_SOURCE, isComputedMetricKey } from './metric-compute';
 import { SEED_METRIC_DEFINITIONS } from './monitoring-defaults';
 
 type Tx = Prisma.TransactionClient;
@@ -73,6 +74,7 @@ export async function seedMetricsIfMissing({
       method: metric.method,
       cadence: metric.cadence,
       target: metric.target,
+      dataSource: isComputedMetricKey(metric.metricKey) ? COMPUTED_SOURCE : 'manual',
       source: 'derived' as const,
       derivedFrom: `seed:${metric.metricKey}`,
       position: maxPosition + 1 + index,

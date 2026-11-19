@@ -9,7 +9,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
   Stack,
   Textarea,
 } from '@trycompai/design-system';
@@ -20,7 +19,7 @@ import {
   METRIC_CADENCES,
   METRIC_CADENCE_LABELS,
 } from './monitoring-constants';
-import { IsmsFieldLabel } from './shared';
+import { IsmsFieldLabel, SelectLabel, optionLabels } from './shared';
 
 interface MetricFieldsProps {
   control: Control<MetricFormValues>;
@@ -47,7 +46,7 @@ function MemberSelect({
       onValueChange={(next) => onChange(!next || next === 'spo-default' ? '' : next)}
     >
       <SelectTrigger aria-label={label}>
-        <SelectValue placeholder="Security & Privacy Owner (default)" />
+        <SelectLabel labels={optionLabels(memberOptions)} placeholder="Security & Privacy Owner (default)" />
       </SelectTrigger>
       <SelectContent>
         <SelectItem value="spo-default">
@@ -117,7 +116,7 @@ export function MetricFields({ control, memberOptions, showName }: MetricFieldsP
             render={({ field }) => (
               <Select value={field.value || undefined} onValueChange={field.onChange}>
                 <SelectTrigger aria-label="Metric cadence">
-                  <SelectValue placeholder="Select cadence" />
+                  <SelectLabel labels={METRIC_CADENCE_LABELS} placeholder="Select cadence" />
                 </SelectTrigger>
                 <SelectContent>
                   {METRIC_CADENCES.map((cadence) => (

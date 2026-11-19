@@ -83,6 +83,7 @@ function makeReview(
   return {
     id: 'mr_1',
     reference: 'MR-2026-01',
+    meetingType: 'management_review',
     meetingDate: '2026-05-01T00:00:00.000Z',
     recordedAt: '2026-05-01T09:30:00.000Z',
     chairName: 'Raoul Plickat (CEO)',
@@ -317,6 +318,17 @@ describe('ManagementReviewClient', () => {
     // The first review's open action appears twice: on its own review and in
     // the second review's carried-forward table.
     expect(screen.getAllByText('MR-2026-01-A01')).toHaveLength(2);
+  });
+
+  it('filters reviews by meeting type (#176)', () => {
+    setMockPermissions(ADMIN_PERMISSIONS);
+    hookState.document = makeDocument({
+      reviews: [makeReview(), makeReview({ id: 'mr_2', reference: 'BRD-1', meetingType: 'board' })],
+    });
+    render(<ManagementReviewClient {...baseProps} />);
+    // The filter lists every meeting type; the board review carries its badge.
+    expect(screen.getByText('All meetings')).toBeInTheDocument();
+    expect(screen.getAllByText('Board meeting').length).toBeGreaterThan(1);
   });
 
   it('warns when no review is recorded (clause 9.3 gate)', () => {

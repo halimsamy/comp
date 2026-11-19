@@ -85,6 +85,7 @@ export class IsmsManagementReviewService {
         data: {
           documentId,
           reference: await this.nextReference({ tx, documentId }),
+          meetingType: dto.meetingType ?? 'management_review',
           meetingDate: meetingDate ?? null,
           chairName: dto.chairName?.trim() || defaults.chairName,
           attendees: attendees.map((attendee) => ({ ...attendee })),
@@ -132,6 +133,7 @@ export class IsmsManagementReviewService {
       return tx.ismsManagementReview.update({
         where: { id: reviewId },
         data: {
+          meetingType: dto.meetingType ?? undefined,
           meetingDate: parseOptionalDate(dto.meetingDate),
           chairName: this.optionalText(dto.chairName),
           attendees:

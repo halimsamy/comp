@@ -70,6 +70,7 @@ export class FindingsService {
       },
     },
     device: { select: { id: true, name: true, hostname: true } },
+    audit: { select: { id: true, title: true } },
   } as const;
 
   constructor(
@@ -298,8 +299,12 @@ export class FindingsService {
         );
     }
 
+    await this.assertAudit(organizationId, createDto);
+
     const finding = await db.finding.create({
       data: {
+        auditId: createDto.auditId ?? null,
+        requirementId: createDto.requirementId ?? null,
         taskId: createDto.taskId ?? null,
         evidenceSubmissionId: createDto.evidenceSubmissionId ?? null,
         evidenceFormType: createDto.evidenceFormType
@@ -355,6 +360,19 @@ export class FindingsService {
 
     this.logger.log(`Created finding ${finding.id} for ${target.kind}`);
     return this.normalizeFindingFormTypes(finding);
+  }
+
+  /** A finding raised in an audit must point at one of this org's audits (#171). */
+  private async assertAudit(organizationId: string, dto: CreateFindingDto) {
+    if (dto.requirementId && !dto.auditId) {
+      throw new BadRequestException('requirementId needs the auditId it belongs to');
+    }
+    if (!dto.auditId) return;
+    const audit = await db.auditEngagement.findFirst({
+      where: { id: dto.auditId, organizationId },
+      select: { id: true },
+    });
+    if (!audit) throw new BadRequestException('Audit not found');
   }
 
   /**

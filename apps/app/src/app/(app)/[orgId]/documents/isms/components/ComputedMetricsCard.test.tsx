@@ -49,7 +49,7 @@ describe('ComputedMetricsCard', () => {
     expect(screen.getByText('Recorded for 2026-11-01')).toBeInTheDocument();
   });
 
-  it('records the pending metrics for the current period', async () => {
+  it('records the pending metrics for the last closed period (#39)', async () => {
     mockPost.mockResolvedValue({ data: { count: 1 }, error: null });
     const onRecorded = vi.fn().mockResolvedValue(undefined);
     render(
@@ -60,7 +60,23 @@ describe('ComputedMetricsCard', () => {
         onRecorded={onRecorded}
       />,
     );
-    fireEvent.click(screen.getByText('Record 1 for this period'));
+    fireEvent.click(screen.getByText('Record 1 for the last closed period'));
+    await waitFor(() =>
+      expect(mockPost).toHaveBeenCalledWith(
+        '/v1/isms/documents/doc_1/metrics/computed/record',
+        { period: 'previous' },
+        'org_1',
+      ),
+    );
+    expect(onRecorded).toHaveBeenCalled();
+  });
+
+  it('takes a provisional snapshot of the open period', async () => {
+    mockPost.mockResolvedValue({ data: { count: 2 }, error: null });
+    render(
+      <ComputedMetricsCard organizationId="org_1" documentId="doc_1" canRecord onRecorded={vi.fn()} />,
+    );
+    fireEvent.click(screen.getByText('Snapshot now (provisional)'));
     await waitFor(() =>
       expect(mockPost).toHaveBeenCalledWith(
         '/v1/isms/documents/doc_1/metrics/computed/record',
@@ -68,7 +84,6 @@ describe('ComputedMetricsCard', () => {
         'org_1',
       ),
     );
-    expect(onRecorded).toHaveBeenCalled();
   });
 
   it('hides recording for a read-only user', () => {
@@ -80,7 +95,8 @@ describe('ComputedMetricsCard', () => {
         onRecorded={vi.fn()}
       />,
     );
-    expect(screen.queryByText(/Record \d+ for this period/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Record \d+ for the last closed period/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Snapshot now (provisional)')).not.toBeInTheDocument();
   });
 
   it('renders nothing when no metric is computable', () => {

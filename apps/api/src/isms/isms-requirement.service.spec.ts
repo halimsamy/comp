@@ -111,7 +111,13 @@ describe('IsmsRequirementService', () => {
       });
 
       expect(mockDb.ismsInterestedParty.findFirst).toHaveBeenCalledWith({
-        where: { id: 'ip_1', documentId: 'doc_1' },
+        where: {
+          id: 'ip_1',
+          document: {
+            organizationId: 'org_1',
+            type: 'interested_parties_register',
+          },
+        },
         select: { id: true },
       });
       expect(
@@ -171,8 +177,39 @@ describe('IsmsRequirementService', () => {
         }),
       ).rejects.toThrow(BadRequestException);
       expect(mockDb.ismsInterestedParty.findFirst).toHaveBeenCalledWith({
-        where: { id: 'ip_other', documentId: 'doc_1' },
+        where: {
+          id: 'ip_other',
+          document: {
+            organizationId: 'org_1',
+            type: 'interested_parties_register',
+          },
+        },
         select: { id: true },
+      });
+    });
+
+    // Regression (#36): the party lives in the 4.2a register document, not in
+    // the requirement's own document, so the old documentId check always failed.
+    it('updates a row linked to a party from the 4.2a register', async () => {
+      (
+        mockDb.ismsInterestedPartyRequirement.findFirst as jest.Mock
+      ).mockResolvedValue({ id: 'ipr_1', documentId: 'doc_requirements' });
+      (mockDb.ismsInterestedParty.findFirst as jest.Mock).mockResolvedValue({
+        id: 'ip_1',
+      });
+      (
+        mockDb.ismsInterestedPartyRequirement.update as jest.Mock
+      ).mockResolvedValue({});
+
+      await service.update({
+        requirementId: 'ipr_1',
+        organizationId: 'org_1',
+        dto: { interestedPartyId: 'ip_1', treatment: 'updated' },
+      });
+
+      expect(mockDb.ismsInterestedPartyRequirement.update).toHaveBeenCalledWith({
+        where: { id: 'ipr_1' },
+        data: expect.objectContaining({ interestedPartyId: 'ip_1' }),
       });
     });
   });

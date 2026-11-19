@@ -1,6 +1,13 @@
 import type { Audit, AuditRequirement } from '@/hooks/use-audits';
 import { describe, expect, it } from 'vitest';
-import { accessLabel, countByStatus, itemStatus } from './audit-labels';
+import {
+  accessLabel,
+  blockedByLabel,
+  countByStatus,
+  evidenceProgress,
+  itemStatus,
+  plural,
+} from './audit-labels';
 import { auditSchema, toAuditFormValues, toAuditPayload } from './audit-schema';
 
 const requirement = (over: Partial<AuditRequirement>): AuditRequirement => ({
@@ -13,6 +20,7 @@ const requirement = (over: Partial<AuditRequirement>): AuditRequirement => ({
   policies: [],
   documents: [],
   readiness: 'ready',
+  blockedBy: [],
   review: null,
   commentCount: 0,
   openRequestCount: 0,
@@ -62,6 +70,7 @@ describe('audit schema', () => {
     periodEnd: '2026-12-31',
     accessEndsAt: '',
     auditorMemberIds: ['mem_1'],
+    pendingAuditorEmails: ['qsa@firm.com'],
   };
 
   it('rejects a period that ends before it starts', () => {
@@ -76,7 +85,14 @@ describe('audit schema', () => {
       periodStart: '2026-01-01',
       periodEnd: '2026-12-31',
       auditorMemberIds: ['mem_1'],
+      pendingAuditorEmails: ['qsa@firm.com'],
     });
+  });
+
+  it('rejects an invalid invited auditor email', () => {
+    expect(auditSchema.safeParse({ ...values, pendingAuditorEmails: ['not-an-email'] }).success).toBe(
+      false,
+    );
   });
 
   it('clears optional fields on update and round-trips an audit', () => {
@@ -98,5 +114,32 @@ describe('audit schema', () => {
       accessEndsAt: null,
       status: 'in_progress',
     });
+  });
+});
+
+describe('evidence progress (#108)', () => {
+  it('summarises partial readiness', () => {
+    expect(
+      evidenceProgress(
+        requirement({
+          tasks: [
+            { id: 't1', title: 'A', status: 'done', filesInPeriod: 1, needsUpdate: false },
+            { id: 't2', title: 'B', status: 'todo', filesInPeriod: 0, needsUpdate: false },
+          ],
+          policies: [{ id: 'p1', name: 'P', status: 'draft' }],
+        }),
+      ),
+    ).toBe('1/2 tasks done · 0/1 policies published');
+    expect(evidenceProgress(requirement({}))).toBe('No evidence linked');
+  });
+
+  it('shortens the blocked-by list', () => {
+    expect(blockedByLabel(['A', 'B', 'C', 'D'])).toBe('Blocked by A, B +2 more');
+    expect(blockedByLabel([])).toBeNull();
+  });
+
+  it('pluralizes', () => {
+    expect(plural({ count: 1, word: 'comment' })).toBe('1 comment');
+    expect(plural({ count: 2, word: 'comment' })).toBe('2 comments');
   });
 });

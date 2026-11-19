@@ -65,6 +65,7 @@ export class IsmsReadinessService {
             name: true,
             cadence: true,
             isActive: true,
+            dataSource: true,
             createdAt: true,
             measurements: {
               orderBy: { periodStart: 'desc' },
@@ -129,7 +130,8 @@ export class IsmsReadinessService {
         metricMessages:
           doc.type === 'monitoring' ? metricValidationMessages({ metrics: doc.metrics }) : [],
         overdueMetrics: activeMetrics.filter((metric) => {
-          if (!metric.cadence) return false;
+          // Comp AI records computed metrics itself (#49).
+          if (!metric.cadence || metric.dataSource === 'computed') return false;
           const latest = metric.measurements[0];
           return isMetricOverdue({
             cadence: metric.cadence,

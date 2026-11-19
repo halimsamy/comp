@@ -101,6 +101,11 @@ describe('metricIsOverdue', () => {
 });
 
 describe('computeDueEntries', () => {
+  it('never lists a metric Comp AI computes (#49)', () => {
+    const metric = makeMetric({ dataSource: 'computed', measurements: [] });
+    expect(computeDueEntries({ metrics: [metric], now: NOW })).toEqual([]);
+  });
+
   it('lists the current period and every historical gap, newest first', () => {
     // Created in April, only May measured → due: July (current), gaps: June, April.
     const metric = makeMetric({

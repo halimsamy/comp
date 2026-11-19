@@ -47,6 +47,9 @@ export interface Finding {
     image: string | null;
   } | null;
   template: { id: string; category: string; title: string } | null;
+  /** Audit engagement the finding was raised in (audit workspace). */
+  audit?: { id: string; title: string } | null;
+  requirementId?: string | null;
   task: { id: string; title: string } | null;
   evidenceSubmission: {
     id: string;
@@ -89,6 +92,9 @@ export interface CreateFindingData {
   severity?: FindingSeverity;
   templateId?: string;
   content: string;
+  /** Raised from a flagged requirement in an audit workspace. */
+  auditId?: string;
+  requirementId?: string;
 }
 
 export interface UpdateFindingData {

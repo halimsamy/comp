@@ -47,8 +47,9 @@ export function IsmsPageHeader({
           <span>ISMS</span>
         </Link>
       )}
-      <div className="flex items-start justify-between gap-4">
-        <Stack gap="2">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <Stack gap="2">
           <HStack gap="3" align="center" wrap="wrap">
             <Heading level="1">{`${clause} ${title}`}</Heading>
             {status !== undefined && <IsmsStatusBadge status={status} isStale={isStale} />}
@@ -60,8 +61,9 @@ export function IsmsPageHeader({
               </Text>
             </div>
           )}
-        </Stack>
-        {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+          </Stack>
+        </div>
+        {actions && <div className="flex flex-wrap items-center gap-2 sm:shrink-0">{actions}</div>}
       </div>
     </Stack>
   );

@@ -21,7 +21,6 @@ const statuses = {
 
 vi.mock('swr', () => ({ default: () => ({ data: statuses }) }));
 vi.mock('@/hooks/use-findings-api', () => ({ useOrganizationFindings: () => ({ data: undefined }) }));
-vi.mock('../isms/hooks/useIso27001FrameworkId', () => ({ useIso27001FrameworkId: () => null }));
 vi.mock('next/link', () => ({
   default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a>,
 }));

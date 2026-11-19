@@ -22,3 +22,4 @@ export {
 } from './IsmsRegisterCard';
 export { IsmsCardActions, type IsmsCardActionsProps } from './IsmsCardActions';
 export { IsmsAddCard, type IsmsAddCardProps } from './IsmsAddCard';
+export { SelectLabel, optionLabels } from './SelectLabel';

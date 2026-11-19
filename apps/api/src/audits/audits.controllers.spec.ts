@@ -4,6 +4,7 @@ import { HybridAuthGuard } from '../auth/hybrid-auth.guard';
 import { PERMISSIONS_KEY, PermissionGuard } from '../auth/permission.guard';
 import { AuditRequestsController } from './audit-requests.controller';
 import { AuditRequestsService } from './audit-requests.service';
+import { AuditTeamRequestsService } from './audit-team-requests.service';
 import { AuditWorkspaceController } from './audit-workspace.controller';
 import { AuditWorkspaceService } from './audit-workspace.service';
 import { AuditsController } from './audits.controller';
@@ -16,6 +17,7 @@ jest.mock('@trycompai/auth', () => ({
   BUILT_IN_ROLE_PERMISSIONS: {},
 }));
 jest.mock('../attachments/attachments.service', () => ({ AttachmentsService: class {} }));
+jest.mock('../notifications/ownership-notifier.service', () => ({ OwnershipNotifier: class {} }));
 
 const auth: AuthContext = {
   organizationId: 'org_1',
@@ -49,6 +51,7 @@ describe('audit controllers', () => {
         { provide: AuditsService, useValue: auditsService },
         { provide: AuditWorkspaceService, useValue: workspaceService },
         { provide: AuditRequestsService, useValue: requestsService },
+        { provide: AuditTeamRequestsService, useValue: { create: jest.fn() } },
       ],
     })
       .overrideGuard(HybridAuthGuard)
@@ -89,6 +92,7 @@ describe('audit controllers', () => {
     ['decide', 'read'],
     ['respond', 'update'],
     ['uploadFile', 'update'],
+    ['createTeam', 'update'],
   ] as const)('requests %s requires audit:%s', (method, action) => {
     expect(permission(requests[method])).toEqual([{ resource: 'audit', actions: [action] }]);
   });

@@ -98,7 +98,7 @@ export class IsmsAutomationController {
       documentId: id,
       organizationId,
       memberId: memberId ?? null,
-      period: dto.period ?? 'current',
+      period: dto.period ?? 'previous',
     });
   }
 

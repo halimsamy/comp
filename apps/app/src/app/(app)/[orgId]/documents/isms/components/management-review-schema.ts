@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  MEETING_TYPES,
   REVIEW_ACTION_STATUSES,
   REVIEW_CONCLUSION_VERDICTS,
   REVIEW_STATUSES,
@@ -12,6 +13,7 @@ import {
  */
 
 export const reviewDetailsSchema = z.object({
+  meetingType: z.enum(MEETING_TYPES),
   meetingDate: z.string(),
   chairName: z.string(),
   status: z.enum(REVIEW_STATUSES),
@@ -26,6 +28,7 @@ export type ReviewDetailsFormValues = z.infer<typeof reviewDetailsSchema>;
 
 export function toReviewPayload(values: ReviewDetailsFormValues) {
   return {
+    meetingType: values.meetingType,
     meetingDate: values.meetingDate || null,
     chairName: values.chairName || null,
     status: values.status,

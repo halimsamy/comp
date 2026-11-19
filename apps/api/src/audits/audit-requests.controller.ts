@@ -7,8 +7,10 @@ import { RequirePermission } from '../auth/require-permission.decorator';
 import type { AuthContext as AuthContextType } from '../auth/types';
 import { UploadAttachmentDto } from '../attachments/upload-attachment.dto';
 import { AuditRequestsService } from './audit-requests.service';
+import { AuditTeamRequestsService } from './audit-team-requests.service';
 import {
   CreateAuditRequestDto,
+  CreateTeamAuditRequestsDto,
   DecideAuditRequestDto,
   RespondAuditRequestDto,
 } from './dto/audit-workspace.dto';
@@ -20,7 +22,10 @@ import {
 @ApiSecurity('apikey')
 @ApiParam({ name: 'auditId', example: 'aud_abc123' })
 export class AuditRequestsController {
-  constructor(private readonly requests: AuditRequestsService) {}
+  constructor(
+    private readonly requests: AuditRequestsService,
+    private readonly teamRequests: AuditTeamRequestsService,
+  ) {}
 
   @Get()
   @RequirePermission('audit', 'read')
@@ -48,6 +53,22 @@ export class AuditRequestsController {
     @Body() body: CreateAuditRequestDto,
   ) {
     return this.requests.create({ auth, auditId, dto: body });
+  }
+
+  @Post('team')
+  @RequirePermission('audit', 'update')
+  @ApiOperation({
+    summary: "Log the auditor's request list",
+    description:
+      "The team logs requests the auditor sent outside Comp AI (a PBC list by email or spreadsheet): one request or many, each optionally tied to a requirement, with a due date and an owner, who is notified.",
+  })
+  @ApiBody({ type: CreateTeamAuditRequestsDto })
+  async createTeam(
+    @AuthContext() auth: AuthContextType,
+    @Param('auditId') auditId: string,
+    @Body() body: CreateTeamAuditRequestsDto,
+  ) {
+    return this.teamRequests.create({ auth, auditId, requests: body.requests });
   }
 
   @Patch(':requestId/response')

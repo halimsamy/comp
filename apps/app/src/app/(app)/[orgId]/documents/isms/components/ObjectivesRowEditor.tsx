@@ -9,7 +9,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
   Stack,
   Textarea,
 } from '@trycompai/design-system';
@@ -17,7 +16,7 @@ import { Controller, type Control } from 'react-hook-form';
 import type { ApproverOption } from './IsmsApprovalSection';
 import type { ObjectiveFormValues } from './objective-schema';
 import { OBJECTIVE_STATUSES, OBJECTIVE_STATUS_LABELS } from './objectives-status';
-import { IsmsFieldLabel } from './shared';
+import { IsmsFieldLabel, SelectLabel, optionLabels } from './shared';
 
 interface ObjectivesRowEditorProps {
   control: Control<ObjectiveFormValues>;
@@ -66,7 +65,7 @@ export function ObjectivesRowEditor({ control, ownerOptions }: ObjectivesRowEdit
               hasOwnerOptions ? (
                 <Select value={field.value || undefined} onValueChange={field.onChange}>
                   <SelectTrigger aria-label="Objective owner">
-                    <SelectValue placeholder="Owner" />
+                    <SelectLabel labels={optionLabels(ownerOptions)} placeholder="Owner" />
                   </SelectTrigger>
                   <SelectContent>
                     {ownerOptions.map((option) => (
@@ -121,7 +120,7 @@ export function ObjectivesRowEditor({ control, ownerOptions }: ObjectivesRowEdit
           render={({ field }) => (
             <Select value={field.value} onValueChange={field.onChange}>
               <SelectTrigger aria-label="Objective status">
-                <SelectValue placeholder="Status" />
+                <SelectLabel labels={OBJECTIVE_STATUS_LABELS} placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
                 {OBJECTIVE_STATUSES.map((status) => (

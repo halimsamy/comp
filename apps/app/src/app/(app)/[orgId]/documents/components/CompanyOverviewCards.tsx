@@ -18,8 +18,6 @@ import Link from 'next/link';
 import { useMemo } from 'react';
 import useSWR from 'swr';
 import { evidenceFormDefinitionList, meetingSubTypeValues } from '../forms';
-import { useIso27001FrameworkId } from '../isms/hooks/useIso27001FrameworkId';
-import { SOAOverviewCard } from './SOAOverviewCard';
 
 type FormStatus = {
   lastSubmittedAt: string | null;
@@ -126,7 +124,6 @@ function StatusBadge({
 }
 
 export function CompanyOverviewCards({ organizationId }: { organizationId: string }) {
-  const iso27001FrameworkId = useIso27001FrameworkId(organizationId);
   const swrKey: readonly [string, string] = ['/v1/evidence-forms/statuses', organizationId];
 
   const { data: statuses } = useSWR<FormStatuses>(
@@ -178,12 +175,6 @@ export function CompanyOverviewCards({ organizationId }: { organizationId: strin
 
   return (
     <Stack gap="6">
-      {iso27001FrameworkId && (
-        <SOAOverviewCard
-          organizationId={organizationId}
-          iso27001FrameworkId={iso27001FrameworkId}
-        />
-      )}
       {Array.from(categories.entries()).map(([category, forms]) => (
         <div key={category} className="space-y-3">
           <div className="flex items-center gap-2">

@@ -35,7 +35,7 @@ export class IsmsRequirementService {
     // or be persisted as an invalid reference.
     const interestedPartyId = dto.interestedPartyId?.trim() || null;
     if (interestedPartyId) {
-      await this.requirePartyInDocument({ interestedPartyId, documentId });
+      await this.requirePartyInOrg({ interestedPartyId, organizationId });
     }
     const ownerMemberId = await resolveActiveMember({
       memberId: dto.ownerMemberId,
@@ -81,10 +81,7 @@ export class IsmsRequirementService {
     const partyFieldProvided = dto.interestedPartyId !== undefined;
     const interestedPartyId = dto.interestedPartyId?.trim() || null;
     if (interestedPartyId) {
-      await this.requirePartyInDocument({
-        interestedPartyId,
-        documentId: requirement.documentId,
-      });
+      await this.requirePartyInOrg({ interestedPartyId, organizationId });
     }
     const ownerMemberId = await resolveActiveMember({
       memberId: dto.ownerMemberId,
@@ -155,21 +152,27 @@ export class IsmsRequirementService {
     return (last?.position ?? -1) + 1;
   }
 
-  /** Ensures a linked interested party belongs to the same document (and org). */
-  private async requirePartyInDocument({
+  /**
+   * Ensures a linked party is in the org's 4.2a Interested Parties Register.
+   * Parties live in that register, not in this (4.2b/c) requirements document.
+   */
+  private async requirePartyInOrg({
     interestedPartyId,
-    documentId,
+    organizationId,
   }: {
     interestedPartyId: string;
-    documentId: string;
+    organizationId: string;
   }) {
     const party = await db.ismsInterestedParty.findFirst({
-      where: { id: interestedPartyId, documentId },
+      where: {
+        id: interestedPartyId,
+        document: { organizationId, type: 'interested_parties_register' },
+      },
       select: { id: true },
     });
     if (!party) {
       throw new BadRequestException(
-        'Interested party does not belong to this document',
+        'Interested party is not in this organization\'s Interested Parties Register',
       );
     }
     return party;

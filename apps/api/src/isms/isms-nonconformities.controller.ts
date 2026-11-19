@@ -24,6 +24,7 @@ import { RequirePermission } from '../auth/require-permission.decorator';
 import { IsmsNonconformityService } from './isms-nonconformity.service';
 import {
   CreateNonconformityDto,
+  ImportNonconformitiesDto,
   UpdateNonconformityDto,
 } from './dto/nonconformity.dto';
 
@@ -62,6 +63,23 @@ export class IsmsNonconformitiesController {
     @OrganizationId() organizationId: string,
   ) {
     return this.service.create({ organizationId, dto });
+  }
+
+  @Post('import')
+  @HttpCode(HttpStatus.CREATED)
+  @RequirePermission('evidence', 'update')
+  @ApiOperation({
+    summary: 'Import ISMS nonconformities',
+    description:
+      'Logs the rows of an existing nonconformity log (for example a CSV export from a spreadsheet) in one go, numbered in order.',
+  })
+  @ApiBody({ type: ImportNonconformitiesDto })
+  @ApiOkResponse({ description: 'Number of nonconformities logged' })
+  async importMany(
+    @Body() dto: ImportNonconformitiesDto,
+    @OrganizationId() organizationId: string,
+  ) {
+    return this.service.importMany({ organizationId, rows: dto.rows });
   }
 
   @Patch(':id')

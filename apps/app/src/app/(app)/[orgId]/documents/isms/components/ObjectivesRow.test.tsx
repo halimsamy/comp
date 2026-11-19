@@ -130,4 +130,26 @@ describe('ObjectivesRow', () => {
     await waitFor(() => expect(screen.getByLabelText('Objective')).toHaveValue(''));
     expect(onSave).not.toHaveBeenCalled();
   });
+
+  it('shows progress from the linked 9.1 metric (#49)', () => {
+    render(
+      <ObjectivesRow
+        objective={makeObjective({
+          metrics: [
+            {
+              id: 'met_1',
+              name: 'Phishing click rate',
+              target: '< 5%',
+              measurements: [{ value: '4%', periodStart: '2026-10-01', provisional: true }],
+            },
+          ],
+        })}
+        canEdit={false}
+        ownerOptions={OWNER_OPTIONS}
+        onSave={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('Phishing click rate: 4% (provisional) · target < 5%')).toBeInTheDocument();
+  });
 });

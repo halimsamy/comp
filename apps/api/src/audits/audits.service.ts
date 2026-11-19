@@ -3,6 +3,7 @@ import { db } from '@db';
 import type { AuthContext } from '../auth/types';
 import { parseDay } from '../attachments/attachment-validity';
 import { getVisibleAudit, visibleAuditsWhere } from './audit-access';
+import { claimPendingAuditorAssignments, normalizeEmails } from './audit-pending-auditors';
 import { summarizeProgress } from './audit-readiness';
 import {
   auditFrameworkSelect,
@@ -31,6 +32,7 @@ const endOfDay = (value: string, field: string) =>
 @Injectable()
 export class AuditsService {
   async list(auth: AuthContext) {
+    await claimPendingAuditorAssignments(auth);
     const audits = await db.auditEngagement.findMany({
       where: visibleAuditsWhere(auth),
       include: auditInclude,
@@ -57,6 +59,7 @@ export class AuditsService {
   }
 
   async get({ auth, auditId }: { auth: AuthContext; auditId: string }) {
+    await claimPendingAuditorAssignments(auth);
     await getVisibleAudit({ auth, auditId });
     const audit = await db.auditEngagement.findFirstOrThrow({
       where: { id: auditId, organizationId: auth.organizationId },
@@ -96,6 +99,7 @@ export class AuditsService {
         periodEnd,
         accessEndsAt: dto.accessEndsAt ? endOfDay(dto.accessEndsAt, 'accessEndsAt') : null,
         auditors: { create: auditorIds.map((memberId) => ({ memberId })) },
+        pendingAuditorEmails: normalizeEmails(dto.pendingAuditorEmails ?? []),
       },
     });
     return this.get({ auth, auditId: audit.id });
@@ -130,6 +134,9 @@ export class AuditsService {
           ...(dto.title !== undefined ? { title: dto.title.trim() } : {}),
           ...(dto.firmName !== undefined ? { firmName: dto.firmName?.trim() || null } : {}),
           ...(dto.status ? { status: dto.status } : {}),
+          ...(dto.pendingAuditorEmails
+            ? { pendingAuditorEmails: normalizeEmails(dto.pendingAuditorEmails) }
+            : {}),
           periodStart,
           periodEnd,
           ...(dto.accessEndsAt !== undefined
@@ -197,6 +204,7 @@ export class AuditsService {
       periodStart: Date;
       periodEnd: Date;
       accessEndsAt: Date | null;
+      pendingAuditorEmails: string[];
       createdAt: Date;
       frameworkInstance: Parameters<typeof frameworkName>[0];
       auditors: Array<{
@@ -217,6 +225,7 @@ export class AuditsService {
       periodStart: audit.periodStart,
       periodEnd: audit.periodEnd,
       accessEndsAt: audit.accessEndsAt,
+      pendingAuditorEmails: audit.pendingAuditorEmails,
       createdAt: audit.createdAt,
       frameworkInstanceId: audit.frameworkInstance.id,
       frameworkName: frameworkName(audit.frameworkInstance),

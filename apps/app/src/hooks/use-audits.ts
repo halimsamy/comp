@@ -1,7 +1,7 @@
 'use client';
 
 import { apiClient } from '@/lib/api-client';
-import useSWR from 'swr';
+import useSWR, { mutate as globalMutate } from 'swr';
 
 export type AuditStatus = 'planned' | 'in_progress' | 'awaiting_report' | 'completed';
 export type AuditReviewStatus = 'accepted' | 'flagged' | 'requested';
@@ -24,6 +24,8 @@ export interface Audit {
   periodStart: string;
   periodEnd: string;
   accessEndsAt: string | null;
+  /** Invited auditors who have not joined yet; assigned on their first visit. */
+  pendingAuditorEmails: string[];
   createdAt: string;
   frameworkInstanceId: string;
   frameworkName: string;
@@ -42,6 +44,7 @@ export interface AuditPayload {
   periodEnd?: string;
   accessEndsAt?: string | null;
   auditorMemberIds?: string[];
+  pendingAuditorEmails?: string[];
 }
 
 export interface AuditRequirement {
@@ -60,6 +63,8 @@ export interface AuditRequirement {
   policies: Array<{ id: string; name: string; status: string }>;
   documents: Array<{ formType: string; slug: string | null; title: string; submissionsInPeriod: number }>;
   readiness: AuditReadiness;
+  /** What keeps the requirement from ready (unfinished tasks, drafts, missing forms). */
+  blockedBy: string[];
   review: {
     status: AuditReviewStatus;
     note: string | null;
@@ -89,7 +94,18 @@ export interface AuditRequest {
   respondedAt: string | null;
   createdAt: string;
   requestedBy: { name: string | null; email: string } | null;
+  /** auditor = raised in the workspace; team = logged from the auditor's request list. */
+  source: 'auditor' | 'team';
+  ownerMemberId: string | null;
   attachments: Array<{ id: string; name: string; createdAt: string }>;
+}
+
+export interface TeamAuditRequestPayload {
+  title: string;
+  description?: string;
+  requirementId?: string;
+  dueDate?: string;
+  ownerMemberId?: string;
 }
 
 export const auditsKey = '/v1/audits';
@@ -189,7 +205,8 @@ export function useAuditComments({
 
   const add = async (content: string) => {
     await unwrap(apiClient.post(`${auditsKey}/${auditId}/comments`, { requirementId, content }));
-    await mutate();
+    // The workspace table shows each requirement's comment count.
+    await Promise.all([mutate(), globalMutate(`${auditsKey}/${auditId}/requirements`)]);
   };
 
   return {
@@ -212,6 +229,12 @@ export function useAuditRequests(auditId: string) {
   }) => {
     await unwrap(apiClient.post(key, payload));
     await mutate();
+  };
+  /** Log requests from the auditor's request list: one ("Add request") or a CSV import. */
+  const createTeam = async (requests: TeamAuditRequestPayload[]) => {
+    const res = await unwrap(apiClient.post<{ count: number }>(`${key}/team`, { requests }));
+    await mutate();
+    return res?.count ?? 0;
   };
   const respond = async ({ id, response }: { id: string; response: string }) => {
     await unwrap(apiClient.patch(`${key}/${id}/response`, { response }));
@@ -237,6 +260,7 @@ export function useAuditRequests(auditId: string) {
     isLoading: isLoading && !data,
     error: error as Error | undefined,
     create,
+    createTeam,
     respond,
     decide,
     upload,

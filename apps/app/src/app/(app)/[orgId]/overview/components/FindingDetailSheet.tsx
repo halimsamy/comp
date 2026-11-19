@@ -245,7 +245,7 @@ export function FindingDetailSheet({
 
   const handleCopyShareLink = async () => {
     if (typeof window === 'undefined') return;
-    const shareUrl = `${window.location.origin}/${organizationId}/overview/findings?open=${finding.id}`;
+    const shareUrl = `${window.location.origin}/${organizationId}/audits?tab=findings&open=${finding.id}`;
     try {
       await navigator.clipboard.writeText(shareUrl);
       toast.success('Link copied — share it with your team');

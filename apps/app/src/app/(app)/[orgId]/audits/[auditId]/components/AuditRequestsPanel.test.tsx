@@ -15,17 +15,21 @@ const request: AuditRequest = {
   createdAt: '2026-11-01T00:00:00.000Z',
   requestedBy: { name: 'Ann Auditor', email: 'ann@cb.com' },
   attachments: [],
+  source: 'auditor',
+  ownerMemberId: null,
 };
 const state = {
   requests: [request],
   isLoading: false,
   error: undefined as Error | undefined,
   create: vi.fn(),
+  createTeam: vi.fn().mockResolvedValue(1),
   respond: vi.fn(),
   decide: vi.fn(),
   upload: vi.fn(),
 };
 vi.mock('@/hooks/use-audits', () => ({ useAuditRequests: () => state }));
+vi.mock('@/hooks/use-organization-members', () => ({ useOrganizationMembers: () => ({ members: [] }) }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 beforeEach(() => {
@@ -48,9 +52,16 @@ describe('AuditRequestsPanel', () => {
     expect(screen.getByRole('button', { name: /Attach file/ })).toBeInTheDocument();
   });
 
+  it('lets the team log the request list the auditor emailed (#109)', () => {
+    render(<AuditRequestsPanel auditId="aud_1" requirements={[]} isAuditor={false} canRespond />);
+    expect(screen.getByRole('button', { name: /Add request/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Import request list/ })).toBeInTheDocument();
+  });
+
   it('is read only without audit:update', () => {
     render(<AuditRequestsPanel auditId="aud_1" requirements={[]} isAuditor={false} canRespond={false} />);
     expect(screen.queryByRole('button', { name: /Send response/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Import request list/ })).not.toBeInTheDocument();
     expect(screen.getByText('Attached the HR export')).toBeInTheDocument();
   });
 

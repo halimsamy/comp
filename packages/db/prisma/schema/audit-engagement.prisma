@@ -15,6 +15,13 @@ enum AuditItemStatus {
   requested
 }
 
+// Who logged the request: the auditor in the workspace, or the team from the
+// auditor's request list (PBC list) received by email.
+enum AuditRequestSource {
+  auditor
+  team
+}
+
 enum AuditRequestStatus {
   open // waiting on the team
   submitted // the team responded; waiting on the auditor
@@ -35,6 +42,9 @@ model AuditEngagement {
   periodEnd           DateTime
   // Auditor-only members lose access after this; a daily job deactivates them.
   accessEndsAt        DateTime?
+  // Auditors invited by email who have not joined yet. On their first visit
+  // after accepting the invitation they are assigned and the email is removed.
+  pendingAuditorEmails String[]             @default([])
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
 
@@ -42,6 +52,7 @@ model AuditEngagement {
   reviews  AuditRequirementReview[]
   comments AuditComment[]
   requests AuditEvidenceRequest[]
+  findings Finding[]
 
   @@index([organizationId])
   @@index([frameworkInstanceId])
@@ -99,6 +110,9 @@ model AuditEvidenceRequest {
   dueDate       DateTime?
   requestedById String?
   requestedBy   Member?            @relation("AuditRequestRequester", fields: [requestedById], references: [id], onDelete: SetNull)
+  source        AuditRequestSource @default(auditor)
+  // Team member who prepares the evidence (plain id, like IsmsObjective.ownerMemberId).
+  ownerMemberId String?
   response      String?            @db.Text
   respondedAt   DateTime?
   createdAt     DateTime           @default(now())

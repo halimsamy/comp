@@ -1,5 +1,17 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsNotEmpty, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
+  IsIn,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+  ValidateNested,
+} from 'class-validator';
 import { DAY } from './audits.dto';
 
 export const REVIEW_STATUSES = ['accepted', 'flagged', 'requested'] as const;
@@ -51,6 +63,26 @@ export class CreateAuditRequestDto {
   @IsOptional()
   @Matches(DAY, { message: 'dueDate must be YYYY-MM-DD' })
   dueDate?: string;
+}
+
+export class TeamAuditRequestDto extends CreateAuditRequestDto {
+  @ApiPropertyOptional({ description: 'Team member who prepares the evidence', example: 'mem_abc123' })
+  @IsOptional()
+  @IsString()
+  ownerMemberId?: string;
+}
+
+export class CreateTeamAuditRequestsDto {
+  @ApiProperty({
+    type: [TeamAuditRequestDto],
+    description: "Requests from the auditor's request list (PBC list), logged by the team",
+  })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(500)
+  @ValidateNested({ each: true })
+  @Type(() => TeamAuditRequestDto)
+  requests: TeamAuditRequestDto[];
 }
 
 export class RespondAuditRequestDto {

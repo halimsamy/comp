@@ -6,12 +6,11 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from '@trycompai/design-system';
 import { Controller, type Control } from 'react-hook-form';
 import type { ApproverOption } from './IsmsApprovalSection';
 import type { RequirementFormValues } from './requirement-schema';
-import { IsmsFieldLabel } from './shared';
+import { IsmsFieldLabel, SelectLabel, optionLabels } from './shared';
 
 const NONE = 'none';
 
@@ -35,7 +34,7 @@ export function RequirementOwnerFields({
               onValueChange={(next) => field.onChange(next === NONE ? '' : next)}
             >
               <SelectTrigger aria-label="Requirement owner">
-                <SelectValue placeholder="Unassigned" />
+                <SelectLabel labels={optionLabels(memberOptions)} placeholder="Unassigned" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={NONE}>Unassigned</SelectItem>

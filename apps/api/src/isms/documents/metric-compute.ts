@@ -4,6 +4,26 @@
  * into a measurement plus a one-line note an auditor can read.
  */
 
+/** measurement.source / metric.dataSource for values Comp AI computes itself. */
+export const COMPUTED_SOURCE = 'computed';
+
+/** Seeded metric keys Comp AI measures from its own data. */
+export const COMPUTED_METRIC_KEYS = [
+  'training_completion',
+  'policy_acknowledgement',
+  'finding_ageing',
+  'risk_treatment_status',
+  'vendor_review_currency',
+  'task_on_time',
+  'vulnerability_remediation',
+] as const;
+
+export type ComputedMetricKey = (typeof COMPUTED_METRIC_KEYS)[number];
+
+export function isComputedMetricKey(key: string | null): key is ComputedMetricKey {
+  return COMPUTED_METRIC_KEYS.some((computed) => computed === key);
+}
+
 export interface ComputedMetricValue {
   value: string;
   note: string;
@@ -146,5 +166,36 @@ export function taskOnTimeRate({
   return {
     value: percent({ part: onTime, total: tasks.length }),
     note: `${onTime} of ${tasks.length} recurring evidence tasks are within their due date.`,
+  };
+}
+
+/**
+ * Critical/High vulnerabilities fixed by their SLA due date (PCI DSS 6.3.3,
+ * 11.3.1). Closed after the due date, or still open past it, counts as missed;
+ * open ones not yet due are not counted either way.
+ */
+export function vulnerabilityRemediationWithinSla({
+  vulnerabilities,
+  now,
+}: {
+  vulnerabilities: Array<{ resolvedAt: Date | null; slaDueAt: Date | null }>;
+  now: Date;
+}): ComputedMetricValue {
+  const dated = vulnerabilities.flatMap(({ resolvedAt, slaDueAt }) =>
+    slaDueAt ? [{ resolvedAt, due: slaDueAt.getTime() }] : [],
+  );
+  const met = dated.filter((row) => row.resolvedAt && row.resolvedAt.getTime() <= row.due).length;
+  const missedOpen = dated.filter((row) => !row.resolvedAt && row.due < now.getTime()).length;
+  const missedClosed = dated.filter((row) => row.resolvedAt && row.resolvedAt.getTime() > row.due).length;
+  const total = met + missedOpen + missedClosed;
+  if (total === 0) {
+    return {
+      value: 'n/a',
+      note: 'No Critical or High vulnerability has reached its SLA due date yet.',
+    };
+  }
+  return {
+    value: percent({ part: met, total }),
+    note: `${met} of ${total} Critical/High vulnerabilities were remediated within SLA; ${missedClosed} closed late and ${missedOpen} are open past their due date.`,
   };
 }

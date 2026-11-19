@@ -33,6 +33,7 @@ function humanizeProvenance(derivedFrom?: string | null): string {
     return name || 'Interested party';
   }
   if (derivedFrom.startsWith('wizard:')) return 'Setup wizard';
+  if (derivedFrom.startsWith('seed:')) return 'Comp AI default';
   const mapped = PROVENANCE_LABELS[derivedFrom];
   if (mapped) return mapped;
   const cleaned = derivedFrom.replace(/[:_-]+/g, ' ').trim();
@@ -40,12 +41,24 @@ function humanizeProvenance(derivedFrom?: string | null): string {
 }
 
 /**
- * The shared provenance pill for an ISMS register entry. Derived rows show their
- * humanized source ("ISO 27001 framework", "Vendor register"); manual rows show
- * "Manual". Rendered as a plain tag-style pill (no icon) meant to sit beneath the
- * entry's description. This is the ONE place this language lives.
+ * The shared provenance pill for an ISMS register entry. Generated rows read
+ * "Generated" (party-derived rows show the party name instead); a generated row
+ * someone changed reads "Edited"; hand-added rows read "Manual". The humanized
+ * source sits in the tooltip, never a raw key like "seed:top_management".
  */
 export function IsmsSourceBadge({ source, derivedFrom }: IsmsSourceBadgeProps) {
-  const label = source === 'manual' ? 'Manual' : humanizeProvenance(derivedFrom);
-  return <Badge variant="secondary">{label}</Badge>;
+  const provenance = derivedFrom ? humanizeProvenance(derivedFrom) : undefined;
+  const label =
+    source === 'manual'
+      ? derivedFrom
+        ? 'Edited'
+        : 'Manual'
+      : derivedFrom?.startsWith('party:')
+        ? (provenance ?? 'Generated')
+        : 'Generated';
+  return (
+    <span title={provenance ? `Source: ${provenance}` : undefined}>
+      <Badge variant="secondary">{label}</Badge>
+    </span>
+  );
 }

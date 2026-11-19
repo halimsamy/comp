@@ -12,18 +12,16 @@ import {
   Text,
 } from '@trycompai/design-system';
 import { Chat } from '@trycompai/design-system/icons';
-import { ITEM_STATUS_LABELS, itemBadgeVariant, itemStatus } from '../../lib/audit-labels';
+import {
+  ITEM_STATUS_LABELS,
+  blockedByLabel,
+  evidenceProgress,
+  itemBadgeVariant,
+  itemStatus,
+  plural,
+} from '../../lib/audit-labels';
 
-const evidenceSummary = (r: AuditRequirement) => {
-  const parts = [
-    r.tasks.length ? `${r.tasks.length} task${r.tasks.length === 1 ? '' : 's'}` : null,
-    r.policies.length ? `${r.policies.length} polic${r.policies.length === 1 ? 'y' : 'ies'}` : null,
-    r.documents.length ? `${r.documents.length} document${r.documents.length === 1 ? '' : 's'}` : null,
-  ].filter(Boolean);
-  return parts.length ? parts.join(' · ') : 'No evidence linked';
-};
-
-/** Requirement rows with evidence counts and the auditor assessment. */
+/** Requirement rows with evidence progress, what blocks them and the auditor assessment. */
 export function RequirementsTable({
   requirements,
   onOpen,
@@ -51,20 +49,30 @@ export function RequirementsTable({
                   <button
                     type="button"
                     onClick={() => onOpen(requirement)}
-                    className="min-w-48 max-w-md rounded-sm text-left outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                    className="block w-full min-w-48 max-w-md whitespace-normal rounded-sm text-left outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50"
                   >
                     <Text size="xs" variant="muted" font="mono">
                       {requirement.identifier || '—'}
                     </Text>
-                    <Text size="sm" weight="medium">
+                    <span className="line-clamp-3 text-sm font-medium" title={requirement.name}>
                       {requirement.name}
-                    </Text>
+                    </span>
                   </button>
                 </TableCell>
                 <TableCell>
-                  <Text size="sm" variant="muted">
-                    {evidenceSummary(requirement)}
-                  </Text>
+                  <div className="min-w-48 max-w-xs whitespace-normal">
+                    <Text size="sm" variant="muted">
+                      {evidenceProgress(requirement)}
+                    </Text>
+                    {status !== 'not_applicable' && blockedByLabel(requirement.blockedBy) ? (
+                      <span
+                        className="line-clamp-2 text-xs text-destructive"
+                        title={requirement.blockedBy.join('\n')}
+                      >
+                        {blockedByLabel(requirement.blockedBy)}
+                      </span>
+                    ) : null}
+                  </div>
                 </TableCell>
                 <TableCell>
                   <Badge variant={itemBadgeVariant(status)}>{ITEM_STATUS_LABELS[status]}</Badge>
@@ -74,9 +82,9 @@ export function RequirementsTable({
                     <span className="inline-flex items-center gap-1 text-muted-foreground">
                       <Chat size={14} />
                       <Text size="xs" variant="muted">
-                        {requirement.commentCount} comments
+                        {plural({ count: requirement.commentCount, word: 'comment' })}
                         {requirement.openRequestCount > 0
-                          ? ` · ${requirement.openRequestCount} open requests`
+                          ? ` · ${plural({ count: requirement.openRequestCount, word: 'open request' })}`
                           : ''}
                       </Text>
                     </span>

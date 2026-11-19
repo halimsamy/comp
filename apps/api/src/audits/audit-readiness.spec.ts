@@ -1,4 +1,9 @@
-import { computeReadiness, summarizeProgress, taskNeedsUpdate } from './audit-readiness';
+import {
+  computeReadiness,
+  readinessBlockers,
+  summarizeProgress,
+  taskNeedsUpdate,
+} from './audit-readiness';
 
 const task = (over: Partial<{ status: string; needsUpdate: boolean }> = {}) => ({
   id: 'tsk_1',
@@ -80,5 +85,33 @@ describe('summarizeProgress', () => {
         ],
       }),
     ).toEqual({ total: 3, accepted: 1, flagged: 1, requested: 0, notReviewed: 1 });
+  });
+});
+
+describe('readinessBlockers (#108)', () => {
+  it('lists what keeps a requirement from ready', () => {
+    expect(
+      readinessBlockers({
+        tasks: [
+          task(),
+          task({ status: 'todo' }),
+          { ...task({ needsUpdate: true }), title: 'Pen test' },
+        ],
+        policies: [
+          { id: 'pol_1', name: 'Access', status: 'published' },
+          { id: 'pol_2', name: 'Backup', status: 'draft' },
+        ],
+        documents: [{ formType: 'meeting', slug: 'meeting', title: 'Meeting', submissionsInPeriod: 0 }],
+      }),
+    ).toEqual([
+      'Pen test (evidence expired)',
+      'Access review',
+      'Backup (not published)',
+      'Meeting (nothing submitted in the period)',
+    ]);
+  });
+
+  it('is empty when everything is in place', () => {
+    expect(readinessBlockers({ tasks: [task()], policies: [], documents: [] })).toEqual([]);
   });
 });

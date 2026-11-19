@@ -164,7 +164,7 @@ describe('RequirementsClient', () => {
 
     expect(screen.getByRole('link', { name: 'ISMS' })).toHaveAttribute(
       'href',
-      '/org-1/documents?tab=iso-27001',
+      '/org-1/documents/isms',
     );
   });
 

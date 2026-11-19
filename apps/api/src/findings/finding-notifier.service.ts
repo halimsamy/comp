@@ -141,7 +141,7 @@ function buildFindingDeepLink(
   organizationId: string,
   findingId: string,
 ): string {
-  return `${getAppUrl()}/${organizationId}/overview/findings?open=${findingId}`;
+  return `${getAppUrl()}/${organizationId}/audits?tab=findings&open=${findingId}`;
 }
 
 @Injectable()

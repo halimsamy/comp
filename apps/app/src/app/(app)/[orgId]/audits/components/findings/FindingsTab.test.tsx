@@ -31,13 +31,13 @@ vi.mock('@/hooks/use-findings-api', async () => {
   };
 });
 
-vi.mock('./CreateFindingSheet', () => ({
+vi.mock('@/app/(app)/[orgId]/overview/components/CreateFindingSheet', () => ({
   CreateFindingSheet: ({ open }: { open: boolean }) => (
     <div data-testid="create-sheet" data-open={open} />
   ),
 }));
 
-vi.mock('./FindingDetailSheet', () => ({
+vi.mock('@/app/(app)/[orgId]/overview/components/FindingDetailSheet', () => ({
   FindingDetailSheet: ({ open }: { open: boolean }) => (
     <div data-testid="detail-sheet" data-open={open} />
   ),

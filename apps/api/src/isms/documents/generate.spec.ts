@@ -29,7 +29,7 @@ const data: IsmsPlatformData = {
 function registerTable() {
   return {
     deleteMany: jest.fn().mockResolvedValue({}),
-    count: jest.fn().mockResolvedValue(2), // two manual rows preserved
+    update: jest.fn().mockResolvedValue({}),
     createMany: jest.fn().mockResolvedValue({}),
     findMany: jest.fn().mockResolvedValue([]),
   };
@@ -58,16 +58,18 @@ const baseArgs = {
 };
 
 describe('runDerivation', () => {
-  it('writes context issues after preserved manual rows', async () => {
+  it('appends new context issues after the existing rows', async () => {
     const tx = buildTx();
+    tx.ismsContextIssue.findMany.mockResolvedValue([
+      { id: 'm1', source: 'manual', derivedFrom: null, position: 0 },
+      { id: 'm2', source: 'manual', derivedFrom: null, position: 1 },
+    ]);
     await runDerivation({
       tx: asTx(tx),
       type: 'context_of_organization',
       ...baseArgs,
     });
-    expect(tx.ismsContextIssue.deleteMany).toHaveBeenCalledWith({
-      where: { documentId: 'doc_1', source: 'derived' },
-    });
+    expect(tx.ismsContextIssue.deleteMany).not.toHaveBeenCalled();
     const created = tx.ismsContextIssue.createMany.mock.calls[0][0].data;
     expect(created[0].position).toBe(2);
   });
@@ -81,7 +83,7 @@ describe('runDerivation', () => {
     });
     expect(tx.ismsInterestedParty.createMany).toHaveBeenCalled();
     const created = tx.ismsInterestedParty.createMany.mock.calls[0][0].data;
-    expect(created[0].position).toBe(2);
+    expect(created[0].position).toBe(0);
   });
 
   it('threads wizard answers into the interested-parties register (CS-438)', async () => {

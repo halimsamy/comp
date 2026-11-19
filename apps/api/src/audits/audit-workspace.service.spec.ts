@@ -27,6 +27,7 @@ jest.mock('../tasks/evidence-export/framework-evidence-mappings', () => ({
 }));
 jest.mock('../tasks/evidence-export/native-artifact-control-map', () => ({
   registersForControlTemplates: () => [],
+  registersForRequirement: () => [],
 }));
 jest.mock('./audit-evidence', () => ({
   loadAuditEvidence: jest.fn().mockResolvedValue({
@@ -78,12 +79,13 @@ describe('AuditWorkspaceService', () => {
     expect(rows[0]).toMatchObject({
       id: 'r1',
       readiness: 'ready',
+      blockedBy: [],
       review: { status: 'accepted', reviewedBy: { name: 'Ann' } },
       commentCount: 2,
       tasks: [{ id: 'tsk_1' }],
       policies: [{ id: 'pol_1' }],
     });
-    expect(rows[1]).toMatchObject({ id: 'r2', readiness: 'not_applicable', review: null });
+    expect(rows[1]).toMatchObject({ id: 'r2', readiness: 'not_applicable', blockedBy: [], review: null });
     expect(mockDb.frameworkInstance.findFirstOrThrow.mock.calls[0][0].where).toEqual({
       id: 'frm_1',
       organizationId: 'org_1',

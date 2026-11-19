@@ -45,6 +45,20 @@ export function computeReadiness({
   return tasksOk && policiesOk && documentsOk ? 'ready' : 'not_ready';
 }
 
+/** What keeps a requirement from "ready", in the order a person fixes it (#108). */
+export function readinessBlockers(evidence: RequirementEvidence): string[] {
+  const { tasks, policies, documents } = evidence;
+  const taskOpen = (t: TaskEvidence) => t.status !== 'done' && t.status !== 'not_relevant';
+  return [
+    ...tasks.filter((t) => t.needsUpdate).map((t) => `${t.title} (evidence expired)`),
+    ...tasks.filter((t) => !t.needsUpdate && taskOpen(t)).map((t) => t.title),
+    ...policies.filter((p) => p.status !== 'published').map((p) => `${p.name} (not published)`),
+    ...documents
+      .filter((d) => d.submissionsInPeriod === 0)
+      .map((d) => `${d.title} (nothing submitted in the period)`),
+  ];
+}
+
 /** A task needs an update when it has dated files and none is still valid. */
 export function taskNeedsUpdate(
   files: Array<{ validUntil: Date | null; validFrom: Date | null }>,

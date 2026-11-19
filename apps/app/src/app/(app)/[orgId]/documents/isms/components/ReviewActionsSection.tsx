@@ -13,7 +13,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
   Stack,
   Table,
   TableBody,
@@ -32,7 +31,7 @@ import {
   reviewActionSchema,
   type ReviewActionFormValues,
 } from './management-review-schema';
-import { IsmsAddCard, IsmsFieldLabel } from './shared';
+import { IsmsAddCard, IsmsFieldLabel, SelectLabel, optionLabels } from './shared';
 
 const NO_OWNER = 'no-owner';
 
@@ -189,7 +188,7 @@ function AddActionForm({
               onValueChange={(next) => field.onChange(next === NO_OWNER ? '' : next)}
             >
               <SelectTrigger aria-label="Action owner">
-                <SelectValue placeholder="Unassigned" />
+                <SelectLabel labels={optionLabels(memberOptions)} placeholder="Unassigned" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={NO_OWNER}>Unassigned</SelectItem>

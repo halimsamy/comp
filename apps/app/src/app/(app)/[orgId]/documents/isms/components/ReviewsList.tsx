@@ -1,12 +1,24 @@
 'use client';
 
-import { Alert, Button, Stack, Text } from '@trycompai/design-system';
+import {
+  Alert,
+  Button,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  Stack,
+  Text,
+} from '@trycompai/design-system';
 import { Add, Events, WarningAlt } from '@trycompai/design-system/icons';
 import { useState } from 'react';
 import type { IsmsManagementReview } from '../isms-types';
 import type { ApproverOption } from './IsmsApprovalSection';
+import { MEETING_TYPES, MEETING_TYPE_LABELS } from './management-review-constants';
 import { ReviewCard, type ReviewHandlers } from './ReviewCard';
-import { IsmsRegisterShell } from './shared';
+import { IsmsRegisterShell, SelectLabel } from './shared';
+
+const ALL = 'all';
 
 interface ReviewsListProps extends ReviewHandlers {
   reviews: IsmsManagementReview[];
@@ -34,6 +46,9 @@ export function ReviewsList({
   ...handlers
 }: ReviewsListProps) {
   const [isCreating, setIsCreating] = useState(false);
+  const [meetingType, setMeetingType] = useState<string>(ALL);
+  const visible =
+    meetingType === ALL ? reviews : reviews.filter((review) => review.meetingType === meetingType);
 
   const handleCreate = async () => {
     setIsCreating(true);
@@ -81,7 +96,29 @@ export function ReviewsList({
         }
       >
         <Stack gap="3">
-          {reviews.map((review) => (
+          {reviews.length > 1 ? (
+            <div className="w-full sm:w-56">
+              <Select value={meetingType} onValueChange={(next) => setMeetingType(next ?? ALL)}>
+                <SelectTrigger aria-label="Filter by meeting">
+                  <SelectLabel labels={{ [ALL]: 'All meetings', ...MEETING_TYPE_LABELS }} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>All meetings</SelectItem>
+                  {MEETING_TYPES.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {MEETING_TYPE_LABELS[type]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
+          {visible.length === 0 ? (
+            <Text size="sm" variant="muted">
+              No reviews of this type yet.
+            </Text>
+          ) : null}
+          {visible.map((review) => (
             <ReviewCard
               key={review.id}
               review={review}

@@ -69,13 +69,13 @@ export const SEED_METRIC_DEFINITIONS: SeedMetricDefinition[] = [
   },
   {
     metricKey: 'vulnerability_remediation',
-    name: 'Critical and High vulnerability remediation time',
+    name: 'Critical and High vulnerabilities remediated within SLA',
     whatIsMeasured:
       'Time from detection to remediation for Critical and High severity vulnerabilities.',
     method:
-      'SAST / SCA findings and tracker SLA timers: days from detection to closure per Critical/High vulnerability.',
+      'Computed by Comp AI from the Vulnerabilities register: share of Critical and High vulnerabilities closed by their remediation SLA due date (open ones past due count as missed).',
     cadence: 'monthly',
-    target: 'Critical within 7 days; High within 30 days',
+    target: '100% within SLA (PCI DSS 6.3.3: critical within one month)',
   },
   {
     metricKey: 'unauthorised_access',

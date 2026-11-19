@@ -16,6 +16,7 @@ function makeReview(
   return {
     id: 'mr_1',
     reference: 'MR-2026-01',
+    meetingType: 'management_review',
     meetingDate: '2026-05-01T00:00:00.000Z',
     recordedAt: '2026-05-01T09:30:00.000Z',
     chairName: 'Raoul Plickat',

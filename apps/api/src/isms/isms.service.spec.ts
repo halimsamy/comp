@@ -299,6 +299,8 @@ describe('IsmsService ensureSetup', () => {
             documentId: 'doc_mon',
             isActive: true,
             cadence: { not: null },
+            // Computed metrics are never "due" (#49).
+            dataSource: { not: 'computed' },
           },
         }),
       );

@@ -8,7 +8,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
   Stack,
   Textarea,
 } from '@trycompai/design-system';
@@ -16,7 +15,7 @@ import { Controller, type Control } from 'react-hook-form';
 import type { ApproverOption } from './IsmsApprovalSection';
 import type { ObjectiveFormValues } from './ObjectivesForm';
 import { OBJECTIVE_STATUSES, OBJECTIVE_STATUS_LABELS } from './objectives-status';
-import { IsmsFieldLabel } from './shared';
+import { IsmsFieldLabel, SelectLabel, optionLabels } from './shared';
 
 interface ObjectivesFormFieldsProps {
   control: Control<ObjectiveFormValues>;
@@ -67,7 +66,7 @@ export function ObjectivesFormFields({ control, ownerOptions }: ObjectivesFormFi
               hasOwnerOptions ? (
                 <Select value={field.value || undefined} onValueChange={field.onChange}>
                   <SelectTrigger aria-label="New objective owner">
-                    <SelectValue placeholder="Select an owner" />
+                    <SelectLabel labels={optionLabels(ownerOptions)} placeholder="Select an owner" />
                   </SelectTrigger>
                   <SelectContent>
                     {ownerOptions.map((option) => (
@@ -131,7 +130,7 @@ export function ObjectivesFormFields({ control, ownerOptions }: ObjectivesFormFi
           render={({ field }) => (
             <Select value={field.value} onValueChange={field.onChange}>
               <SelectTrigger aria-label="New objective status">
-                <SelectValue placeholder="Status" />
+                <SelectLabel labels={OBJECTIVE_STATUS_LABELS} placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
                 {OBJECTIVE_STATUSES.map((status) => (

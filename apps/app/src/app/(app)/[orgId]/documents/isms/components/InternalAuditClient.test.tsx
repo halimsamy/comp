@@ -230,8 +230,10 @@ describe('InternalAuditClient', () => {
     expect(
       screen.getByText('Three of nine metrics have no measurement in 90 days.'),
     ).toBeInTheDocument();
-    // Owner resolved from memberOptions.
+    // Owner resolved from memberOptions; the corrective action is edited in 10.2 (#13).
     expect(screen.getAllByText('Approver Two').length).toBeGreaterThan(0);
+    const editLink = screen.getByRole('link', { name: 'Edit in 10.2' });
+    expect(editLink).toHaveAttribute('href', '/org_1/documents/isms/nonconformities');
   });
 
   it('renders the three sign-off slots with the signed count', () => {

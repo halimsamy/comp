@@ -488,6 +488,10 @@ model IsmsMeasurement {
   // 'manual' in v1; reserved for integration identifiers later.
   source String @default("manual")
 
+  // A mid-period snapshot ("Snapshot now"): the close-of-period job replaces it
+  // with the final value. recordedAt is when it was measured.
+  provisional Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -705,10 +709,22 @@ enum IsmsReviewActionStatus {
 // customer can accept or edit. Manual-first: all values are typed in by the
 // customer, with the same schema shape as Monitoring so later auto-population
 // of the Inputs table needs no schema change.
+// The governance meeting a 9.3 instance records. Board, IT leadership, risk
+// committee and PCI BAU meetings feed the management review (#176).
+enum IsmsMeetingType {
+  management_review
+  board
+  it_leadership
+  risk_committee
+  pci_bau
+}
+
 model IsmsManagementReview {
   id         String       @id @default(dbgenerated("generate_prefixed_cuid('isms_mr'::text)"))
   documentId String
   document   IsmsDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  meetingType IsmsMeetingType @default(management_review)
 
   // Server-generated "MR-YYYY-NN" (year of creation, per-document sequence).
   reference String

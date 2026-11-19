@@ -60,4 +60,24 @@ describe('NonconformitySheet', () => {
     render(<NonconformitySheet {...baseProps} canEdit={false} row={row} onSubmit={vi.fn()} />);
     expect(screen.queryByText('Save')).not.toBeInTheDocument();
   });
+
+  it('shows the owner and status by name, not by id (#38)', () => {
+    render(
+      <NonconformitySheet
+        {...baseProps}
+        row={{ ...row, kind: 'standalone', source: 'incident', ownerMemberId: 'mem_1', status: 'in_progress' }}
+        onSubmit={vi.fn()}
+      />,
+    );
+    expect(screen.getByLabelText('Owner')).toHaveTextContent('Dana');
+    expect(screen.getByLabelText('Owner')).not.toHaveTextContent('mem_1');
+    expect(screen.getByLabelText('Status')).toHaveTextContent('In progress');
+    expect(screen.getByLabelText('Source')).toHaveTextContent('Security incident');
+  });
+
+  it('does not offer External audit as a source for a new entry (#171)', () => {
+    render(<NonconformitySheet {...baseProps} row={null} onSubmit={vi.fn()} />);
+    expect(screen.getByLabelText('Source')).toHaveTextContent('Security incident');
+    expect(screen.queryByText('External audit')).not.toBeInTheDocument();
+  });
 });

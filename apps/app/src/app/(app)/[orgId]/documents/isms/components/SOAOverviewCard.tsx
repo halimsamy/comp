@@ -2,8 +2,8 @@ import { useMemo } from 'react';
 import useSWR from 'swr';
 import { api } from '@/lib/api-client';
 import { usePermissions } from '@/hooks/use-permissions';
-import { IsmsDocumentCard } from '../isms/components/shared';
-import type { IsmsDocumentStatus } from '../isms/isms-types';
+import { IsmsDocumentCard } from './shared';
+import type { IsmsDocumentStatus } from '../isms-types';
 
 const STATEMENT_OF_APPLICABILITY_FORM = {
   type: 'statement-of-applicability',
