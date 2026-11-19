@@ -429,8 +429,16 @@ export class PolicyPdfRendererService {
                 this.checkPageBreak(config);
                 const bullet =
                   node.type === 'bulletList' ? '•' : `${index + 1}.`;
+                // Only the item's own blocks: nested lists render below,
+                // indented, instead of being glued onto this line too.
+                const isList = (n: JSONContent) =>
+                  n.type === 'bulletList' || n.type === 'orderedList';
                 const itemText = this.cleanTextForPDF(
-                  this.extractTextFromContent(item.content),
+                  item.content
+                    .filter((n) => !isList(n))
+                    .map((n) => this.blockText(n))
+                    .filter((t) => t.length > 0)
+                    .join(' '),
                 );
                 const lines = config.doc.splitTextToSize(
                   itemText,
@@ -449,15 +457,16 @@ export class PolicyPdfRendererService {
                   config.yPosition += config.lineHeight;
                 }
 
-                if (
-                  item.content.some(
-                    (n) => n.type === 'bulletList' || n.type === 'orderedList',
-                  )
-                ) {
-                  const nestedLists = item.content.filter(
-                    (n) => n.type === 'bulletList' || n.type === 'orderedList',
-                  );
+                const nestedLists = item.content.filter(isList);
+                if (nestedLists.length > 0) {
+                  const indent = 10;
+                  config.margin += indent;
+                  config.contentWidth -= indent;
                   this.processContent(config, nestedLists);
+                  config.margin -= indent;
+                  config.contentWidth += indent;
+                  // processContent adds a list's trailing gap; keep nested lists tight.
+                  config.yPosition -= config.lineHeight;
                 }
               }
             });

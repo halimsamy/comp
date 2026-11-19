@@ -38,6 +38,7 @@ describe('resolveNativeAccess', () => {
       member: ['read'],
       finding: ['read'],
       audit: ['read'],
+      training: ['read'],
     });
 
     await expect(resolveNativeAccess(base)).resolves.toEqual({
@@ -49,6 +50,13 @@ describe('resolveNativeAccess', () => {
         'devices',
         'offboarding',
         'findings',
+        'access-reviews',
+        'privileged-users',
+        'access-roles',
+        'training-records',
+        'vendor-reviews',
+        'risk-reviews',
+        'risk-treatment-actions',
       ],
       soa: true,
     });
@@ -64,7 +72,7 @@ describe('resolveNativeAccess', () => {
     });
 
     await expect(resolveNativeAccess(base)).resolves.toEqual({
-      registers: ['risks', 'risk-acceptances'],
+      registers: ['risks', 'risk-acceptances', 'risk-reviews', 'risk-treatment-actions'],
       soa: false,
     });
   });
@@ -83,7 +91,7 @@ describe('resolveNativeAccess', () => {
         isServiceToken: true,
         serviceName: 'svc',
       }),
-    ).resolves.toEqual({ registers: ['vendors'], soa: false });
+    ).resolves.toEqual({ registers: ['vendors', 'vendor-reviews'], soa: false });
     await expect(
       resolveNativeAccess({ ...base, isPlatformAdmin: true }),
     ).resolves.toMatchObject({ soa: true });

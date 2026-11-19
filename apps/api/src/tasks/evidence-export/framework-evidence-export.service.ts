@@ -2,19 +2,17 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { db, type EvidenceFormType as DbEvidenceFormType } from '@db';
 import type { Archiver } from 'archiver';
 import { format } from 'date-fns';
-import { toCsvRow } from '../../evidence-forms/evidence-forms-csv';
 import { loadRequirementDefinitions } from '../../frameworks/frameworks-requirements.helper';
 import { PolicyPdfRendererService } from '../../trust-portal/policy-pdf-renderer.service';
-import {
-  appendAttachmentToArchive,
-  createFilenameTracker,
-} from './evidence-attachment-streamer';
+import { createFilenameTracker } from './evidence-attachment-streamer';
 import { sanitizeFilename } from './evidence-pdf-generator';
 import type { OffboardingExportService } from '../../offboarding-checklist/offboarding-export.service';
 import {
   appendFolderNative,
   appendRootNative,
+  buildIndexCsv,
   buildReadme,
+  indexRow,
   NativeIndex,
   type AuditPeriod,
 } from './framework-evidence-native-archive';
@@ -24,22 +22,20 @@ import {
   nativeForFolder,
   type NativeAccess,
 } from './framework-evidence-native';
+import { appendDocumentEvidence, loadDocumentBundle, type DocumentBundle } from './framework-evidence-documents';
+import { buildRequirementReadme, planRequirementFolders, safeSegment } from './framework-evidence-plan';
 import {
-  appendDocumentEvidence,
-  loadDocumentBundle,
-  type DocumentBundle,
-} from './framework-evidence-documents';
-import {
-  buildRequirementReadme,
-  planRequirementFolders,
-  safeSegment,
-} from './framework-evidence-plan';
+  applicabilityBlock,
+  applicabilityFor,
+  buildApplicabilitySummaryCsv,
+  loadApplicability,
+  notApplicableText,
+} from './framework-evidence-applicability';
+import { appendPolicies, loadApprovedPolicies, type ApprovedPolicy } from './framework-evidence-policies';
+import { appendRootRecords } from './framework-evidence-records';
+import { renderApplicabilityWorksheet } from './framework-evidence-worksheets';
 import { loadMappings } from './framework-evidence-mappings';
-import {
-  appendTaskEvidence,
-  loadTaskBundle,
-  type TaskBundle,
-} from './framework-evidence-tasks';
+import { appendTaskEvidence, loadTaskBundle, type TaskBundle } from './framework-evidence-tasks';
 
 export type FrameworkForExport = {
   id: string;
@@ -88,7 +84,8 @@ export class FrameworkEvidenceExportService {
 
   /**
    * Fill `archive` with one folder per framework requirement holding its policies,
-   * tasks, documents and platform records (ISMS documents, SoA, registers). The
+   * tasks, documents and platform records (ISMS documents, SoA, registers), its
+   * applicability, and for an audit the audit trail and evidence requests. The
    * caller owns the archive and finalizes it.
    */
   async populate({
@@ -98,6 +95,7 @@ export class FrameworkEvidenceExportService {
     access = { registers: [], soa: false },
     period = {},
     offboardingExport,
+    auditId,
   }: {
     archive: Archiver;
     organizationId: string;
@@ -107,43 +105,30 @@ export class FrameworkEvidenceExportService {
     period?: AuditPeriod;
     /** Adds every offboarding's evidence files when the offboarding register is included. */
     offboardingExport?: OffboardingExportService;
+    /** An audit of this framework: adds audit-trail.csv and Requests/. */
+    auditId?: string;
   }): Promise<void> {
     const { root } = framework;
-    const natives = await loadNativeArtifacts({
-      organizationId,
-      frameworkId: framework.frameworkId,
-      access,
-    });
-    archive.append(
-      buildReadme({
-        frameworkName: framework.frameworkName,
-        organizationName: framework.organizationName,
-        natives,
-        period,
-      }),
-      { name: `${root}/README.txt` },
-    );
-    const nativeIndex = new NativeIndex();
-    appendRootNative({ archive, root, natives, index: nativeIndex });
-    if (offboardingExport && natives.registers.has('offboarding')) {
-      await offboardingExport.appendAllOffboardings({
-        archive,
-        organizationId,
-        prefix: `${root}/_Platform records/Offboarding evidence/`,
-      });
-    }
-
-    const [requirements, mappings, notRelevant] = await Promise.all([
+    const [natives, requirements, mappings, notRelevant, applicability, audit] = await Promise.all([
+      loadNativeArtifacts({ organizationId, frameworkId: framework.frameworkId, access }),
       loadRequirementDefinitions(framework),
       loadMappings(framework.id),
       db.evidenceFormSetting.findMany({
         where: { organizationId, isNotRelevant: true },
         select: { formType: true },
       }),
+      loadApplicability({ organizationId, frameworkInstanceId: framework.id }),
+      auditId
+        ? db.auditEngagement.findFirst({
+            where: { id: auditId, organizationId, frameworkInstanceId: framework.id },
+            select: { id: true, title: true },
+          })
+        : Promise.resolve(null),
     ]);
     const skippedFormTypes = new Set(notRelevant.map((s) => s.formType));
     const folders = planRequirementFolders({
       requirements,
+      frameworkName: framework.frameworkName,
       mappings: mappings.map((m) => ({
         ...m,
         control: {
@@ -152,45 +137,91 @@ export class FrameworkEvidenceExportService {
         },
       })),
     });
-
-    const policies = await db.policy.findMany({
-      where: {
-        organizationId,
-        id: { in: Array.from(new Set(folders.flatMap((f) => f.policyIds))) },
-      },
-      select: {
-        id: true,
-        name: true,
-        content: true,
-        pdfUrl: true,
-        currentVersion: { select: { content: true, pdfUrl: true } },
-      },
+    const planned = folders.map((folder) => ({
+      folder,
+      applicability: applicabilityFor({
+        folder,
+        frameworkName: framework.frameworkName,
+        byRequirement: applicability.byRequirement,
+      }),
+    }));
+    const policies = await loadApprovedPolicies({
+      organizationId,
+      policyIds: Array.from(new Set(folders.flatMap((f) => f.policyIds))),
     });
-    const policiesById = new Map(policies.map((p) => [p.id, p]));
+
+    archive.append(
+      buildReadme({
+        frameworkName: framework.frameworkName,
+        organizationName: framework.organizationName,
+        natives,
+        period,
+        unapprovedPolicies: policies.unapproved,
+        notApplicable: planned.filter((p) => p.applicability.status === 'not_applicable').length,
+        auditTitle: audit?.title,
+      }),
+      { name: `${root}/README.txt` },
+    );
+    const nativeIndex = new NativeIndex();
+    appendRootNative({ archive, root, natives, index: nativeIndex });
+    await appendRootRecords({
+      archive,
+      root,
+      organizationId,
+      framework,
+      natives,
+      offboardingExport,
+      auditId: audit?.id,
+      requirementLabels: new Map(folders.map((f) => [f.requirement.id, f.folder])),
+    });
 
     // shortcut: rendered PDFs are cached for the whole export (fine for one org's
     // framework); render per folder if policy counts grow enough to pressure memory.
     const renderedPolicies = new Map<string, Buffer>();
+    const renderPolicy = (policy: ApprovedPolicy) => {
+      const cached = renderedPolicies.get(policy.id);
+      if (cached) return cached;
+      const pdf = this.policyPdfRenderer.renderPoliciesPdfBuffer(
+        [{ name: policy.name, content: policy.content, documentControl: policy.documentControl }],
+        framework.organizationName,
+        framework.primaryColor,
+      );
+      renderedPolicies.set(policy.id, pdf);
+      return pdf;
+    };
     const taskBundles = new Map<string, TaskBundle>();
     const documentBundles = new Map<DbEvidenceFormType, DocumentBundle>();
     const indexRows: string[][] = [];
 
-    for (const folder of folders) {
+    for (const { folder, applicability: applies } of planned) {
       const base = `${root}/${folder.folder}`;
-      const folderPolicies = folder.policyIds.flatMap((id) => policiesById.get(id) ?? []);
+      // N/A: the justification is the evidence; nothing else goes in the folder.
+      if (applies.status === 'not_applicable') {
+        archive.append(
+          buildRequirementReadme({
+            folder,
+            frameworkName: framework.frameworkName,
+            applicability: applicabilityBlock(applies),
+            policyNames: [],
+            taskTitles: [],
+            documentTitles: [],
+          }),
+          { name: `${base}/00-requirement.txt` },
+        );
+        archive.append(notApplicableText(applies), { name: `${base}/NOT_APPLICABLE.txt` });
+        indexRows.push(indexRow({ folder, applies, counts: [0, 0, 0, 0, 0] }));
+        continue;
+      }
 
+      const folderPolicies = folder.policyIds.flatMap((id) => policies.approved.get(id) ?? []);
       for (const taskId of folder.taskIds) {
         if (!taskBundles.has(taskId)) {
           taskBundles.set(taskId, await loadTaskBundle({ organizationId, taskId, period }));
         }
       }
       for (const formType of folder.formTypes) {
-        if (!documentBundles.has(formType)) {
-          documentBundles.set(
-            formType,
-            await loadDocumentBundle({ organizationId, formType, period }),
-          );
-        }
+        if (documentBundles.has(formType)) continue;
+        documentBundles.set(formType, await loadDocumentBundle({ organizationId, formType, period }));
       }
       const tasks = folder.taskIds.flatMap((id) => taskBundles.get(id) ?? []);
       const documents = folder.formTypes.flatMap((t) => documentBundles.get(t) ?? []);
@@ -200,39 +231,23 @@ export class FrameworkEvidenceExportService {
         buildRequirementReadme({
           folder,
           frameworkName: framework.frameworkName,
-          policyNames: folderPolicies.map((p) => p.name),
+          applicability: applicabilityBlock(applies),
+          policyNames: folderPolicies.map((p) => `${p.name} (approved v${p.version})`),
           taskTitles: tasks.map((t) => t.title),
           documentTitles: documents.map((d) => d.title),
           nativeTitles: folderNativeTitles(native, natives),
         }),
         { name: `${base}/00-requirement.txt` },
       );
+      const worksheet = renderApplicabilityWorksheet({
+        folder,
+        applicability: applies,
+        controlNames: applicability.controlNames,
+        framework,
+      });
+      if (worksheet) archive.append(worksheet.pdf, { name: `${base}/${worksheet.fileName}` });
 
-      const uniquePolicyName = createFilenameTracker();
-      for (const policy of folderPolicies) {
-        const fileName = uniquePolicyName(`${safeSegment(policy.name)}.pdf`);
-        const uploadedPdf = policy.currentVersion?.pdfUrl || policy.pdfUrl;
-        if (uploadedPdf) {
-          await appendAttachmentToArchive({
-            archive,
-            attachment: { id: policy.id, name: fileName, url: uploadedPdf },
-            folderPath: `${base}/Policies`,
-            uniqueName: (name) => name,
-          });
-          continue;
-        }
-        let pdf = renderedPolicies.get(policy.id);
-        if (!pdf) {
-          pdf = this.policyPdfRenderer.renderPoliciesPdfBuffer(
-            [{ name: policy.name, content: policy.currentVersion?.content ?? policy.content }],
-            framework.organizationName,
-            framework.primaryColor,
-          );
-          renderedPolicies.set(policy.id, pdf);
-        }
-        archive.append(pdf, { name: `${base}/Policies/${fileName}` });
-      }
-
+      await appendPolicies({ archive, folderPath: `${base}/Policies`, policies: folderPolicies, render: renderPolicy });
       const uniqueTaskFolder = createFilenameTracker();
       for (const task of tasks) {
         await appendTaskEvidence({
@@ -248,39 +263,28 @@ export class FrameworkEvidenceExportService {
           folderPath: `${base}/Documents/${safeSegment(document.title)}`,
         });
       }
+      appendFolderNative({ archive, root, folder: folder.folder, native, natives, index: nativeIndex });
 
-      appendFolderNative({
-        archive,
-        root,
-        folder: folder.folder,
-        native,
-        natives,
-        index: nativeIndex,
-      });
-
-      indexRows.push([
-        folder.requirement.identifier,
-        folder.requirement.name,
-        folder.folder,
-        String(folder.controlNames.length),
-        String(folderPolicies.length),
-        String(tasks.length),
-        String(documents.length),
-        String(native.isms.length + (native.soa ? 1 : 0)),
-        String(native.registers.length),
-      ]);
+      indexRows.push(
+        indexRow({
+          folder,
+          applies,
+          counts: [
+            folderPolicies.length,
+            tasks.length,
+            documents.length,
+            native.isms.length + (native.soa ? 1 : 0),
+            native.registers.length,
+          ],
+        }),
+      );
     }
 
-    archive.append(
-      [
-        toCsvRow([
-          'requirement', 'name', 'folder', 'controls', 'policies', 'tasks',
-          'documents', 'isms_documents', 'registers',
-        ]),
-        ...indexRows.map((row) => toCsvRow(row)),
-      ].join('\n'),
-      { name: `${root}/index.csv` },
-    );
+    archive.append(buildIndexCsv(indexRows), { name: `${root}/index.csv` });
+    archive.append(buildApplicabilitySummaryCsv(planned), {
+      name: `${root}/Applicability summary.csv`,
+    });
     archive.append(nativeIndex.toCsv(), { name: `${root}/native-artifacts.csv` });
   }
 }
+

@@ -88,4 +88,20 @@ describe('planRequirementFolders', () => {
 
     expect(folders.map((f) => f.folder)).toEqual(['6.1.3 Planning', '1.1.1 Processes are defined']);
   });
+
+  it('adds the per-requirement registers for ISO 27001 and PCI DSS, not for other frameworks', () => {
+    const plan = (frameworkName: string, identifier: string) =>
+      planRequirementFolders({
+        requirements: [requirement('r1', identifier, 'Requirement')],
+        mappings: [],
+        frameworkName,
+      })[0].registers;
+
+    expect(plan('PCI DSS Level 1', '7.2.4')).toEqual(['access-reviews', 'privileged-users']);
+    expect(plan('ISO 27001', 'A.8.2')).toEqual(['access-reviews', 'privileged-users', 'access-roles']);
+    expect(plan('ISO 27001', '7.2')).toEqual(['training-records']);
+    // ISO clause 7.2 is not PCI section 7.2.
+    expect(plan('PCI DSS Level 1', '7.2')).toEqual([]);
+    expect(plan('SOC 2', 'A.8.2')).toEqual([]);
+  });
 });

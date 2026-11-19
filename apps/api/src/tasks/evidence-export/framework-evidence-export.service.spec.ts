@@ -15,6 +15,8 @@ const mockDb = {
   requirementMap: { findMany: jest.fn() },
   evidenceFormSetting: { findMany: jest.fn() },
   policy: { findMany: jest.fn() },
+  control: { findMany: jest.fn() },
+  auditEngagement: { findFirst: jest.fn() },
 };
 jest.mock('@db', () => ({ db: mockDb }));
 
@@ -57,6 +59,19 @@ jest.mock('./framework-evidence-documents', () => ({
   }) => archive.append(bundle.csv, { name: `${folderPath}/submissions.csv` }),
 }));
 
+const mockListApplicability = jest.fn();
+jest.mock('../../frameworks/applicability/requirement-applicability.service', () => ({
+  RequirementApplicabilityService: jest.fn(() => ({ list: mockListApplicability })),
+}));
+const mockAppendRootRecords = jest.fn();
+jest.mock('./framework-evidence-records', () => ({
+  appendRootRecords: (...args: unknown[]) => mockAppendRootRecords(...args),
+}));
+const mockRenderWorksheet = jest.fn();
+jest.mock('./record-pdf', () => ({
+  renderRecordPdf: (...args: unknown[]) => mockRenderWorksheet(...args),
+}));
+
 const mockLoadNatives = jest.fn();
 jest.mock('../../utils/compliance-filters', () => ({ filterComplianceMembers: jest.fn() }));
 jest.mock('../../soa/soa.service', () => ({ SOAService: jest.fn() }));
@@ -72,52 +87,14 @@ jest.mock('./framework-evidence-native', () => ({
 
 import { FrameworkEvidenceExportService } from './framework-evidence-export.service';
 
-const RISK_MANAGEMENT_TEMPLATE = 'frk_ct_683f484fc7b5506ab97c26af';
-
-function natives(overrides: Record<string, unknown> = {}) {
-  return {
-    isms: [
-      {
-        title: 'Risk Treatment Plan',
-        fileName: 'Risk Treatment Plan v2.pdf',
-        version: 2,
-        requirementId: 'r3',
-        controlIds: new Set<string>(),
-        pdf: Buffer.from('isms'),
-      },
-    ],
-    unpublishedIsms: ['ISMS Scope'],
-    soa: null,
-    registers: new Map([['risks', 'risk-csv']]),
-    omittedRegisters: ['people'],
-    soaOmitted: false,
-    ...overrides,
-  };
-}
-
-const renderer = { renderPoliciesPdfBuffer: jest.fn(() => Buffer.from('policy-pdf')) };
-
-function requirement(id: string, identifier: string, name: string) {
-  return { id, identifier, name, description: '', frameworkId: 'frk_1', customFrameworkId: null, kind: 'platform' };
-}
-
-function mapping(
-  requirementId: string,
-  links: { policyId?: string; taskId?: string; formType?: string; templateId?: string },
-) {
-  return {
-    requirementId,
-    customRequirementId: null,
-    control: {
-      id: `ctl_${requirementId}`,
-      controlTemplateId: links.templateId ?? null,
-      name: `Control ${links.policyId ?? ''}${links.taskId ?? ''}${links.formType ?? ''}`,
-      frameworkPolicyLinks: links.policyId ? [{ policyId: links.policyId }] : [],
-      frameworkTaskLinks: links.taskId ? [{ taskId: links.taskId }] : [],
-      frameworkDocumentLinks: links.formType ? [{ formType: links.formType }] : [],
-    },
-  };
-}
+import {
+  approvedPolicy,
+  mapping,
+  natives,
+  RISK_MANAGEMENT_TEMPLATE,
+  renderer,
+  requirement,
+} from './framework-evidence-export.fixturespec';
 
 describe('FrameworkEvidenceExportService', () => {
   const service = new FrameworkEvidenceExportService(
@@ -147,9 +124,11 @@ describe('FrameworkEvidenceExportService', () => {
       mapping('r2', { formType: 'network_diagram' }),
     ]);
     mockDb.evidenceFormSetting.findMany.mockResolvedValue([{ formType: 'network_diagram' }]);
-    mockDb.policy.findMany.mockResolvedValue([
-      { id: 'pol_1', name: 'Information Security Policy', content: [], pdfUrl: null, currentVersion: null },
-    ]);
+    mockDb.policy.findMany.mockResolvedValue([approvedPolicy()]);
+    mockDb.control.findMany.mockResolvedValue([{ id: 'ctl_x', name: 'Network segmentation' }]);
+    mockDb.auditEngagement.findFirst.mockResolvedValue(null);
+    mockListApplicability.mockResolvedValue({ data: [], count: 0 });
+    mockRenderWorksheet.mockReturnValue(Buffer.from('worksheet'));
     mockLoadTaskBundle.mockResolvedValue({ title: 'Access Review', summaryPdf: Buffer.from('task') });
     mockLoadDocumentBundle.mockResolvedValue({ title: 'RBAC Matrix', csv: 'a,b', files: [] });
     mockLoadNatives.mockResolvedValue(natives());
@@ -176,15 +155,16 @@ describe('FrameworkEvidenceExportService', () => {
       '_Platform records/ISMS/Risk Treatment Plan v2.pdf',
       '_Platform records/Registers/risk-register.csv',
       '1.1.1 Security policies are documented/00-requirement.txt',
-      '1.1.1 Security policies are documented/Policies/Information Security Policy.pdf',
+      '1.1.1 Security policies are documented/Policies/Information Security Policy v3.pdf',
       '1.1.1 Security policies are documented/Tasks/Access Review/00-summary.pdf',
       '2.1.1 Secure configuration/00-requirement.txt',
-      '2.1.1 Secure configuration/Policies/Information Security Policy.pdf',
+      '2.1.1 Secure configuration/Policies/Information Security Policy v3.pdf',
       '2.1.1 Secure configuration/Documents/RBAC Matrix/submissions.csv',
       '2.1.1 Secure configuration/Registers/risk-register.csv',
       '3.1 Nothing mapped yet/00-requirement.txt',
       '3.1 Nothing mapped yet/ISMS/Risk Treatment Plan v2.pdf',
       'index.csv',
+      'Applicability summary.csv',
       'native-artifacts.csv',
     ]);
   });
@@ -203,7 +183,9 @@ describe('FrameworkEvidenceExportService', () => {
 
   it('streams an uploaded policy PDF instead of rendering it', async () => {
     mockDb.policy.findMany.mockResolvedValue([
-      { id: 'pol_1', name: 'Information Security Policy', content: [], pdfUrl: 'org_1/policy.pdf', currentVersion: null },
+      approvedPolicy({
+        versions: [{ ...approvedPolicy().versions[0], pdfUrl: 'org_1/policy.pdf' }],
+      }),
     ]);
 
     await exportNames();
@@ -211,7 +193,7 @@ describe('FrameworkEvidenceExportService', () => {
     expect(renderer.renderPoliciesPdfBuffer).not.toHaveBeenCalled();
     expect(mockAppendAttachment).toHaveBeenCalledWith(
       expect.objectContaining({
-        attachment: { id: 'pol_1', name: 'Information Security Policy.pdf', url: 'org_1/policy.pdf' },
+        attachment: { id: 'pol_1', name: 'Information Security Policy v3.pdf', url: 'org_1/policy.pdf' },
       }),
     );
   });
@@ -221,10 +203,10 @@ describe('FrameworkEvidenceExportService', () => {
 
     const index = appendCalls.find((call) => call.name.endsWith('/index.csv'));
     expect(String(index?.source).split('\n')).toEqual([
-      '"requirement","name","folder","controls","policies","tasks","documents","isms_documents","registers"',
-      '"1.1.1","Security policies are documented.","1.1.1 Security policies are documented","1","1","1","0","0","0"',
-      '"2.1.1","Secure configuration","2.1.1 Secure configuration","2","1","0","1","0","1"',
-      '"3.1","Nothing mapped yet","3.1 Nothing mapped yet","0","0","0","0","1","0"',
+      '"requirement","name","folder","controls","policies","tasks","documents","isms_documents","registers","applicability","justification","set_by","set_at"',
+      '"1.1.1","Security policies are documented.","1.1.1 Security policies are documented","1","1","1","0","0","0","Applicable","","",""',
+      '"2.1.1","Secure configuration","2.1.1 Secure configuration","2","1","0","1","0","1","Applicable","","",""',
+      '"3.1","Nothing mapped yet","3.1 Nothing mapped yet","0","0","0","0","1","0","Applicable","","",""',
     ]);
   });
 
@@ -265,7 +247,7 @@ describe('FrameworkEvidenceExportService', () => {
     expect(readme).toContain('  - People population');
   });
 
-  it('puts the SoA in the 6.1.3 folder and appends offboarding evidence when allowed', async () => {
+  it('puts the SoA in the 6.1.3 folder and hands offboarding evidence to the root records', async () => {
     mockLoadRequirements.mockResolvedValue([requirement('r9', '6.1.3', 'Risk treatment')]);
     mockLoadNatives.mockResolvedValue(
       natives({
@@ -289,11 +271,8 @@ describe('FrameworkEvidenceExportService', () => {
     const names = appendCalls.map((c) => c.name.split('/').slice(1).join('/'));
     expect(names).toContain('_Platform records/ISMS/Statement of Applicability v1.pdf');
     expect(names).toContain('6.1.3 Risk treatment/ISMS/Statement of Applicability v1.pdf');
-    expect(offboardingExport.appendAllOffboardings).toHaveBeenCalledWith(
-      expect.objectContaining({
-        organizationId: 'org_1',
-        prefix: expect.stringMatching(/_Platform records\/Offboarding evidence\/$/),
-      }),
+    expect(mockAppendRootRecords).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: 'org_1', offboardingExport, auditId: undefined }),
     );
   });
 

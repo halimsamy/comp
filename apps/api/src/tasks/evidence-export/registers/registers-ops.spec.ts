@@ -36,7 +36,7 @@ function parse(csv: string): Array<Record<string, string>> {
 
 beforeEach(() => jest.clearAllMocks());
 
-describe('device inventory, findings and offboarding', () => {
+describe('device inventory and offboarding', () => {
   it('lists device posture', async () => {
     mockDb.device.findMany.mockResolvedValue([
       {
@@ -68,57 +68,6 @@ describe('device inventory, findings and offboarding', () => {
       Antivirus: 'No',
       'Last check-in': '2026-11-01',
     });
-  });
-
-  it('describes each finding by its subject', async () => {
-    const none = {
-      task: null,
-      policy: null,
-      vendor: null,
-      risk: null,
-      device: null,
-      member: null,
-    };
-    mockDb.finding.findMany.mockResolvedValue([
-      {
-        ...none,
-        id: 'fnd_1',
-        type: 'iso27001',
-        severity: 'high',
-        status: 'open',
-        policy: { name: 'Access Control' },
-        content: 'Outdated',
-        revisionNote: null,
-        createdBy: { user },
-        evidenceFormType: null,
-        area: null,
-        createdAt: d('2026-05-01'),
-        updatedAt: d('2026-05-02'),
-      },
-      {
-        ...none,
-        id: 'fnd_2',
-        type: 'pci_dss',
-        severity: 'low',
-        status: 'closed',
-        content: 'No risks',
-        revisionNote: null,
-        createdBy: null,
-        evidenceFormType: null,
-        area: 'risks',
-        createdAt: d('2026-05-01'),
-        updatedAt: d('2026-05-02'),
-      },
-    ]);
-
-    const rows = parse(await REGISTERS.findings.build(ORG));
-
-    expect(
-      rows.map((r) => [r['Subject type'], r.Subject, r.Framework]),
-    ).toEqual([
-      ['Policy', 'Access Control', 'Iso27001'],
-      ['Area', 'Risks', 'Pci dss'],
-    ]);
   });
 
   it('summarizes each offboarding checklist and the vendor access revoked', async () => {

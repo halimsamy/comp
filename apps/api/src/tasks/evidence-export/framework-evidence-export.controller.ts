@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Body,
+  ForbiddenException,
   Controller,
   Param,
   Post,
@@ -16,6 +17,7 @@ import {
 } from '@nestjs/swagger';
 import { tasks } from '@trycompai/jobs';
 import { AuditRead } from '../../audit/skip-audit-log.decorator';
+import { getVisibleAudit } from '../../audits/audit-access';
 import { AuthContext, OrganizationId } from '../../auth/auth-context.decorator';
 import { HybridAuthGuard } from '../../auth/hybrid-auth.guard';
 import { PermissionGuard } from '../../auth/permission.guard';
@@ -45,7 +47,7 @@ export class FrameworkEvidenceExportController {
   @ApiOperation({
     summary: 'Export framework evidence as ZIP',
     description:
-      'Starts a job building a ZIP with one folder per requirement: policies, tasks, documents, ISMS documents, SoA and registers. Optional audit period. Poll GET /v1/job-runs/:runId for the download URL.',
+      'Starts a job building a ZIP with one folder per requirement: applicability, approved policies, tasks, documents, ISMS documents, SoA and registers, plus vendor documents and risk review PDFs. Optional audit period and audit engagement (adds the audit trail and evidence requests). Poll GET /v1/job-runs/:runId for the download URL; session users are also emailed the link.',
   })
   @ApiParam({
     name: 'frameworkInstanceId',
@@ -54,7 +56,8 @@ export class FrameworkEvidenceExportController {
   })
   @ApiBody({ type: ExportFrameworkEvidenceDto, required: false })
   @ApiResponse({ status: 201, description: 'Export job started' })
-  @ApiResponse({ status: 400, description: 'Invalid audit period' })
+  @ApiResponse({ status: 400, description: 'Invalid audit period, or the audit is for another framework' })
+  @ApiResponse({ status: 403, description: 'Audit export without audit read access' })
   @ApiResponse({ status: 404, description: 'Framework not found' })
   async exportFrameworkEvidence(
     @OrganizationId() organizationId: string,
@@ -81,14 +84,31 @@ export class FrameworkEvidenceExportController {
     // Registers and the SoA need their own read permissions; without them
     // the export still runs and the README says what was left out.
     const access = await resolveNativeAccess(authContext);
+    const auditId = body?.auditId;
+    if (auditId) {
+      // The SoA flag is audit read; the audit trail and requests need it too.
+      if (!access.soa) throw new ForbiddenException('Exporting an audit requires audit read access');
+      const audit = await getVisibleAudit({ auth: authContext, auditId });
+      if (audit.frameworkInstanceId !== frameworkInstanceId) {
+        throw new BadRequestException('This audit is for another framework');
+      }
+    }
     const handle = await tasks.trigger(
       'export-framework-evidence',
-      { organizationId, frameworkInstanceId, access, period },
+      {
+        organizationId,
+        frameworkInstanceId,
+        access,
+        period,
+        auditId,
+        // Session callers get the download link by email; API keys poll the run.
+        notifyEmail: authContext.userEmail,
+      },
       {
         concurrencyKey: organizationId,
         // Collapse double-clicks into one run; short so a failed run can be retried soon.
         // Keyed by access too, so a caller never gets a run built with someone else's permissions.
-        idempotencyKey: `framework-evidence-export:${frameworkInstanceId}:${body?.from ?? ''}:${body?.to ?? ''}:${access.registers.join(',')}:${access.soa}`,
+        idempotencyKey: `framework-evidence-export:${frameworkInstanceId}:${body?.from ?? ''}:${body?.to ?? ''}:${auditId ?? ''}:${authContext.userId ?? ''}:${access.registers.join(',')}:${access.soa}`,
         idempotencyKeyTTL: '2m',
       },
     );

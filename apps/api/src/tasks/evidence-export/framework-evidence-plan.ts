@@ -1,6 +1,9 @@
 import type { EvidenceFormType as DbEvidenceFormType } from '@db';
 import type { RequirementDef } from '../../frameworks/frameworks-requirements.helper';
-import { registersForControlTemplates } from './native-artifact-control-map';
+import {
+  registersForControlTemplates,
+  registersForRequirement,
+} from './native-artifact-control-map';
 import type { RegisterKey } from './registers/registers';
 
 export type MappedControl = {
@@ -46,9 +49,12 @@ const unique = <T>(values: T[]): T[] => Array.from(new Set(values));
 export function planRequirementFolders({
   requirements,
   mappings,
+  frameworkName,
 }: {
   requirements: RequirementDef[];
   mappings: MappedControl[];
+  /** Enables the per-requirement register map (ISO 27001 / PCI DSS). */
+  frameworkName?: string;
 }): RequirementFolder[] {
   const usedFolders = new Set<string>();
 
@@ -78,7 +84,10 @@ export function planRequirementFolders({
       policyIds: unique(controls.flatMap((c) => c.policyIds)),
       taskIds: unique(controls.flatMap((c) => c.taskIds)),
       formTypes: unique(controls.flatMap((c) => c.formTypes)),
-      registers: registersForControlTemplates(controls.map((c) => c.controlTemplateId)),
+      registers: unique([
+        ...registersForControlTemplates(controls.map((c) => c.controlTemplateId)),
+        ...registersForRequirement({ frameworkName, identifier: requirement.identifier }),
+      ]),
     };
   });
 }
@@ -90,8 +99,11 @@ export function buildRequirementReadme({
   taskTitles,
   documentTitles,
   nativeTitles = [],
+  applicability = [],
 }: {
   folder: RequirementFolder;
+  /** The "Applicability:" block (status, justification, set by/at). */
+  applicability?: string[];
   frameworkName: string;
   policyNames: string[];
   taskTitles: string[];
@@ -109,6 +121,7 @@ export function buildRequirementReadme({
     `Name: ${requirement.name}`,
     `Description: ${requirement.description || '-'}`,
     '',
+    ...applicability,
     'Mapped controls:',
     ...list(controlNames),
     '',

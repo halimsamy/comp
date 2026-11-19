@@ -1,6 +1,16 @@
-import { Controller, Get, Header, Res, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Header,
+  NotFoundException,
+  Param,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
+import { db } from '@db';
 import {
   ApiOperation,
+  ApiParam,
   ApiProduces,
   ApiResponse,
   ApiSecurity,
@@ -13,6 +23,7 @@ import { HybridAuthGuard } from '../../../auth/hybrid-auth.guard';
 import { PermissionGuard } from '../../../auth/permission.guard';
 import { RequirePermission } from '../../../auth/require-permission.decorator';
 import { datedFileName, REGISTERS, type RegisterKey } from './registers';
+import { buildRiskReviewSnapshotCsv } from './risk-review-register';
 
 /**
  * CSV snapshots of the platform registers an auditor samples from. Each
@@ -200,5 +211,35 @@ export class RegisterExportsController {
     @Res() res: Response,
   ) {
     await this.send({ key: 'vulnerabilities', organizationId, res });
+  }
+
+  @Get('risk-reviews/:id')
+  @RequirePermission('risk', 'read')
+  @AuditRead()
+  @Header('Content-Type', 'text/csv; charset=utf-8')
+  @ApiProduces('text/csv')
+  @ApiOperation({
+    summary: 'Export one risk review as CSV',
+    description:
+      'Download the risk register as frozen when a periodic risk review was signed off (levels, owner, treatment, acceptance, open actions). Evidence for ISO 27001 clause 8.2.',
+  })
+  @ApiParam({ name: 'id', description: 'Risk review id', example: 'rskrv_abc123' })
+  @ApiResponse({ status: 200, description: 'Risk review snapshot CSV' })
+  @ApiResponse({ status: 404, description: 'Risk review not found' })
+  async exportRiskReview(
+    @OrganizationId() organizationId: string,
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
+    const review = await db.riskReview.findFirst({
+      where: { id, organizationId },
+      select: { createdAt: true, snapshot: true },
+    });
+    if (!review) throw new NotFoundException('Risk review not found');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="risk-review-${review.createdAt.toISOString().slice(0, 10)}.csv"`,
+    );
+    res.send(buildRiskReviewSnapshotCsv(review.snapshot));
   }
 }

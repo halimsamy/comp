@@ -44,6 +44,62 @@ export const REGISTERS_BY_CONTROL_TEMPLATE: Record<string, RegisterKey[]> = {
   frk_ct_683f4f59dea367ca96145e14: ['findings'],
 };
 
+/**
+ * Registers that evidence one specific requirement, by framework family and
+ * requirement identifier. Used where a control template maps too broadly
+ * (e.g. Access Rights covers ~30 PCI requirements; the access review only
+ * evidences the periodic-review ones).
+ */
+export const REGISTERS_BY_REQUIREMENT: Record<FrameworkFamily, Record<string, RegisterKey[]>> = {
+  iso27001: {
+    '6.1.2': ['risk-reviews'],
+    '6.1.3': ['risk-treatment-actions'],
+    '7.2': ['training-records'],
+    '7.3': ['training-records'],
+    '8.2': ['risk-reviews'],
+    '8.3': ['risk-treatment-actions'],
+    '10.2': ['findings'],
+    'A.5.15': ['access-reviews', 'access-roles'],
+    'A.5.18': ['access-reviews'],
+    'A.5.22': ['vendor-reviews'],
+    'A.6.3': ['training-records'],
+    'A.8.2': ['access-reviews', 'privileged-users', 'access-roles'],
+  },
+  pci: {
+    '7.2.1': ['access-roles'],
+    '7.2.2': ['access-roles', 'privileged-users'],
+    '7.2.3': ['access-roles'],
+    '7.2.4': ['access-reviews', 'privileged-users'],
+    '7.2.5.1': ['access-reviews'],
+    '8.2.6': ['access-reviews'],
+    '12.6.3': ['training-records'],
+    '12.6.3.1': ['training-records'],
+    '12.6.3.2': ['training-records'],
+    '12.8.4': ['vendor-reviews'],
+    '12.8.5': ['vendor-reviews'],
+  },
+};
+
+export type FrameworkFamily = 'iso27001' | 'pci';
+
+export function frameworkFamily(frameworkName: string | null | undefined): FrameworkFamily | null {
+  if (!frameworkName) return null;
+  if (/iso\s*\/?\s*(iec\s*)?27001/i.test(frameworkName)) return 'iso27001';
+  if (/pci/i.test(frameworkName)) return 'pci';
+  return null;
+}
+
+export function registersForRequirement({
+  frameworkName,
+  identifier,
+}: {
+  frameworkName: string | null | undefined;
+  identifier: string;
+}): RegisterKey[] {
+  const family = frameworkFamily(frameworkName);
+  return family ? (REGISTERS_BY_REQUIREMENT[family][identifier.trim()] ?? []) : [];
+}
+
 /** ISO 27001 clause whose folder also carries the Statement of Applicability. */
 export const SOA_REQUIREMENT_IDENTIFIER = '6.1.3';
 

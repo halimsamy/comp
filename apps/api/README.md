@@ -29,6 +29,8 @@
 
 - Security penetration tests integration:
   - `src/security-penetration-tests/README.md`
+- Evidence export ZIP (layout, S3 lifecycle rule for `exports/`):
+  - `src/tasks/evidence-export/README.md`
 
 ## Project setup
 

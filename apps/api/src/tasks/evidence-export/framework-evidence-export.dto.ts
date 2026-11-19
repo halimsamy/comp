@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, Matches } from 'class-validator';
+import { IsOptional, IsString, Matches, MaxLength } from 'class-validator';
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -21,6 +21,25 @@ export class ExportFrameworkEvidenceDto {
   @IsOptional()
   @Matches(DAY, { message: 'to must be a date in YYYY-MM-DD format' })
   to?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'An audit engagement of this framework. Adds audit-trail.csv (readiness, auditor decisions, comments) and Requests/ (evidence requests with responses and files). Requires audit read.',
+    example: 'aud_abc123',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  auditId?: string;
+}
+
+/** "2026-01-01_to_2026-12-31", "from_2026-01-01", "to_2026-12-31" or "all-time" (download filename). */
+export function periodSlug({ from, to }: { from?: string; to?: string }): string {
+  const day = (v?: string) => v?.slice(0, 10);
+  if (from && to) return `${day(from)}_to_${day(to)}`;
+  if (from) return `from_${day(from)}`;
+  if (to) return `to_${day(to)}`;
+  return 'all-time';
 }
 
 /** Day bounds of an audit period as ISO timestamps (UTC, inclusive). */
@@ -32,4 +51,22 @@ export function toPeriodBounds({ from, to }: ExportFrameworkEvidenceDto): {
     ...(from ? { from: `${from}T00:00:00.000Z` } : {}),
     ...(to ? { to: `${to}T23:59:59.999Z` } : {}),
   };
+}
+
+/**
+ * One object per run, so two exports (another period, another user's
+ * permissions) never overwrite each other's download. Storage stays bounded by
+ * an S3 lifecycle rule expiring `<org>/exports/` after 2 days (see README.md
+ * in this folder).
+ */
+export function frameworkExportKey({
+  organizationId,
+  frameworkInstanceId,
+  runId,
+}: {
+  organizationId: string;
+  frameworkInstanceId: string;
+  runId: string;
+}): string {
+  return `${organizationId}/exports/framework-evidence-${frameworkInstanceId}-${runId}.zip`;
 }

@@ -1,9 +1,11 @@
 'use client';
 
 import { useRiskReview, type RiskReviewDetail } from '@/hooks/use-risk-workspace';
+import { downloadRiskReviewCsv } from '@/lib/evidence-download';
 import { LEVEL_LABEL } from '@/lib/risk-score';
 import {
   Badge,
+  Button,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -18,6 +20,9 @@ import {
   TableRow,
   Text,
 } from '@trycompai/design-system';
+import { Download } from '@trycompai/design-system/icons';
+import { useState } from 'react';
+import { toast } from 'sonner';
 import { TRIGGER_LABEL } from './RecordRiskReviewSheet';
 import { formatDay } from './workspace-types';
 
@@ -40,6 +45,19 @@ export function RiskReviewDetailDialog({
 }) {
   const { review, error, isLoading } = useRiskReview(reviewId);
   const snapshot = review?.snapshot;
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownload = async () => {
+    if (!reviewId) return;
+    setIsDownloading(true);
+    try {
+      await downloadRiskReviewCsv(reviewId);
+    } catch {
+      toast.error("Couldn't download this review. Please try again.");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   return (
     <Dialog open={reviewId !== null} onOpenChange={onOpenChange}>
@@ -80,6 +98,17 @@ export function RiskReviewDetailDialog({
                   <dd>{formatDay(review.nextReviewDue)}</dd>
                 </div>
               </dl>
+              <div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  iconLeft={<Download size={14} />}
+                  loading={isDownloading}
+                  onClick={() => void handleDownload()}
+                >
+                  Download CSV
+                </Button>
+              </div>
               {review.notes && <p className="whitespace-pre-wrap text-sm">{review.notes}</p>}
               <Table>
                 <TableHeader>

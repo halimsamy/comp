@@ -1,8 +1,8 @@
 'use client';
 
-import { useJobRun } from '@/hooks/use-job-run';
+import { ExportEvidenceDialog } from '@/components/evidence-export/ExportEvidenceDialog';
+import { useEvidenceExport } from '@/hooks/use-evidence-export';
 import { usePermissions } from '@/hooks/use-permissions';
-import { startFileDownload, triggerFrameworkEvidenceExport } from '@/lib/evidence-download';
 import { Button } from '@trycompai/design-system';
 import { Download, Edit, OverflowMenuVertical, TrashCan } from '@trycompai/design-system/icons';
 import {
@@ -11,9 +11,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@trycompai/ui/dropdown-menu';
-import { useEffect, useState } from 'react';
-import { toast } from 'sonner';
-import { FrameworkExportDialog, type ExportPeriod } from './FrameworkExportDialog';
+import { useState } from 'react';
 
 export function FrameworkActionsMenu({
   frameworkInstanceId,
@@ -36,55 +34,9 @@ export function FrameworkActionsMenu({
   // The ZIP bundles policies and evidence, so the API requires read on both.
   const canExport = hasPermission('evidence', 'read') && hasPermission('policy', 'read');
 
-  // The ZIP is built by a background job into storage; the browser then downloads
-  // it from there (known size, resumable) once the run finishes.
-  const [exportRunId, setExportRunId] = useState<string | null>(null);
-  const toastId = `framework-evidence-export-${frameworkInstanceId}`;
-  const failExport = () => {
-    setExportRunId(null);
-    toast.error('Evidence export failed. Please try again.', { id: toastId });
-  };
-
-  const { error: runError } = useJobRun<{ downloadUrl?: string }>(exportRunId, {
-    enabled: exportRunId !== null,
-    onComplete: (run) => {
-      const downloadUrl = run.output?.downloadUrl;
-      if (run.status !== 'COMPLETED' || !downloadUrl) return failExport();
-      setExportRunId(null);
-      startFileDownload(downloadUrl);
-      // The action covers browsers that block a download not started by a click.
-      toast.success(`${frameworkName} evidence ZIP is ready. Your download should start now.`, {
-        id: toastId,
-        duration: 60_000,
-        action: { label: 'Download', onClick: () => startFileDownload(downloadUrl) },
-      });
-    },
-  });
-
-  // The run can no longer be read (e.g. 404): stop waiting for it.
-  useEffect(() => {
-    if (runError && exportRunId !== null) failExport();
-  });
+  const { startExport, isExporting } = useEvidenceExport();
 
   if (!canEdit && !canDelete && !canExport) return null;
-
-  const handleExport = async (period: ExportPeriod) => {
-    setIsExportDialogOpen(false);
-    toast.loading(
-      `Preparing the ${frameworkName} evidence ZIP. Keep this page open; the download starts when it is ready.`,
-      { id: toastId, duration: Infinity },
-    );
-    try {
-      const { runId } = await triggerFrameworkEvidenceExport({
-        frameworkInstanceId,
-        from: period.from || undefined,
-        to: period.to || undefined,
-      });
-      setExportRunId(runId);
-    } catch {
-      failExport();
-    }
-  };
 
   return (
     <>
@@ -110,12 +62,14 @@ export function FrameworkActionsMenu({
             <DropdownMenuItem
               onClick={() => {
                 setOpen(false);
-                setIsExportDialogOpen(true);
+                // Open after the menu has closed and released focus, or the dialog
+                // opens under the menu's pointer-events lock.
+                setTimeout(() => setIsExportDialogOpen(true), 0);
               }}
-              disabled={exportRunId !== null}
+              disabled={isExporting}
             >
               <Download size={16} className="mr-2" />
-              {exportRunId !== null ? 'Preparing export…' : 'Export all evidences'}
+              {isExporting ? 'Preparing export…' : 'Export evidence'}
             </DropdownMenuItem>
           )}
           {canDelete && (
@@ -132,11 +86,14 @@ export function FrameworkActionsMenu({
           )}
         </DropdownMenuContent>
       </DropdownMenu>
-      <FrameworkExportDialog
+      <ExportEvidenceDialog
         open={isExportDialogOpen}
         onOpenChange={setIsExportDialogOpen}
-        frameworkName={frameworkName}
-        onExport={handleExport}
+        frameworks={[{ id: frameworkInstanceId, name: frameworkName }]}
+        onExport={(values) => {
+          setIsExportDialogOpen(false);
+          void startExport(values);
+        }}
       />
     </>
   );

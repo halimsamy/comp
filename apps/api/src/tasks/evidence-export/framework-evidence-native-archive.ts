@@ -1,9 +1,15 @@
 import type { Archiver } from 'archiver';
 import { toCsvRow } from '../../evidence-forms/evidence-forms-csv';
+import {
+  APPLICABILITY_HEADERS,
+  applicabilityColumns,
+  type Applicability,
+} from './framework-evidence-applicability';
 import type {
   FolderNative,
   NativeArtifacts,
 } from './framework-evidence-native';
+import type { RequirementFolder } from './framework-evidence-plan';
 import { REGISTERS } from './registers/registers';
 
 export type AuditPeriod = { from?: Date; to?: Date };
@@ -132,16 +138,54 @@ export function appendRootNative({
   });
 }
 
+/** One index.csv row: counts are policies, tasks, documents, ISMS documents, registers. */
+export function indexRow({
+  folder,
+  applies,
+  counts,
+}: {
+  folder: RequirementFolder;
+  applies: Applicability;
+  counts: [number, number, number, number, number];
+}): string[] {
+  return [
+    folder.requirement.identifier,
+    folder.requirement.name,
+    folder.folder,
+    String(folder.controlNames.length),
+    ...counts.map(String),
+    ...applicabilityColumns(applies),
+  ];
+}
+
+export function buildIndexCsv(rows: string[][]): string {
+  return [
+    toCsvRow([
+      'requirement', 'name', 'folder', 'controls', 'policies', 'tasks',
+      'documents', 'isms_documents', 'registers', ...APPLICABILITY_HEADERS,
+    ]),
+    ...rows.map((row) => toCsvRow(row)),
+  ].join('\n');
+}
+
 export function buildReadme({
   frameworkName,
   organizationName,
   natives,
   period,
+  unapprovedPolicies = [],
+  notApplicable = 0,
+  auditTitle,
 }: {
   frameworkName: string;
   organizationName: string;
   natives: NativeArtifacts;
   period: AuditPeriod;
+  /** Mapped policies with no approved version (left out). */
+  unapprovedPolicies?: string[];
+  /** Requirements marked not applicable. */
+  notApplicable?: number;
+  auditTitle?: string;
 }): string {
   const day = (d?: Date) => (d ? d.toISOString().slice(0, 10) : '');
   const periodLine =
@@ -158,8 +202,30 @@ export function buildReadme({
     '(Documents/), published ISMS documents and the SoA (ISMS/) and platform registers',
     '(Registers/). "_Platform records/" holds one copy of every register and ISMS',
     'document; native-artifacts.csv lists where each one was placed.',
-    'Rejected document submissions are never exported.',
+    'Rejected document submissions are never exported. Policies are exported at their',
+    'last approved version, with a document-control header.',
+    '',
+    'Applicability: index.csv and "Applicability summary.csv" give each requirement\'s',
+    'applicability, justification, who set it and when. A not-applicable folder holds',
+    'only 00-requirement.txt and NOT_APPLICABLE.txt. Requirements met with compensating',
+    'controls carry "CCW - <requirement>.pdf" (PCI DSS Appendix C).',
+    `Requirements marked not applicable: ${notApplicable}.`,
+    '',
+    'Vendors/ holds each vendor\'s latest documents and AI report summaries; Risk reviews/',
+    'holds the register as frozen at each periodic review.',
   ];
+  if (auditTitle) {
+    lines.push(
+      '',
+      `Audit: ${auditTitle}. audit-trail.csv lists each requirement's readiness, the`,
+      'auditor\'s decision and comments; Requests/<id>/ holds each evidence request with',
+      'the response and files.',
+    );
+  }
+  if (unapprovedPolicies.length > 0) {
+    lines.push('', 'Policies not approved (not included):');
+    lines.push(...unapprovedPolicies.map((name) => `  - ${name}`));
+  }
   if (natives.unpublishedIsms.length > 0) {
     lines.push('', 'ISMS documents not yet published (not included):');
     lines.push(...natives.unpublishedIsms.map((t) => `  - ${t}`));

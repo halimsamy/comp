@@ -66,15 +66,28 @@ export function triggerFrameworkEvidenceExport({
   frameworkInstanceId,
   from,
   to,
+  auditId,
 }: {
   frameworkInstanceId: string;
   /** Optional audit period, `YYYY-MM-DD`, inclusive. */
   from?: string;
   to?: string;
+  /** An audit of this framework: adds the audit trail and evidence requests. */
+  auditId?: string;
 }): Promise<{ runId: string }> {
   return startExportJob(`/v1/evidence-export/frameworks/${frameworkInstanceId}`, {
     ...(from ? { from } : {}),
     ...(to ? { to } : {}),
+    ...(auditId ? { auditId } : {}),
+  });
+}
+
+/** Download one periodic risk review (the register as frozen at sign-off) as CSV. */
+export async function downloadRiskReviewCsv(reviewId: string): Promise<void> {
+  const baseUrl = env.NEXT_PUBLIC_API_URL || 'http://localhost:3333';
+  await downloadFile(`${baseUrl}/v1/register-exports/risk-reviews/${encodeURIComponent(reviewId)}`, {
+    fallbackBaseName: 'risk-review',
+    fallbackExtension: 'csv',
   });
 }
 
