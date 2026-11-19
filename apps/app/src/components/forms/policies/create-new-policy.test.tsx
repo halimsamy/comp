@@ -33,6 +33,10 @@ vi.mock('@/actions/schema', async () => {
   };
 });
 
+vi.mock('./create-policy-ownership-fields', () => ({
+  CreatePolicyOwnershipFields: () => <div data-testid="ownership-fields" />,
+}));
+
 // Mock next/navigation
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -125,5 +129,6 @@ describe('CreateNewPolicyForm permission gating', () => {
 
     expect(screen.getByLabelText(/title/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/description/i)).toBeInTheDocument();
+    expect(screen.getByTestId('ownership-fields')).toBeInTheDocument();
   });
 });

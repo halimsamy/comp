@@ -27,6 +27,7 @@ export interface PolicyAcknowledgementMember {
   acknowledgedAt: string | null;
   lastAcknowledgedAt: string | null;
   lastAcknowledgedVersion: number | null;
+  lastRemindedAt: string | null;
 }
 
 export interface PolicyAcknowledgementHistoryItem {
@@ -46,6 +47,8 @@ export interface PolicyAcknowledgements {
   policyName: string;
   isRequiredToSign: boolean;
   status: string;
+  /** False until a version has been approved: nothing to acknowledge yet. */
+  inForce: boolean;
   currentVersion: { id: string; version: number } | null;
   summary: { total: number; acknowledged: number; pending: number };
   members: PolicyAcknowledgementMember[];
@@ -58,6 +61,15 @@ export interface DocumentControl {
   primaryColor: string | null;
   logo: { dataUrl: string; format: 'PNG' | 'JPEG' } | null;
   rows: { label: string; value: string }[];
+  revisions?: { version: string; date: string; approvedBy: string; changes: string }[];
+}
+
+export interface PolicyReminderResult {
+  sent: number;
+  alreadyRemindedToday: number;
+  unsubscribed: number;
+  failed: number;
+  pending: number;
 }
 
 export const policyReviewsKey = (policyId: string) =>
@@ -103,7 +115,7 @@ export function usePolicyAcknowledgements({ policyId }: { policyId: string }) {
   const sendReminder = useCallback(
     () =>
       unwrap(
-        apiClient.post<{ sent: number; skipped: number; pending: number }>(
+        apiClient.post<PolicyReminderResult>(
           `/v1/policies/${policyId}/acknowledgements/remind`,
         ),
       ),

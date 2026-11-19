@@ -15,18 +15,18 @@ vi.mock('@/hooks/use-permissions', () => ({
 
 const mockRecordReview = vi.fn();
 const mockMutateAcknowledgements = vi.fn();
+const review = (reviewedAt: string) => ({
+  id: 'prv_1',
+  reviewedAt,
+  nextReviewDate: '2027-06-01T00:00:00Z',
+  notes: 'No changes needed',
+  reviewer: { id: 'mem_1', user: { id: 'u1', name: 'Rita Reviewer', email: 'r@x.io' } },
+  policyVersion: { id: 'pv_2', version: 2 },
+});
+const reviewState = { reviews: [review('2026-06-01T00:00:00Z')] };
 vi.mock('@/hooks/use-policy-lifecycle', () => ({
   usePolicyReviews: () => ({
-    reviews: [
-      {
-        id: 'prv_1',
-        reviewedAt: '2026-06-01T00:00:00Z',
-        nextReviewDate: '2027-06-01T00:00:00Z',
-        notes: 'No changes needed',
-        reviewer: { id: 'mem_1', user: { id: 'u1', name: 'Rita Reviewer', email: 'r@x.io' } },
-        policyVersion: { id: 'pv_2', version: 2 },
-      },
-    ],
+    reviews: reviewState.reviews,
     recordReview: mockRecordReview,
   }),
   usePolicyAcknowledgements: () => ({
@@ -38,6 +38,7 @@ vi.mock('@/hooks/use-policy-lifecycle', () => ({
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const future = new Date(Date.now() + 200 * 24 * 60 * 60 * 1000).toISOString();
+const past = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
 const basePolicy: PolicyLifecyclePolicy = {
   id: 'pol_1',
   status: 'published',
@@ -60,9 +61,24 @@ describe('PolicyLifecycle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     setMockPermissions(ADMIN_PERMISSIONS);
+    reviewState.reviews = [review('2026-06-01T00:00:00Z')];
+  });
+
+  it('marks the periodic review done once a review exists in this cycle', () => {
+    render(<PolicyLifecycle policy={basePolicy} currentVersion={version} />);
+    expect(screen.getByText('Last reviewed')).toBeInTheDocument();
+    expect(document.querySelector('[aria-current="step"]')).toBeNull();
+  });
+
+  it('labels the approval date "Approved" until the first review', () => {
+    reviewState.reviews = [];
+    render(<PolicyLifecycle policy={basePolicy} currentVersion={version} />);
+    expect(screen.getByText('Approved')).toBeInTheDocument();
+    expect(screen.queryByText('Last reviewed')).not.toBeInTheDocument();
   });
 
   it('shows the document-control facts and current step', () => {
+    reviewState.reviews = [review('2025-06-01T00:00:00Z')];
     render(<PolicyLifecycle policy={basePolicy} currentVersion={version} />);
     expect(screen.getByText('Olivia Owner')).toBeInTheDocument();
     expect(screen.getByText('v2')).toBeInTheDocument();
@@ -81,7 +97,7 @@ describe('PolicyLifecycle', () => {
     const onMutate = vi.fn();
     render(
       <PolicyLifecycle
-        policy={{ ...basePolicy, status: 'needs_review' }}
+        policy={{ ...basePolicy, reviewDate: past }}
         currentVersion={version}
         onMutate={onMutate}
       />,
@@ -94,7 +110,8 @@ describe('PolicyLifecycle', () => {
 
     expect(mockRecordReview).toHaveBeenCalledWith({
       notes: 'Still accurate',
-      nextReviewDate: expect.any(String),
+      // UTC midnight of the picked day, so it never shifts a day in the PDF.
+      nextReviewDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T00:00:00\.000Z$/),
       requireReacknowledgement: false,
     });
     expect(onMutate).toHaveBeenCalled();
@@ -122,9 +139,7 @@ describe('PolicyLifecycle', () => {
 
   it('hides the review action from read-only users', () => {
     setMockPermissions(AUDITOR_PERMISSIONS);
-    render(
-      <PolicyLifecycle policy={{ ...basePolicy, status: 'needs_review' }} currentVersion={version} />,
-    );
+    render(<PolicyLifecycle policy={{ ...basePolicy, reviewDate: past }} currentVersion={version} />);
     expect(screen.queryByRole('button', { name: /mark as reviewed/i })).not.toBeInTheDocument();
   });
 
@@ -135,7 +150,14 @@ describe('PolicyLifecycle', () => {
         currentVersion={version}
       />,
     );
-    expect(screen.getByText('In review').closest('li')).toHaveAttribute('aria-current', 'step');
+    expect(screen.getByText('Pending approval').closest('li')).toHaveAttribute('aria-current', 'step');
     expect(screen.queryByRole('button', { name: /mark as reviewed/i })).not.toBeInTheDocument();
+  });
+
+  it('warns before recording a second review on the same day', async () => {
+    reviewState.reviews = [review(new Date().toISOString())];
+    render(<PolicyLifecycle policy={basePolicy} currentVersion={version} />);
+    await userEvent.click(screen.getByRole('button', { name: /mark as reviewed/i }));
+    expect(screen.getByText(/already recorded today/)).toBeInTheDocument();
   });
 });

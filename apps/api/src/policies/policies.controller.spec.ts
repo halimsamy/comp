@@ -110,7 +110,6 @@ describe('PoliciesController', () => {
     create: jest.fn(),
     updateById: jest.fn(),
     deleteById: jest.fn(),
-    publishAll: jest.fn(),
     downloadAllPoliciesPdf: jest.fn(),
     getVersions: jest.fn(),
     getVersionById: jest.fn(),
@@ -255,68 +254,6 @@ describe('PoliciesController', () => {
         authType: 'session',
       });
       expect(result).not.toHaveProperty('authenticatedUser');
-    });
-  });
-
-  describe('publishAllPolicies', () => {
-    it('should call policiesService.publishAll with the resolved acting user', async () => {
-      const mockResult = { count: 3 };
-      mockPoliciesService.publishAll.mockResolvedValue(mockResult);
-      actingUser.resolve.mockResolvedValueOnce({
-        userId: 'usr_123',
-        source: 'session',
-      });
-
-      const result = await controller.publishAllPolicies(
-        orgId,
-        mockAuthContext,
-        sessionReq(),
-      );
-
-      expect(policiesService.publishAll).toHaveBeenCalledWith(
-        orgId,
-        'usr_123',
-        undefined,
-      );
-      expect(result).toEqual({
-        count: 3,
-        authType: 'session',
-        authenticatedUser: { id: 'usr_123', email: 'test@example.com' },
-      });
-    });
-
-    it('attributes bulk publish to the resolved user/member for API-key callers', async () => {
-      // Regression: API-key callers have no authContext.userId, so the
-      // per-policy audit rows used to be dropped. The controller must resolve
-      // the acting user (key creator / org owner) and pass it to the service.
-      const mockResult = { count: 2 };
-      mockPoliciesService.publishAll.mockResolvedValue(mockResult);
-      actingUser.resolve.mockResolvedValueOnce({
-        userId: 'usr_owner',
-        memberId: 'mem_owner',
-        source: 'org-owner-fallback',
-        callerLabel: 'via API key "CI Pipeline"',
-      });
-
-      const apiKeyAuthContext: AuthContext = {
-        ...mockAuthContext,
-        userId: undefined,
-        userEmail: undefined,
-        authType: 'api-key',
-        isApiKey: true,
-      };
-
-      await controller.publishAllPolicies(orgId, apiKeyAuthContext, apiKeyReq());
-
-      expect(actingUser.resolve).toHaveBeenCalledWith(
-        expect.objectContaining({ isApiKey: true }),
-        orgId,
-      );
-      expect(policiesService.publishAll).toHaveBeenCalledWith(
-        orgId,
-        'usr_owner',
-        'mem_owner',
-      );
     });
   });
 
@@ -465,14 +402,18 @@ describe('PoliciesController', () => {
       const createData = { name: 'New Policy' };
       const mockPolicy = { id: 'pol_2', name: 'New Policy' };
       mockPoliciesService.create.mockResolvedValue(mockPolicy);
+      actingUser.resolve.mockResolvedValue({ memberId: 'mem_creator' } as never);
+      const req = {} as never;
 
       const result = await controller.createPolicy(
         createData as never,
         orgId,
         mockAuthContext,
+        req,
       );
 
-      expect(policiesService.create).toHaveBeenCalledWith(orgId, createData);
+      expect(actingUser.resolve).toHaveBeenCalledWith(req, orgId);
+      expect(policiesService.create).toHaveBeenCalledWith(orgId, createData, 'mem_creator');
       expect(result).toEqual({
         id: 'pol_2',
         name: 'New Policy',
@@ -1000,7 +941,7 @@ describe('PoliciesController', () => {
         'ver_1',
         body as never,
         orgId,
-        mockAuthContext,
+        { ...mockAuthContext, memberId: 'mem_author' },
       );
 
       expect(policiesService.submitForApproval).toHaveBeenCalledWith(
@@ -1008,6 +949,7 @@ describe('PoliciesController', () => {
         'ver_1',
         orgId,
         body,
+        'mem_author',
       );
       expect(result.data).toEqual(mockResult);
     });

@@ -152,7 +152,7 @@ vi.mock('date-fns', () => ({
   format: () => 'Jan 1, 2025',
 }));
 
-import { PolicyAlerts } from './PolicyAlerts';
+import { findOpenRejection, PolicyAlerts } from './PolicyAlerts';
 
 const basePolicy = {
   id: 'policy-1',
@@ -278,6 +278,42 @@ describe('PolicyAlerts', () => {
       render(<PolicyAlerts policy={archivedPolicy} isPendingApproval={false} />);
       expect(screen.getByText('This policy is archived')).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /restore/i })).not.toBeInTheDocument();
+    });
+  });
+
+  describe('rejected changes', () => {
+    const rejected = {
+      id: 'pv_3',
+      version: 3,
+      rejectedAt: '2026-11-10T00:00:00Z',
+      rejectionComment: 'Missing MFA section',
+      rejectedBy: { user: { name: 'Adam Approver' } },
+    };
+
+    it('shows the open rejection with the reason to the author', () => {
+      setMockPermissions(ADMIN_PERMISSIONS);
+      render(
+        <PolicyAlerts
+          policy={{ ...basePolicy, pendingVersionId: null, lastPublishedAt: null } as never}
+          versions={[rejected] as never}
+          isPendingApproval={false}
+        />,
+      );
+      expect(screen.getByText('Version 3 was rejected')).toBeInTheDocument();
+      expect(screen.getByText(/Missing MFA section/)).toBeInTheDocument();
+    });
+
+    it('drops the rejection once something newer is pending or published', () => {
+      const versions = [rejected] as never;
+      expect(
+        findOpenRejection({ policy: { pendingVersionId: 'pv_4', lastPublishedAt: null }, versions }),
+      ).toBeNull();
+      expect(
+        findOpenRejection({
+          policy: { pendingVersionId: null, lastPublishedAt: new Date('2026-11-12') },
+          versions,
+        }),
+      ).toBeNull();
     });
   });
 });

@@ -11,63 +11,35 @@ import {
 } from '@trycompai/ui/chart';
 import { Card, HStack, Stack, Text } from '@trycompai/design-system';
 import { Information } from '@trycompai/design-system/icons';
-
-interface PolicyOverviewData {
-  totalPolicies: number;
-  publishedPolicies: number;
-  draftPolicies: number;
-  archivedPolicies: number;
-  needsReviewPolicies: number;
-}
+import {
+  POLICY_STAGE_COLORS,
+  POLICY_STAGE_LABELS,
+  type PolicyLifecycleStage,
+} from '../../lib/policy-stage';
+import type { PoliciesOverview } from '../lib/compute-overview';
 
 interface PolicyStatusChartProps {
-  data?: PolicyOverviewData | null;
+  data?: PoliciesOverview | null;
 }
 
-const CHART_COLORS = {
-  published: 'var(--primary)',
-  draft: 'var(--warning)',
-  needs_review: 'var(--destructive)',
-  archived: 'var(--muted-foreground)',
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  published: 'Published',
-  draft: 'Draft',
-  needs_review: 'Review',
-  archived: 'Archived',
-};
+const LEGEND: { key: PolicyLifecycleStage | 'archived'; name: string }[] = [
+  { key: 'published', name: POLICY_STAGE_LABELS.published },
+  { key: 'pending_approval', name: POLICY_STAGE_LABELS.pending_approval },
+  { key: 'review_due', name: POLICY_STAGE_LABELS.review_due },
+  { key: 'draft', name: POLICY_STAGE_LABELS.draft },
+  { key: 'archived', name: 'Archived' },
+];
 
 export function PolicyStatusChart({ data }: PolicyStatusChartProps) {
   // All statuses for the legend (always show all)
   const allStatuses = React.useMemo(() => {
     if (!data) return [];
-    return [
-      {
-        key: 'published',
-        name: 'Published',
-        value: data.publishedPolicies,
-        fill: CHART_COLORS.published,
-      },
-      {
-        key: 'draft',
-        name: 'Draft',
-        value: data.draftPolicies,
-        fill: CHART_COLORS.draft,
-      },
-      {
-        key: 'needs_review',
-        name: 'Needs Review',
-        value: data.needsReviewPolicies,
-        fill: CHART_COLORS.needs_review,
-      },
-      {
-        key: 'archived',
-        name: 'Archived',
-        value: data.archivedPolicies,
-        fill: CHART_COLORS.archived,
-      },
-    ];
+    return LEGEND.map(({ key, name }) => ({
+      key,
+      name,
+      value: data.byStage[key],
+      fill: POLICY_STAGE_COLORS[key],
+    }));
   }, [data]);
 
   // Only non-zero values for the pie chart

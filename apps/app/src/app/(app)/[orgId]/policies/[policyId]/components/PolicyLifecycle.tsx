@@ -69,13 +69,13 @@ export function PolicyLifecycle({
   const { acknowledgements, mutate: mutateAcknowledgements } = usePolicyAcknowledgements({
     policyId: policy.id,
   });
-  const lifecycle = getPolicyLifecycle(policy);
+  const lastReview = reviews[0]?.reviewedAt ?? null;
+  const lifecycle = getPolicyLifecycle({ ...policy, lastReviewedAt: lastReview });
   const canRecordReview =
     hasPermission('policy', 'update') &&
     lifecycle.canRecordReview &&
     !policy.isArchived &&
     Boolean(currentVersion);
-  const lastReviewedAt = reviews[0]?.reviewedAt ?? policy.lastPublishedAt;
   const summary = acknowledgements?.summary;
 
   const handleRecordReview = async (input: {
@@ -124,7 +124,7 @@ export function PolicyLifecycle({
                 aria-current={isCurrent ? 'step' : undefined}
                 className={`flex items-center gap-2 rounded-md border px-3 py-2 ${
                   isWarning
-                    ? 'border-warning/50 bg-warning/10'
+                    ? 'border-destructive/50 bg-destructive/10'
                     : isCurrent
                       ? 'border-primary/40 bg-primary/5'
                       : 'border-border'
@@ -132,7 +132,7 @@ export function PolicyLifecycle({
               >
                 <span
                   className={
-                    isWarning ? 'text-warning' : isDone || isCurrent ? 'text-primary' : 'text-muted-foreground'
+                    isWarning ? 'text-destructive' : isDone || isCurrent ? 'text-primary' : 'text-muted-foreground'
                   }
                 >
                   {isDone ? (
@@ -173,7 +173,15 @@ export function PolicyLifecycle({
             hint={currentVersion?.approvedAt ? formatDate(currentVersion.approvedAt) : undefined}
           />
           <Fact label="Effective" value={formatDate(policy.lastPublishedAt)} />
-          <Fact label="Last reviewed" value={formatDate(lastReviewedAt)} />
+          {/* Until a periodic review exists, the only date we have is the approval. */}
+          {lastReview ? (
+            <Fact label="Last reviewed" value={formatDate(lastReview)} />
+          ) : (
+            <Fact
+              label="Approved"
+              value={formatDate(currentVersion?.approvedAt ?? policy.lastPublishedAt)}
+            />
+          )}
           <Fact label="Next review" value={formatDate(policy.reviewDate)} hint={reviewHint} />
         </div>
 
@@ -197,6 +205,7 @@ export function PolicyLifecycle({
         onOpenChange={setIsReviewOpen}
         frequency={policy.frequency}
         versionLabel={currentVersion ? `version ${currentVersion.version}` : 'this policy'}
+        lastReviewedAt={lastReview}
         onSubmit={handleRecordReview}
       />
     </Section>

@@ -66,6 +66,10 @@ jest.mock('@db', () => ({
   },
 }));
 
+jest.mock('./lifecycle/policy-approval-notifier', () => ({
+  notifyPolicyApproval: jest.fn(async () => true),
+}));
+
 jest.mock('../utils/compliance-filters', () => ({
   filterComplianceMembers: jest.fn(async (members: unknown[]) => members),
 }));
@@ -586,86 +590,6 @@ describe('PoliciesService', () => {
     });
   });
 
-  describe('publishAll', () => {
-    it('clears signedBy[] on every published policy and returns { success, publishedCount, members }', async () => {
-      const orgId = 'org_abc';
-      const drafts = [
-        { id: 'pol_1', name: 'Access', frequency: 'yearly' },
-        { id: 'pol_2', name: 'Backup', frequency: null },
-      ];
-      db.policy.findMany.mockResolvedValueOnce(drafts);
-      db.$transaction.mockImplementation((updates: unknown[]) => Promise.resolve(updates));
-      db.policy.update.mockImplementation((args) => args);
-      db.member.findMany.mockResolvedValueOnce([]);
-
-      const result = await service.publishAll(orgId);
-
-      expect(db.$transaction).toHaveBeenCalledTimes(1);
-      const txArg = db.$transaction.mock.calls[0][0] as Array<{
-        where: { id: string };
-        data: Record<string, unknown>;
-      }>;
-      expect(txArg).toHaveLength(2);
-      for (const update of txArg) {
-        expect(update.data.status).toBe('published');
-        expect(update.data.signedBy).toEqual([]);
-        expect(update.data.lastPublishedAt).toBeInstanceOf(Date);
-      }
-      expect(result.success).toBe(true);
-      expect(result.publishedCount).toBe(2);
-      expect(result.members).toEqual([]);
-    });
-
-    it('returns early with publishedCount 0 when there are no drafts', async () => {
-      db.policy.findMany.mockResolvedValueOnce([]);
-      const result = await service.publishAll('org_empty');
-      expect(result).toEqual({ success: true, publishedCount: 0, members: [] });
-      expect(db.$transaction).not.toHaveBeenCalled();
-    });
-
-    it('returns only compliance-obligated members in the members array', async () => {
-      const orgId = 'org_abc';
-      db.policy.findMany.mockResolvedValueOnce([
-        { id: 'pol_1', name: 'P', frequency: 'yearly' },
-      ]);
-      db.$transaction.mockImplementation((updates: unknown[]) =>
-        Promise.resolve(updates),
-      );
-      db.policy.update.mockImplementation((args) => args);
-      db.member.findMany.mockResolvedValueOnce([
-        {
-          role: 'employee',
-          user: { email: 'alice@example.com', name: 'Alice', role: null },
-          organization: { id: orgId, name: 'Acme' },
-        },
-        {
-          role: 'auditor',
-          user: { email: 'audit@example.com', name: 'Aud', role: null },
-          organization: { id: orgId, name: 'Acme' },
-        },
-      ]);
-      // Mock filterComplianceMembers to return only Alice
-      mockedFilterComplianceMembers.mockResolvedValueOnce([
-        {
-          role: 'employee',
-          user: { email: 'alice@example.com', name: 'Alice', role: null },
-          organization: { id: orgId, name: 'Acme' },
-        },
-      ] as never);
-
-      const result = await service.publishAll(orgId);
-
-      expect(result.members).toEqual([
-        {
-          email: 'alice@example.com',
-          userName: 'Alice',
-          organizationName: 'Acme',
-          organizationId: orgId,
-        },
-      ]);
-    });
-  });
-
   describe('acceptChanges', () => {
     const buildPendingPolicy = (overrides: Record<string, unknown> = {}) => ({
       id: 'pol_1',
@@ -986,15 +910,26 @@ describe('PoliciesService', () => {
         lastPublishedAt: null,
       });
       db.policy.update.mockResolvedValueOnce({});
+      db.policyVersion.update.mockResolvedValueOnce({ submittedById: 'mem_author' });
+      db.$transaction.mockImplementationOnce((ops: Promise<unknown>[]) => Promise.all(ops));
 
       const result = await service.denyChanges(
         'pol_1',
         'org_abc',
-        {},
+        { comment: ' Missing scope ' },
         'mem_approver',
       );
 
       expect(result).toEqual({ status: 'draft' });
+      expect(db.policyVersion.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'ver_1' },
+          data: expect.objectContaining({
+            rejectedById: 'mem_approver',
+            rejectionComment: 'Missing scope',
+          }),
+        }),
+      );
       expect(db.policy.update).toHaveBeenCalledWith({
         where: { id: 'pol_1' },
         data: {
@@ -1014,6 +949,8 @@ describe('PoliciesService', () => {
         lastPublishedAt: new Date('2026-01-01'),
       });
       db.policy.update.mockResolvedValueOnce({});
+      db.policyVersion.update.mockResolvedValueOnce({ submittedById: null });
+      db.$transaction.mockImplementationOnce((ops: Promise<unknown>[]) => Promise.all(ops));
 
       const result = await service.denyChanges(
         'pol_1',

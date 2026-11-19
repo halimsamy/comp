@@ -26,19 +26,26 @@ import { POST as complete } from '@/app/api/portal/mark-policy-completed/route';
 import { GET } from '@/app/api/portal/policy-pdf-url/route';
 import { getPortalPolicy, portalPolicySelect } from './portal-policy-access';
 
+type Condition = {
+  status?: string;
+  lastPublishedAt?: { not: null };
+  visibility?: string;
+  visibleToDepartments?: { has: string };
+};
 interface PolicyFilter {
   id?: string | { in: string[] };
   organizationId?: string;
-  status?: string;
   isArchived?: boolean;
   archivedAt?: null;
   isRequiredToSign?: boolean;
-  OR?: Array<{ visibility: string; visibleToDepartments?: { has: string } }>;
+  AND?: Array<{ OR: Condition[] }>;
 }
 const published = {
   id: 'pol_own',
   organizationId: 'org_own',
+  name: 'Access Control',
   status: 'published',
+  lastPublishedAt: new Date('2026-01-01') as Date | null,
   isArchived: false,
   archivedAt: null,
   isRequiredToSign: true,
@@ -47,26 +54,29 @@ const published = {
   signedBy: new Array<string>(),
   pdfUrl: 'own.pdf',
   currentVersionId: 'pv_own',
-  currentVersion: { id: 'pv_own', policyId: 'pol_own', pdfUrl: 'current.pdf' },
+  currentVersion: { id: 'pv_own', policyId: 'pol_own', pdfUrl: 'current.pdf', version: 3 },
 };
 let policy = { ...published };
 
+function matchesCondition(condition: Condition): boolean {
+  if (condition.status && condition.status !== policy.status) return false;
+  if (condition.lastPublishedAt && !policy.lastPublishedAt) return false;
+  if (condition.visibility && condition.visibility !== policy.visibility) return false;
+  if (
+    condition.visibleToDepartments &&
+    !policy.visibleToDepartments.includes(condition.visibleToDepartments.has)
+  )
+    return false;
+  return true;
+}
 function matches(where: PolicyFilter): boolean {
   if (typeof where.id === 'string' && where.id !== policy.id) return false;
   if (typeof where.id === 'object' && !where.id.in.includes(policy.id)) return false;
-  if (where.organizationId !== policy.organizationId || where.status !== policy.status)
-    return false;
+  if (where.organizationId !== policy.organizationId) return false;
   if (where.isArchived !== policy.isArchived || where.archivedAt !== policy.archivedAt)
     return false;
   if (where.isRequiredToSign && !policy.isRequiredToSign) return false;
-  return Boolean(
-    where.OR?.some(
-      (condition) =>
-        condition.visibility === policy.visibility &&
-        (!condition.visibleToDepartments ||
-          policy.visibleToDepartments.includes(condition.visibleToDepartments.has)),
-    ),
-  );
+  return Boolean(where.AND?.every((group) => group.OR.some(matchesCondition)));
 }
 function request({ body, raw }: { body?: unknown; raw?: string }): NextRequest {
   return new NextRequest('http://localhost/api/portal/accept-policies', {
@@ -80,7 +90,13 @@ function pdf(versionId?: string): NextRequest {
   if (versionId) params.set('versionId', versionId);
   return new NextRequest(`http://localhost/api/portal/policy-pdf-url?${params}`);
 }
-const body = { organizationId: 'org_own', memberId: 'mem_own', policyIds: ['pol_own'] };
+const body = {
+  organizationId: 'org_own',
+  memberId: 'mem_own',
+  policyIds: ['pol_own'],
+  attested: true,
+};
+const completeBody = { organizationId: 'org_own', policyId: 'pol_own', attested: true };
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -141,6 +157,7 @@ describe('employee portal policy authorization', () => {
   it.each([
     ['foreign', { organizationId: 'org_foreign' }],
     ['draft', { status: 'draft' }],
+    ['never approved, waiting for approval', { status: 'needs_review', lastPublishedAt: null }],
     ['archived', { isArchived: true }],
     ['sync archived', { archivedAt: new Date() }],
     ['another department', { visibility: 'DEPARTMENT', visibleToDepartments: ['finance'] }],
@@ -156,10 +173,26 @@ describe('employee portal policy authorization', () => {
     expect((await GET(pdf())).status).toBe(404);
     expect((await accept(request({ body }))).status).toBe(404);
     expect(
-      (await complete(request({ body: { organizationId: 'org_own', policyId: 'pol_own' } })))
+      (await complete(request({ body: completeBody })))
         .status,
     ).toBe(404);
     expect(mocks.sign).not.toHaveBeenCalled();
+    expect(mocks.policyUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it('keeps the approved version in force while a new version waits for approval', async () => {
+    policy.status = 'needs_review';
+    expect((await GET(pdf('pv_own'))).status).toBe(200);
+    expect((await accept(request({ body }))).status).toBe(200);
+  });
+
+  it('requires the attestation before accepting', async () => {
+    const { attested: _attested, ...unattested } = body;
+    expect((await accept(request({ body: unattested }))).status).toBe(400);
+    expect(
+      (await complete(request({ body: { organizationId: 'org_own', policyId: 'pol_own' } })))
+        .status,
+    ).toBe(400);
     expect(mocks.policyUpdateMany).not.toHaveBeenCalled();
   });
 
@@ -194,7 +227,7 @@ describe('employee portal policy authorization', () => {
     expect((await GET(pdf())).status).toBe(403);
     expect((await accept(request({ body }))).status).toBe(403);
     expect(
-      (await complete(request({ body: { organizationId: 'org_own', policyId: 'pol_own' } })))
+      (await complete(request({ body: completeBody })))
         .status,
     ).toBe(403);
     expect(mocks.policyFindFirst).not.toHaveBeenCalled();
@@ -225,7 +258,6 @@ describe('employee portal policy authorization', () => {
       where: expect.objectContaining({
         id: 'pol_own',
         organizationId: 'org_own',
-        status: 'published',
         isArchived: false,
         archivedAt: null,
         NOT: { signedBy: { has: 'mem_own' } },
@@ -242,6 +274,8 @@ describe('employee portal policy authorization', () => {
         policyId: 'pol_own',
         policyVersionId: 'pv_own',
         memberId: 'mem_own',
+        attestation:
+          'I have read and understood Access Control (version 3) and I agree to comply with it.',
       },
     });
   });
@@ -254,7 +288,7 @@ describe('employee portal policy authorization', () => {
 
   it('selects the member in the requested organization when completing a policy', async () => {
     expect(
-      (await complete(request({ body: { organizationId: 'org_own', policyId: 'pol_own' } })))
+      (await complete(request({ body: completeBody })))
         .status,
     ).toBe(200);
     expect(mocks.memberFindFirst).toHaveBeenCalledWith(
@@ -273,7 +307,7 @@ describe('employee portal policy authorization', () => {
   it('makes already accepted acknowledgments idempotent', async () => {
     policy.signedBy = ['mem_own'];
     const response = await complete(
-      request({ body: { organizationId: 'org_own', policyId: 'pol_own' } }),
+      request({ body: completeBody }),
     );
     expect(await response.json()).toEqual({ success: true, alreadySigned: true });
   });

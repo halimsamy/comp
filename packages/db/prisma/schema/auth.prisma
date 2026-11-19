@@ -246,6 +246,9 @@ model Member {
   approvedPolicyVersions           PolicyVersion[]                  @relation("PolicyVersionApprover")
   policyReviews                    PolicyReview[]                   @relation("PolicyReviewer")
   policyAcknowledgements           PolicyAcknowledgement[]
+  submittedPolicyVersions          PolicyVersion[]                  @relation("PolicyVersionSubmitter")
+  rejectedPolicyVersions           PolicyVersion[]                  @relation("PolicyVersionRejecter")
+  policyAckReminders               PolicyAckReminder[]
   performedFrameworkSyncOperations FrameworkSyncOperation[] @relation("FrameworkSyncOperationPerformer")
   approvedTasks                    Task[]                   @relation("TaskApprover")
   devices                          Device[]

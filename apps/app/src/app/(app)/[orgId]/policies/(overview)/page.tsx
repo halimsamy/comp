@@ -1,18 +1,16 @@
 import { serverApi } from '@/lib/api-server';
-import type { Policy } from '@db';
+import { filterAppAccessMembers } from '@/lib/compliance';
+import type { Member, User } from '@db';
 import { PageHeader, PageLayout, Stack } from '@trycompai/design-system';
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { PolicyFilters } from '../all/components/PolicyFilters';
 import { PolicyPageActions } from '../all/components/PolicyPageActions';
 import { isArchivedPolicy } from '../lib/policy-archive-state';
+import type { PolicyRegisterRow } from '../lib/policy-register';
 import { PolicyChartsClient } from './components/PolicyChartsClient';
 import { computePoliciesOverview } from './lib/compute-overview';
 import Loading from './loading';
-
-type PolicyWithAssignee = Policy & {
-  assignee: { id: string; user: { name: string | null } } | null;
-};
 
 interface PoliciesPageProps {
   params: Promise<{ orgId: string }>;
@@ -25,12 +23,13 @@ export default async function PoliciesPage({ params }: PoliciesPageProps) {
   // client-side filters component can subscribe and surface "tailoring your
   // policies…" status during first-run AI generation. Mirrors the pattern
   // used by the risks and vendors pages.
-  const [policiesRes, onboardingRes] = await Promise.all([
-    serverApi.get<{ data: PolicyWithAssignee[] }>('/v1/policies?includeArchived=true'),
+  const [policiesRes, onboardingRes, peopleRes] = await Promise.all([
+    serverApi.get<{ data: PolicyRegisterRow[] }>('/v1/policies?includeArchived=true'),
     serverApi.get<{
       triggerJobId: string | null;
       triggerJobCompleted: boolean;
     } | null>('/v1/organization/onboarding'),
+    serverApi.get<{ data: (Member & { user: User })[] }>('/v1/people'),
   ]);
 
   const policies = Array.isArray(policiesRes.data?.data)
@@ -38,14 +37,11 @@ export default async function PoliciesPage({ params }: PoliciesPageProps) {
     : [];
 
   // Compute overview from policies (same logic used client-side)
-  const initialOverview = computePoliciesOverview(
-    policies.map((p) => ({
-      id: p.id,
-      status: p.status,
-      isArchived: isArchivedPolicy(p),
-      assigneeId: p.assigneeId,
-      assignee: p.assignee,
-    })),
+  const initialOverview = computePoliciesOverview(policies);
+  const people = Array.isArray(peopleRes.data?.data) ? peopleRes.data.data : [];
+  const members = await filterAppAccessMembers(
+    people.filter((m) => !m.deactivated),
+    orgId,
   );
 
   return (
@@ -60,6 +56,7 @@ export default async function PoliciesPage({ params }: PoliciesPageProps) {
         </Suspense>
         <PolicyFilters
           policies={policies}
+          members={members}
           onboardingRunId={onboardingRes.data?.triggerJobId ?? null}
         />
       </Stack>

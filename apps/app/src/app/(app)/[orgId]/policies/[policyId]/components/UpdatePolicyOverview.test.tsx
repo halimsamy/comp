@@ -101,8 +101,20 @@ describe('UpdatePolicyOverview', () => {
       );
       expect(screen.getByText('Review Frequency')).toBeInTheDocument();
       expect(screen.getByText('Department')).toBeInTheDocument();
-      expect(screen.getByText('Assignee')).toBeInTheDocument();
+      expect(screen.getByText('Owner')).toBeInTheDocument();
       expect(screen.getByText('Review Date')).toBeInTheDocument();
+    });
+
+    it('shows "Not set" instead of a fabricated review frequency', () => {
+      render(
+        <UpdatePolicyOverview
+          policy={{ ...basePolicy, frequency: null, department: null }}
+          assignees={defaultAssignees}
+          isPendingApproval={false}
+        />,
+      );
+      expect(screen.getAllByText('Not set').length).toBeGreaterThan(0);
+      expect(screen.queryByText('Monthly')).not.toBeInTheDocument();
     });
 
     it('renders the Save button for admin', () => {

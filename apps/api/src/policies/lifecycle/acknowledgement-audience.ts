@@ -34,20 +34,37 @@ export async function getAcknowledgementAudience({
   );
 }
 
-const CSV_HEADER = [
+export const CSV_HEADER = [
   'Policy',
-  'Version',
   'Employee',
   'Email',
+  'Department',
+  'Role',
+  'Status',
+  'Current version',
+  'Acknowledged version',
   'Acknowledged at (UTC)',
+  'Last reminded at (UTC)',
+  'Owner',
+  'Approved by',
+  'Approved at (UTC)',
 ];
 
+/** One row per audience member and policy, signed or not. */
 export interface AcknowledgementCsvRow {
   policyName: string;
-  version: number | null;
   memberName: string;
   memberEmail: string;
-  acknowledgedAt: Date;
+  department: string;
+  role: string;
+  status: 'Acknowledged' | 'Pending' | 'Outdated';
+  currentVersion: number | null;
+  acknowledgedVersion: number | null;
+  acknowledgedAt: Date | null;
+  lastRemindedAt: Date | null;
+  owner: string;
+  approvedBy: string;
+  approvedAt: Date | null;
 }
 
 function escapeCsv(value: string): string {
@@ -56,14 +73,25 @@ function escapeCsv(value: string): string {
   return `"${safe.replace(/"/g, '""')}"`;
 }
 
+const version = (v: number | null) => (v === null ? '' : `v${v}`);
+const iso = (d: Date | null) => (d ? d.toISOString() : '');
+
 export function toAcknowledgementsCsv(rows: AcknowledgementCsvRow[]): string {
   const lines = rows.map((row) =>
     [
       row.policyName,
-      row.version === null ? '' : `v${row.version}`,
       row.memberName,
       row.memberEmail,
-      row.acknowledgedAt.toISOString(),
+      row.department,
+      row.role,
+      row.status,
+      version(row.currentVersion),
+      version(row.acknowledgedVersion),
+      iso(row.acknowledgedAt),
+      iso(row.lastRemindedAt),
+      row.owner,
+      row.approvedBy,
+      iso(row.approvedAt),
     ]
       .map(escapeCsv)
       .join(','),

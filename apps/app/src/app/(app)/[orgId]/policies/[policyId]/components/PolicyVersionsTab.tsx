@@ -1,24 +1,7 @@
 'use client';
 
-import { SelectAssignee } from '@/components/SelectAssignee';
-import { getInitials } from '@/lib/utils';
-import { Avatar, AvatarFallback, AvatarImage } from '@trycompai/ui/avatar';
-import { Badge } from '@trycompai/ui/badge';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@trycompai/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@trycompai/ui/dropdown-menu';
-import { PolicyStatus, type Member, type Policy, type PolicyVersion, type User } from '@db';
+import { usePermissions } from '@/hooks/use-permissions';
+import type { Member, Policy, PolicyVersion, User } from '@db';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,25 +13,20 @@ import {
   AlertDialogTitle,
   Button,
   HStack,
-  Label,
   Stack,
   Text,
 } from '@trycompai/design-system';
-import { format } from 'date-fns';
-import { Edit, FileText, MoreVertical, Plus, Trash2, Upload } from 'lucide-react';
-import { ChevronLeft, ChevronRight } from '@trycompai/design-system/icons';
+import { Add, ChevronLeft, ChevronRight, Document } from '@trycompai/design-system/icons';
 import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
+import { usePolicyVersions, type PolicyVersionWithPublisher } from '../hooks/usePolicyVersions';
+import { PolicyVersionActions } from './PolicyVersionActions';
+import { PolicyVersionCard, type VersionState } from './PolicyVersionCard';
+import { PublishVersionDialog } from './PublishVersionDialog';
+import { SubmitApprovalDialog } from './SubmitApprovalDialog';
 
 const VERSIONS_PER_PAGE = 10;
-import { toast } from 'sonner';
-import { usePermissions } from '@/hooks/use-permissions';
-import { usePolicyVersions } from '../hooks/usePolicyVersions';
-import { PublishVersionDialog } from './PublishVersionDialog';
-
-type PolicyVersionWithPublisher = PolicyVersion & {
-  publishedBy: (Member & { user: User }) | null;
-};
 
 type PolicyWithVersion = Policy & {
   currentVersion?: (PolicyVersion & { publishedBy: (Member & { user: User }) | null }) | null;
@@ -88,49 +66,35 @@ export function PolicyVersionsTab({
   const [deleteVersionDialogOpen, setDeleteVersionDialogOpen] = useState(false);
   const [versionToDelete, setVersionToDelete] = useState<PolicyVersionWithPublisher | null>(null);
   const [isDeletingVersion, setIsDeletingVersion] = useState(false);
-  const [isSetActiveApprovalDialogOpen, setIsSetActiveApprovalDialogOpen] = useState(false);
   const [pendingSetActiveVersion, setPendingSetActiveVersion] = useState<PolicyVersionWithPublisher | null>(null);
   const [versionApprovalApproverId, setVersionApprovalApproverId] = useState<string | null>(null);
   const [settingActive, setSettingActive] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Sort versions: current version first, then pending, then by version number descending
+  // Current version first, then the pending one, then newest first.
   const sortedVersions = useMemo(() => {
-    return [...versions].sort((a, b) => {
-      // Current version first (whether draft or published)
-      if (a.id === policy.currentVersionId) return -1;
-      if (b.id === policy.currentVersionId) return 1;
-      // Pending approval version second
-      if (a.id === policy.pendingVersionId) return -1;
-      if (b.id === policy.pendingVersionId) return 1;
-      // Then by version number descending
-      return b.version - a.version;
-    });
+    const rank = (id: string) =>
+      id === policy.currentVersionId ? 0 : id === policy.pendingVersionId ? 1 : 2;
+    return [...versions].sort((a, b) => rank(a.id) - rank(b.id) || b.version - a.version);
   }, [versions, policy.currentVersionId, policy.pendingVersionId]);
 
-  // Pagination calculations
   const totalPages = Math.ceil(sortedVersions.length / VERSIONS_PER_PAGE);
-  const paginatedVersions = useMemo(() => {
-    const startIndex = (currentPage - 1) * VERSIONS_PER_PAGE;
-    const endIndex = startIndex + VERSIONS_PER_PAGE;
-    return sortedVersions.slice(startIndex, endIndex);
-  }, [sortedVersions, currentPage]);
+  const paginatedVersions = useMemo(
+    () => sortedVersions.slice((currentPage - 1) * VERSIONS_PER_PAGE, currentPage * VERSIONS_PER_PAGE),
+    [sortedVersions, currentPage],
+  );
 
-  // Reset to page 1 when versions change and current page is out of bounds
   useEffect(() => {
-    if (currentPage > totalPages && totalPages > 0) {
-      setCurrentPage(1);
-    }
+    if (currentPage > totalPages && totalPages > 0) setCurrentPage(1);
   }, [totalPages, currentPage]);
 
   const handleRequestSetActive = (version: PolicyVersionWithPublisher) => {
     setPendingSetActiveVersion(version);
-    setIsSetActiveApprovalDialogOpen(true);
+    setVersionApprovalApproverId(policy.approverId);
   };
 
   const handleConfirmSetActive = async () => {
     if (!pendingSetActiveVersion) return;
-
     if (!versionApprovalApproverId) {
       toast.error('Please select an approver');
       return;
@@ -138,16 +102,14 @@ export function PolicyVersionsTab({
 
     const versionToPublish = pendingSetActiveVersion;
     setSettingActive(versionToPublish.id);
-
     try {
       await submitForApproval(versionToPublish.id, versionApprovalApproverId);
       toast.success(`Version ${versionToPublish.version} submitted for approval`);
       setPendingSetActiveVersion(null);
-      setIsSetActiveApprovalDialogOpen(false);
       setVersionApprovalApproverId(null);
       onMutate?.();
-    } catch {
-      toast.error('Failed to submit version for approval');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to submit version for approval');
     } finally {
       setSettingActive(null);
     }
@@ -183,18 +145,16 @@ export function PolicyVersionsTab({
         <HStack justify="between" align="center">
           <Text weight="semibold" size="lg">Version History</Text>
           {canUpdatePolicy && (
-            <Button
-              size="lg"
-              onClick={() => setIsPublishDialogOpen(true)}
-            >
-              <Plus className="h-4 w-4 mr-2" />
+            <Button size="lg" iconLeft={<Add size={16} />} onClick={() => setIsPublishDialogOpen(true)}>
               Create Version
             </Button>
           )}
         </HStack>
         {sortedVersions.length === 0 ? (
           <div className="py-8 text-center">
-            <FileText className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-50" />
+            <div className="mb-2 flex justify-center text-muted-foreground opacity-50">
+              <Document size={32} />
+            </div>
             <Text variant="muted">No versions yet</Text>
             <Text size="sm" variant="muted">
               Create a version to start tracking changes
@@ -206,136 +166,46 @@ export function PolicyVersionsTab({
               const isCurrentVersion = version.id === policy.currentVersionId;
               const isPendingVersion = version.id === policy.pendingVersionId;
               
-              // Badge logic:
-              // - Published: current version AND policy was ever published (has lastPublishedAt)
-              //   This ensures the published version keeps its badge even during pending approval
-              // - Pending Approval: this version is pending approval
-              // - Draft: everything else (all versions that aren't published or pending)
+              // The published version keeps its state while a newer one is pending.
               const isPublished = isCurrentVersion && !!policy.lastPublishedAt;
-              const isDraft = !isPublished && !isPendingVersion;
-              
               const canDelete = canDeletePolicy && !isCurrentVersion && !isPendingVersion;
               const hasPendingVersion = Boolean(policy.pendingVersionId) && isPendingApproval;
               // Can publish other versions (not current, not pending)
               const canPublishOther = canPublishPolicy && !isCurrentVersion && !isPendingVersion && !hasPendingVersion;
               // Can publish current version if it's in draft or needs_review status
-              const canPublishCurrent = canPublishPolicy && isCurrentVersion && (policy.status === PolicyStatus.draft || policy.status === PolicyStatus.needs_review) && !hasPendingVersion;
+              const canPublishCurrent = canPublishPolicy && isCurrentVersion && (policy.status === 'draft' || policy.status === 'needs_review') && !hasPendingVersion;
               const canPublish = canPublishOther || canPublishCurrent;
-              const publisher = version.publishedBy?.user;
-
-              // Determine border/background styling based on status
-              const getBorderClass = () => {
-                if (isPublished) return 'border-primary/50 bg-primary/5';
-                if (isPendingVersion) return 'border-warning/50 bg-warning/5';
-                return 'border-border';
-              };
+              const state: VersionState = isPublished
+                ? 'published'
+                : isPendingVersion
+                  ? 'pending'
+                  : version.rejectedAt
+                    ? 'rejected'
+                    : 'draft';
 
               return (
-                <div
+                <PolicyVersionCard
                   key={version.id}
-                  className={`group flex items-center justify-between rounded-lg border py-2 px-3 ${getBorderClass()}`}
-                >
-                  <div className="flex items-center gap-4">
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage
-                        src={publisher?.image || ''}
-                        alt={publisher?.name || 'User'}
-                      />
-                      <AvatarFallback className="text-xs">
-                        {publisher?.name ? getInitials(publisher.name) : 'U'}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex flex-col gap-1">
-                      <HStack gap="md" align="center">
-                        <Text weight="medium">v{version.version}</Text>
-                        {isPublished && (
-                          <Badge
-                            variant="secondary"
-                            className="bg-primary/10 text-primary hover:bg-primary/10"
-                          >
-                            Published
-                          </Badge>
-                        )}
-                        {isDraft && (
-                          <Badge
-                            variant="secondary"
-                            className="border-warning/30 bg-warning/10 text-warning hover:bg-warning/10"
-                          >
-                            Draft
-                          </Badge>
-                        )}
-                        {isPendingVersion && (
-                          <Badge variant="outline" className="border-warning text-warning">
-                            Pending Approval
-                          </Badge>
-                        )}
-                      </HStack>
-                      {version.changelog && (
-                        <Text size="sm" variant="muted">
-                          {version.changelog}
-                        </Text>
-                      )}
-                      <Text size="xs" variant="muted">
-                        Last updated: {format(new Date(version.updatedAt), 'MMM d, yyyy \'at\' h:mm a')}
-                        {' by '}{publisher?.name || 'System'}
-                      </Text>
-                    </div>
-                  </div>
-                    {(canPublish || canDelete || canUpdatePolicy) ? (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {canPublish && (
-                            <DropdownMenuItem onClick={() => handleRequestSetActive(version)}>
-                              <Upload className="h-4 w-4 mr-2" />
-                              Publish
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem onClick={() => handleEditVersion(version)}>
-                            {isPublished || !canUpdatePolicy ? (
-                              <>
-                                <FileText className="h-4 w-4 mr-2" />
-                                View
-                              </>
-                            ) : (
-                              <>
-                                <Edit className="h-4 w-4 mr-2" />
-                                Edit
-                              </>
-                            )}
-                          </DropdownMenuItem>
-                          {canDelete && (
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setVersionToDelete(version);
-                                setDeleteVersionDialogOpen(true);
-                              }}
-                              className="text-destructive focus:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    ) : (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEditVersion(version)}
-                      >
-                        <FileText className="h-4 w-4 mr-2" />
-                        View
-                      </Button>
-                    )}
-                </div>
+                  version={version}
+                  state={state}
+                  actions={
+                    <PolicyVersionActions
+                      canPublish={canPublish}
+                      canDelete={canDelete}
+                      canUpdate={canUpdatePolicy}
+                      isPublished={isPublished}
+                      onPublish={() => handleRequestSetActive(version)}
+                      onEdit={() => handleEditVersion(version)}
+                      onDelete={() => {
+                        setVersionToDelete(version);
+                        setDeleteVersionDialogOpen(true);
+                      }}
+                    />
+                  }
+                />
               );
             })}
-            
+
             {/* Pagination Controls */}
             {totalPages > 1 && (
               <div className="pt-4 border-t border-border">
@@ -409,57 +279,21 @@ export function PolicyVersionsTab({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Publish Version Approval Dialog */}
-      <Dialog
-        open={isSetActiveApprovalDialogOpen}
+      <SubmitApprovalDialog
+        isOpen={pendingSetActiveVersion !== null}
         onOpenChange={(open) => {
-          if (!open) {
-            setIsSetActiveApprovalDialogOpen(false);
-            setPendingSetActiveVersion(null);
-            setVersionApprovalApproverId(null);
-          }
+          if (open) return;
+          setPendingSetActiveVersion(null);
+          setVersionApprovalApproverId(null);
         }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Publish Version {pendingSetActiveVersion?.version}</DialogTitle>
-            <DialogDescription>
-              Select an approver to review and publish version {pendingSetActiveVersion?.version}.
-              Once approved, this version will become the active published version.
-            </DialogDescription>
-          </DialogHeader>
-          <Stack gap="md">
-            <Stack gap="sm">
-              <Label htmlFor="version-approver">Approver</Label>
-              <SelectAssignee
-                assignees={assignees}
-                onAssigneeChange={(id) => setVersionApprovalApproverId(id)}
-                assigneeId={versionApprovalApproverId || ''}
-                withTitle={false}
-              />
-            </Stack>
-          </Stack>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setIsSetActiveApprovalDialogOpen(false);
-                setPendingSetActiveVersion(null);
-                setVersionApprovalApproverId(null);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleConfirmSetActive}
-              disabled={!!settingActive || !versionApprovalApproverId}
-              loading={!!settingActive}
-            >
-              Submit for Approval
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        assignees={assignees}
+        selectedApproverId={versionApprovalApproverId}
+        onSelectedApproverIdChange={setVersionApprovalApproverId}
+        onConfirm={handleConfirmSetActive}
+        isSubmitting={!!settingActive}
+        title={`Publish version ${pendingSetActiveVersion?.version ?? ''}`}
+        description="The approver gets an email and an in-app notification. Once approved, this version becomes the published version employees acknowledge."
+      />
     </>
   );
 }

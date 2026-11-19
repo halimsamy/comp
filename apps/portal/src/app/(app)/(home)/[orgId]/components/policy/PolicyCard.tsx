@@ -15,6 +15,8 @@ import {
 } from '@trycompai/design-system';
 import { ArrowRight } from '@trycompai/design-system/icons';
 import { useState } from 'react';
+import { policyAttestationText } from '@/lib/policy-attestation';
+import { PolicyAttestation } from './PolicyAttestation';
 import { PolicyEditor } from './PolicyEditor';
 import { PortalPdfViewer } from './PortalPdfViewer';
 
@@ -29,6 +31,8 @@ interface PolicyCardProps {
 
 export function PolicyCard({ policy, onNext, onComplete, member, isLastPolicy }: PolicyCardProps) {
   const [isAccepted, setIsAccepted] = useState(policy.signedBy.includes(member.id));
+  const [attested, setAttested] = useState(false);
+  const version = policy.currentVersion?.version;
 
   const handleAccept = () => {
     setIsAccepted(true);
@@ -79,16 +83,15 @@ export function PolicyCard({ policy, onNext, onComplete, member, isLastPolicy }:
                 <PolicyEditor content={effectiveContent as JSONContent[]} />
               )}
             </div>
-            <Text variant="muted" size="sm">
-              Status: {policy.status}{' '}
-              {policy.updatedAt && (
-                <span>(Last updated: {new Date(policy.updatedAt).toLocaleDateString()})</span>
-              )}
-            </Text>
+            {version && (
+              <Text variant="muted" size="sm">
+                Version {version}
+              </Text>
+            )}
           </div>
         </CardContent>
         <CardFooter>
-          <div className="flex w-full items-center justify-between gap-2">
+          <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
               {policy.updatedAt && (
                 <Text variant="muted" size="sm">
@@ -96,8 +99,17 @@ export function PolicyCard({ policy, onNext, onComplete, member, isLastPolicy }:
                 </Text>
               )}
             </div>
-            <div className="flex gap-2">
-              <Button onClick={handleAccept}>Accept Policy</Button>
+            <div className="flex flex-col gap-3 sm:items-end">
+              <PolicyAttestation
+                text={policyAttestationText({ policyName: policy.name, version })}
+                checked={attested}
+                onCheckedChange={setAttested}
+              />
+              <div>
+                <Button onClick={handleAccept} disabled={!attested}>
+                  Accept Policy
+                </Button>
+              </div>
             </div>
           </div>
         </CardFooter>

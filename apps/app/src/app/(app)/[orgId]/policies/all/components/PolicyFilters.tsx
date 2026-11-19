@@ -1,171 +1,164 @@
 'use client';
 
-import type { Policy, PolicyStatus } from '@db';
+import { usePermissions } from '@/hooks/use-permissions';
+import { authClient } from '@/utils/auth-client';
+import type { Member, User } from '@db';
 import {
-  HStack,
+  Checkbox,
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  Stack,
   Spinner,
+  Stack,
 } from '@trycompai/design-system';
 import { Search } from '@trycompai/design-system/icons';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { usePolicyOnboardingStatus } from '../../(overview)/hooks/use-policy-onboarding-status';
-import { isArchivedPolicy } from '../../lib/policy-archive-state';
+import {
+  filterPolicyRegister,
+  type PolicyRegisterRow,
+  type RegisterSort,
+  type StageFilter,
+} from '../../lib/policy-register';
 import { PoliciesTableDS } from './PoliciesTableDS';
+import { PolicyBulkActions } from './PolicyBulkActions';
+import { FilterSelect, STAGE_OPTIONS } from './PolicyFilterSelect';
 import { PolicyTailoringProvider } from './policy-tailoring-context';
-import { comparePoliciesByName } from './policy-name-sort';
 
 interface PolicyFiltersProps {
-  policies: Policy[];
+  policies: PolicyRegisterRow[];
+  members: (Member & { user: User })[];
   onboardingRunId?: string | null;
 }
 
-const STATUS_OPTIONS: { value: PolicyStatus | 'all' | 'archived'; label: string }[] = [
-  { value: 'all', label: 'All Statuses' },
-  { value: 'draft', label: 'Draft' },
-  { value: 'published', label: 'Published' },
-  { value: 'needs_review', label: 'Needs Review' },
-  { value: 'archived', label: 'Archived' },
-];
+export function PolicyFilters({ policies, members, onboardingRunId }: PolicyFiltersProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const { hasPermission } = usePermissions();
+  const { data: activeMember } = authClient.useActiveMember();
+  const canUpdate = hasPermission('policy', 'update');
 
-export function PolicyFilters({ policies, onboardingRunId }: PolicyFiltersProps) {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<PolicyStatus | 'all' | 'archived'>('all');
-  const [departmentFilter, setDepartmentFilter] = useState<string>('all');
-  const [sortColumn, setSortColumn] = useState<'name' | 'status' | 'updatedAt'>('name');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [search, setSearch] = useState('');
+  const [stage, setStage] = useState<StageFilter>('all');
+  const [department, setDepartment] = useState('all');
+  const [framework, setFramework] = useState('all');
+  const [reviewOverdue, setReviewOverdue] = useState(false);
+  const [sort, setSort] = useState<RegisterSort>('name');
+  const [direction, setDirection] = useState<'asc' | 'desc'>('asc');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // "Awaiting my approval" lives in the URL so the header chip can link to it.
+  const awaitingMine = searchParams.get('awaiting') === 'me';
+  const currentMemberId = activeMember?.id ?? null;
 
-  // ENG-108: subscribe to the onboarding run so PoliciesTableDS can surface
-  // per-row "Tailoring/Queued/Preparing" state and we can render the banner
-  // while AI is still personalizing the policy pack. Mirrors the existing
-  // pattern in RisksTable/VendorsTable.
   const { itemStatuses, progress, isActive } = usePolicyOnboardingStatus(onboardingRunId);
-  const hasActivePolicies = policies.length > 0;
-  const showTailoringBanner = isActive && hasActivePolicies && progress !== null;
+  const showTailoringBanner = isActive && policies.length > 0 && progress !== null;
 
-  // Get unique departments from policies
-  const departments = useMemo(() => {
-    const depts = new Set<string>();
-    policies.forEach((p) => {
-      if (p.department) depts.add(p.department);
-    });
-    return Array.from(depts).sort();
-  }, [policies]);
+  const departments = useMemo(
+    () => [...new Set(policies.flatMap((p) => (p.department ? [p.department] : [])))].sort(),
+    [policies],
+  );
+  const frameworks = useMemo(
+    () => [...new Set(policies.flatMap((p) => p.frameworks ?? []))].sort(),
+    [policies],
+  );
 
-  // Filter and sort policies
-  const filteredPolicies = useMemo(() => {
-    let result = [...policies];
+  const visible = useMemo(
+    () =>
+      filterPolicyRegister(policies, {
+        search,
+        stage,
+        department,
+        framework,
+        reviewOverdue,
+        awaitingMemberId: awaitingMine ? currentMemberId : null,
+        sort,
+        direction,
+      }),
+    [policies, search, stage, department, framework, reviewOverdue, awaitingMine, currentMemberId, sort, direction],
+  );
+  const selected = visible.filter((policy) => selectedIds.has(policy.id));
 
-    // Search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      result = result.filter((p) => p.name.toLowerCase().includes(query));
+  const handleSort = (column: RegisterSort) => {
+    if (sort === column) {
+      setDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
+      return;
     }
-
-    // Status filter
-    if (statusFilter === 'archived') {
-      result = result.filter((p) => isArchivedPolicy(p));
-    } else {
-      result = result.filter((p) => !isArchivedPolicy(p));
-      if (statusFilter !== 'all') {
-        result = result.filter((p) => p.status === statusFilter);
-      }
-    }
-
-    // Department filter
-    if (departmentFilter !== 'all') {
-      result = result.filter((p) => p.department === departmentFilter);
-    }
-
-    // Sort
-    result.sort((a, b) => {
-      let comparison = 0;
-      if (sortColumn === 'name') {
-        comparison = comparePoliciesByName(a, b);
-      } else if (sortColumn === 'status') {
-        comparison = a.status.localeCompare(b.status);
-      } else if (sortColumn === 'updatedAt') {
-        comparison = new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
-      }
-      return sortDirection === 'asc' ? comparison : -comparison;
-    });
-
-    return result;
-  }, [policies, searchQuery, statusFilter, departmentFilter, sortColumn, sortDirection]);
-
-  const handleSort = (column: 'name' | 'status' | 'updatedAt') => {
-    if (sortColumn === column) {
-      setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortColumn(column);
-      setSortDirection('asc');
-    }
+    setSort(column);
+    setDirection('asc');
   };
 
-  const statusLabel = STATUS_OPTIONS.find((opt) => opt.value === statusFilter)?.label ?? 'Status';
+  const handleToggleAwaiting = (checked: boolean) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (checked) params.set('awaiting', 'me');
+    else params.delete('awaiting');
+    router.replace(`${pathname}?${params.toString()}`);
+  };
 
-  const formatDepartment = (str: string) => str.toUpperCase();
-  const departmentLabel =
-    departmentFilter === 'all' ? 'All Departments' : formatDepartment(departmentFilter);
+  const handleToggle = (policyId: string) =>
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(policyId)) next.delete(policyId);
+      else next.add(policyId);
+      return next;
+    });
+
+  const handleBulkDone = () => {
+    setSelectedIds(new Set());
+    router.refresh();
+  };
 
   return (
     <PolicyTailoringProvider statuses={itemStatuses}>
       <Stack gap="md">
-        <div className="flex flex-col gap-3 md:flex-row md:items-end">
-          {/* Search - full width on mobile, constrained on desktop */}
-          <div className="w-full md:max-w-[300px]">
+        <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center">
+          <div className="w-full lg:max-w-[260px]">
             <InputGroup>
               <InputGroupAddon>
                 <Search size={16} />
               </InputGroupAddon>
               <InputGroupInput
                 placeholder="Search policies..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
               />
             </InputGroup>
           </div>
-          {/* Filters - side by side on mobile, inline with search on desktop */}
-          <div className="flex gap-2">
-            <div className="flex-1 md:w-[160px] md:flex-none">
-              <Select
-                value={statusFilter}
-                onValueChange={(v) => setStatusFilter((v ?? 'all') as PolicyStatus | 'all' | 'archived')}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Status">{statusLabel}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {STATUS_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex-1 md:w-[160px] md:flex-none">
-              <Select value={departmentFilter} onValueChange={(v) => setDepartmentFilter(v ?? 'all')}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Department">{departmentLabel}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Departments</SelectItem>
-                  {departments.map((dept) => (
-                    <SelectItem key={dept} value={dept}>
-                      {formatDepartment(dept)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:flex">
+            <FilterSelect
+              value={stage}
+              onChange={(v) => setStage(v as StageFilter)}
+              options={STAGE_OPTIONS}
+            />
+            <FilterSelect
+              value={department}
+              onChange={setDepartment}
+              options={[
+                { value: 'all', label: 'All departments' },
+                ...departments.map((d) => ({ value: d, label: d.toUpperCase() })),
+              ]}
+            />
+            <FilterSelect
+              value={framework}
+              onChange={setFramework}
+              options={[
+                { value: 'all', label: 'All frameworks' },
+                ...frameworks.map((f) => ({ value: f, label: f })),
+              ]}
+            />
+          </div>
+          <div className="flex flex-wrap gap-4">
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <Checkbox checked={reviewOverdue} onCheckedChange={(c) => setReviewOverdue(c === true)} />
+              Review overdue
+            </label>
+            {currentMemberId && (
+              <label className="flex cursor-pointer items-center gap-2 text-sm">
+                <Checkbox checked={awaitingMine} onCheckedChange={(c) => handleToggleAwaiting(c === true)} />
+                Awaiting my approval
+              </label>
+            )}
           </div>
         </div>
         {showTailoringBanner && progress !== null && (
@@ -181,11 +174,29 @@ export function PolicyFilters({ policies, onboardingRunId }: PolicyFiltersProps)
             </div>
           </div>
         )}
+        {canUpdate && selected.length > 0 && (
+          <PolicyBulkActions
+            selected={selected}
+            members={members}
+            currentMemberId={currentMemberId}
+            onDone={handleBulkDone}
+          />
+        )}
         <PoliciesTableDS
-          policies={filteredPolicies}
-          sortColumn={sortColumn}
-          sortDirection={sortDirection}
+          policies={visible}
+          sort={sort}
+          direction={direction}
           onSort={handleSort}
+          selection={
+            canUpdate
+              ? {
+                  selectedIds,
+                  onToggle: handleToggle,
+                  onToggleAll: (checked) =>
+                    setSelectedIds(checked ? new Set(visible.map((p) => p.id)) : new Set()),
+                }
+              : undefined
+          }
         />
       </Stack>
     </PolicyTailoringProvider>

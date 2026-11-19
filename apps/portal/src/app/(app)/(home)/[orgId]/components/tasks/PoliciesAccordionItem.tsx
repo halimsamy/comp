@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { PolicyAttestation } from '../policy/PolicyAttestation';
 
 interface PoliciesAccordionItemProps {
   policies: PortalPolicy[];
@@ -26,6 +27,7 @@ export function PoliciesAccordionItem({ policies, member }: PoliciesAccordionIte
     policies.filter((p) => p.signedBy.includes(member.id)).map((p) => p.id),
   );
   const [isAcceptingAll, setIsAcceptingAll] = useState(false);
+  const [attested, setAttested] = useState(false);
 
   const hasAcceptedPolicies = policies.length === 0 || acceptedPolicies.length === policies.length;
 
@@ -44,6 +46,7 @@ export function PoliciesAccordionItem({ policies, member }: PoliciesAccordionIte
           policyIds: unacceptedPolicyIds,
           memberId: member.id,
           organizationId: member.organizationId,
+          attested,
         }),
       });
 
@@ -121,10 +124,18 @@ export function PoliciesAccordionItem({ policies, member }: PoliciesAccordionIte
                     );
                   })}
                 </div>
+                {!hasAcceptedPolicies && (
+                  <PolicyAttestation
+                    text="I have read and understood the policies above and I agree to comply with them."
+                    checked={attested}
+                    onCheckedChange={setAttested}
+                    disabled={isAcceptingAll}
+                  />
+                )}
                 <div className="flex items-center gap-2">
                   <Button
                     onClick={handleAcceptAllPolicies}
-                    disabled={hasAcceptedPolicies || isAcceptingAll}
+                    disabled={hasAcceptedPolicies || isAcceptingAll || !attested}
                   >
                     {isAcceptingAll
                       ? 'Accepting...'

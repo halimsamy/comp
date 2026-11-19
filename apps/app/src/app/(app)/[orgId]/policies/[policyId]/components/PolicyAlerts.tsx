@@ -22,14 +22,40 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { usePolicy } from '../hooks/usePolicy';
+import type { PolicyVersionWithPublisher } from '../hooks/usePolicyVersions';
+
+/** The latest rejection that is still unresolved (nothing pending or published since). */
+export function findOpenRejection({
+  policy,
+  versions,
+}: {
+  policy: Pick<Policy, 'pendingVersionId' | 'lastPublishedAt'>;
+  versions: PolicyVersionWithPublisher[];
+}) {
+  if (policy.pendingVersionId) return null;
+  const latest = versions
+    .filter((v) => v.rejectedAt)
+    .sort((a, b) => new Date(b.rejectedAt ?? 0).getTime() - new Date(a.rejectedAt ?? 0).getTime())[0];
+  if (!latest?.rejectedAt) return null;
+  if (policy.lastPublishedAt && new Date(policy.lastPublishedAt) > new Date(latest.rejectedAt)) {
+    return null;
+  }
+  return latest;
+}
 
 interface PolicyAlertsProps {
   policy: (Policy & { approver: (Member & { user: User }) | null }) | null;
+  versions?: PolicyVersionWithPublisher[];
   isPendingApproval: boolean;
   onMutate?: () => void;
 }
 
-export function PolicyAlerts({ policy, isPendingApproval, onMutate }: PolicyAlertsProps) {
+export function PolicyAlerts({
+  policy,
+  versions = [],
+  isPendingApproval,
+  onMutate,
+}: PolicyAlertsProps) {
   const { data: activeMember } = authClient.useActiveMember();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -86,7 +112,7 @@ export function PolicyAlerts({ policy, isPendingApproval, onMutate }: PolicyAler
       setIsDenying(true);
       try {
         await denyChanges({ comment });
-        toast.info('Policy changes denied!');
+        toast.info('Policy changes rejected. The author has been notified.');
         onMutate?.();
       } catch {
         toast.error('Failed to deny policy changes.');
@@ -108,8 +134,9 @@ export function PolicyAlerts({ policy, isPendingApproval, onMutate }: PolicyAler
 
   const showPendingAlert = isPendingApproval && Boolean(policy.pendingVersionId);
   const showArchivedAlert = policy.isArchived;
+  const rejection = findOpenRejection({ policy, versions });
 
-  if (!showPendingAlert && !showArchivedAlert) {
+  if (!showPendingAlert && !showArchivedAlert && !rejection) {
     return null;
   }
 
@@ -144,8 +171,8 @@ export function PolicyAlerts({ policy, isPendingApproval, onMutate }: PolicyAler
             cancelText: 'Cancel',
           }}
           rejectConfirmation={{
-            title: 'Deny Policy Changes',
-            description: 'Are you sure you want to deny these policy changes?',
+            title: 'Reject Policy Changes',
+            description: 'The author is emailed your reason and the previous version stays in force.',
             content: (
               <Stack gap="2">
                 <Label htmlFor="reject-comment">Reason (optional)</Label>
@@ -157,7 +184,7 @@ export function PolicyAlerts({ policy, isPendingApproval, onMutate }: PolicyAler
                 />
               </Stack>
             ),
-            confirmText: 'Deny',
+            confirmText: 'Reject',
             cancelText: 'Cancel',
           }}
         />
@@ -193,6 +220,22 @@ export function PolicyAlerts({ policy, isPendingApproval, onMutate }: PolicyAler
               </Text>
             </Stack>
           </HStack>
+        </div>
+      )}
+
+      {rejection && (
+        <div className="rounded-lg border border-l-4 border-border border-l-destructive bg-background p-4">
+          <Stack gap="1">
+            <Text size="sm" weight="medium" leading="tight">
+              Version {rejection.version} was rejected
+            </Text>
+            <Text size="sm" variant="muted">
+              {rejection.rejectedBy?.user?.name ?? 'The approver'} rejected it on{' '}
+              {format(new Date(rejection.rejectedAt ?? new Date()), 'PPP')}
+              {rejection.rejectionComment ? `: “${rejection.rejectionComment}”` : '.'} Edit the
+              version and submit it again.
+            </Text>
+          </Stack>
         </div>
       )}
 

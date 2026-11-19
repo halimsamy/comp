@@ -17,6 +17,9 @@ interface PolicyFromApi {
   status: string;
   isArchived: boolean;
   archivedAt: string | null;
+  pendingVersionId: string | null;
+  reviewDate: string | null;
+  lifecycleStage?: 'draft' | 'pending_approval' | 'published' | 'review_due';
   assigneeId: string | null;
   assignee?: {
     id: string;

@@ -16,6 +16,7 @@ import { headers } from 'next/headers';
 import Link from 'next/link';
 import { PolicyHeaderActions } from './components/PolicyHeaderActions';
 import PolicyPage from './components/PolicyPage';
+import { getPolicyStage } from '../lib/policy-stage';
 import { PolicyStatusBadge } from './components/PolicyStatusBadge';
 
 type PolicyDetail = Policy & {
@@ -97,12 +98,14 @@ export default async function PolicyDetails({
           { label: policy?.name ?? 'Policy', isCurrent: true },
         ]}
       />
-      <div className="flex items-center justify-between pb-6">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-3 pb-6 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex min-w-0 flex-wrap items-center gap-3">
           <h1 className="text-2xl font-semibold tracking-tight">
             {policy?.name ?? 'Policy'}
           </h1>
-          {policy && <PolicyStatusBadge status={policy.status} isArchived={policy.isArchived} />}
+          {policy && (
+            <PolicyStatusBadge stage={getPolicyStage(policy)} isArchived={policy.isArchived} />
+          )}
         </div>
         <PolicyHeaderActions policy={policy} organizationId={orgId} />
       </div>

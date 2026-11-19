@@ -1,7 +1,11 @@
 import { db } from '@db/server';
+import { policyAttestationText } from './policy-attestation';
 import { portalPolicyWhere } from './portal-policy-access';
 
-/** Validate the entire batch before writing, in one serializable transaction. */
+/**
+ * Validate the entire batch before writing, in one serializable transaction.
+ * The caller must have confirmed the attestation; its text is stored per row.
+ */
 export async function acknowledgePortalPolicies({
   userId,
   organizationId,
@@ -31,7 +35,13 @@ export async function acknowledgePortalPolicies({
       const where = portalPolicyWhere({ organizationId, department: member.department });
       const policies = await transaction.policy.findMany({
         where: { ...where, id: { in: ids } },
-        select: { id: true, signedBy: true, currentVersionId: true },
+        select: {
+          id: true,
+          name: true,
+          signedBy: true,
+          currentVersionId: true,
+          currentVersion: { select: { version: true } },
+        },
       });
       if (policies.length !== ids.length) return { success: false, status: 404 };
 
@@ -52,6 +62,10 @@ export async function acknowledgePortalPolicies({
             policyId: policy.id,
             policyVersionId: policy.currentVersionId,
             memberId: member.id,
+            attestation: policyAttestationText({
+              policyName: policy.name,
+              version: policy.currentVersion?.version,
+            }),
           },
         });
       }

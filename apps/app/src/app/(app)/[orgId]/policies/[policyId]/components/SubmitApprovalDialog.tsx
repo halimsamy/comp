@@ -20,6 +20,9 @@ interface SubmitApprovalDialogProps {
   onSelectedApproverIdChange: (id: string | null) => void;
   onConfirm: () => void;
   isSubmitting: boolean;
+  title?: string;
+  description?: string;
+  confirmText?: string;
 }
 
 export const SubmitApprovalDialog = ({
@@ -30,13 +33,16 @@ export const SubmitApprovalDialog = ({
   onSelectedApproverIdChange,
   onConfirm,
   isSubmitting,
+  title = 'Submit for Approval',
+  description = 'Please select an approver for this policy.',
+  confirmText = 'Confirm & Submit',
 }: SubmitApprovalDialogProps) => {
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Submit for Approval</DialogTitle>
-          <DialogDescription>Please select an approver for this policy.</DialogDescription>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         <SelectAssignee
           assignees={assignees}
@@ -53,7 +59,7 @@ export const SubmitApprovalDialog = ({
             disabled={isSubmitting || !selectedApproverId}
             loading={isSubmitting}
           >
-            Confirm & Submit
+            {confirmText}
           </Button>
         </DialogFooter>
       </DialogContent>

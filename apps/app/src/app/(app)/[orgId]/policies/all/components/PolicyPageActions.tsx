@@ -2,12 +2,16 @@
 
 import { CreatePolicySheet } from '@/components/sheets/create-policy-sheet';
 import { usePermissions } from '@/hooks/use-permissions';
+import { authClient } from '@/utils/auth-client';
 import { Add, Download, Upload } from '@trycompai/design-system/icons';
 import type { Policy } from '@db';
-import { Button, HStack } from '@trycompai/design-system';
+import { Button } from '@trycompai/design-system';
+import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
+import { isAwaitingApprovalBy } from '../../lib/policy-register';
 import { BulkUploadPoliciesSheet } from './BulkUploadPoliciesSheet';
+import { ExportAcknowledgementsButton } from './ExportAcknowledgementsButton';
 import { PolicyDownloadSheet } from './PolicyDownloadSheet';
 
 interface PolicyPageActionsProps {
@@ -21,6 +25,10 @@ export function PolicyPageActions({ policies }: PolicyPageActionsProps) {
   const [isDownloadSheetOpen, setIsDownloadSheetOpen] = useState(false);
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
   const { hasPermission } = usePermissions();
+  const { data: activeMember } = authClient.useActiveMember();
+  const awaitingMine = policies.filter((p) =>
+    isAwaitingApprovalBy(p, activeMember?.id ?? null),
+  ).length;
 
   // Bulk upload creates a draft policy AND attaches a PDF, so it needs both
   // policy:create (create step) and policy:update (attach step). Gating on
@@ -39,7 +47,16 @@ export function PolicyPageActions({ policies }: PolicyPageActionsProps) {
 
   return (
     <>
-      <HStack gap="sm" align="center">
+      <div className="flex flex-wrap items-center gap-2">
+        {awaitingMine > 0 && (
+          <Link
+            href={`${pathname}?awaiting=me`}
+            className="rounded-full border border-warning/40 bg-warning/10 px-3 py-1 text-xs font-medium text-warning hover:bg-warning/20"
+          >
+            Awaiting my approval ({awaitingMine})
+          </Link>
+        )}
+        {policies.length > 0 && hasPermission('policy', 'read') && <ExportAcknowledgementsButton />}
         {policies.length > 0 && (
           <Button
             variant="outline"
@@ -63,7 +80,7 @@ export function PolicyPageActions({ policies }: PolicyPageActionsProps) {
             Create Policy
           </Button>
         )}
-      </HStack>
+      </div>
       <CreatePolicySheet />
       <BulkUploadPoliciesSheet
         open={isBulkUploadOpen}

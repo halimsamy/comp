@@ -4,6 +4,14 @@ export interface PdfDocumentControl {
   organizationName: string;
   logo: { dataUrl: string; format: 'PNG' | 'JPEG' } | null;
   rows: { label: string; value: string }[];
+  revisions?: PdfRevision[];
+}
+
+export interface PdfRevision {
+  version: string;
+  date: string;
+  approvedBy: string;
+  changes: string;
 }
 
 const LOGO_MAX_WIDTH = 40;
@@ -75,4 +83,79 @@ export function drawDocumentControlHeader({
 
   doc.setTextColor(0, 0, 0);
   return cursor + control.rows.length * ROW_HEIGHT + 8;
+}
+
+const REVISION_COLUMNS: { key: keyof PdfRevision; label: string; share: number }[] = [
+  { key: 'version', label: 'Version', share: 0.12 },
+  { key: 'date', label: 'Approved', share: 0.24 },
+  { key: 'approvedBy', label: 'Approved by', share: 0.24 },
+  { key: 'changes', label: 'Changes', share: 0.4 },
+];
+
+/**
+ * Draws the "Revision history" table (ISO 27001 7.5.3 change control) from
+ * approved policy versions. Returns the y position after the table.
+ */
+export function drawRevisionHistory({
+  doc,
+  revisions,
+  margin,
+  y,
+}: {
+  doc: JsPDFType;
+  revisions: PdfRevision[];
+  margin: number;
+  y: number;
+}): number {
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const contentWidth = doc.internal.pageSize.getWidth() - margin * 2;
+  let cursor = y + 8;
+  const ensureSpace = (needed: number) => {
+    if (cursor + needed <= pageHeight - 20) return;
+    doc.addPage();
+    cursor = 20;
+  };
+
+  ensureSpace(20);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.setTextColor(0, 0, 0);
+  doc.text('Revision history', margin, cursor);
+  cursor += 8;
+
+  doc.setFontSize(9);
+  if (revisions.length === 0) {
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 100, 100);
+    doc.text('No approved versions yet.', margin, cursor);
+    doc.setTextColor(0, 0, 0);
+    return cursor + 6;
+  }
+
+  const drawRow = (cells: Record<keyof PdfRevision, string>, bold: boolean) => {
+    doc.setFont('helvetica', bold ? 'bold' : 'normal');
+    let x = margin;
+    const wrapped = REVISION_COLUMNS.map((col) =>
+      doc.splitTextToSize(toPdfText(cells[col.key]), contentWidth * col.share - 4),
+    );
+    const height = Math.max(...wrapped.map((lines) => lines.length)) * 4 + 3;
+    ensureSpace(height);
+    if (bold) {
+      doc.setFillColor(240, 240, 240);
+      doc.rect(margin, cursor - 4, contentWidth, height, 'F');
+    }
+    REVISION_COLUMNS.forEach((col, index) => {
+      doc.text(wrapped[index], x + 2, cursor);
+      x += contentWidth * col.share;
+    });
+    cursor += height;
+    doc.setDrawColor(220, 220, 220);
+    doc.line(margin, cursor - 4, margin + contentWidth, cursor - 4);
+  };
+
+  doc.setTextColor(30, 41, 59);
+  drawRow({ version: 'Version', date: 'Approved', approvedBy: 'Approved by', changes: 'Changes' }, true);
+  revisions.forEach((revision) => drawRow(revision, false));
+  doc.setTextColor(0, 0, 0);
+  return cursor + 4;
 }

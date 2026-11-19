@@ -58,6 +58,7 @@ model Policy {
   findings              Finding[]
   reviews               PolicyReview[]
   acknowledgements      PolicyAcknowledgement[]
+  ackReminders          PolicyAckReminder[]
 
   @@index([organizationId])
   @@index([organizationId, archivedAt])
@@ -86,6 +87,15 @@ model PolicyVersion {
   approvedById    String?
   approvedBy      Member?   @relation("PolicyVersionApprover", fields: [approvedById], references: [id], onDelete: SetNull)
   approvalComment String?
+
+  // Submission and rejection record for the approval workflow.
+  submittedAt      DateTime?
+  submittedById    String?
+  submittedBy      Member?   @relation("PolicyVersionSubmitter", fields: [submittedById], references: [id], onDelete: SetNull)
+  rejectedAt       DateTime?
+  rejectedById     String?
+  rejectedBy       Member?   @relation("PolicyVersionRejecter", fields: [rejectedById], references: [id], onDelete: SetNull)
+  rejectionComment String?
 
   reviews          PolicyReview[]
   acknowledgements PolicyAcknowledgement[]
@@ -128,8 +138,24 @@ model PolicyAcknowledgement {
   memberId        String?
   member          Member?        @relation(fields: [memberId], references: [id], onDelete: SetNull)
   acknowledgedAt  DateTime       @default(now())
+  // The statement the employee ticked when accepting (portal attestation).
+  attestation     String?
 
   @@index([policyId, memberId])
   @@index([memberId])
   @@index([organizationId, acknowledgedAt])
+}
+
+// One row per acknowledgement reminder email, so reminders leave a trace and
+// a member is reminded at most once per day.
+model PolicyAckReminder {
+  id              String   @id @default(dbgenerated("generate_prefixed_cuid('par'::text)"))
+  policyId        String
+  policy          Policy   @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  memberId        String
+  member          Member   @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  policyVersionId String?
+  sentAt          DateTime @default(now())
+
+  @@index([policyId, memberId, sentAt])
 }

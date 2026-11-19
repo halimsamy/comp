@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isPolicyReviewDue } from './policy-schedule-helpers';
+import { isPolicyReviewDue, shouldNotifyReviewDue } from './policy-schedule-helpers';
 
 describe('isPolicyReviewDue', () => {
   const now = new Date('2026-11-18T12:00:00Z');
@@ -16,5 +16,21 @@ describe('isPolicyReviewDue', () => {
 
   it('is never due without a review date', () => {
     expect(isPolicyReviewDue({ reviewDate: null, now })).toBe(false);
+  });
+});
+
+describe('shouldNotifyReviewDue', () => {
+  const reviewDate = new Date('2026-11-01T00:00:00.000Z');
+  const hoursAfter = (h: number) => new Date(reviewDate.getTime() + h * 3_600_000);
+
+  it('notifies on the first run after the due date, then once a week', () => {
+    expect(shouldNotifyReviewDue({ reviewDate, now: hoursAfter(-1) })).toBe(false);
+    expect(shouldNotifyReviewDue({ reviewDate, now: hoursAfter(1) })).toBe(true);
+    expect(shouldNotifyReviewDue({ reviewDate, now: hoursAfter(13) })).toBe(false);
+    expect(shouldNotifyReviewDue({ reviewDate, now: hoursAfter(7 * 24 + 1) })).toBe(true);
+  });
+
+  it('never notifies without a review date', () => {
+    expect(shouldNotifyReviewDue({ reviewDate: null, now: hoursAfter(1) })).toBe(false);
   });
 });

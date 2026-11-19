@@ -3,7 +3,6 @@
 import { DepartmentSelect } from '@/components/DepartmentSelect';
 import { SelectAssignee } from '@/components/SelectAssignee';
 import {
-  Departments,
   Frequency,
   Member,
   PolicyStatus,
@@ -71,12 +70,12 @@ export function UpdatePolicyOverview({
   const [pendingChanges, setPendingChanges] = useState<{
     assigneeId: { from: string | null; to: string | null } | null;
     department: { from: string | null; to: string } | null;
-    reviewFrequency: { from: Frequency | null; to: Frequency } | null;
+    reviewFrequency: { from: Frequency | null; to: Frequency | null } | null;
     formData: {
       status: PolicyStatus;
       assigneeId: string | null;
       department: string;
-      reviewFrequency: Frequency;
+      reviewFrequency: Frequency | null;
     };
   } | null>(null);
 
@@ -85,12 +84,9 @@ export function UpdatePolicyOverview({
   const displayStatus = policy.status ?? PolicyStatus.draft;
 
   const [selectedAssigneeId, setSelectedAssigneeId] = useState<string | null>(policy.assigneeId);
-  const [selectedDepartment, setSelectedDepartment] = useState<string>(
-    policy.department || Departments.admin,
-  );
-  const [selectedFrequency, setSelectedFrequency] = useState<Frequency>(
-    policy.frequency || Frequency.monthly,
-  );
+  // Unset values stay unset ("Not set"); never show fabricated defaults.
+  const [selectedDepartment, setSelectedDepartment] = useState<string>(policy.department ?? '');
+  const [selectedFrequency, setSelectedFrequency] = useState<Frequency | null>(policy.frequency);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { hasPermission } = usePermissions();
   const canUpdate = hasPermission('policy', 'update');
@@ -107,7 +103,7 @@ export function UpdatePolicyOverview({
 
     // Show confirmation dialog with list of changes
     const assigneeChanged = assigneeId !== policy.assigneeId;
-    const departmentChanged = department !== policy.department;
+    const departmentChanged = department !== (policy.department ?? '');
     const frequencyChanged = reviewFrequency !== policy.frequency;
 
     setPendingChanges({
@@ -128,8 +124,8 @@ export function UpdatePolicyOverview({
       await updatePolicy({
         status: pendingChanges.formData.status,
         assigneeId: pendingChanges.formData.assigneeId,
-        department: pendingChanges.formData.department,
-        frequency: pendingChanges.formData.reviewFrequency,
+        department: pendingChanges.formData.department || undefined,
+        frequency: pendingChanges.formData.reviewFrequency ?? undefined,
       });
       toast.success('Policy updated successfully');
       onMutate?.();
@@ -145,9 +141,9 @@ export function UpdatePolicyOverview({
   // Check if any form values have actually changed from their original values
   const hasFormChanges = useMemo(() => {
     const assigneeChanged = selectedAssigneeId !== policy.assigneeId;
-    const departmentChanged = selectedDepartment !== (policy.department || Departments.admin);
-    const frequencyChanged = selectedFrequency !== (policy.frequency || Frequency.monthly);
-    
+    const departmentChanged = selectedDepartment !== (policy.department ?? '');
+    const frequencyChanged = selectedFrequency !== policy.frequency;
+
     return assigneeChanged || departmentChanged || frequencyChanged;
   }, [selectedAssigneeId, selectedDepartment, selectedFrequency, policy.assigneeId, policy.department, policy.frequency]);
 
@@ -164,9 +160,9 @@ export function UpdatePolicyOverview({
             {/* Review Frequency Field */}
             <Stack gap="sm">
               <Label htmlFor="review_frequency">Review Frequency</Label>
-              <input type="hidden" name="review_frequency" value={selectedFrequency} />
+              <input type="hidden" name="review_frequency" value={selectedFrequency ?? ''} />
               <Select
-                value={selectedFrequency}
+                value={selectedFrequency ?? undefined}
                 disabled={fieldsDisabled}
                 onValueChange={(value) => {
                   setSelectedFrequency(value as Frequency);
@@ -174,7 +170,9 @@ export function UpdatePolicyOverview({
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select review frequency">
-                    {selectedFrequency.charAt(0).toUpperCase() + selectedFrequency.slice(1)}
+                    {selectedFrequency
+                      ? selectedFrequency.charAt(0).toUpperCase() + selectedFrequency.slice(1)
+                      : 'Not set'}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
@@ -195,12 +193,13 @@ export function UpdatePolicyOverview({
                 value={selectedDepartment}
                 onChange={setSelectedDepartment}
                 disabled={fieldsDisabled}
+                placeholder="Not set"
               />
             </Stack>
 
-            {/* Assignee Field */}
+            {/* Owner Field */}
             <Stack gap="sm">
-              <Label htmlFor="assigneeId">Assignee</Label>
+              <Label htmlFor="assigneeId">Owner</Label>
               <SelectAssignee
                 assignees={assignees}
                 onAssigneeChange={(id) => {
@@ -265,7 +264,7 @@ export function UpdatePolicyOverview({
             {pendingChanges?.assigneeId && (
               <HStack justify="between" align="center">
                 <Text size="sm" variant="muted">
-                  Assignee
+                  Owner
                 </Text>
                 <Text size="sm">
                   <Text as="span" size="sm" variant="muted">
@@ -318,8 +317,10 @@ export function UpdatePolicyOverview({
                     {' → '}
                   </Text>
                   <Text as="span" size="sm" weight="medium">
-                    {pendingChanges.reviewFrequency.to.charAt(0).toUpperCase() +
-                      pendingChanges.reviewFrequency.to.slice(1)}
+                    {pendingChanges.reviewFrequency.to
+                      ? pendingChanges.reviewFrequency.to.charAt(0).toUpperCase() +
+                        pendingChanges.reviewFrequency.to.slice(1)
+                      : 'Not set'}
                   </Text>
                 </Text>
               </HStack>

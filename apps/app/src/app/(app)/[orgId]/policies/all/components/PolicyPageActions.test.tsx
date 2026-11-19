@@ -38,6 +38,15 @@ vi.mock('@/lib/api-client', () => ({
   api: { get: vi.fn() },
 }));
 
+vi.mock('@/utils/auth-client', () => ({
+  authClient: { useActiveMember: () => ({ data: { id: 'mem_me' } }) },
+}));
+
+const mockDownloadCsv = vi.fn();
+vi.mock('@/hooks/use-policy-lifecycle', () => ({
+  downloadAcknowledgementsCsv: (...args: unknown[]) => mockDownloadCsv(...args),
+}));
+
 import { PolicyPageActions } from './PolicyPageActions';
 
 const basePolicies = [
@@ -186,6 +195,28 @@ describe('PolicyPageActions', () => {
       expect(
         screen.getByRole('button', { name: /create policy/i }),
       ).toBeInTheDocument();
+    });
+  });
+
+  describe('acknowledgements export and my approvals', () => {
+    it('exports every acknowledgement for read-only users too', async () => {
+      setMockPermissions(AUDITOR_PERMISSIONS);
+      render(<PolicyPageActions policies={basePolicies as never} />);
+      await userEvent.click(screen.getByRole('button', { name: /export acknowledgements/i }));
+      expect(mockDownloadCsv).toHaveBeenCalledWith({});
+    });
+
+    it('shows a chip with the policies awaiting my approval', () => {
+      setMockPermissions(ADMIN_PERMISSIONS);
+      const pending = [
+        { ...basePolicies[0], id: 'p9', approverId: 'mem_me', pendingVersionId: 'pv_9' },
+        { ...basePolicies[0], id: 'p8', approverId: 'mem_other', pendingVersionId: 'pv_8' },
+      ];
+      render(<PolicyPageActions policies={pending as never} />);
+      expect(screen.getByRole('link', { name: 'Awaiting my approval (1)' })).toHaveAttribute(
+        'href',
+        expect.stringContaining('awaiting=me'),
+      );
     });
   });
 });

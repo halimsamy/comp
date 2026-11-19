@@ -7,6 +7,9 @@ interface CreatePolicyData {
   name: string;
   description?: string;
   content?: unknown[];
+  frequency?: string;
+  assigneeId?: string;
+  approverId?: string;
 }
 
 interface UpdatePolicyData {

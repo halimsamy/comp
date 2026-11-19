@@ -1,8 +1,10 @@
-export type PolicyLifecycleStage = 'draft' | 'in_review' | 'published' | 'review_due';
+import { getPolicyStage, type PolicyLifecycleStage } from '../../lib/policy-stage';
+
+export type { PolicyLifecycleStage };
 
 export const POLICY_LIFECYCLE_STEPS: { stage: PolicyLifecycleStage; label: string }[] = [
   { stage: 'draft', label: 'Draft' },
-  { stage: 'in_review', label: 'In review' },
+  { stage: 'pending_approval', label: 'Pending approval' },
   { stage: 'published', label: 'Approved & published' },
   { stage: 'review_due', label: 'Periodic review' },
 ];
@@ -14,29 +16,33 @@ export const REVIEW_DUE_SOON_DAYS = 30;
 export function getPolicyLifecycle({
   status,
   pendingVersionId,
-  approverId,
   reviewDate,
+  lastPublishedAt = null,
+  lastReviewedAt = null,
   now = new Date(),
 }: {
   status: string;
   pendingVersionId: string | null;
-  approverId: string | null;
   reviewDate: Date | string | null;
+  lastPublishedAt?: Date | string | null;
+  lastReviewedAt?: Date | string | null;
   now?: Date;
 }) {
   const due = reviewDate ? new Date(reviewDate) : null;
   const daysUntilReview = due ? Math.ceil((due.getTime() - now.getTime()) / DAY_MS) : null;
-
-  let stage: PolicyLifecycleStage = 'published';
-  if (pendingVersionId && approverId) stage = 'in_review';
-  else if (status === 'draft') stage = 'draft';
-  else if (status === 'needs_review' || (daysUntilReview !== null && daysUntilReview <= 0)) {
-    stage = 'review_due';
-  }
+  const stage = getPolicyStage({ status, pendingVersionId, reviewDate, now });
+  // A review recorded after the current version was published closes this cycle.
+  const reviewDoneThisCycle =
+    stage === 'published' &&
+    lastReviewedAt !== null &&
+    (!lastPublishedAt || new Date(lastReviewedAt) >= new Date(lastPublishedAt));
 
   return {
     stage,
-    stepIndex: POLICY_LIFECYCLE_STEPS.findIndex((step) => step.stage === stage),
+    stepIndex: reviewDoneThisCycle
+      ? POLICY_LIFECYCLE_STEPS.length
+      : POLICY_LIFECYCLE_STEPS.findIndex((step) => step.stage === stage),
+    reviewDoneThisCycle,
     daysUntilReview,
     isReviewDueSoon:
       stage === 'published' &&
@@ -65,4 +71,20 @@ export function defaultNextReviewDate({
   const next = new Date(now.getFullYear(), now.getMonth() + months, now.getDate());
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${next.getFullYear()}-${pad(next.getMonth() + 1)}-${pad(next.getDate())}`;
+}
+
+/** The review form's yyyy-MM-dd as UTC midnight, so the PDF and API never shift a day. */
+export function reviewDateToIso(date: string): string {
+  return `${date}T00:00:00.000Z`;
+}
+
+/** True when a review was already recorded today (local calendar day). */
+export function isSameDay(a: Date | string | null | undefined, b: Date = new Date()): boolean {
+  if (!a) return false;
+  const d = new Date(a);
+  return (
+    d.getFullYear() === b.getFullYear() &&
+    d.getMonth() === b.getMonth() &&
+    d.getDate() === b.getDate()
+  );
 }

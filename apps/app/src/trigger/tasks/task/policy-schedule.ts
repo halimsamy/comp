@@ -2,7 +2,7 @@ import { isOrgParticipant } from '@/lib/org-participation-rule';
 import { db } from '@db/server';
 import { Novu } from '@novu/api';
 import { logger, schedules } from '@trycompai/jobs';
-import { isPolicyReviewDue } from './policy-schedule-helpers';
+import { shouldNotifyReviewDue } from './policy-schedule-helpers';
 
 export const policySchedule = schedules.task({
   id: 'policy-schedule',
@@ -16,10 +16,14 @@ export const policySchedule = schedules.task({
       secretKey: process.env.NOVU_API_KEY,
     });
 
-    // Find all published policies that have a review date and frequency set
+    // Policies in force (published, or published with a newer version
+    // pending approval) whose next-review date is set.
     const candidatePolicies = await db.policy.findMany({
       where: {
-        status: 'published',
+        isArchived: false,
+        archivedAt: null,
+        lastPublishedAt: { not: null },
+        status: { in: ['published', 'needs_review'] },
         reviewDate: {
           not: null,
         },
@@ -54,36 +58,24 @@ export const policySchedule = schedules.task({
     });
 
     // reviewDate is the date the next review is due (set on publish and on
-    // every recorded review), so a policy is overdue once that date passes.
+    // every recorded review). "Review due" is derived from it, never stored,
+    // so this job only notifies (first run after the due date, then weekly).
     const overduePolicies = candidatePolicies.filter((policy) =>
-      isPolicyReviewDue({ reviewDate: policy.reviewDate, now }),
+      shouldNotifyReviewDue({ reviewDate: policy.reviewDate, now }),
     );
 
-    logger.info(`Found ${overduePolicies.length} policies past their computed review deadline`);
+    logger.info(`Found ${overduePolicies.length} policies to notify about a due review`);
 
     if (overduePolicies.length === 0) {
       return {
         success: true,
-        totalPoliciesChecked: 0,
-        updatedPolicies: 0,
-        message: 'No policies found past their computed review deadline',
+        notifiedPolicies: 0,
+        message: 'No policy review notifications due',
       };
     }
 
-    // Update all overdue policies to "needs_review" status
     try {
       const policyIds = overduePolicies.map((policy) => policy.id);
-
-      const updateResult = await db.policy.updateMany({
-        where: {
-          id: {
-            in: policyIds,
-          },
-        },
-        data: {
-          status: 'needs_review',
-        },
-      });
 
       // Build array of all org members as recipients for each overdue policy.
       // The notification matrix (isUserUnsubscribed) handles role-based filtering.
@@ -161,31 +153,27 @@ export const policySchedule = schedules.task({
         })),
       });
 
-      // Log details about updated policies
       overduePolicies.forEach((policy) => {
         logger.info(
-          `Updated policy "${policy.name}" (${policy.id}) from org "${policy.organization.name}" - frequency ${policy.frequency} - review was due ${policy.reviewDate?.toISOString()}`,
+          `Review due for policy "${policy.name}" (${policy.id}) from org "${policy.organization.name}" - frequency ${policy.frequency} - due ${policy.reviewDate?.toISOString()}`,
         );
       });
 
-      logger.info(`Successfully updated ${updateResult.count} policies to "needs_review" status`);
-
       return {
         success: true,
-        totalPoliciesChecked: overduePolicies.length,
-        updatedPolicies: updateResult.count,
-        updatedPolicyIds: policyIds,
-        message: `Updated ${updateResult.count} policies past their review deadline`,
+        notifiedPolicies: policyIds.length,
+        notifiedPolicyIds: policyIds,
+        recipients: recipients.length,
+        message: `Sent review-due notifications for ${policyIds.length} policies`,
       };
     } catch (error) {
-      logger.error(`Failed to update overdue policies: ${error}`);
+      logger.error(`Failed to send policy review notifications: ${error}`);
 
       return {
         success: false,
-        totalPoliciesChecked: overduePolicies.length,
-        updatedPolicies: 0,
+        notifiedPolicies: 0,
         error: error instanceof Error ? error.message : String(error),
-        message: 'Failed to update policies past their review deadline',
+        message: 'Failed to send policy review notifications',
       };
     }
   },

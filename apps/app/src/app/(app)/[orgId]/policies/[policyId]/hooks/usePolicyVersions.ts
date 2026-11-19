@@ -5,9 +5,15 @@ import type { Member, PolicyVersion, User } from '@db';
 import { useCallback, useEffect, useRef } from 'react';
 import useSWR from 'swr';
 
-type PolicyVersionWithPublisher = PolicyVersion & {
+type VersionPerson = (Member & { user: Pick<User, 'id' | 'name' | 'image'> }) | null;
+
+export type PolicyVersionWithPublisher = PolicyVersion & {
   publishedBy: (Member & { user: User }) | null;
-  approvedBy?: (Member & { user: User }) | null;
+  approvedBy?: VersionPerson;
+  submittedBy?: VersionPerson;
+  rejectedBy?: VersionPerson;
+  reviews?: { id: string; reviewedAt: Date | string; notes: string | null; reviewer: { user: { name: string | null } } | null }[];
+  _count?: { acknowledgements: number };
 };
 
 // API response includes versions in data object, plus auth info

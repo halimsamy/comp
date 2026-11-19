@@ -26,12 +26,23 @@ export function portalPolicyWhere({
 }): Prisma.PolicyWhereInput {
   return {
     organizationId,
-    status: 'published',
     isArchived: false,
     archivedAt: null,
-    OR: [
-      { visibility: 'ALL' },
-      { visibility: 'DEPARTMENT', visibleToDepartments: { has: department } },
+    AND: [
+      // Approved content stays in force while a newer version waits for
+      // approval or its periodic review is due ("review due" is not a status).
+      {
+        OR: [
+          { status: 'published' },
+          { status: 'needs_review', lastPublishedAt: { not: null } },
+        ],
+      },
+      {
+        OR: [
+          { visibility: 'ALL' },
+          { visibility: 'DEPARTMENT', visibleToDepartments: { has: department } },
+        ],
+      },
     ],
   };
 }
@@ -73,4 +84,22 @@ export async function getPortalPolicy({
   // A current-version reference must never grant access to another policy's content.
   if (policy?.currentVersion && policy.currentVersion.policyId !== policy.id) return null;
   return policy;
+}
+
+/** The member's latest sign-off of this policy, for "Accepted vN on <date>". */
+export async function getLatestPortalAcknowledgement({
+  policyId,
+  memberId,
+}: {
+  policyId: string;
+  memberId: string;
+}) {
+  const row = await db.policyAcknowledgement.findFirst({
+    where: { policyId, memberId },
+    orderBy: { acknowledgedAt: 'desc' },
+    select: { acknowledgedAt: true, policyVersion: { select: { version: true } } },
+  });
+  return row
+    ? { acknowledgedAt: row.acknowledgedAt, version: row.policyVersion?.version ?? null }
+    : null;
 }

@@ -8,6 +8,8 @@ export const dynamic = 'force-dynamic';
 
 const schema = z.object({
   organizationId: z.string().min(1),
+  // The employee must tick the attestation statement before accepting.
+  attested: z.literal(true),
   policyId: z.string().min(1),
 });
 

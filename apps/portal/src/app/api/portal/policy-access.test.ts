@@ -61,6 +61,7 @@ const routes = [
             policyIds: [policy.id],
             memberId: 'mem_employee',
             organizationId: policy.organizationId,
+            attested: true,
           },
         }),
       ),
@@ -72,7 +73,7 @@ const routes = [
       markPolicyCompleted(
         makePostRequest({
           path: 'mark-policy-completed',
-          body: { policyId: policy.id, organizationId: policy.organizationId },
+          body: { policyId: policy.id, organizationId: policy.organizationId, attested: true },
         }),
       ),
     mutation: true,

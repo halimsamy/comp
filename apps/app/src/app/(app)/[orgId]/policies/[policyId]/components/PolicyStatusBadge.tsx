@@ -1,55 +1,22 @@
-'use client';
-
-import { getStatusTranslation, type StatusType } from '@/components/status-indicator';
-import { Badge } from '@trycompai/ui/badge';
-import type { PolicyStatus } from '@db';
+import {
+  POLICY_STAGE_BADGE_CLASS,
+  POLICY_STAGE_LABELS,
+  type PolicyLifecycleStage,
+} from '../../lib/policy-stage';
 
 interface PolicyStatusBadgeProps {
-  status: PolicyStatus;
+  stage: PolicyLifecycleStage;
   isArchived?: boolean;
 }
 
-export function PolicyStatusBadge({ status, isArchived }: PolicyStatusBadgeProps) {
-  if (isArchived) {
-    return (
-      <Badge variant="secondary" className="bg-muted text-muted-foreground hover:bg-muted">
-        Archived
-      </Badge>
-    );
-  }
-
-  const statusLabel = getStatusTranslation(status as StatusType);
-
-  const getBadgeProps = () => {
-    switch (status) {
-      case 'published':
-        return {
-          variant: 'secondary' as const,
-          className: 'bg-primary/10 text-primary hover:bg-primary/10',
-        };
-      case 'draft':
-        return {
-          variant: 'secondary' as const,
-          className: 'border-warning/30 bg-warning/10 text-warning hover:bg-warning/10',
-        };
-      case 'needs_review':
-        return {
-          variant: 'outline' as const,
-          className: 'border-warning text-warning',
-        };
-      default:
-        return {
-          variant: 'secondary' as const,
-          className: '',
-        };
-    }
-  };
-
-  const badgeProps = getBadgeProps();
-
+/** Lifecycle badge: "Pending approval" amber, "Review due" red. */
+export function PolicyStatusBadge({ stage, isArchived }: PolicyStatusBadgeProps) {
+  const key = isArchived ? 'archived' : stage;
   return (
-    <Badge variant={badgeProps.variant} className={badgeProps.className}>
-      {statusLabel}
-    </Badge>
+    <span
+      className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-md border px-2 py-0.5 text-xs font-medium ${POLICY_STAGE_BADGE_CLASS[key]}`}
+    >
+      {isArchived ? 'Archived' : POLICY_STAGE_LABELS[stage]}
+    </span>
   );
 }

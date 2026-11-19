@@ -4,13 +4,15 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { db, PolicyStatus } from '@db';
+import { db } from '@db';
 import { isUserUnsubscribed, PolicyNotificationEmail } from '@trycompai/email';
 import { triggerEmail } from '../../email/trigger-email';
-import {
-  getAcknowledgementAudience,
-  toAcknowledgementsCsv,
-} from './acknowledgement-audience';
+import { getAcknowledgementAudience } from './acknowledgement-audience';
+import { exportAcknowledgementsCsv } from './acknowledgement-export';
+import { isPolicyInForce } from './lifecycle-stage';
+
+const startOfUtcDay = (now: Date) =>
+  new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 
 const HISTORY_INCLUDE = {
   member: {
@@ -32,14 +34,22 @@ export class PolicyAcknowledgementsService {
     organizationId: string;
   }) {
     const policy = await this.getPolicy({ policyId, organizationId });
-    const [audience, history] = await Promise.all([
+    const [audience, history, reminders] = await Promise.all([
       getAcknowledgementAudience({ organizationId, policy }),
       db.policyAcknowledgement.findMany({
         where: { policyId, organizationId },
         orderBy: { acknowledgedAt: 'desc' },
         include: HISTORY_INCLUDE,
       }),
+      db.policyAckReminder.groupBy({
+        by: ['memberId'],
+        where: { policyId },
+        _max: { sentAt: true },
+      }),
     ]);
+    const lastReminded = new Map(
+      reminders.map((row) => [row.memberId, row._max.sentAt ?? null]),
+    );
 
     const members = audience.map((member) => {
       const own = history.filter((row) => row.memberId === member.id);
@@ -58,6 +68,7 @@ export class PolicyAcknowledgementsService {
         acknowledgedAt: current?.acknowledgedAt ?? null,
         lastAcknowledgedAt: last?.acknowledgedAt ?? null,
         lastAcknowledgedVersion: last?.policyVersion?.version ?? null,
+        lastRemindedAt: lastReminded.get(member.id) ?? null,
       };
     });
     const acknowledged = members.filter((m) => m.status === 'acknowledged');
@@ -67,6 +78,8 @@ export class PolicyAcknowledgementsService {
       policyName: policy.name,
       isRequiredToSign: policy.isRequiredToSign,
       status: policy.status,
+      // False when no version was ever approved: nothing to acknowledge yet.
+      inForce: isPolicyInForce(policy) && Boolean(policy.currentVersion),
       currentVersion: policy.currentVersion,
       summary: {
         total: members.length,
@@ -100,56 +113,31 @@ export class PolicyAcknowledgementsService {
     return rows.map((row) => this.toHistoryItem(row));
   }
 
-  async exportCsv({
-    organizationId,
-    policyId,
-    memberId,
-  }: {
+  exportCsv(params: {
     organizationId: string;
     policyId?: string;
     memberId?: string;
   }) {
-    const rows = await db.policyAcknowledgement.findMany({
-      where: {
-        organizationId,
-        ...(policyId ? { policyId } : {}),
-        ...(memberId ? { memberId } : {}),
-      },
-      orderBy: [{ policy: { name: 'asc' } }, { acknowledgedAt: 'desc' }],
-      include: HISTORY_INCLUDE,
-    });
-    const csv = toAcknowledgementsCsv(
-      rows.map((row) => {
-        const item = this.toHistoryItem(row);
-        return {
-          policyName: item.policyName,
-          version: item.version,
-          memberName: item.memberName,
-          memberEmail: item.memberEmail,
-          acknowledgedAt: item.acknowledgedAt,
-        };
-      }),
-    );
-    const date = new Date().toISOString().slice(0, 10);
-    return {
-      filename: `policy-acknowledgements-${date}.csv`,
-      count: rows.length,
-      csv,
-    };
+    return exportAcknowledgementsCsv(params);
   }
 
-  /** Email every member who still has to acknowledge the current version. */
+  /**
+   * Email every member who still has to acknowledge the current version,
+   * at most once per member and day. Each email leaves a PolicyAckReminder row.
+   */
   async remindPending({
     policyId,
     organizationId,
+    now = new Date(),
   }: {
     policyId: string;
     organizationId: string;
+    now?: Date;
   }) {
     const result = await this.listForPolicy({ policyId, organizationId });
-    if (result.status !== PolicyStatus.published) {
+    if (!result.inForce) {
       throw new BadRequestException(
-        'Reminders can only be sent for published policies',
+        'Reminders can only be sent once a version has been approved and published',
       );
     }
     if (!result.isRequiredToSign) {
@@ -158,16 +146,25 @@ export class PolicyAcknowledgementsService {
       );
     }
 
-    const organization = await db.organization.findUnique({
-      where: { id: organizationId },
-      select: { name: true },
-    });
-    const today = new Date().toISOString().slice(0, 10);
-    let sent = 0;
-    let skipped = 0;
+    const [organization, remindedToday] = await Promise.all([
+      db.organization.findUnique({
+        where: { id: organizationId },
+        select: { name: true },
+      }),
+      db.policyAckReminder.findMany({
+        where: { policyId, sentAt: { gte: startOfUtcDay(now) } },
+        select: { memberId: true },
+      }),
+    ]);
+    const skipToday = new Set(remindedToday.map((row) => row.memberId));
+    const counts = { sent: 0, alreadyRemindedToday: 0, unsubscribed: 0, failed: 0 };
 
     for (const member of result.members) {
       if (member.status !== 'pending' || !member.email) continue;
+      if (skipToday.has(member.memberId)) {
+        counts.alreadyRemindedToday++;
+        continue;
+      }
       const unsubscribed = await isUserUnsubscribed(
         db,
         member.email,
@@ -175,7 +172,7 @@ export class PolicyAcknowledgementsService {
         organizationId,
       );
       if (unsubscribed) {
-        skipped++;
+        counts.unsubscribed++;
         continue;
       }
       try {
@@ -191,19 +188,26 @@ export class PolicyAcknowledgementsService {
             notificationType: member.lastAcknowledgedAt ? 'updated' : 'new',
           }),
           system: true,
-          // One reminder per member, policy and day, however often it is clicked.
-          idempotencyKey: `policy-ack-reminder:${policyId}:${member.memberId}:${today}`,
+          idempotencyKey: `policy-ack-reminder:${policyId}:${member.memberId}:${now.toISOString().slice(0, 10)}`,
         });
-        sent++;
+        await db.policyAckReminder.create({
+          data: {
+            policyId,
+            memberId: member.memberId,
+            policyVersionId: result.currentVersion?.id ?? null,
+            sentAt: now,
+          },
+        });
+        counts.sent++;
       } catch (error) {
-        skipped++;
+        counts.failed++;
         this.logger.warn(
           `Failed to send acknowledgement reminder for policy ${policyId}`,
           error instanceof Error ? error.message : String(error),
         );
       }
     }
-    return { sent, skipped, pending: result.summary.pending };
+    return { ...counts, pending: result.summary.pending };
   }
 
   private async getPolicy({
@@ -219,6 +223,7 @@ export class PolicyAcknowledgementsService {
         id: true,
         name: true,
         status: true,
+        lastPublishedAt: true,
         signedBy: true,
         isRequiredToSign: true,
         visibility: true,

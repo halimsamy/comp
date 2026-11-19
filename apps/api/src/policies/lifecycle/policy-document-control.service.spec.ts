@@ -14,6 +14,9 @@ describe('buildDocumentControlRows', () => {
       status: 'published',
       lastPublishedAt: new Date('2026-03-01T00:00:00Z'),
       reviewDate: new Date('2027-03-01T00:00:00Z'),
+      frequency: 'yearly',
+      visibility: 'ALL',
+      visibleToDepartments: [],
       assignee: person('Olivia'),
       currentVersion: {
         version: 4,
@@ -32,6 +35,8 @@ describe('buildDocumentControlRows', () => {
       'Effective date': 'March 1, 2026',
       'Last reviewed': 'September 1, 2026',
       'Next review': 'March 1, 2027',
+      'Review frequency': 'Yearly',
+      Classification: 'Internal - all employees',
     });
   });
 
@@ -40,11 +45,16 @@ describe('buildDocumentControlRows', () => {
       status: 'draft',
       lastPublishedAt: null,
       reviewDate: null,
+      frequency: null,
+      visibility: 'DEPARTMENT',
+      visibleToDepartments: ['it', 'hr'],
       assignee: null,
       currentVersion: null,
       reviews: [],
     });
     expect(rows.find((r) => r.label === 'Version')?.value).toBe('Draft');
     expect(rows.find((r) => r.label === 'Approved by')?.value).toBe('—');
+    expect(rows.find((r) => r.label === 'Review frequency')?.value).toBe('Not set');
+    expect(rows.find((r) => r.label === 'Classification')?.value).toBe('Internal - IT, HR');
   });
 });

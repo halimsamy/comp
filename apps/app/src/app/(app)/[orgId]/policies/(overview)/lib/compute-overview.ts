@@ -1,11 +1,15 @@
 // Shared utility - can be used by both server and client
 import { isArchivedPolicy } from '../../lib/policy-archive-state';
+import { getPolicyStage, type PolicyLifecycleStage } from '../../lib/policy-stage';
 
 interface PolicyForOverview {
   id: string;
   status: string;
   isArchived: boolean;
   archivedAt?: Date | string | null;
+  pendingVersionId?: string | null;
+  reviewDate?: Date | string | null;
+  lifecycleStage?: PolicyLifecycleStage;
   assigneeId: string | null;
   assignee?: {
     id: string;
@@ -15,87 +19,66 @@ interface PolicyForOverview {
   } | null;
 }
 
-export interface AssigneeData {
+type StageCounts = Record<PolicyLifecycleStage | 'archived', number>;
+
+export interface AssigneeData extends StageCounts {
   id: string;
   name: string;
   total: number;
-  published: number;
-  draft: number;
-  archived: number;
-  needs_review: number;
 }
 
 export interface PoliciesOverview {
   totalPolicies: number;
-  publishedPolicies: number;
-  draftPolicies: number;
-  archivedPolicies: number;
-  needsReviewPolicies: number;
+  byStage: StageCounts;
   assigneeData: AssigneeData[];
 }
 
+export const UNASSIGNED_ID = 'unassigned';
+
+const emptyCounts = (): StageCounts => ({
+  draft: 0,
+  pending_approval: 0,
+  published: 0,
+  review_due: 0,
+  archived: 0,
+});
+
 /**
- * Compute overview stats from policies array
- * Pure function - works on both server and client
+ * Overview stats by lifecycle stage (same rule as the API), grouped by owner.
+ * Active policies without an owner are counted in an "Unassigned" bar.
+ * Pure function - works on both server and client.
  */
 export function computePoliciesOverview(policies: PolicyForOverview[]): PoliciesOverview {
-  let publishedPolicies = 0;
-  let draftPolicies = 0;
-  let archivedPolicies = 0;
-  let needsReviewPolicies = 0;
-
-  const policyDataByOwner = new Map<string, AssigneeData>();
+  const byStage = emptyCounts();
+  const byOwner = new Map<string, AssigneeData>();
 
   for (const policy of policies) {
-    const archived = isArchivedPolicy(policy);
+    const key = isArchivedPolicy(policy)
+      ? 'archived'
+      : (policy.lifecycleStage ??
+        getPolicyStage({
+          status: policy.status,
+          pendingVersionId: policy.pendingVersionId ?? null,
+          reviewDate: policy.reviewDate ?? null,
+        }));
+    byStage[key] += 1;
+    if (key === 'archived') continue;
 
-    // Count by status
-    if (archived) {
-      archivedPolicies += 1;
-    } else if (policy.status === 'published') {
-      publishedPolicies += 1;
-    } else if (policy.status === 'draft') {
-      draftPolicies += 1;
-    } else if (policy.status === 'needs_review') {
-      needsReviewPolicies += 1;
-    }
-
-    // Group by assignee
-    if (policy.assignee) {
-      const assigneeId = policy.assignee.id;
-      if (!policyDataByOwner.has(assigneeId)) {
-        policyDataByOwner.set(assigneeId, {
-          id: assigneeId,
-          name: policy.assignee.user.name || 'Unknown',
-          total: 0,
-          published: 0,
-          draft: 0,
-          archived: 0,
-          needs_review: 0,
-        });
-      }
-
-      const assigneeData = policyDataByOwner.get(assigneeId)!;
-      assigneeData.total += 1;
-
-      if (archived) {
-        assigneeData.archived += 1;
-      } else if (policy.status === 'published') {
-        assigneeData.published += 1;
-      } else if (policy.status === 'draft') {
-        assigneeData.draft += 1;
-      } else if (policy.status === 'needs_review') {
-        assigneeData.needs_review += 1;
-      }
-    }
+    const ownerId = policy.assignee?.id ?? UNASSIGNED_ID;
+    const owner = byOwner.get(ownerId) ?? {
+      id: ownerId,
+      name: policy.assignee ? policy.assignee.user.name || 'Unknown' : 'Unassigned',
+      total: 0,
+      ...emptyCounts(),
+    };
+    owner.total += 1;
+    owner[key] += 1;
+    byOwner.set(ownerId, owner);
   }
 
   return {
     totalPolicies: policies.length,
-    publishedPolicies,
-    draftPolicies,
-    archivedPolicies,
-    needsReviewPolicies,
-    assigneeData: Array.from(policyDataByOwner.values()),
+    byStage,
+    assigneeData: Array.from(byOwner.values()),
   };
 }

@@ -8,6 +8,8 @@ export const dynamic = 'force-dynamic';
 
 const schema = z.object({
   organizationId: z.string().min(1),
+  // The employee must tick the attestation statement before accepting.
+  attested: z.literal(true),
   policyIds: z.array(z.string().min(1)).min(1).max(1000),
   memberId: z.string().min(1),
 });
@@ -22,7 +24,13 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const result = await acknowledgePortalPolicies({ userId: session.user.id, ...parsed.data });
+    const { organizationId, policyIds, memberId } = parsed.data;
+    const result = await acknowledgePortalPolicies({
+      userId: session.user.id,
+      organizationId,
+      policyIds,
+      memberId,
+    });
     if (!result.success) {
       return NextResponse.json({ error: 'Policy access denied' }, { status: result.status });
     }

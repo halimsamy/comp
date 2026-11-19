@@ -106,7 +106,7 @@ export class PolicyLifecycleController {
   @ApiOperation({
     summary: 'Remind employees to acknowledge a policy',
     description:
-      'Emails every employee who has not yet acknowledged the current published version of a policy. Sends at most one reminder per employee per day.',
+      'Emails every employee who has not yet acknowledged the current approved version of a policy, at most once per employee per day. Returns counts: sent, alreadyRemindedToday, unsubscribed, failed and pending.',
   })
   @ApiParam(POLICY_PARAMS.policyId)
   @ApiExtension('x-speakeasy-mcp', { name: 'remind-policy-acknowledgements' })

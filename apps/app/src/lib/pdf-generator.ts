@@ -7,7 +7,11 @@ async function createPDF(): Promise<JsPDFType> {
 import type { JSONContent as TipTapJSONContent } from '@tiptap/react';
 import { AuditLog, User, Member, Organization, Policy } from '@db';
 import { format } from 'date-fns';
-import { drawDocumentControlHeader, type PdfDocumentControl } from './pdf-document-control';
+import {
+  drawDocumentControlHeader,
+  drawRevisionHistory,
+  type PdfDocumentControl,
+} from './pdf-document-control';
 
 // Type definition for the JSON content structure
 interface JSONContent {
@@ -740,9 +744,18 @@ export async function generatePolicyPDF(
 
   // Process the main content
   processContent(config, internalContent);
-  
-  // Add audit logs section
-  addAuditLogsSection(config, logs);
+
+  // Revision history from approved versions replaces the raw activity log.
+  if (documentControl?.revisions) {
+    config.yPosition = drawRevisionHistory({
+      doc,
+      revisions: documentControl.revisions,
+      margin: config.margin,
+      y: config.yPosition,
+    });
+  } else {
+    addAuditLogsSection(config, logs);
+  }
   
   // Add page numbers
   addPageNumbers(config);

@@ -1,11 +1,7 @@
 'use client';
 
-import { StatusIndicator } from '@/components/status-indicator';
-import { formatDate } from '@/lib/format';
-import type { Policy } from '@db';
 import {
-  Badge,
-  HStack,
+  Checkbox,
   Table,
   TableBody,
   TableCell,
@@ -14,219 +10,172 @@ import {
   TableRow,
   Text,
 } from '@trycompai/design-system';
-import { ArrowDown, ArrowUp, ArrowsVertical, Launch } from '@trycompai/design-system/icons';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { isArchivedPolicy } from '../../lib/policy-archive-state';
+import type { PolicyRegisterRow, RegisterSort } from '../../lib/policy-register';
+import {
+  AcknowledgedCell,
+  FrameworksCell,
+  LastApprovedCell,
+  NextReviewCell,
+  PersonCell,
+  SortableHeader,
+  StatusCell,
+  VersionCell,
+} from './policy-register-cells';
 import { usePolicyTailoringStatus, type PolicyTailoringStatus } from './policy-tailoring-context';
-
-type SortColumn = 'name' | 'status' | 'updatedAt';
-
-const capitalize = (str: string) => str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
-
-interface PoliciesTableDSProps {
-  policies: Policy[];
-  sortColumn?: SortColumn;
-  sortDirection?: 'asc' | 'desc';
-  onSort?: (column: SortColumn) => void;
-}
 
 const ACTIVE_STATUSES: PolicyTailoringStatus[] = ['queued', 'pending', 'processing'];
 
-function SortIcon({
-  column,
-  sortColumn,
-  sortDirection,
-}: {
-  column: SortColumn;
-  sortColumn?: SortColumn;
-  sortDirection?: 'asc' | 'desc';
-}) {
-  if (sortColumn !== column) {
-    return <ArrowsVertical size={14} className="text-muted-foreground opacity-50" />;
-  }
-  return sortDirection === 'asc' ? (
-    <ArrowUp size={14} className="text-foreground" />
-  ) : (
-    <ArrowDown size={14} className="text-foreground" />
-  );
+interface PoliciesTableDSProps {
+  policies: PolicyRegisterRow[];
+  sort: RegisterSort;
+  direction: 'asc' | 'desc';
+  onSort: (column: RegisterSort) => void;
+  /** Row selection for bulk actions; omitted for users who cannot act. */
+  selection?: {
+    selectedIds: Set<string>;
+    onToggle: (policyId: string) => void;
+    onToggleAll: (checked: boolean) => void;
+  };
 }
 
+/** The policy register: the auditor columns ISO 27001 7.5 / PCI DSS 12.1 ask for. */
 export function PoliciesTableDS({
   policies,
-  sortColumn,
-  sortDirection,
+  sort,
+  direction,
   onSort,
+  selection,
 }: PoliciesTableDSProps) {
-  const params = useParams<{ orgId: string }>();
+  const { orgId } = useParams<{ orgId: string }>();
   const router = useRouter();
-  const orgId = params.orgId;
-
-  const handleRowClick = (policyId: string) => {
-    router.push(`/${orgId}/policies/${policyId}`);
-  };
 
   if (policies.length === 0) {
     return (
-      <div className="flex h-32 items-center justify-center">
-        <Text variant="muted">No policies found.</Text>
+      <div className="flex h-32 items-center justify-center rounded-lg border">
+        <Text variant="muted">No policies match these filters.</Text>
       </div>
     );
   }
+
+  const allSelected = Boolean(selection) && policies.every((p) => selection?.selectedIds.has(p.id));
+  const headerProps = { sort, direction, onSort };
 
   return (
     <Table variant="bordered">
       <TableHeader>
         <TableRow>
+          {selection && (
+            <TableHead>
+              <Checkbox
+                aria-label="Select all policies"
+                checked={allSelected}
+                onCheckedChange={(checked) => selection.onToggleAll(checked === true)}
+              />
+            </TableHead>
+          )}
           <TableHead>
-            <HStack
-              gap="xs"
-              align="center"
-              style={{ cursor: onSort ? 'pointer' : 'default' }}
-              onClick={() => onSort?.('name')}
-            >
-              <span>Policy Name</span>
-              {onSort && (
-                <SortIcon column="name" sortColumn={sortColumn} sortDirection={sortDirection} />
-              )}
-            </HStack>
+            <SortableHeader label="Policy" column="name" {...headerProps} />
           </TableHead>
           <TableHead>
-            <HStack
-              gap="xs"
-              align="center"
-              style={{ cursor: onSort ? 'pointer' : 'default' }}
-              onClick={() => onSort?.('status')}
-            >
-              <span>Status</span>
-              {onSort && (
-                <SortIcon column="status" sortColumn={sortColumn} sortDirection={sortDirection} />
-              )}
-            </HStack>
+            <SortableHeader label="Status" column="status" {...headerProps} />
           </TableHead>
-          <TableHead>Department</TableHead>
+          <TableHead>Version</TableHead>
+          <TableHead>Owner</TableHead>
+          <TableHead>Approver</TableHead>
+          <TableHead>Last approved</TableHead>
           <TableHead>
-            <HStack
-              gap="xs"
-              align="center"
-              style={{ cursor: onSort ? 'pointer' : 'default' }}
-              onClick={() => onSort?.('updatedAt')}
-            >
-              <span>Last Updated</span>
-              {onSort && (
-                <SortIcon
-                  column="updatedAt"
-                  sortColumn={sortColumn}
-                  sortDirection={sortDirection}
-                />
-              )}
-            </HStack>
+            <SortableHeader label="Next review" column="nextReview" {...headerProps} />
           </TableHead>
+          <TableHead>Acknowledged</TableHead>
+          <TableHead>Frameworks</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {policies.map((policy) => (
-          <PolicyRow key={policy.id} policy={policy} orgId={orgId} onRowClick={handleRowClick} />
+          <PolicyRow
+            key={policy.id}
+            policy={policy}
+            orgId={orgId}
+            selection={selection}
+            onOpen={() => router.push(`/${orgId}/policies/${policy.id}`)}
+          />
         ))}
       </TableBody>
     </Table>
   );
 }
 
-interface PolicyRowProps {
-  policy: Policy;
+function PolicyRow({
+  policy,
+  orgId,
+  selection,
+  onOpen,
+}: {
+  policy: PolicyRegisterRow;
   orgId: string;
-  onRowClick: (policyId: string) => void;
-}
-
-function PolicyRow({ policy, orgId, onRowClick }: PolicyRowProps) {
-  const status = usePolicyTailoringStatus(policy.id);
-  const isTailoring = status && ACTIVE_STATUSES.includes(status);
+  selection: PoliciesTableDSProps['selection'];
+  onOpen: () => void;
+}) {
+  const tailoring = usePolicyTailoringStatus(policy.id);
+  const isTailoring = Boolean(tailoring && ACTIVE_STATUSES.includes(tailoring));
 
   return (
     <TableRow
-      onClick={() => !isTailoring && onRowClick(policy.id)}
+      onClick={() => !isTailoring && onOpen()}
       style={{ cursor: isTailoring ? 'not-allowed' : 'pointer' }}
+      data-state={selection?.selectedIds.has(policy.id) ? 'selected' : undefined}
     >
+      {selection && (
+        <TableCell onClick={(event) => event.stopPropagation()}>
+          <Checkbox
+            aria-label={`Select ${policy.name}`}
+            checked={selection.selectedIds.has(policy.id)}
+            onCheckedChange={() => selection.onToggle(policy.id)}
+          />
+        </TableCell>
+      )}
       <TableCell>
-        <PolicyNameCell policy={policy} orgId={orgId} isTailoring={isTailoring} />
+        {isTailoring ? (
+          <Text size="sm" variant="muted">
+            {policy.name}
+          </Text>
+        ) : (
+          <Link
+            href={`/${orgId}/policies/${policy.id}`}
+            onClick={(event) => event.stopPropagation()}
+            className="block min-w-[12rem] font-medium hover:underline"
+          >
+            {policy.name}
+          </Link>
+        )}
       </TableCell>
       <TableCell>
-        <PolicyStatusCell policy={policy} status={status} isTailoring={isTailoring} />
+        <StatusCell policy={policy} tailoring={isTailoring ? tailoring : undefined} />
       </TableCell>
       <TableCell>
-        <Badge variant="secondary">{policy.department ? capitalize(policy.department) : '—'}</Badge>
+        <VersionCell policy={policy} />
       </TableCell>
       <TableCell>
-        <Text size="sm" variant="muted">
-          {formatDate(policy.updatedAt)}
-        </Text>
+        <PersonCell person={policy.assignee ?? null} />
+      </TableCell>
+      <TableCell>
+        {/* The pending approver, else whoever approved the version in force. */}
+        <PersonCell person={policy.approver ?? policy.currentVersion?.approvedBy ?? null} />
+      </TableCell>
+      <TableCell>
+        <LastApprovedCell policy={policy} />
+      </TableCell>
+      <TableCell>
+        <NextReviewCell policy={policy} />
+      </TableCell>
+      <TableCell>
+        <AcknowledgedCell policy={policy} />
+      </TableCell>
+      <TableCell>
+        <FrameworksCell frameworks={policy.frameworks} />
       </TableCell>
     </TableRow>
   );
-}
-
-interface PolicyNameCellProps {
-  policy: Policy;
-  orgId: string;
-  isTailoring: boolean | undefined;
-}
-
-function PolicyNameCell({ policy, orgId, isTailoring }: PolicyNameCellProps) {
-  const policyHref = `/${orgId}/policies/${policy.id}`;
-
-  if (isTailoring) {
-    return (
-      <HStack gap="xs" align="center">
-        <div className="size-3 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-        <Text size="sm" variant="muted">
-          {policy.name}
-        </Text>
-      </HStack>
-    );
-  }
-
-  return (
-    <Link
-      href={policyHref}
-      onClick={(e) => e.stopPropagation()}
-      className="group flex items-center gap-2"
-    >
-      <Text size="sm" weight="medium">
-        {policy.name}
-      </Text>
-      <Launch
-        size={16}
-        className="shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
-      />
-    </Link>
-  );
-}
-
-interface PolicyStatusCellProps {
-  policy: Policy;
-  status: PolicyTailoringStatus | undefined;
-  isTailoring: boolean | undefined;
-}
-
-function PolicyStatusCell({ policy, status, isTailoring }: PolicyStatusCellProps) {
-  if (isTailoring) {
-    const label =
-      status === 'processing' ? 'Tailoring' : status === 'queued' ? 'Queued' : 'Preparing';
-
-    return (
-      <HStack gap="xs" align="center">
-        <div className="size-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-        <Text size="sm" variant="primary">
-          {label}
-        </Text>
-      </HStack>
-    );
-  }
-
-  if (isArchivedPolicy(policy)) {
-    return <StatusIndicator status="archived" />;
-  }
-
-  return <StatusIndicator status={policy.status} />;
 }

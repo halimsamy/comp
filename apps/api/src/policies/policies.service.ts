@@ -13,7 +13,7 @@ import { PolicyPdfRendererService } from '../trust-portal/policy-pdf-renderer.se
 import { filterComplianceMembers } from '../utils/compliance-filters';
 import { isMemberOrgParticipant } from '../utils/org-participation';
 import { BUCKET_NAME, getSignedUrl, s3Client } from '../app/s3';
-import type { CreatePolicyDto } from './dto/create-policy.dto';
+import { Frequency, type CreatePolicyDto } from './dto/create-policy.dto';
 import type { UpdatePolicyDto } from './dto/update-policy.dto';
 import type {
   ConfirmPolicyPdfUploadedDto,
@@ -29,6 +29,12 @@ import type {
 import { checkAutoCompletePhases } from '../frameworks/frameworks-timeline.helper';
 import { TimelinesService } from '../timelines/timelines.service';
 import { computeNextReviewDate } from './lifecycle/review-date';
+import { getPolicyLifecycleStage } from './lifecycle/lifecycle-stage';
+import { notifyPolicyApproval } from './lifecycle/policy-approval-notifier';
+import {
+  enrichPolicyRegister,
+  POLICY_REGISTER_SELECT,
+} from './lifecycle/policy-register';
 import {
   buildDocumentControlRows,
   DOCUMENT_CONTROL_POLICY_SELECT,
@@ -109,16 +115,9 @@ export class PoliciesService {
           pendingVersionId: true,
           displayFormat: true,
           pdfUrl: true,
-          assignee: {
-            select: {
-              id: true,
-              user: {
-                select: {
-                  name: true,
-                },
-              },
-            },
-          },
+          visibility: true,
+          visibleToDepartments: true,
+          ...POLICY_REGISTER_SELECT,
         },
         orderBy: { createdAt: 'desc' },
       });
@@ -128,7 +127,7 @@ export class PoliciesService {
           (excludeContent ? ' (content excluded)' : '') +
           (includeArchived ? ' (archived included)' : ''),
       );
-      return policies;
+      return enrichPolicyRegister({ organizationId, policies });
     } catch (error) {
       this.logger.error(
         `Failed to retrieve policies for organization ${organizationId}:`,
@@ -136,89 +135,6 @@ export class PoliciesService {
       );
       throw error;
     }
-  }
-
-  async publishAll(organizationId: string, userId?: string, memberId?: string) {
-    const draftPolicies = await db.policy.findMany({
-      where: { organizationId, status: 'draft', isArchived: false },
-      select: { id: true, name: true, frequency: true },
-    });
-
-    if (draftPolicies.length === 0) {
-      return { success: true, publishedCount: 0, members: [] };
-    }
-
-    const now = new Date();
-
-    await db.$transaction(
-      draftPolicies.map((p) =>
-        db.policy.update({
-          where: { id: p.id },
-          data: {
-            status: 'published',
-            lastPublishedAt: now,
-            reviewDate: computeNextReviewDate(p.frequency),
-            // Clear signatures — employees must re-acknowledge new content
-            signedBy: [],
-          },
-        }),
-      ),
-    );
-
-    if (userId) {
-      await db.auditLog.createMany({
-        data: draftPolicies.map((p) => ({
-          organizationId,
-          userId,
-          memberId: memberId ?? null,
-          entityType: 'policy' as const,
-          entityId: p.id,
-          description: `Published policy via bulk publish`,
-          data: {
-            action: 'Published policy',
-            method: 'POST',
-            path: '/v1/policies/publish-all',
-            resource: 'policy',
-            permission: 'update',
-          },
-        })),
-      });
-    }
-
-    const allMembers = await db.member.findMany({
-      where: { organizationId, deactivated: false },
-      include: {
-        user: { select: { email: true, name: true, role: true } },
-        organization: { select: { name: true, id: true } },
-      },
-    });
-
-    const complianceMembers = await filterComplianceMembers(
-      allMembers,
-      organizationId,
-    );
-
-    // Check timeline auto-completion after bulk publish
-    checkAutoCompletePhases({
-      organizationId,
-      timelinesService: this.timelinesService,
-    }).catch((err) => {
-      this.logger.warn(
-        'timeline auto-complete check failed after publish-all',
-        err,
-      );
-    });
-
-    return {
-      success: true,
-      publishedCount: draftPolicies.length,
-      members: complianceMembers.map((m) => ({
-        email: m.user.email,
-        userName: m.user.name || '',
-        organizationName: m.organization.name || '',
-        organizationId: m.organization.id,
-      })),
-    };
   }
 
   async findById(id: string, organizationId: string) {
@@ -259,6 +175,11 @@ export class PoliciesService {
               user: true,
             },
           },
+          assignee: {
+            include: {
+              user: { select: { id: true, name: true, email: true, image: true } },
+            },
+          },
           currentVersion: {
             select: {
               id: true,
@@ -275,7 +196,7 @@ export class PoliciesService {
       }
 
       this.logger.log(`Retrieved policy: ${policy.name} (${id})`);
-      return policy;
+      return { ...policy, lifecycleStage: getPolicyLifecycleStage(policy) };
     } catch (error) {
       if (error instanceof NotFoundException) {
         throw error;
@@ -285,21 +206,50 @@ export class PoliciesService {
     }
   }
 
-  async create(organizationId: string, createData: CreatePolicyDto) {
+  /**
+   * The owner defaults to the creator; frequency defaults to yearly and the
+   * department to the creator's, so no fabricated values reach the register.
+   */
+  async create(
+    organizationId: string,
+    createData: CreatePolicyDto,
+    actorMemberId?: string,
+  ) {
     try {
-      if (createData.assigneeId) {
-        const assignee = await db.member.findFirst({
-          where: { id: createData.assigneeId, organizationId },
+      const creator = actorMemberId
+        ? await db.member.findFirst({
+            where: { id: actorMemberId, organizationId, deactivated: false },
+            select: { id: true, department: true },
+          })
+        : null;
+      createData = {
+        ...createData,
+        assigneeId: createData.assigneeId ?? creator?.id,
+        frequency: createData.frequency ?? Frequency.YEARLY,
+        department:
+          createData.department ??
+          (creator?.department && creator.department !== 'none'
+            ? creator.department
+            : undefined),
+      };
+      for (const [field, label] of [
+        ['assigneeId', 'Owner'],
+        ['approverId', 'Approver'],
+      ] as const) {
+        const memberId = createData[field];
+        if (!memberId) continue;
+        const member = await db.member.findFirst({
+          where: { id: memberId, organizationId, deactivated: false },
           include: { user: { select: { role: true } } },
         });
-        if (!assignee) {
+        if (!member) {
           throw new BadRequestException(
-            'Assignee is not a member of this organization',
+            `${label} is not an active member of this organization`,
           );
         }
-        if (!(await isMemberOrgParticipant(assignee.user.role, organizationId))) {
+        if (!(await isMemberOrgParticipant(member.user.role, organizationId))) {
           throw new BadRequestException(
-            'Cannot assign a platform admin as assignee',
+            `Cannot assign a platform admin as ${label.toLowerCase()}`,
           );
         }
       }
@@ -722,6 +672,22 @@ export class PoliciesService {
             user: { select: { id: true, name: true, image: true } },
           },
         },
+        submittedBy: {
+          include: { user: { select: { id: true, name: true, image: true } } },
+        },
+        rejectedBy: {
+          include: { user: { select: { id: true, name: true, image: true } } },
+        },
+        reviews: {
+          orderBy: { reviewedAt: 'desc' },
+          select: {
+            id: true,
+            reviewedAt: true,
+            notes: true,
+            reviewer: { select: { user: { select: { name: true } } } },
+          },
+        },
+        _count: { select: { acknowledgements: true } },
       },
     });
 
@@ -1237,6 +1203,7 @@ export class PoliciesService {
     versionId: string,
     organizationId: string,
     dto: SubmitForApprovalDto,
+    actorMemberId?: string,
   ) {
     const policy = await db.policy.findUnique({
       where: { id: policyId, organizationId },
@@ -1244,6 +1211,13 @@ export class PoliciesService {
 
     if (!policy) {
       throw new NotFoundException(`Policy with ID ${policyId} not found`);
+    }
+
+    // ISO 27001 A.5.1: every policy needs an accountable owner before approval.
+    if (!policy.assigneeId) {
+      throw new BadRequestException(
+        'Set a policy owner before submitting it for approval',
+      );
     }
 
     const version = await db.policyVersion.findUnique({
@@ -1290,13 +1264,35 @@ export class PoliciesService {
       );
     }
 
-    await db.policy.update({
-      where: { id: policyId },
-      data: {
-        pendingVersionId: versionId,
-        status: PolicyStatus.needs_review,
-        approverId: dto.approverId,
-      },
+    await db.$transaction([
+      db.policy.update({
+        where: { id: policyId },
+        data: {
+          pendingVersionId: versionId,
+          status: PolicyStatus.needs_review,
+          approverId: dto.approverId,
+        },
+      }),
+      db.policyVersion.update({
+        where: { id: versionId },
+        data: {
+          submittedAt: new Date(),
+          submittedById: actorMemberId ?? null,
+          rejectedAt: null,
+          rejectedById: null,
+          rejectionComment: null,
+        },
+      }),
+    ]);
+
+    await notifyPolicyApproval({
+      kind: 'requested',
+      organizationId,
+      policyId,
+      versionId,
+      recipientMemberId: dto.approverId,
+      actorMemberId,
+      idempotencyKey: `policy-approval-requested:${versionId}:${dto.approverId}`,
     });
 
     return {
@@ -1435,7 +1431,7 @@ export class PoliciesService {
   async denyChanges(
     policyId: string,
     organizationId: string,
-    _dto: { comment?: string },
+    dto: { comment?: string },
     actorMemberId?: string,
   ) {
     const policy = await db.policy.findUnique({
@@ -1475,14 +1471,40 @@ export class PoliciesService {
       ? PolicyStatus.published
       : PolicyStatus.draft;
 
-    await db.policy.update({
-      where: { id: policyId },
-      data: {
-        status: newStatus,
-        pendingVersionId: null,
-        approverId: null,
-      },
-    });
+    const rejectedVersionId = policy.pendingVersionId;
+    const [, rejected] = await db.$transaction([
+      db.policy.update({
+        where: { id: policyId },
+        data: {
+          status: newStatus,
+          pendingVersionId: null,
+          approverId: null,
+        },
+      }),
+      db.policyVersion.update({
+        where: { id: rejectedVersionId },
+        data: {
+          rejectedAt: new Date(),
+          rejectedById: actorMemberId,
+          rejectionComment: dto.comment?.trim() || null,
+        },
+        select: { submittedById: true },
+      }),
+    ]);
+
+    // Tell the author; fall back to the policy owner for older submissions.
+    const authorId = rejected.submittedById ?? policy.assigneeId;
+    if (authorId) {
+      await notifyPolicyApproval({
+        kind: 'rejected',
+        organizationId,
+        policyId,
+        versionId: rejectedVersionId,
+        recipientMemberId: authorId,
+        actorMemberId,
+        comment: dto.comment?.trim() || null,
+      });
+    }
 
     return { status: newStatus };
   }

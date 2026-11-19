@@ -165,37 +165,6 @@ export class PoliciesController {
     };
   }
 
-  @Post('publish-all')
-  @RequirePermission('policy', 'update')
-  @ApiOperation({ summary: 'Publish all draft policies' })
-  async publishAllPolicies(
-    @OrganizationId() organizationId: string,
-    @AuthContext() authContext: AuthContextType,
-    @Req() req: AuthenticatedRequest,
-  ) {
-    // Resolve the acting user so per-policy audit rows are attributed correctly.
-    // Session callers have authContext.userId; API-key / service-token callers
-    // resolve to the key creator (else org owner) — without this, the granular
-    // audit rows would be dropped for API-key auth (userId undefined).
-    const acting = await this.actingUser.resolve(req, organizationId);
-    const data = await this.policiesService.publishAll(
-      organizationId,
-      acting.userId ?? undefined,
-      acting.memberId ?? undefined,
-    );
-
-    return {
-      ...data,
-      authType: authContext.authType,
-      ...(authContext.userId && {
-        authenticatedUser: {
-          id: authContext.userId,
-          email: authContext.userEmail,
-        },
-      }),
-    };
-  }
-
   @Get('download-all')
   @RequirePermission('policy', 'read')
   @AuditRead()
@@ -1088,10 +1057,14 @@ export class PoliciesController {
     @Body() createData: CreatePolicyDto,
     @OrganizationId() organizationId: string,
     @AuthContext() authContext: AuthContextType,
+    @Req() req: AuthenticatedRequest,
   ) {
+    // The creator (or the API key's creator) becomes the default owner.
+    const acting = await this.actingUser.resolve(req, organizationId);
     const policy = await this.policiesService.create(
       organizationId,
       createData,
+      acting.memberId ?? undefined,
     );
 
     return {
@@ -1422,6 +1395,7 @@ export class PoliciesController {
       versionId,
       organizationId,
       body,
+      authContext.memberId,
     );
 
     return {

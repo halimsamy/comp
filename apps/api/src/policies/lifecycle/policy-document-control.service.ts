@@ -34,6 +34,9 @@ export const DOCUMENT_CONTROL_POLICY_SELECT = {
   status: true,
   lastPublishedAt: true,
   reviewDate: true,
+  frequency: true,
+  visibility: true,
+  visibleToDepartments: true,
   assignee: { select: { user: { select: { name: true, email: true } } } },
   currentVersion: {
     select: {
@@ -54,6 +57,9 @@ type DocumentControlPolicy = {
   status: string;
   lastPublishedAt: Date | null;
   reviewDate: Date | null;
+  frequency: string | null;
+  visibility: string;
+  visibleToDepartments: string[];
   assignee: { user: { name: string | null; email: string } } | null;
   currentVersion: {
     version: number;
@@ -84,7 +90,47 @@ export function buildDocumentControlRows(
       value: formatDate(policy.reviews[0]?.reviewedAt ?? policy.lastPublishedAt),
     },
     { label: 'Next review', value: formatDate(policy.reviewDate) },
+    {
+      label: 'Review frequency',
+      value: policy.frequency ? capitalize(policy.frequency) : 'Not set',
+    },
+    { label: 'Classification', value: classification(policy) },
   ];
+}
+
+const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
+
+/** Policies are internal documents; the audience comes from portal visibility. */
+function classification(policy: Pick<DocumentControlPolicy, 'visibility' | 'visibleToDepartments'>) {
+  if (policy.visibility === 'DEPARTMENT' && policy.visibleToDepartments.length > 0) {
+    return `Internal - ${policy.visibleToDepartments.map((d) => d.toUpperCase()).join(', ')}`;
+  }
+  return 'Internal - all employees';
+}
+
+/** Approved (or legacy-published) versions, newest first, for "Revision history". */
+export async function getRevisionHistory(policyId: string) {
+  const versions = await db.policyVersion.findMany({
+    where: {
+      policyId,
+      OR: [{ approvedAt: { not: null } }, { publishedById: { not: null } }],
+    },
+    orderBy: { version: 'desc' },
+    select: {
+      version: true,
+      changelog: true,
+      approvedAt: true,
+      createdAt: true,
+      approvedBy: { select: { user: { select: { name: true, email: true } } } },
+      publishedBy: { select: { user: { select: { name: true, email: true } } } },
+    },
+  });
+  return versions.map((v) => ({
+    version: `v${v.version}`,
+    date: formatDate(v.approvedAt ?? v.createdAt),
+    approvedBy: personName(v.approvedBy ?? v.publishedBy),
+    changes: v.changelog?.trim() || '—',
+  }));
 }
 
 @Injectable()
@@ -117,6 +163,7 @@ export class PolicyDocumentControlService {
       primaryColor: organization.primaryColor,
       logo: await this.getLogo({ logoKey: organization.logo, organizationId }),
       rows: buildDocumentControlRows(policy),
+      revisions: await getRevisionHistory(policyId),
     };
   }
 

@@ -5,6 +5,8 @@ import { TimelinesModule } from '../timelines/timelines.module';
 import { PolicyPdfRendererService } from '../trust-portal/policy-pdf-renderer.service';
 import { PoliciesController } from './policies.controller';
 import { PoliciesService } from './policies.service';
+import { PolicyBulkController } from './lifecycle/policy-bulk.controller';
+import { PolicyBulkService } from './lifecycle/policy-bulk.service';
 import { PolicyAcknowledgementsController } from './lifecycle/policy-acknowledgements.controller';
 import { PolicyAcknowledgementsService } from './lifecycle/policy-acknowledgements.service';
 import { PolicyDocumentControlService } from './lifecycle/policy-document-control.service';
@@ -14,6 +16,7 @@ import { PolicyReviewsService } from './lifecycle/policy-reviews.service';
 @Module({
   imports: [AuthModule, AttachmentsModule, TimelinesModule],
   controllers: [
+    PolicyBulkController,
     PoliciesController,
     PolicyLifecycleController,
     PolicyAcknowledgementsController,
@@ -24,6 +27,7 @@ import { PolicyReviewsService } from './lifecycle/policy-reviews.service';
     PolicyReviewsService,
     PolicyAcknowledgementsService,
     PolicyDocumentControlService,
+    PolicyBulkService,
   ],
   exports: [PoliciesService],
 })

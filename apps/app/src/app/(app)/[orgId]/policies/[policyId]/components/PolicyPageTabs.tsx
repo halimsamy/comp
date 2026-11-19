@@ -154,7 +154,12 @@ export function PolicyPageTabs({
   return (
     <Stack gap="md">
       {/* Alerts always visible above tabs */}
-      <PolicyAlerts policy={policy} isPendingApproval={isPendingApproval} onMutate={mutateAll} />
+      <PolicyAlerts
+        policy={policy}
+        versions={Array.isArray(versions) ? versions : []}
+        isPendingApproval={isPendingApproval}
+        onMutate={mutateAll}
+      />
 
       <Tabs value={activeTab} onValueChange={handleTabChange}>
         <Stack gap="lg">

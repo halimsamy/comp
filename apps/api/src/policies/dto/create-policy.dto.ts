@@ -21,6 +21,7 @@ export enum PolicyStatus {
 export enum Frequency {
   MONTHLY = 'monthly',
   QUARTERLY = 'quarterly',
+  SEMIANNUALLY = 'semiannually',
   YEARLY = 'yearly',
 }
 

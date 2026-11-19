@@ -30,7 +30,7 @@ export function PolicyCarousel({
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ policyId, organizationId: member.organizationId }),
+        body: JSON.stringify({ policyId, organizationId: member.organizationId, attested: true }),
       });
       if (!res.ok) {
         throw new Error('Failed to complete policy');

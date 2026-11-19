@@ -5,12 +5,14 @@ import { Checkmark } from '@trycompai/design-system/icons';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { toast } from 'sonner';
+import { PolicyAttestation } from '../../components/policy/PolicyAttestation';
 
 interface PolicyAcceptButtonProps {
   policyId: string;
   memberId: string;
   isAccepted: boolean;
   orgId: string;
+  attestationText: string;
 }
 
 export function PolicyAcceptButton({
@@ -18,10 +20,12 @@ export function PolicyAcceptButton({
   memberId,
   isAccepted,
   orgId,
+  attestationText,
 }: PolicyAcceptButtonProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [accepted, setAccepted] = useState(isAccepted);
+  const [attested, setAttested] = useState(false);
 
   const handleAccept = async () => {
     startTransition(async () => {
@@ -30,7 +34,12 @@ export function PolicyAcceptButton({
           method: 'POST',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ policyIds: [policyId], memberId, organizationId: orgId }),
+          body: JSON.stringify({
+            policyIds: [policyId],
+            memberId,
+            organizationId: orgId,
+            attested,
+          }),
         });
 
         if (!res.ok) {
@@ -64,10 +73,18 @@ export function PolicyAcceptButton({
   }
 
   return (
-    <div className="w-full">
-      <Button onClick={handleAccept} disabled={isPending}>
-        {isPending ? 'Accepting...' : 'Accept Policy'}
-      </Button>
+    <div className="flex w-full flex-col gap-3">
+      <PolicyAttestation
+        text={attestationText}
+        checked={attested}
+        onCheckedChange={setAttested}
+        disabled={isPending}
+      />
+      <div>
+        <Button onClick={handleAccept} disabled={isPending || !attested}>
+          {isPending ? 'Accepting...' : 'Accept Policy'}
+        </Button>
+      </div>
     </div>
   );
 }

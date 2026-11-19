@@ -20,7 +20,11 @@ import { useEffect } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
-import { defaultNextReviewDate } from '../lib/policy-lifecycle-state';
+import {
+  defaultNextReviewDate,
+  isSameDay,
+  reviewDateToIso,
+} from '../lib/policy-lifecycle-state';
 
 const reviewSchema = z.object({
   notes: z.string().max(5000).optional(),
@@ -40,6 +44,8 @@ interface MarkReviewedDialogProps {
   onOpenChange: (open: boolean) => void;
   frequency: string | null;
   versionLabel: string;
+  /** Last recorded review, to warn before a same-day duplicate. */
+  lastReviewedAt?: string | null;
   onSubmit: (input: {
     notes?: string;
     nextReviewDate: string;
@@ -52,6 +58,7 @@ export function MarkReviewedDialog({
   onOpenChange,
   frequency,
   versionLabel,
+  lastReviewedAt,
   onSubmit,
 }: MarkReviewedDialogProps) {
   const {
@@ -83,7 +90,8 @@ export function MarkReviewedDialog({
     try {
       await onSubmit({
         notes: values.notes?.trim() || undefined,
-        nextReviewDate: new Date(`${values.nextReviewDate}T00:00:00`).toISOString(),
+        // UTC midnight: the local-midnight ISO string shifted the date a day early east of UTC.
+        nextReviewDate: reviewDateToIso(values.nextReviewDate),
         requireReacknowledgement: values.requireReacknowledgement,
       });
       toast.success(
@@ -109,6 +117,12 @@ export function MarkReviewedDialog({
                 are.
               </DialogDescription>
             </DialogHeader>
+            {isSameDay(lastReviewedAt) && (
+              <Text size="sm" variant="warning">
+                A review was already recorded today. Only record another one if this is a
+                separate review.
+              </Text>
+            )}
             <Stack gap="2">
               <Label htmlFor="review-notes">Review notes (optional)</Label>
               <Textarea

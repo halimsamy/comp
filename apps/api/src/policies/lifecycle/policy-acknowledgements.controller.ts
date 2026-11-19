@@ -25,7 +25,7 @@ export class PolicyAcknowledgementsController {
   @ApiOperation({
     summary: 'Export policy acknowledgements as CSV',
     description:
-      'Returns every recorded policy acknowledgement (policy, version, employee, time) as CSV text. Filter by policyId or memberId. Use as audit evidence of policy sign-off.',
+      'Returns CSV text with one row per employee who must acknowledge each policy: status (Acknowledged, Pending, Outdated), current and acknowledged version, acknowledgement and last reminder time, owner and approval. Without policyId it covers every in-force policy that requires sign-off. Filter by policyId or memberId. Use as audit evidence of policy sign-off.',
   })
   @ApiQuery({ name: 'policyId', required: false, example: 'pol_abc123def456' })
   @ApiQuery({ name: 'memberId', required: false, example: 'mem_abc123def456' })
