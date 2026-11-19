@@ -15,6 +15,9 @@ jest.mock('@trycompai/email', () => ({
   getUnsubscribeUrl: () => 'https://example.com/unsubscribe',
 }));
 jest.mock('../../email/trigger-email', () => ({ triggerEmail: jest.fn() }));
+jest.mock('../../email/templates/weekly-compliance-digest', () => ({
+  WeeklyComplianceDigestEmail: (props: unknown) => ({ props }),
+}));
 jest.mock('../../overview/compliance-snapshots', () => ({
   recordComplianceSnapshots: jest.fn(),
 }));
@@ -29,12 +32,14 @@ jest.mock('../../overview/overview-deadlines', () => ({
 }));
 
 import { isUserUnsubscribed } from '@trycompai/email';
+import { loadOverviewData } from '../../overview/overview-data';
 import { triggerEmail } from '../../email/trigger-email';
 import { recordComplianceSnapshots } from '../../overview/compliance-snapshots';
 import { buildAttentionCards } from '../../overview/overview-attention';
 import { buildDeadlines } from '../../overview/overview-deadlines';
 import { recordComplianceSnapshotsForAllOrgs } from './compliance-snapshot-schedule';
 import {
+  complianceDigestFrequency,
   isDigestRecipient,
   sendWeeklyComplianceDigests,
 } from './weekly-compliance-digest';
@@ -77,9 +82,38 @@ describe('sendWeeklyComplianceDigests', () => {
       },
     ],
     dueSoon: [],
+    noDueDateCount: 0,
   };
+  const MONDAY = new Date('2026-11-16T08:00:00Z');
+  const TUESDAY = new Date('2026-11-17T08:00:00Z');
+  const owner = (email: string, emailPreferences: unknown = null) => ({
+    id: `mem_${email}`,
+    role: 'owner',
+    user: { name: email, email, role: 'user', emailPreferences },
+  });
+  const setup = () => {
+    mockDb.organization.findMany.mockResolvedValue([
+      { id: 'org_a', name: 'Spare', isInternal: false },
+    ]);
+    (loadOverviewData as jest.Mock).mockResolvedValue({
+      tasks: [
+        { id: 't_mine', title: 'Mine', status: 'todo', assigneeId: 'mem_o@spare.com' },
+        { id: 't_free', title: 'Unassigned', status: 'in_progress', assigneeId: null },
+        { id: 't_other', title: 'Other', status: 'todo', assigneeId: 'mem_x' },
+        { id: 't_done', title: 'Done', status: 'done', assigneeId: null },
+      ],
+    });
+    (buildAttentionCards as jest.Mock).mockReturnValue([
+      { label: 'Tasks', needsAttention: 1, href: '/tasks' },
+    ]);
+    (buildDeadlines as jest.Mock).mockReturnValue(deadlines);
+    (isUserUnsubscribed as jest.Mock).mockResolvedValue(false);
+  };
+  const sentTo = () =>
+    (triggerEmail as jest.Mock).mock.calls.map(([call]) => call.to);
 
   it('emails subscribed owners and admins only', async () => {
+    (loadOverviewData as jest.Mock).mockResolvedValue({ tasks: [] });
     mockDb.organization.findMany.mockResolvedValue([
       { id: 'org_a', name: 'Spare', isInternal: false },
     ]);
@@ -89,6 +123,7 @@ describe('sendWeeklyComplianceDigests', () => {
     (buildDeadlines as jest.Mock).mockReturnValue(deadlines);
     mockDb.member.findMany.mockResolvedValue([
       {
+        id: 'mem_o',
         role: 'owner',
         user: { name: 'Olivia', email: 'o@spare.com', role: 'user' },
       },
@@ -107,7 +142,8 @@ describe('sendWeeklyComplianceDigests', () => {
       },
     ]);
     (isUserUnsubscribed as jest.Mock).mockImplementation(
-      async (_db, email: string) => email === 'u@spare.com',
+      async (_db, email: string, type: string) =>
+        email === 'u@spare.com' && type === 'complianceDigest',
     );
 
     const result = await sendWeeklyComplianceDigests(
@@ -125,9 +161,8 @@ describe('sendWeeklyComplianceDigests', () => {
   });
 
   it('sends nothing when nothing needs attention', async () => {
-    mockDb.organization.findMany.mockResolvedValue([
-      { id: 'org_a', name: 'Spare', isInternal: false },
-    ]);
+    setup();
+    mockDb.member.findMany.mockResolvedValue([owner('o@spare.com')]);
     (buildAttentionCards as jest.Mock).mockReturnValue([
       { label: 'Tasks', needsAttention: 0, href: '/tasks' },
     ]);
@@ -137,10 +172,68 @@ describe('sendWeeklyComplianceDigests', () => {
       overdue: [],
     });
 
-    await sendWeeklyComplianceDigests();
+    await sendWeeklyComplianceDigests(MONDAY);
 
-    expect(mockDb.member.findMany).not.toHaveBeenCalled();
     expect(triggerEmail).not.toHaveBeenCalled();
+  });
+
+  it('sends weekly subscribers only on Mondays and daily subscribers every day', async () => {
+    setup();
+    mockDb.member.findMany.mockResolvedValue([
+      owner('weekly@spare.com'),
+      owner('daily@spare.com', { complianceDigestFrequency: 'daily' }),
+    ]);
+
+    await sendWeeklyComplianceDigests(TUESDAY);
+    expect(sentTo()).toEqual(['daily@spare.com']);
+    expect(loadOverviewData).toHaveBeenCalledTimes(1);
+    expect((triggerEmail as jest.Mock).mock.calls[0][0].subject).toMatch(
+      /^Daily compliance digest/,
+    );
+
+    jest.clearAllMocks();
+    setup();
+    mockDb.member.findMany.mockResolvedValue([owner('weekly@spare.com')]);
+    await sendWeeklyComplianceDigests(TUESDAY);
+    // No recipient due today: the org data is not even loaded.
+    expect(loadOverviewData).not.toHaveBeenCalled();
+    expect(triggerEmail).not.toHaveBeenCalled();
+  });
+
+  it('skips members who turned the compliance digest off', async () => {
+    setup();
+    mockDb.member.findMany.mockResolvedValue([owner('o@spare.com')]);
+    (isUserUnsubscribed as jest.Mock).mockImplementation(
+      async (_db, _email: string, type: string) => type === 'complianceDigest',
+    );
+    await sendWeeklyComplianceDigests(MONDAY);
+    expect(triggerEmail).not.toHaveBeenCalled();
+  });
+
+  it('folds the Monday task digest into the email when it is on', async () => {
+    setup();
+    mockDb.member.findMany.mockResolvedValue([owner('o@spare.com')]);
+    await sendWeeklyComplianceDigests(MONDAY);
+    const email = (triggerEmail as jest.Mock).mock.calls[0][0].react;
+    expect(email.props.tasks).toEqual([
+      { id: 't_mine', title: 'Mine' },
+      { id: 't_free', title: 'Unassigned' },
+    ]);
+
+    jest.clearAllMocks();
+    setup();
+    mockDb.member.findMany.mockResolvedValue([owner('o@spare.com')]);
+    (isUserUnsubscribed as jest.Mock).mockImplementation(
+      async (_db, _email: string, type: string) => type === 'weeklyTaskDigest',
+    );
+    await sendWeeklyComplianceDigests(MONDAY);
+    expect((triggerEmail as jest.Mock).mock.calls[0][0].react.props.tasks).toEqual([]);
+  });
+
+  it('reads the compliance digest frequency from email preferences', () => {
+    expect(complianceDigestFrequency(null)).toBe('weekly');
+    expect(complianceDigestFrequency({ complianceDigestFrequency: 'daily' })).toBe('daily');
+    expect(complianceDigestFrequency({ digestFrequency: 'daily' })).toBe('weekly');
   });
 
   it('recognises owner and admin in multi-role strings', () => {

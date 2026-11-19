@@ -7,9 +7,15 @@ export type AttentionModule =
   | 'policies'
   | 'acknowledgements'
   | 'training'
+  | 'people'
   | 'vendors'
+  | 'risks'
+  | 'assets'
+  | 'vulnerabilities'
   | 'checks'
-  | 'findings'
+  | 'correctiveActions'
+  | 'documents'
+  | 'questionnaires'
   | 'accessReviews';
 
 export interface AttentionCard {
@@ -20,18 +26,36 @@ export interface AttentionCard {
   total: number;
   /** Org-relative path, e.g. `/tasks`. */
   href: string;
-  reasons: Array<{ label: string; count: number }>;
+  /** A reason may deep-link to the filtered list (org-relative). */
+  reasons: Array<{ label: string; count: number; href?: string }>;
 }
 
 export type DeadlineType =
-  'task' | 'policy_review' | 'vendor_review' | 'vendor_document' | 'training' | 'access_review';
+  | 'task'
+  | 'policy_review'
+  | 'vendor_review'
+  | 'vendor_document'
+  | 'training'
+  | 'access_review'
+  | 'policy_approval'
+  | 'timeline_phase'
+  | 'audit_request'
+  | 'questionnaire_review'
+  | 'vulnerability'
+  | 'corrective_action'
+  | 'review_action'
+  | 'risk_review'
+  | 'risk_action'
+  | 'scan'
+  | 'form';
 
 export interface DeadlineItem {
   id: string;
   type: DeadlineType;
   title: string;
   subtitle: string | null;
-  dueDate: string;
+  /** null only in `noDueDate`. */
+  dueDate: string | null;
   href: string;
   ownerName: string | null;
 }
@@ -40,8 +64,11 @@ export interface Deadlines {
   windowDays: number;
   overdueCount: number;
   dueSoonCount: number;
+  noDueDateCount: number;
   overdue: DeadlineItem[];
   dueSoon: DeadlineItem[];
+  /** Open work nobody put a date on. */
+  noDueDate: DeadlineItem[];
 }
 
 export interface FrameworkTrend {
@@ -84,7 +111,9 @@ export function useOverviewDeadlines({
   const swr = useApiSWR<Deadlines>(`/v1/overview/deadlines?days=${days}`, { enabled });
   const body = swr.data?.data;
   const deadlines =
-    body && Array.isArray(body.overdue) && Array.isArray(body.dueSoon) ? body : null;
+    body && Array.isArray(body.overdue) && Array.isArray(body.dueSoon)
+      ? { ...body, noDueDate: Array.isArray(body.noDueDate) ? body.noDueDate : [] }
+      : null;
   return { ...swr, deadlines, hasError: Boolean(swr.error || swr.data?.error) };
 }
 

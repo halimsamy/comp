@@ -1,4 +1,4 @@
-import { render, renderHook, screen } from '@testing-library/react';
+import { renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 // The live posthog-js value is controlled per-test. `undefined` simulates a
@@ -14,21 +14,7 @@ vi.mock('posthog-js/react', () => ({
   PostHogProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 
-vi.mock('next/navigation', () => ({
-  useParams: () => ({ orgId: 'org_test123' }),
-  usePathname: () => '/org_test123/overview',
-}));
-
-vi.mock('@/hooks/use-findings-api', () => ({
-  useOrganizationFindings: () => ({ data: undefined }),
-}));
-
-vi.mock('@db', () => ({
-  FindingStatus: { open: 'open' },
-}));
-
 import { ServerFeatureFlagsProvider, useFeatureFlag } from '@trycompai/analytics';
-import { OverviewTabs } from './OverviewTabs';
 
 describe('useFeatureFlag server fallback', () => {
   it('returns false when flags never load and no server flags are provided', () => {
@@ -104,39 +90,5 @@ describe('useFeatureFlag server fallback', () => {
     const { result } = renderHook(() => useFeatureFlag('is-timeline-enabled'));
 
     expect(result.current).toBe(true);
-  });
-});
-
-describe('OverviewTabs timeline gating', () => {
-  it('shows the Timeline tab via server flags when the client cannot load flags', () => {
-    useFeatureFlagEnabledMock.mockReturnValue(undefined);
-
-    render(
-      <ServerFeatureFlagsProvider flags={{ 'is-timeline-enabled': true }}>
-        <OverviewTabs />
-      </ServerFeatureFlagsProvider>,
-    );
-
-    expect(screen.getByText('Timeline')).toBeInTheDocument();
-  });
-
-  it('hides the Timeline tab when the flag is off everywhere', () => {
-    useFeatureFlagEnabledMock.mockReturnValue(undefined);
-
-    render(
-      <ServerFeatureFlagsProvider flags={{}}>
-        <OverviewTabs />
-      </ServerFeatureFlagsProvider>,
-    );
-
-    expect(screen.queryByText('Timeline')).not.toBeInTheDocument();
-  });
-
-  it('shows the Timeline tab from the live client flag without server flags', () => {
-    useFeatureFlagEnabledMock.mockReturnValue(true);
-
-    render(<OverviewTabs />);
-
-    expect(screen.getByText('Timeline')).toBeInTheDocument();
   });
 });

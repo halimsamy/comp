@@ -1,5 +1,7 @@
 import { db } from '@db';
 import { filterComplianceMembers } from '../utils/compliance-filters';
+import { loadModuleData } from './overview-data-modules';
+import { countTaskProgress } from './task-progress';
 
 const memberName = {
   select: { user: { select: { name: true, email: true } } },
@@ -19,24 +21,19 @@ export async function loadOverviewData({
     tasks,
     policies,
     members,
-    trainingRecords,
-    trainingModules,
     vendors,
     checkRuns,
-    findings,
     accessReviews,
+    modules,
   ] = await Promise.all([
     db.task.findMany({
-      where: {
-        organizationId,
-        archivedAt: null,
-        status: { not: 'not_relevant' },
-      },
+      where: { organizationId, archivedAt: null },
       select: {
         id: true,
         title: true,
         status: true,
         reviewDate: true,
+        assigneeId: true,
         assignee: memberName,
       },
     }),
@@ -51,6 +48,8 @@ export async function loadOverviewData({
         signedBy: true,
         visibility: true,
         visibleToDepartments: true,
+        pendingVersionId: true,
+        updatedAt: true,
         assignee: memberName,
       },
     }),
@@ -63,20 +62,15 @@ export async function loadOverviewData({
         user: { select: { name: true, email: true, role: true } },
       },
     }),
-    db.trainingCompletionRecord.findMany({
-      where: { organizationId, member: { isActive: true, deactivated: false } },
-      select: { memberId: true, moduleId: true, expiresAt: true },
-    }),
-    db.trainingModule.findMany({
-      where: { organizationId },
-      select: { id: true, title: true, isEnabled: true },
-    }),
     db.vendor.findMany({
-      where: { organizationId },
+      where: { organizationId, archivedAt: null },
       select: {
         id: true,
         name: true,
+        status: true,
         criticality: true,
+        inherentProbability: true,
+        inherentImpact: true,
         handlesCardholderData: true,
         affectsCdeSecurity: true,
         lastReviewedAt: true,
@@ -101,11 +95,6 @@ export async function loadOverviewData({
       ],
       select: { id: true, checkName: true, status: true, failedCount: true },
     }),
-    db.finding.groupBy({
-      by: ['status'],
-      where: { organizationId },
-      _count: { _all: true },
-    }),
     db.accessReview.findMany({
       where: { organizationId },
       select: {
@@ -116,48 +105,48 @@ export async function loadOverviewData({
         signedOffAt: true,
       },
     }),
+    loadModuleData({ organizationId }),
   ]);
 
-  const complianceMembers = await filterComplianceMembers(
-    members,
-    organizationId,
-  );
+  const [complianceMembers, pendingVersions] = await Promise.all([
+    filterComplianceMembers(members, organizationId),
+    // When each pending policy version was submitted for approval.
+    db.policyVersion.findMany({
+      where: {
+        id: {
+          in: policies
+            .map((p) => p.pendingVersionId)
+            .filter((id): id is string => !!id),
+        },
+        policy: { organizationId },
+      },
+      select: { id: true, submittedAt: true },
+    }),
+  ]);
+  const submittedAt = new Map(pendingVersions.map((v) => [v.id, v.submittedAt]));
+  const nameOf = new Map(members.map((m) => [m.id, m.user.name || m.user.email]));
 
   return {
-    tasks,
-    policies,
+    tasks: tasks.filter((t) => t.status !== 'not_relevant'),
+    taskProgress: countTaskProgress(tasks),
+    policies: policies.map(({ pendingVersionId, updatedAt, ...policy }) => ({
+      ...policy,
+      submittedForApprovalAt:
+        policy.status === 'needs_review'
+          ? ((pendingVersionId && submittedAt.get(pendingVersionId)) ||
+            updatedAt)
+          : null,
+    })),
     members: complianceMembers,
-    trainingRecords,
-    trainingModules,
     vendors,
     checkRuns,
-    findings: findings.map((f) => ({ status: f.status, count: f._count._all })),
     accessReviews,
+    ...modules,
+    forms: modules.forms.map(({ ownerMemberId, ...form }) => ({
+      ...form,
+      ownerName: ownerMemberId ? (nameOf.get(ownerMemberId) ?? null) : null,
+    })),
   };
 }
 
 export type OverviewData = Awaited<ReturnType<typeof loadOverviewData>>;
-
-export const DAY_MS = 24 * 60 * 60 * 1000;
-
-export function personName(
-  member: { user: { name: string | null; email: string } } | null,
-): string | null {
-  if (!member) return null;
-  return member.user.name || member.user.email;
-}
-
-/** Only the latest-expiring document of each type matters; older ones are superseded. */
-export function newestDocuments<
-  T extends { type: string; expiresAt: Date | null },
->(documents: T[]): Array<T & { expiresAt: Date }> {
-  const newest = new Map<string, T & { expiresAt: Date }>();
-  for (const doc of documents) {
-    const { expiresAt } = doc;
-    if (!expiresAt) continue;
-    const current = newest.get(doc.type);
-    if (!current || current.expiresAt < expiresAt)
-      newest.set(doc.type, { ...doc, expiresAt });
-  }
-  return [...newest.values()];
-}

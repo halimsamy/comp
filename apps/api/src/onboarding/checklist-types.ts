@@ -16,6 +16,10 @@ export interface ChecklistState {
   frameworkCount: number;
   hasLogo: boolean;
   hasWebsite: boolean;
+  /** Organization.sessionIdleTimeoutMinutes (null = off). */
+  idleTimeoutMinutes: number | null;
+  controls: { total: number; owned: number };
+  assets: { total: number; scoped: number };
   ismsProfileCompleted: boolean;
   /** Categories of the org's active integration connections (e.g. 'Cloud', 'Identity & Access'). */
   connectedCategories: string[];
@@ -33,9 +37,11 @@ export interface ChecklistState {
   pciScopeTask: { id: string; done: boolean } | null;
   activeMembers: number;
   risks: { total: number; assessed: number; withAcceptance: number };
-  vendors: { total: number; assessed: number };
-  tasks: { total: number; complete: number };
+  vendors: { total: number; assessed: number; classified: number };
+  /** Non-archived tasks; not relevant ones are out of `total` (countTaskProgress). */
+  tasks: { total: number; complete: number; notRelevant: number };
   evidenceSubmissions: number;
+  /** An audit engagement has an auditor (or a pending invite), or an auditor member exists. */
   auditorInvited: boolean;
   skips: ChecklistSkips;
 }
@@ -54,6 +60,8 @@ export interface ChecklistItem {
   lockedReason: string | null;
   progress: { done: number; total: number } | null;
   skip: ChecklistSkip | null;
+  /** False for steps an ISO 27001 / PCI DSS audit cannot do without (SoA, ISMS documents, PCI scope). */
+  skippable: boolean;
 }
 
 export interface ChecklistSection {

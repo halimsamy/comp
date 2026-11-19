@@ -1,8 +1,14 @@
 import { isOrgParticipant } from '@/lib/org-participation-rule';
 import { db } from '@db/server';
+import { isUserUnsubscribed } from '@trycompai/email';
 import { logger, schedules } from '@trycompai/jobs';
 import { sendWeeklyTaskDigestEmailTask } from '../email/weekly-task-digest-email';
-import { getDigestFrequency, isDigestDue, selectDigestTasks } from './task-digest-helpers';
+import {
+  getDigestFrequency,
+  isDigestDue,
+  isFoldedIntoComplianceDigest,
+  selectDigestTasks,
+} from './task-digest-helpers';
 
 const ORG_INACTIVITY_DAYS = 90;
 
@@ -113,6 +119,14 @@ export const weeklyTaskReminder = schedules.task({
         }
 
         if (!isDigestDue({ frequency: getDigestFrequency(member.user.emailPreferences) })) {
+          continue;
+        }
+
+        // One combined Monday email (#10): the compliance digest carries this member's tasks.
+        if (
+          isFoldedIntoComplianceDigest({ role: member.role }) &&
+          !(await isUserUnsubscribed(db, member.user.email, 'complianceDigest', org.id))
+        ) {
           continue;
         }
 

@@ -37,7 +37,7 @@ const cards: AttentionCard[] = [
     href: '/tasks',
     reasons: [
       { label: 'Overdue', count: 1 },
-      { label: 'Failed', count: 3 },
+      { label: 'Failed', count: 3, href: '/tasks?status=failed' },
     ],
   },
   {
@@ -71,7 +71,14 @@ describe('AttentionGrid', () => {
   it('renders a card per module with counts, reasons and a deep link', () => {
     render(<AttentionGrid organizationId="org_1" />);
     const tasks = screen.getByTestId('attention-card-tasks');
-    expect(tasks).toHaveAttribute('href', '/org_1/tasks');
+    expect(within(tasks).getByRole('link', { name: 'Evidence tasks' })).toHaveAttribute(
+      'href',
+      '/org_1/tasks',
+    );
+    expect(within(tasks).getByRole('link', { name: '3 failed' })).toHaveAttribute(
+      'href',
+      '/org_1/tasks?status=failed',
+    );
     expect(within(tasks).getByText('4')).toBeInTheDocument();
     expect(within(tasks).getByText('2 of 6 OK')).toBeInTheDocument();
     expect(within(tasks).getByText('failed')).toBeInTheDocument();
@@ -116,6 +123,8 @@ describe('DeadlinesCard', () => {
           },
         ],
         dueSoon: [],
+        noDueDateCount: 0,
+        noDueDate: [],
       },
       isLoading: false,
       hasError: false,
@@ -139,9 +148,40 @@ describe('DeadlinesCard', () => {
       dueSoonCount: 0,
       overdue: [],
       dueSoon: [],
+      noDueDateCount: 0,
+      noDueDate: [],
     };
     render(<DeadlinesCard organizationId="org_1" />);
     expect(screen.getByText('Nothing is overdue.')).toBeInTheDocument();
+  });
+
+  it('does not report all clear while open items have no due date', () => {
+    state.deadlines.deadlines = {
+      windowDays: 30,
+      overdueCount: 0,
+      dueSoonCount: 0,
+      overdue: [],
+      dueSoon: [],
+      noDueDateCount: 1,
+      noDueDate: [
+        {
+          id: 'access-request',
+          type: 'form',
+          title: 'Access request',
+          subtitle: 'Company form · never submitted',
+          dueDate: null,
+          href: '/documents/access-request',
+          ownerName: null,
+        },
+      ],
+    };
+    render(<DeadlinesCard organizationId="org_1" />);
+    expect(screen.getByText(/1 item has no due date/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Review items without a due date' }));
+    expect(screen.getByRole('link', { name: /Access request/ })).toHaveAttribute(
+      'href',
+      '/org_1/documents/access-request',
+    );
   });
 
   it('formats relative due dates', () => {
@@ -158,6 +198,24 @@ describe('ComplianceTrendCard', () => {
     state.trends = { frameworks: [], isLoading: false, hasError: false, mutate: vi.fn() };
     render(<ComplianceTrendCard />);
     expect(screen.getByText(/daily snapshot/)).toBeInTheDocument();
+  });
+
+  it('shows when tracking started while there is a single snapshot', () => {
+    state.trends = {
+      frameworks: [
+        {
+          frameworkInstanceId: 'fi_iso',
+          frameworkName: 'ISO 27001',
+          points: [{ date: '2026-11-18', scorePercent: 50, controlsComplete: 1, controlsTotal: 2 }],
+        },
+      ],
+      isLoading: false,
+      hasError: false,
+      mutate: vi.fn(),
+    };
+    render(<ComplianceTrendCard />);
+    expect(screen.getByText(/Tracking since Nov 18/)).toBeInTheDocument();
+    expect(screen.queryByTestId('compliance-trend-chart')).not.toBeInTheDocument();
   });
 
   it('merges framework series into one row per day', () => {

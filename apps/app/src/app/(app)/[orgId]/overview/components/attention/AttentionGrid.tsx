@@ -9,14 +9,20 @@ import { Button, Skeleton, Text } from '@trycompai/design-system';
 import {
   CheckmarkFilled,
   ChevronRight,
+  DataBase,
+  Debug,
+  Document,
   DocumentSigned,
   Education,
   ListChecked,
   Partnership,
   Plug,
   Policy,
-  Report,
+  QuestionAnswering,
+  Tools,
   UserAccess,
+  UserMultiple,
+  WarningAlt,
 } from '@trycompai/design-system/icons';
 import Link from 'next/link';
 import type { ComponentType } from 'react';
@@ -26,9 +32,15 @@ const ICONS: Record<AttentionModule, ComponentType<{ size?: number; className?: 
   policies: Policy,
   acknowledgements: DocumentSigned,
   training: Education,
+  people: UserMultiple,
   vendors: Partnership,
+  risks: WarningAlt,
+  assets: DataBase,
+  vulnerabilities: Debug,
   checks: Plug,
-  findings: Report,
+  correctiveActions: Tools,
+  documents: Document,
+  questionnaires: QuestionAnswering,
   accessReviews: UserAccess,
 };
 
@@ -36,10 +48,16 @@ const EMPTY_HINT: Record<AttentionModule, string> = {
   tasks: 'No evidence tasks yet. Add a framework to generate them.',
   policies: 'No policies yet. Generate or upload your policies.',
   acknowledgements: 'Publish policies that require sign-off to track acknowledgements.',
-  training: 'Training completions appear here once people finish training.',
+  training: 'Invite your team to track security awareness training.',
+  people: 'Invite your team to track policies, training and devices per person.',
   vendors: 'Add the vendors you share data with to track reviews.',
+  risks: 'Add risks to your register, or generate them from the risk library.',
+  assets: 'Connect a cloud provider or import your inventory to track assets.',
+  vulnerabilities: 'No open vulnerabilities. Import a scan or connect a scanner.',
   checks: 'Connect an integration to monitor controls automatically.',
-  findings: 'No audit findings. Auditors raise them during an audit.',
+  correctiveActions: 'No nonconformities or audit findings are open.',
+  documents: 'Complete the ISMS setup wizard to draft your ISO 27001 documents.',
+  questionnaires: 'No questionnaire answers are waiting for review.',
   accessReviews: 'Run an access review at least every 6 months (PCI DSS 7.2.4).',
 };
 
@@ -49,7 +67,7 @@ export function AttentionGrid({ organizationId }: { organizationId: string }) {
   if (isLoading && !cards) {
     return (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-busy="true">
-        {Array.from({ length: 8 }).map((_, i) => (
+        {Array.from({ length: 12 }).map((_, i) => (
           <div key={i} className="h-[148px] rounded-md border border-border p-4">
             <Skeleton style={{ height: '100%', width: '100%' }} />
           </div>
@@ -105,17 +123,20 @@ function AttentionCardLink({
   const isEmpty = card.total === 0 && card.needsAttention === 0;
   const okPercent = card.total > 0 ? Math.round((card.ok / card.total) * 100) : 0;
 
+  // The title link stretches over the card; reason links sit above it (no nested anchors).
   return (
-    <Link
-      href={`/${organizationId}${card.href}`}
-      className="group flex min-h-[148px] flex-col gap-3 rounded-md border border-border bg-card p-4 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    <div
+      className="group relative flex min-h-[148px] flex-col gap-3 rounded-md border border-border bg-card p-4 transition-colors focus-within:ring-2 focus-within:ring-ring hover:bg-muted/40"
       data-testid={`attention-card-${card.module}`}
     >
       <div className="flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
+        <Link
+          href={`/${organizationId}${card.href}`}
+          className="flex min-w-0 items-center gap-2 after:absolute after:inset-0 after:rounded-md focus-visible:outline-none"
+        >
           <Icon size={16} className="shrink-0 text-muted-foreground" />
           <span className="truncate text-sm font-medium text-foreground">{card.label}</span>
-        </div>
+        </Link>
         <ChevronRight
           size={16}
           className="shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
@@ -167,16 +188,32 @@ function AttentionCardLink({
           )}
           {card.reasons.length > 0 && (
             <ul className="mt-auto flex flex-wrap gap-x-3 gap-y-1">
-              {card.reasons.slice(0, 3).map((reason) => (
-                <li key={reason.label} className="text-xs text-muted-foreground">
-                  <span className="font-medium tabular-nums text-foreground">{reason.count}</span>{' '}
-                  {reason.label.toLowerCase()}
-                </li>
-              ))}
+              {card.reasons.slice(0, 3).map((reason) => {
+                const text = (
+                  <>
+                    <span className="font-medium tabular-nums text-foreground">{reason.count}</span>{' '}
+                    {reason.label.toLowerCase()}
+                  </>
+                );
+                return (
+                  <li key={reason.label} className="text-xs text-muted-foreground">
+                    {reason.href ? (
+                      <Link
+                        href={`/${organizationId}${reason.href}`}
+                        className="relative z-10 underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-none"
+                      >
+                        {text}
+                      </Link>
+                    ) : (
+                      text
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </>
       )}
-    </Link>
+    </div>
   );
 }

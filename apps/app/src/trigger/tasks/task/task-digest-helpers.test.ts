@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { getDigestFrequency, isDigestDue, selectDigestTasks } from './task-digest-helpers';
+import {
+  getDigestFrequency,
+  isDigestDue,
+  isFoldedIntoComplianceDigest,
+  selectDigestTasks,
+} from './task-digest-helpers';
 
 describe('task digest helpers', () => {
   it('defaults to weekly and reads daily', () => {
@@ -30,5 +35,13 @@ describe('task digest helpers', () => {
       't1',
       't3',
     ]);
+  });
+
+  it('folds owners and admins into the Monday compliance digest', () => {
+    const monday = new Date('2026-11-16T09:00:00Z');
+    const tuesday = new Date('2026-11-17T09:00:00Z');
+    expect(isFoldedIntoComplianceDigest({ role: 'employee, admin', now: monday })).toBe(true);
+    expect(isFoldedIntoComplianceDigest({ role: 'admin', now: tuesday })).toBe(false);
+    expect(isFoldedIntoComplianceDigest({ role: 'employee', now: monday })).toBe(false);
   });
 });

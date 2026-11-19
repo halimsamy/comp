@@ -101,11 +101,14 @@ export function ComplianceTrendCard() {
             Try again
           </Button>
         </div>
-      ) : rows.length === 0 ? (
+      ) : rows.length < 2 ? (
+        // #17: one point is not a trend.
         <div className="flex h-[240px] flex-col items-center justify-center gap-2 text-center">
           <ChartLine size={24} className="text-muted-foreground" />
           <Text size="sm" variant="muted">
-            Score history starts with tonight&apos;s daily snapshot.
+            {rows.length === 0
+              ? 'Score history starts with tonight’s daily snapshot.'
+              : `Tracking since ${formatDay(String(rows[0].date))}. The trend appears after the next daily snapshot.`}
           </Text>
         </div>
       ) : (
@@ -144,7 +147,6 @@ export function ComplianceTrendCard() {
                   stroke={`var(--color-score_${index})`}
                   strokeWidth={2}
                   strokeDasharray={DASHES[index % DASHES.length]}
-                  dot={rows.length === 1}
                   connectNulls
                 />
               ))}

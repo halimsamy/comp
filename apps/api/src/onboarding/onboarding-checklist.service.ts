@@ -1,7 +1,10 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { db, Prisma } from '@db';
 import { buildChecklist } from './build-checklist';
-import { CHECKLIST_ITEM_IDS } from './checklist-catalog';
+import {
+  CHECKLIST_ITEM_IDS,
+  NON_SKIPPABLE_ITEM_IDS,
+} from './checklist-catalog';
 import type { OnboardingChecklist } from './checklist-types';
 import { loadChecklistState, parseSkips } from './load-checklist-state';
 
@@ -26,6 +29,11 @@ export class OnboardingChecklistService {
     skippedById: string | null;
   }): Promise<OnboardingChecklist> {
     this.assertItemId(itemId);
+    if ((NON_SKIPPABLE_ITEM_IDS as readonly string[]).includes(itemId)) {
+      throw new BadRequestException(
+        'This step is required for your audit and cannot be skipped.',
+      );
+    }
     const skips = await this.readSkips(organizationId);
     skips[itemId] = {
       reason: reason.trim(),

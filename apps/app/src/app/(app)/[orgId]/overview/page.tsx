@@ -1,11 +1,10 @@
 import { getFeatureFlags } from '@/app/posthog';
 import { serverApi } from '@/lib/api-server';
 import { auth } from '@/utils/auth';
-import type { FrameworkEditorFramework, Policy, Task } from '@db';
+import type { FrameworkEditorFramework } from '@db';
 import { PageHeader, PageLayout } from '@trycompai/design-system';
 import { headers } from 'next/headers';
 import { Overview } from './components/Overview';
-import { OverviewTabs } from './components/OverviewTabs';
 import { OverviewNudges } from './nudges/OverviewNudges';
 import type { FrameworkInstanceWithControls } from '@/lib/types/framework';
 
@@ -20,22 +19,10 @@ type FrameworkWithScore = FrameworkInstanceWithControls & {
 };
 
 interface ScoresResponse {
-  policies: {
-    total: number;
-    published: number;
-    draftPolicies: Policy[];
-    policiesInReview: Policy[];
-    unpublishedPolicies: Policy[];
-  };
-  tasks: {
-    total: number;
-    done: number;
-    incompleteTasks: Task[];
-  };
+  policies: { total: number; published: number };
+  tasks: { total: number; done: number };
   people: { total: number; completed: number };
   documents: { totalDocuments: number; completedDocuments: number; outstandingDocuments: number };
-  onboardingTriggerJobId: string | null;
-  currentMember: { id: string; role: string } | null;
 }
 
 export default async function OverviewPage({ params }: { params: Promise<{ orgId: string }> }) {
@@ -83,7 +70,7 @@ export default async function OverviewPage({ params }: { params: Promise<{ orgId
         orgId={organizationId}
         server={{ trust: { isTrustNdaEnabled, isConfigured: isTrustConfigured } }}
       />
-      <PageLayout header={<PageHeader title="Overview" tabs={<OverviewTabs />} />}>
+      <PageLayout header={<PageHeader title="Overview" />}>
         <Overview
         frameworksWithControls={frameworksWithControls}
         frameworksWithCompliance={frameworksWithCompliance}
@@ -92,14 +79,10 @@ export default async function OverviewPage({ params }: { params: Promise<{ orgId
         publishedPoliciesScore={{
           totalPolicies: scores?.policies?.total ?? 0,
           publishedPolicies: scores?.policies?.published ?? 0,
-          draftPolicies: scores?.policies?.draftPolicies ?? [],
-          policiesInReview: scores?.policies?.policiesInReview ?? [],
-          unpublishedPolicies: scores?.policies?.unpublishedPolicies ?? [],
         }}
         doneTasksScore={{
           totalTasks: scores?.tasks?.total ?? 0,
           doneTasks: scores?.tasks?.done ?? 0,
-          incompleteTasks: scores?.tasks?.incompleteTasks ?? [],
         }}
         documentsScore={{
           totalDocuments: scores?.documents?.totalDocuments ?? 0,
@@ -110,8 +93,6 @@ export default async function OverviewPage({ params }: { params: Promise<{ orgId
           totalMembers: scores?.people?.total ?? 0,
           completedMembers: scores?.people?.completed ?? 0,
         }}
-        currentMember={scores?.currentMember ?? null}
-        onboardingTriggerJobId={scores?.onboardingTriggerJobId ?? null}
       />
       </PageLayout>
     </>

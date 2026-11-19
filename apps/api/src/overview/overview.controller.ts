@@ -19,7 +19,7 @@ export class OverviewController {
   @ApiOperation({
     summary: 'Get needs-attention cards',
     description:
-      'Returns one card per compliance area (tasks, policies, acknowledgements, training, vendors, integration checks, findings, access reviews) with needs-attention, OK and total counts, reasons and a deep link.',
+      'Returns one card per compliance area (evidence tasks, policies, acknowledgements, training, people, vendors, risks, assets, vulnerabilities, integration checks, corrective actions, documents (ISMS documents and company forms), questionnaire reviews, access reviews) with needs-attention, OK and total counts, reasons (some with a filtered deep link) and a deep link.',
   })
   async getAttention(@OrganizationId() organizationId: string) {
     return this.overviewService.getAttention(organizationId);
@@ -30,7 +30,7 @@ export class OverviewController {
   @ApiOperation({
     summary: 'Get overdue and due-soon items',
     description:
-      'Returns one queue of overdue and due-soon items across evidence tasks, policy reviews, vendor reviews and documents, training renewals and access reviews, sorted by due date, with deep links.',
+      'Returns one queue of overdue and due-soon items across evidence tasks, policy reviews and approvals, vendor reviews and documents, training renewals, access reviews, timeline phases, auditor requests, questionnaire reviews, vulnerability SLAs, corrective and management-review actions, risk treatment actions, the risk register review, the scan cadence and company form due dates, sorted by due date, with deep links. Open items without a due date are listed separately.',
   })
   async getDeadlines(
     @OrganizationId() organizationId: string,

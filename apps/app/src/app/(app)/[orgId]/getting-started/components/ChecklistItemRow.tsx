@@ -95,7 +95,7 @@ export function ChecklistItemRow({
             Restore
           </Button>
         )}
-        {isOpen && canManage && (
+        {isOpen && canManage && item.skippable && (
           <Button type="button" size="sm" variant="ghost" onClick={() => onSkip(item)}>
             Skip
           </Button>

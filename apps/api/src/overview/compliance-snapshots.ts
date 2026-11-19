@@ -1,6 +1,6 @@
 import { db } from '@db';
 import { loadFrameworkScores } from '../frameworks/scoring/framework-scoring.loader';
-import { DAY_MS } from './overview-data';
+import { DAY_MS } from './overview-utils';
 
 /** UTC calendar day, the snapshot key. */
 export function snapshotDay(now: Date): Date {

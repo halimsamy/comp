@@ -19,6 +19,22 @@ export function isDigestDue({
   return frequency === 'daily' || now.getUTCDay() === 1;
 }
 
+/**
+ * On Mondays owners and admins get their task list inside the compliance digest
+ * (apps/api trigger/overview/weekly-compliance-digest.ts), so this job skips them
+ * unless they turned the compliance digest off.
+ */
+export function isFoldedIntoComplianceDigest({
+  role,
+  now = new Date(),
+}: {
+  role: string | null;
+  now?: Date;
+}): boolean {
+  const roles = (role ?? '').split(',').map((r) => r.trim());
+  return now.getUTCDay() === 1 && (roles.includes('owner') || roles.includes('admin'));
+}
+
 interface DigestTask {
   id: string;
   title: string;

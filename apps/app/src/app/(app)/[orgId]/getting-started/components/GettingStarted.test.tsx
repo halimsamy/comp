@@ -80,6 +80,22 @@ describe('GettingStarted', () => {
     expect(screen.getByText('Skipped: Handled in HR system')).toBeInTheDocument();
   });
 
+  it('offers no skip on steps an audit requires', () => {
+    hook.checklist = {
+      ...checklistFixture,
+      sections: checklistFixture.sections.map((section) => ({
+        ...section,
+        items: section.items.map((item) =>
+          item.id === 'cloud_provider' ? { ...item, skippable: false } : item,
+        ),
+      })),
+    };
+    render(<GettingStarted organizationId="org_1" />);
+    const row = screen.getByTestId('checklist-item-cloud_provider');
+    expect(within(row).queryByText('Skip')).not.toBeInTheDocument();
+    expect(within(row).getByRole('link')).toBeInTheDocument();
+  });
+
   it('shows loading and error states', () => {
     hook.checklist = null;
     hook.isLoading = true;

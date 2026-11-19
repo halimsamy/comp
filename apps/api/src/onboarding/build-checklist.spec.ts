@@ -9,6 +9,9 @@ const baseState = (
   frameworkCount: 2,
   hasLogo: false,
   hasWebsite: true,
+  idleTimeoutMinutes: null,
+  controls: { total: 10, owned: 0 },
+  assets: { total: 0, scoped: 0 },
   ismsProfileCompleted: false,
   connectedCategories: [],
   hasLegacyCloudIntegration: false,
@@ -20,8 +23,8 @@ const baseState = (
   pciScopeTask: { id: 'tsk_scope', done: false },
   activeMembers: 1,
   risks: { total: 0, assessed: 0, withAcceptance: 0 },
-  vendors: { total: 2, assessed: 2 },
-  tasks: { total: 4, complete: 1 },
+  vendors: { total: 2, assessed: 2, classified: 2 },
+  tasks: { total: 4, complete: 1, notRelevant: 0 },
   evidenceSubmissions: 0,
   auditorInvited: false,
   skips: {},
@@ -44,9 +47,11 @@ describe('buildChecklist', () => {
     expect(byId.vendors_assessed.status).toBe('done');
     expect(byId.company_profile.status).toBe('todo');
     expect(byId.evidence_tasks.progress).toEqual({ done: 1, total: 4 });
-    expect(checklist.total).toBe(19);
-    expect(checklist.completed).toBe(2);
-    expect(checklist.percent).toBe(11);
+    expect(byId.vendors_classified.status).toBe('done');
+    expect(byId.control_owners.progress).toEqual({ done: 0, total: 10 });
+    expect(checklist.total).toBe(23);
+    expect(checklist.completed).toBe(3);
+    expect(checklist.percent).toBe(13);
     expect(checklist.isComplete).toBe(false);
   });
 
@@ -61,7 +66,12 @@ describe('buildChecklist', () => {
     expect(byId.risk_acceptance.lockedReason).toBe(
       'Add risks to your register first.',
     );
-    expect(byId.auditor_access.status).toBe('locked');
+    // The auditor can be invited at any time, from the audit.
+    expect(byId.auditor_access).toMatchObject({
+      status: 'todo',
+      dependsOn: [],
+      href: '/audits',
+    });
   });
 
   it('unlocks dependants once the dependency is done or skipped', () => {
@@ -98,7 +108,7 @@ describe('buildChecklist', () => {
     expect(byId.version_control.status).toBe('skipped');
     expect(
       buildChecklist(baseState({ skips: { version_control: skip } })).completed,
-    ).toBe(3);
+    ).toBe(4);
   });
 
   it('hides ISO-only and PCI-only steps when those frameworks are not active', () => {
@@ -112,7 +122,6 @@ describe('buildChecklist', () => {
         baseState({ hasIso27001: false, hasPciDss: false }),
       ).sections.map((s) => s.id),
     ).not.toContain('isms');
-    expect(byId.auditor_access.dependsOn).toEqual(['policies_published']);
   });
 
   it('deep-links to the next unpublished policy', () => {
@@ -139,15 +148,68 @@ describe('buildChecklist', () => {
       pciScopeTask: { id: 'tsk_scope', done: true },
       activeMembers: 6,
       risks: { total: 2, assessed: 2, withAcceptance: 2 },
-      tasks: { total: 4, complete: 4 },
+      tasks: { total: 4, complete: 4, notRelevant: 2 },
       evidenceSubmissions: 1,
       auditorInvited: true,
+      idleTimeoutMinutes: 15,
+      controls: { total: 10, owned: 10 },
+      assets: { total: 3, scoped: 3 },
     });
     expect(buildChecklist(state)).toMatchObject({
-      completed: 19,
-      total: 19,
+      completed: 23,
+      total: 23,
       percent: 100,
       isComplete: true,
     });
+  });
+
+  it('never lets the SoA, ISMS documents or PCI scope be skipped', () => {
+    const skip = {
+      reason: 'later',
+      skippedAt: '2026-11-18T00:00:00Z',
+      skippedById: null,
+    };
+    const byId = items(
+      baseState({
+        ismsProfileCompleted: true,
+        skips: { statement_of_applicability: skip, pci_scope: skip },
+      }),
+    );
+    expect(byId.statement_of_applicability).toMatchObject({
+      status: 'todo',
+      skip: null,
+      skippable: false,
+    });
+    expect(byId.pci_scope.skippable).toBe(false);
+    expect(byId.isms_documents.skippable).toBe(false);
+    expect(byId.version_control.skippable).toBe(true);
+  });
+
+  it('deep-links connect steps to their integration category', () => {
+    const byId = items(baseState());
+    expect(byId.identity_provider.href).toBe(
+      '/integrations?category=Identity%20%26%20Access',
+    );
+    expect(byId.cloud_provider.href).toBe('/integrations?category=Cloud');
+    expect(byId.version_control.href).toBe('/integrations?category=Development');
+  });
+
+  it('requires an idle timeout of at most 15 minutes (PCI DSS 8.2.8)', () => {
+    expect(items(baseState({ idleTimeoutMinutes: 30 })).idle_timeout.status).toBe('todo');
+    expect(items(baseState({ idleTimeoutMinutes: 15 })).idle_timeout.status).toBe('done');
+  });
+
+  it('asks to scope assets and classify vendors', () => {
+    const byId = items(
+      baseState({
+        assets: { total: 4, scoped: 1 },
+        vendors: { total: 3, assessed: 0, classified: 1 },
+      }),
+    );
+    expect(byId.assets_scoped).toMatchObject({
+      status: 'todo',
+      progress: { done: 1, total: 4 },
+    });
+    expect(byId.vendors_classified.progress).toEqual({ done: 1, total: 3 });
   });
 });

@@ -22,25 +22,16 @@ vi.mock('./attention/ComplianceTrendCard', () => ({
 vi.mock('./FrameworksOverview', () => ({
   FrameworksOverview: () => <div data-testid="frameworks" />,
 }));
-vi.mock('./ToDoOverview', () => ({ ToDoOverview: () => <div data-testid="todo" /> }));
 
 const props: OverviewProps = {
   frameworksWithControls: [],
   frameworksWithCompliance: [],
   allFrameworks: [],
   organizationId: 'org_1',
-  publishedPoliciesScore: {
-    totalPolicies: 0,
-    publishedPolicies: 0,
-    draftPolicies: [],
-    policiesInReview: [],
-    unpublishedPolicies: [],
-  },
-  doneTasksScore: { totalTasks: 0, doneTasks: 0, incompleteTasks: [] },
+  publishedPoliciesScore: { totalPolicies: 0, publishedPolicies: 0 },
+  doneTasksScore: { totalTasks: 0, doneTasks: 0 },
   documentsScore: { totalDocuments: 0, completedDocuments: 0, outstandingDocuments: 0 },
   peopleScore: { totalMembers: 0, completedMembers: 0 },
-  currentMember: null,
-  onboardingTriggerJobId: null,
 };
 
 describe('Overview', () => {

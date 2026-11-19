@@ -1,5 +1,6 @@
 import { db } from '@db';
 import { z } from 'zod';
+import { countTaskProgress } from '../overview/task-progress';
 import type { ChecklistSkips, ChecklistState } from './checklist-types';
 
 const ISO_27001_NAMES = ['ISO 27001', 'iso27001', 'ISO27001'];
@@ -51,10 +52,18 @@ export async function loadChecklistState(
     taskGroups,
     evidenceSubmissions,
     onboarding,
+    controls,
+    assets,
+    auditsWithAuditor,
   ] = await Promise.all([
     db.organization.findUnique({
       where: { id: organizationId },
-      select: { logo: true, website: true, fleetDmLabelId: true },
+      select: {
+        logo: true,
+        website: true,
+        fleetDmLabelId: true,
+        sessionIdleTimeoutMinutes: true,
+      },
     }),
     db.frameworkInstance.findMany({
       where,
@@ -106,7 +115,11 @@ export async function loadChecklistState(
       select: { id: true },
     }),
     db.task.findFirst({
-      where: { organizationId, taskTemplateId: PCI_SCOPE_TASK_TEMPLATE_ID },
+      where: {
+        organizationId,
+        taskTemplateId: PCI_SCOPE_TASK_TEMPLATE_ID,
+        archivedAt: null,
+      },
       select: { id: true, status: true },
     }),
     db.risk.findMany({
@@ -118,12 +131,36 @@ export async function loadChecklistState(
       select: { riskId: true },
       distinct: ['riskId'],
     }),
-    db.vendor.findMany({ where, select: { status: true } }),
-    db.task.groupBy({ by: ['status'], where, _count: { _all: true } }),
+    db.vendor.findMany({
+      where: { organizationId, archivedAt: null },
+      select: { status: true, criticality: true },
+    }),
+    db.task.groupBy({
+      by: ['status'],
+      where: { organizationId, archivedAt: null },
+      _count: { _all: true },
+    }),
     db.evidenceSubmission.count({ where }),
     db.onboarding.findUnique({
       where: { organizationId },
       select: { checklistSkips: true },
+    }),
+    db.control.findMany({
+      where: { organizationId, archivedAt: null },
+      select: { ownerId: true },
+    }),
+    db.asset.findMany({
+      where: { organizationId, archivedAt: null },
+      select: { cdeScope: true },
+    }),
+    db.auditEngagement.count({
+      where: {
+        organizationId,
+        OR: [
+          { auditors: { some: {} } },
+          { pendingAuditorEmails: { isEmpty: false } },
+        ],
+      },
     }),
   ]);
 
@@ -139,10 +176,9 @@ export async function loadChecklistState(
     (m) => hasRole(m.role, 'employee') || hasRole(m.role, 'contractor'),
   );
   const acceptedRiskIds = new Set(acceptances.map((a) => a.riskId));
-  const taskCount = (statuses: string[]) =>
-    taskGroups
-      .filter((g) => statuses.includes(g.status))
-      .reduce((sum, g) => sum + g._count._all, 0);
+  const taskProgress = countTaskProgress(
+    taskGroups.map((g) => ({ status: g.status, count: g._count._all })),
+  );
 
   return {
     hasIso27001: frameworkNames.some((name) => ISO_27001_NAMES.includes(name)),
@@ -152,6 +188,15 @@ export async function loadChecklistState(
     frameworkCount: frameworks.length,
     hasLogo: Boolean(org?.logo),
     hasWebsite: Boolean(org?.website),
+    idleTimeoutMinutes: org?.sessionIdleTimeoutMinutes ?? null,
+    controls: {
+      total: controls.length,
+      owned: controls.filter((c) => c.ownerId).length,
+    },
+    assets: {
+      total: assets.length,
+      scoped: assets.filter((a) => a.cdeScope !== 'unassessed').length,
+    },
     ismsProfileCompleted: Boolean(ismsProfile),
     connectedCategories: [
       ...new Set(connections.map((c) => c.provider.category)),
@@ -190,20 +235,16 @@ export async function loadChecklistState(
     vendors: {
       total: vendors.length,
       assessed: vendors.filter((v) => v.status === 'assessed').length,
+      classified: vendors.filter((v) => v.criticality).length,
     },
     tasks: {
-      total: taskCount([
-        'todo',
-        'in_progress',
-        'in_review',
-        'done',
-        'not_relevant',
-        'failed',
-      ]),
-      complete: taskCount(['done', 'not_relevant']),
+      total: taskProgress.total,
+      complete: taskProgress.done,
+      notRelevant: taskProgress.notRelevant,
     },
     evidenceSubmissions,
     auditorInvited:
+      auditsWithAuditor > 0 ||
       pendingAuditorInvites > 0 ||
       members.some((m) => hasRole(m.role, 'auditor')),
     skips: parseSkips(onboarding?.checklistSkips),

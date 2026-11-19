@@ -1,3 +1,4 @@
+import type { FrameworkInstanceWithControls } from '@/lib/types/framework';
 import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -120,5 +121,32 @@ describe('FrameworksOverview permission gating', () => {
 
     const badge = screen.getByAltText('PCI DSS v4.0 Level 1');
     expect(badge).toHaveAttribute('src', '/badges/pci-dss.svg');
+  });
+
+  it('labels controls OK and evidence progress, without a subtitle that repeats the name', () => {
+    setMockPermissions({});
+    const instance = {
+      id: 'fi_iso',
+      controls: [],
+      framework: { id: 'fw_iso', name: 'ISO 27001', description: 'ISO 27001' },
+    } as unknown as FrameworkInstanceWithControls;
+
+    render(
+      <FrameworksOverview
+        {...baseProps}
+        frameworksWithControls={[instance]}
+        frameworksWithCompliance={[
+          {
+            frameworkInstance: instance,
+            complianceScore: 42.4,
+            controlsComplete: 12,
+            controlsTotal: 93,
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText('Controls OK 12/93 · Evidence progress 42%')).toBeInTheDocument();
+    expect(screen.getAllByText('ISO 27001')).toHaveLength(1);
   });
 });

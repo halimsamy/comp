@@ -11,30 +11,22 @@ const isResolved = (item: ChecklistItem) => item.status === 'done' || item.statu
 
 /** The audit-unblocking outcomes, reduced from the checklist (Vanta's "Starter Guide Progress" card). */
 export function getMilestones(checklist: OnboardingChecklist): Milestone[] {
-  const items = checklist.sections.flatMap((section) => section.items);
-  const byId = new Map(items.map((item) => [item.id, item]));
-  const count = (ids: string[]) => {
-    const present = ids.map((id) => byId.get(id)).filter((item): item is ChecklistItem => !!item);
-    return { done: present.filter(isResolved).length, total: present.length };
-  };
+  const resolved = (items: ChecklistItem[]) => ({
+    done: items.filter(isResolved).length,
+    total: items.length,
+  });
+  // #7: a milestone counts every step of its section, so its total matches the section card.
+  const section = (id: string) =>
+    resolved(checklist.sections.find((s) => s.id === id)?.items ?? []);
+  const auditor = checklist.sections
+    .flatMap((s) => s.items)
+    .filter((item) => item.id === 'auditor_access');
 
   const milestones: Milestone[] = [
-    {
-      id: 'systems',
-      label: 'key systems connected',
-      ...count(['identity_provider', 'cloud_provider', 'version_control', 'device_monitoring']),
-    },
-    {
-      id: 'policies',
-      label: 'policy steps complete',
-      ...count(['policies_published', 'policies_acknowledged']),
-    },
-    {
-      id: 'isms',
-      label: 'ISMS documents and SoA approved',
-      ...count(['isms_documents', 'statement_of_applicability']),
-    },
-    { id: 'auditor', label: 'auditor invited', ...count(['auditor_access']) },
+    { id: 'systems', label: 'key systems connected', ...section('systems') },
+    { id: 'policies', label: 'policy steps complete', ...section('policies') },
+    { id: 'isms', label: 'ISMS and scope steps complete', ...section('isms') },
+    { id: 'auditor', label: 'auditor invited', ...resolved(auditor) },
   ];
   return milestones.filter((milestone) => milestone.total > 0);
 }

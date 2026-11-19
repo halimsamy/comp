@@ -25,6 +25,8 @@ export interface ChecklistItem {
   lockedReason: string | null;
   progress: { done: number; total: number } | null;
   skip: ChecklistSkip | null;
+  /** False for steps an audit cannot do without (SoA, ISMS documents, PCI scope). */
+  skippable: boolean;
 }
 
 export interface ChecklistSection {

@@ -2,26 +2,21 @@
 
 import { usePermissions } from '@/hooks/use-permissions';
 import type { FrameworkInstanceWithControls } from '@/lib/types/framework';
-import { FrameworkEditorFramework, Policy, Task } from '@db';
+import type { FrameworkEditorFramework } from '@db';
 import { AttentionGrid } from './attention/AttentionGrid';
 import { ComplianceTrendCard } from './attention/ComplianceTrendCard';
 import { DeadlinesCard } from './attention/DeadlinesCard';
 import { FrameworksOverview } from './FrameworksOverview';
-import { ToDoOverview } from './ToDoOverview';
 import { FrameworkInstanceWithComplianceScore } from './types';
 
 export interface PublishedPoliciesScore {
   totalPolicies: number;
   publishedPolicies: number;
-  draftPolicies: Policy[];
-  policiesInReview: Policy[];
-  unpublishedPolicies: Policy[];
 }
 
 export interface DoneTasksScore {
   totalTasks: number;
   doneTasks: number;
-  incompleteTasks: Task[];
 }
 
 export interface PeopleScore {
@@ -44,8 +39,6 @@ export interface OverviewProps {
   doneTasksScore: DoneTasksScore;
   documentsScore: DocumentsScore;
   peopleScore: PeopleScore;
-  currentMember: { id: string; role: string } | null;
-  onboardingTriggerJobId: string | null;
 }
 
 export const Overview = ({
@@ -57,8 +50,6 @@ export const Overview = ({
   doneTasksScore,
   documentsScore,
   peopleScore,
-  currentMember,
-  onboardingTriggerJobId,
 }: OverviewProps) => {
   const overallComplianceScore = calculateOverallComplianceScore({
     publishedPolicies: publishedPoliciesScore.publishedPolicies,
@@ -87,21 +78,11 @@ export const Overview = ({
           organizationId={organizationId}
         />
         {canReadProgram && <DeadlinesCard organizationId={organizationId} />}
-        {canReadProgram && <ComplianceTrendCard />}
-        <ToDoOverview
-          totalPolicies={publishedPoliciesScore.totalPolicies}
-          totalTasks={doneTasksScore.totalTasks}
-          remainingPolicies={
-            publishedPoliciesScore.totalPolicies - publishedPoliciesScore.publishedPolicies
-          }
-          remainingTasks={doneTasksScore.totalTasks - doneTasksScore.doneTasks}
-          unpublishedPolicies={publishedPoliciesScore.unpublishedPolicies}
-          incompleteTasks={doneTasksScore.incompleteTasks}
-          policiesInReview={publishedPoliciesScore.policiesInReview}
-          organizationId={organizationId}
-          currentMember={currentMember}
-          onboardingTriggerJobId={onboardingTriggerJobId}
-        />
+        {canReadProgram && (
+          <div className="xl:col-span-2">
+            <ComplianceTrendCard />
+          </div>
+        )}
       </div>
     </div>
   );

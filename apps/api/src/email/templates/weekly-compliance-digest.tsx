@@ -24,11 +24,12 @@ export interface DigestItem {
   id: string;
   title: string;
   subtitle: string | null;
-  dueDate: string;
+  dueDate: string | null;
   href: string;
 }
 
 interface Props {
+  frequency?: 'daily' | 'weekly';
   userName: string;
   organizationName: string;
   organizationId: string;
@@ -37,12 +38,18 @@ interface Props {
   overdueCount: number;
   dueSoon: DigestItem[];
   dueSoonCount: number;
+  noDueDateCount?: number;
   windowDays: number;
+  /** Open tasks folded in from the Monday task digest (#10). */
+  tasks?: Array<{ id: string; title: string }>;
+  tasksCount?: number;
   email?: string;
 }
 
-const formatDate = (iso: string) =>
-  new Date(iso).toLocaleDateString('en-US', {
+const formatDate = (iso: string | null) =>
+  iso === null
+    ? 'no due date'
+    : new Date(iso).toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -73,8 +80,9 @@ function ItemList({
   );
 }
 
-/** Weekly program digest: the same needs-attention cards and deadline queue as the overview page. */
+/** Program digest (weekly or daily): the same needs-attention cards and deadline queue as the overview page. */
 export const WeeklyComplianceDigestEmail = ({
+  frequency = 'weekly',
   userName,
   organizationName,
   organizationId,
@@ -83,7 +91,10 @@ export const WeeklyComplianceDigestEmail = ({
   overdueCount,
   dueSoon,
   dueSoonCount,
+  noDueDateCount = 0,
   windowDays,
+  tasks = [],
+  tasksCount = 0,
   email,
 }: Props) => {
   const baseUrl =
@@ -120,14 +131,15 @@ export const WeeklyComplianceDigestEmail = ({
           >
             <Logo />
             <Heading className="mx-0 my-[30px] p-0 text-center text-[24px] font-normal text-[#121212]">
-              Your weekly compliance digest
+              Your {frequency} compliance digest
             </Heading>
             <Text className="text-[14px] leading-[24px] text-[#121212]">
               Hi {userName},
             </Text>
             <Text className="text-[14px] leading-[24px] text-[#121212]">
               Here is what needs attention in{' '}
-              <strong>{organizationName}</strong> this week.
+              <strong>{organizationName}</strong>{' '}
+              {frequency === 'daily' ? 'today' : 'this week'}.
             </Text>
 
             {attentionCards.length > 0 && (
@@ -169,6 +181,34 @@ export const WeeklyComplianceDigestEmail = ({
                   Due in the next {windowDays} days ({dueSoonCount})
                 </Text>
                 <ItemList items={dueSoon} url={url} />
+              </Section>
+            )}
+
+            {noDueDateCount > 0 && (
+              <Text className="text-[14px] leading-[24px] text-[#666666]">
+                {noDueDateCount} open {noDueDateCount === 1 ? 'item has' : 'items have'} no due
+                date.{' '}
+                <Link href={url('/overview')} className="text-[#121212] underline">
+                  Set due dates
+                </Link>{' '}
+                so nothing slips.
+              </Text>
+            )}
+
+            {tasks.length > 0 && (
+              <Section className="my-[12px]">
+                <Text className="mb-[4px] mt-0 text-[16px] font-medium text-[#121212]">
+                  Your open tasks ({tasksCount})
+                </Text>
+                <ul className="pl-[16px]">
+                  {tasks.map((task) => (
+                    <li key={task.id} className="text-[14px] leading-[24px] text-[#121212]">
+                      <Link href={url(`/tasks/${task.id}`)} className="text-[#121212] underline">
+                        {task.title}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
               </Section>
             )}
 

@@ -42,6 +42,8 @@ export const CHECKLIST_SECTIONS = [
 export const CHECKLIST_ITEM_IDS = [
   'frameworks',
   'company_profile',
+  'idle_timeout',
+  'control_owners',
   'isms_profile',
   'identity_provider',
   'cloud_provider',
@@ -50,11 +52,13 @@ export const CHECKLIST_ITEM_IDS = [
   'policies_acknowledged',
   'isms_documents',
   'statement_of_applicability',
+  'assets_scoped',
   'pci_scope',
   'invite_team',
   'device_monitoring',
   'risks_assessed',
   'risk_acceptance',
+  'vendors_classified',
   'vendors_assessed',
   'evidence_forms',
   'evidence_tasks',
@@ -62,3 +66,10 @@ export const CHECKLIST_ITEM_IDS = [
 ] as const;
 
 export type ChecklistItemId = (typeof CHECKLIST_ITEM_IDS)[number];
+
+/** Mandatory audit inputs: ISO 27001 6.1.3 d) SoA, clauses 4–10, PCI DSS 12.5.2 scope. */
+export const NON_SKIPPABLE_ITEM_IDS: readonly ChecklistItemId[] = [
+  'isms_documents',
+  'statement_of_applicability',
+  'pci_scope',
+];

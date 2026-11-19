@@ -128,19 +128,28 @@ export function FrameworksOverview({
               {frameworksWithControls.map((framework, index) => {
                 const complianceScore = complianceMap.get(framework.id) ?? 0;
                 const scoreEntry = controlsMap.get(framework.id);
-                const controlsLabel =
+                // #34: controls OK is the headline; the weighted score is evidence progress.
+                const progressLabel = [
                   scoreEntry?.controlsTotal !== undefined
-                    ? ` · ${scoreEntry.controlsComplete ?? 0}/${scoreEntry.controlsTotal} controls`
-                    : '';
+                    ? `Controls OK ${scoreEntry.controlsComplete ?? 0}/${scoreEntry.controlsTotal}`
+                    : null,
+                  `Evidence progress ${Math.round(complianceScore)}%`,
+                ]
+                  .filter(Boolean)
+                  .join(' · ');
                 const badgeSrc = mapFrameworkToBadge(framework);
                 const displayName =
                   framework.framework?.name ??
                   framework.customFramework?.name ??
                   '';
-                const displayDescription =
+                const description = (
                   framework.framework?.description ??
                   framework.customFramework?.description ??
-                  '';
+                  ''
+                ).trim();
+                // #17: no subtitle when it only repeats the name.
+                const displayDescription =
+                  description.toLowerCase() === displayName.trim().toLowerCase() ? '' : description;
 
                 return (
                   <div key={framework.id}>
@@ -171,9 +180,11 @@ export function FrameworksOverview({
                           <div className="flex flex-col flex-1 min-w-0">
                             <span className="text-sm font-medium text-foreground flex flex-col">
                               {displayName}
-                              <span className="text-xs text-muted-foreground font-normal">
-                                {displayDescription?.trim()}
-                              </span>
+                              {displayDescription && (
+                                <span className="text-xs text-muted-foreground font-normal">
+                                  {displayDescription}
+                                </span>
+                              )}
                             </span>
 
                             <div className="flex flex-col mt-1.5">
@@ -186,7 +197,7 @@ export function FrameworksOverview({
                                 />
                               </div>
                               <span className="text-xs text-muted-foreground tabular-nums text-right mt-1">
-                                {Math.round(complianceScore)}% compliant{controlsLabel}
+                                {progressLabel}
                               </span>
                             </div>
                           </div>

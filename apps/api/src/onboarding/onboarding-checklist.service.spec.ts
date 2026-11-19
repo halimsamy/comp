@@ -18,6 +18,9 @@ const mockDb = {
   vendor: { findMany: jest.fn() },
   evidenceSubmission: { count: jest.fn() },
   onboarding: { findUnique: jest.fn(), upsert: jest.fn() },
+  control: { findMany: jest.fn() },
+  asset: { findMany: jest.fn() },
+  auditEngagement: { count: jest.fn() },
 };
 jest.mock('@db', () => ({ db: mockDb }));
 jest.mock('../auth/auth.server', () => ({
@@ -39,7 +42,17 @@ function seedDb() {
     logo: 'org_1/logo.png',
     website: null,
     fleetDmLabelId: null,
+    sessionIdleTimeoutMinutes: 15,
   });
+  mockDb.control.findMany.mockResolvedValue([
+    { ownerId: 'mem_1' },
+    { ownerId: null },
+  ]);
+  mockDb.asset.findMany.mockResolvedValue([
+    { cdeScope: 'in_scope' },
+    { cdeScope: 'unassessed' },
+  ]);
+  mockDb.auditEngagement.count.mockResolvedValue(0);
   mockDb.frameworkInstance.findMany.mockResolvedValue([
     { framework: { name: 'ISO 27001' }, customFramework: null },
     { framework: { name: 'PCI DSS Level 1' }, customFramework: null },
@@ -87,8 +100,8 @@ function seedDb() {
   ]);
   mockDb.riskAcceptance.findMany.mockResolvedValue([{ riskId: 'rsk_2' }]);
   mockDb.vendor.findMany.mockResolvedValue([
-    { status: 'assessed' },
-    { status: 'not_assessed' },
+    { status: 'assessed', criticality: 'high' },
+    { status: 'not_assessed', criticality: null },
   ]);
   mockDb.task.groupBy.mockResolvedValue([
     { status: 'done', _count: { _all: 3 } },
@@ -121,19 +134,46 @@ describe('loadChecklistState', () => {
       ismsDocuments: { total: 2, approved: 1 },
       pciScopeTask: { id: 'tsk_scope', done: false },
       risks: { total: 2, assessed: 1, withAcceptance: 1 },
-      vendors: { total: 2, assessed: 1 },
-      tasks: { total: 10, complete: 4 },
+      vendors: { total: 2, assessed: 1, classified: 1 },
+      // Not relevant tasks are out of the denominator (#125).
+      tasks: { total: 9, complete: 3, notRelevant: 1 },
+      idleTimeoutMinutes: 15,
+      controls: { total: 2, owned: 1 },
+      assets: { total: 2, scoped: 1 },
       auditorInvited: true,
       skips: {},
     });
+    // Archived tasks never count, in progress or for the PCI scope step.
+    expect(mockDb.task.groupBy.mock.calls[0][0].where).toEqual({
+      organizationId: 'org_1',
+      archivedAt: null,
+    });
+    expect(mockDb.task.findFirst.mock.calls[0][0].where.archivedAt).toBeNull();
     for (const call of [
       mockDb.policy.findMany,
       mockDb.member.findMany,
       mockDb.task.groupBy,
       mockDb.vendor.findMany,
+      mockDb.control.findMany,
+      mockDb.asset.findMany,
+      mockDb.auditEngagement.count,
     ]) {
       expect(call.mock.calls[0][0].where.organizationId).toBe('org_1');
     }
+  });
+});
+
+describe('loadChecklistState auditor step', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    seedDb();
+  });
+
+  it('is done when an audit engagement has an auditor, even without an auditor member', async () => {
+    mockDb.member.findMany.mockResolvedValue([{ id: 'mem_1', role: 'owner' }]);
+    expect((await loadChecklistState('org_1')).auditorInvited).toBe(false);
+    mockDb.auditEngagement.count.mockResolvedValue(1);
+    expect((await loadChecklistState('org_1')).auditorInvited).toBe(true);
   });
 });
 
@@ -187,6 +227,18 @@ describe('OnboardingChecklistService', () => {
         organizationId: 'org_1',
         itemId: 'nope',
         reason: 'x',
+        skippedById: null,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(mockDb.onboarding.upsert).not.toHaveBeenCalled();
+  });
+
+  it('refuses to skip steps the audit needs (SoA, ISMS documents, PCI scope)', async () => {
+    await expect(
+      service.skipItem({
+        organizationId: 'org_1',
+        itemId: 'statement_of_applicability',
+        reason: 'later',
         skippedById: null,
       }),
     ).rejects.toBeInstanceOf(BadRequestException);

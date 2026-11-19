@@ -18,10 +18,7 @@ jest.mock('@trycompai/integration-platform', () => ({
 jest.mock('../frameworks/scoring/framework-scoring.loader', () => ({
   loadFrameworkScores: jest.fn(),
 }));
-jest.mock('./overview-data', () => ({
-  ...jest.requireActual('./overview-data'),
-  loadOverviewData: jest.fn(),
-}));
+jest.mock('./overview-data', () => ({ loadOverviewData: jest.fn() }));
 
 import { PERMISSIONS_KEY } from '../auth/permission.guard';
 import { loadFrameworkScores } from '../frameworks/scoring/framework-scoring.loader';
@@ -31,20 +28,11 @@ import {
 } from './compliance-snapshots';
 import { loadIntegrationCoverage } from './integration-coverage';
 import { loadOverviewData } from './overview-data';
+import { emptyOverviewData } from './overview-data.fixturespec';
 import { OverviewController } from './overview.controller';
 import { OverviewService } from './overview.service';
 
-const emptyData = {
-  tasks: [],
-  policies: [],
-  members: [],
-  trainingRecords: [],
-  trainingModules: [],
-  vendors: [],
-  checkRuns: [],
-  findings: [],
-  accessReviews: [],
-};
+const emptyData = emptyOverviewData();
 
 describe('OverviewController', () => {
   const controller = new OverviewController(new OverviewService());
@@ -71,13 +59,14 @@ describe('OverviewController', () => {
     (loadOverviewData as jest.Mock).mockResolvedValue(emptyData);
     const attention = await controller.getAttention('org_1');
     expect(loadOverviewData).toHaveBeenCalledWith({ organizationId: 'org_1' });
-    expect(attention.data).toHaveLength(8);
+    expect(attention.data).toHaveLength(14);
 
     const deadlines = await controller.getDeadlines('org_1', { days: 14 });
     expect(deadlines).toMatchObject({
       windowDays: 14,
       overdue: [],
       dueSoon: [],
+      noDueDate: [],
     });
   });
 });

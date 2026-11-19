@@ -1,4 +1,7 @@
-import { CHECKLIST_SECTIONS } from './checklist-catalog';
+import {
+  CHECKLIST_SECTIONS,
+  NON_SKIPPABLE_ITEM_IDS,
+} from './checklist-catalog';
 import { buildItemSpecs } from './checklist-items';
 import type {
   ChecklistItem,
@@ -13,17 +16,22 @@ import type {
  */
 export function buildChecklist(state: ChecklistState): OnboardingChecklist {
   const specs = buildItemSpecs(state);
+  const isSkippable = (id: string) =>
+    !(NON_SKIPPABLE_ITEM_IDS as readonly string[]).includes(id);
+  // Skips recorded before a step became mandatory no longer count.
+  const skipOf = (id: string) =>
+    isSkippable(id) ? (state.skips[id] ?? null) : null;
   const titles = new Map(specs.map((spec) => [spec.id, spec.title]));
   const resolved = new Set(
     specs
-      .filter((spec) => spec.done || state.skips[spec.id])
+      .filter((spec) => spec.done || skipOf(spec.id))
       .map((spec) => spec.id),
   );
 
   const sectionOf = new Map(specs.map((spec) => [spec.id, spec.section]));
   const items: ChecklistItem[] = specs.map((spec) => {
     const dependsOn = (spec.dependsOn ?? []).filter((id) => titles.has(id));
-    const skip = spec.done ? null : (state.skips[spec.id] ?? null);
+    const skip = spec.done ? null : skipOf(spec.id);
     const blocking = dependsOn.filter((id) => !resolved.has(id));
     const lockedReason =
       spec.lockedReason ||
@@ -48,6 +56,7 @@ export function buildChecklist(state: ChecklistState): OnboardingChecklist {
       lockedReason: status === 'locked' ? lockedReason : null,
       progress: spec.progress ?? null,
       skip,
+      skippable: isSkippable(spec.id),
     };
   });
 

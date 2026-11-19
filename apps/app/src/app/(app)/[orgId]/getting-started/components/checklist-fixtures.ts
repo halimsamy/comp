@@ -11,6 +11,7 @@ export const makeItem = (overrides: Partial<ChecklistItem> & { id: string }): Ch
   lockedReason: null,
   progress: null,
   skip: null,
+  skippable: true,
   ...overrides,
 });
 
