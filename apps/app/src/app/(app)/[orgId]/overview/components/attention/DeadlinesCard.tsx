@@ -73,8 +73,9 @@ export function DeadlinesCard({ organizationId }: { organizationId: string }) {
       title="Deadlines"
       description="Overdue and due in the next 30 days, across every module"
       width="full"
-      headerAction={
-        deadlines ? (
+    >
+      <div className="flex flex-col gap-3">
+        {deadlines && (
           <div className="max-w-full overflow-x-auto">
             <Tabs
               value={group}
@@ -87,59 +88,58 @@ export function DeadlinesCard({ organizationId }: { organizationId: string }) {
               </TabsList>
             </Tabs>
           </div>
-        ) : undefined
-      }
-    >
-      {isLoading && !deadlines ? (
-        <div className="flex flex-col gap-2" aria-busy="true">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} style={{ height: 40, width: '100%' }} />
-          ))}
-        </div>
-      ) : hasError || !deadlines ? (
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <Text size="sm" variant="muted">
-            We couldn&apos;t load deadlines.
-          </Text>
-          <Button size="sm" variant="outline" onClick={() => mutate()}>
-            Try again
-          </Button>
-        </div>
-      ) : items.length === 0 && undated > 0 ? (
-        <div className="flex flex-col items-center gap-2 py-8 text-center">
-          <Time size={24} className="text-muted-foreground" />
-          <Text size="sm" variant="muted">
-            {EMPTY_TEXT[group]} {undated} {undated === 1 ? 'item has' : 'items have'} no due date.
-          </Text>
-          <Button size="sm" variant="outline" onClick={() => setGroup('noDueDate')}>
-            Review items without a due date
-          </Button>
-        </div>
-      ) : items.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 py-8 text-center">
-          <CheckmarkOutline size={24} className="text-green-600 dark:text-green-400" />
-          <Text size="sm" variant="muted">
-            {EMPTY_TEXT[group]}
-          </Text>
-        </div>
-      ) : (
-        <div className="flex flex-col">
-          <ul className="max-h-[360px] divide-y divide-border overflow-y-auto">
-            {items.map((item) => (
-              <DeadlineRow
-                key={`${item.type}:${item.id}`}
-                item={item}
-                organizationId={organizationId}
-              />
+        )}
+        {isLoading && !deadlines ? (
+          <div className="flex flex-col gap-2" aria-busy="true">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} style={{ height: 40, width: '100%' }} />
             ))}
-          </ul>
-          {count > items.length && (
-            <Text size="xs" variant="muted">
-              Showing {items.length} of {count}
+          </div>
+        ) : hasError || !deadlines ? (
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <Text size="sm" variant="muted">
+              We couldn&apos;t load deadlines.
             </Text>
-          )}
-        </div>
-      )}
+            <Button size="sm" variant="outline" onClick={() => mutate()}>
+              Try again
+            </Button>
+          </div>
+        ) : items.length === 0 && undated > 0 ? (
+          <div className="flex flex-col items-center gap-2 py-8 text-center">
+            <Time size={24} className="text-muted-foreground" />
+            <Text size="sm" variant="muted">
+              {EMPTY_TEXT[group]} {undated} {undated === 1 ? 'item has' : 'items have'} no due date.
+            </Text>
+            <Button size="sm" variant="outline" onClick={() => setGroup('noDueDate')}>
+              Review items without a due date
+            </Button>
+          </div>
+        ) : items.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 py-8 text-center">
+            <CheckmarkOutline size={24} className="text-green-600 dark:text-green-400" />
+            <Text size="sm" variant="muted">
+              {EMPTY_TEXT[group]}
+            </Text>
+          </div>
+        ) : (
+          <div className="flex flex-col">
+            <ul className="max-h-[360px] divide-y divide-border overflow-y-auto">
+              {items.map((item) => (
+                <DeadlineRow
+                  key={`${item.type}:${item.id}`}
+                  item={item}
+                  organizationId={organizationId}
+                />
+              ))}
+            </ul>
+            {count > items.length && (
+              <Text size="xs" variant="muted">
+                Showing {items.length} of {count}
+              </Text>
+            )}
+          </div>
+        )}
+      </div>
     </Card>
   );
 }

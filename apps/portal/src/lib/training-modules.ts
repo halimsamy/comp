@@ -1,9 +1,5 @@
-import { Departments, type Prisma } from '@db';
+import type { Prisma } from '@db';
 import { db } from '@db/server';
-
-function isDepartment(value: string): value is Departments {
-  return Object.values(Departments).some((d) => d === value);
-}
 
 /** Custom modules assigned to a member (mirrors assignedModulesWhere in apps/api training-modules.service). */
 export function assignedModulesWhere({
@@ -27,7 +23,7 @@ export function assignedModulesWhere({
       {
         OR: [
           { targetDepartments: { isEmpty: true } },
-          ...(isDepartment(department) ? [{ targetDepartments: { has: department } }] : []),
+          ...(department ? [{ targetDepartments: { has: department } }] : []),
         ],
       },
     ],

@@ -52,9 +52,11 @@ export function AssetsTable({
                   onClick={() => onOpen(asset)}
                   className="min-w-40 max-w-xs rounded-sm text-left outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50"
                 >
-                  <Text size="sm" weight="medium">
-                    {asset.name}
-                  </Text>
+                  <div className="whitespace-normal break-words">
+                    <Text size="sm" weight="medium">
+                      {asset.name}
+                    </Text>
+                  </div>
                   <div className="truncate">
                     <Text size="xs" variant="muted">
                       {asset.source === 'manual'

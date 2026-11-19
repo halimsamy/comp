@@ -1,10 +1,8 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
-import { Departments } from '@db';
 import {
   IsArray,
   IsBoolean,
   IsDateString,
-  IsEnum,
   IsInt,
   IsNotEmpty,
   IsOptional,
@@ -57,15 +55,16 @@ export class CreateTrainingModuleDto {
   targetRoles?: string[];
 
   @ApiPropertyOptional({
-    description: 'Departments that must take it. Empty means every department.',
-    enum: Departments,
-    isArray: true,
+    description:
+      'Departments that must take it, built-in (e.g. "it") or custom, matched against the member department. Empty means every department.',
+    type: [String],
     example: ['it'],
   })
   @IsOptional()
   @IsArray()
-  @IsEnum(Departments, { each: true })
-  targetDepartments?: Departments[];
+  @IsString({ each: true })
+  @MaxLength(64, { each: true })
+  targetDepartments?: string[];
 
   @ApiPropertyOptional({
     description: 'Months a completion stays valid before the member must retake it',

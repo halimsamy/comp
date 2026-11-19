@@ -5,7 +5,7 @@ const mockDb = {
   trainingModule: { findMany: jest.fn(), findFirst: jest.fn(), update: jest.fn(), create: jest.fn() },
   trainingCompletionRecord: { findMany: jest.fn(), create: jest.fn() },
 };
-jest.mock('@db', () => ({ db: mockDb, Departments: { none: 'none', it: 'it', hr: 'hr' } }));
+jest.mock('@db', () => ({ db: mockDb }));
 
 import { assignedModulesWhere, TrainingModulesService } from './training-modules.service';
 
@@ -24,6 +24,15 @@ describe('TrainingModulesService', () => {
     expect(where).toMatchObject({ organizationId: 'org_1', isEnabled: true });
     expect(JSON.stringify(where)).toContain('"hasSome":["employee","admin"]');
     expect(JSON.stringify(where)).toContain('"has":"it"');
+  });
+
+  it('targets custom departments too', () => {
+    const where = assignedModulesWhere({
+      organizationId: 'org_1',
+      role: 'employee',
+      department: 'ENGINEERING',
+    });
+    expect(JSON.stringify(where)).toContain('"has":"ENGINEERING"');
   });
 
   it('reports completed, expired and not started modules', async () => {

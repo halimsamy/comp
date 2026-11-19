@@ -12,7 +12,7 @@ model TrainingModule {
   // Empty = every member. Values are member role names.
   targetRoles        String[]      @default([])
   // Empty = every department.
-  targetDepartments  Departments[] @default([])
+  targetDepartments  String[]      @default([])
   recurrenceMonths   Int           @default(12)
   isEnabled          Boolean       @default(true)
   createdAt          DateTime      @default(now())

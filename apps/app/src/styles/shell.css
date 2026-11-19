@@ -24,3 +24,17 @@
     flex-wrap: wrap;
   }
 }
+
+/* DialogContent's close (×) button asks for `absolute top-2 right-2`, but the DS
+   Button overwrites className, so the × fell into the flow under the footer and
+   stopped the footer from being :last-child (no bleed to the bottom edge). */
+[data-slot='dialog-content'] > [data-slot='button']:last-child {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+}
+[data-slot='dialog-content'] > [data-slot='dialog-footer']:has(+ [data-slot='button']:last-child) {
+  margin-bottom: calc(var(--dialog-px, 1rem) * -1);
+  border-bottom-left-radius: var(--dialog-radius, 0.75rem);
+  border-bottom-right-radius: var(--dialog-radius, 0.75rem);
+}

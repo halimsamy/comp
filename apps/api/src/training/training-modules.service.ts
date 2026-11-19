@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { db, Departments, type Prisma } from '@db';
+import { db, type Prisma } from '@db';
 import type {
   CreateTrainingModuleDto,
   UpdateTrainingModuleDto,
@@ -7,10 +7,6 @@ import type {
 import { addMonths } from './training-cycles';
 
 export type ModuleTrainingStatus = 'completed' | 'expired' | 'not_started';
-
-function isDepartment(value: string): value is Departments {
-  return Object.values(Departments).some((d) => d === value);
-}
 
 /** Prisma filter for the custom modules a member must take (role and department targeting). */
 export function assignedModulesWhere({
@@ -34,9 +30,7 @@ export function assignedModulesWhere({
       {
         OR: [
           { targetDepartments: { isEmpty: true } },
-          ...(isDepartment(department)
-            ? [{ targetDepartments: { has: department } }]
-            : []),
+          ...(department ? [{ targetDepartments: { has: department } }] : []),
         ],
       },
     ],
