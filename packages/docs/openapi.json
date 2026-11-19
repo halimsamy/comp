@@ -40805,22 +40805,13 @@
             ]
           },
           "targetDepartments": {
-            "type": "array",
-            "description": "Departments that must take it. Empty means every department.",
+            "description": "Departments that must take it, built-in (e.g. \"it\") or custom, matched against the member department. Empty means every department.",
             "example": [
               "it"
             ],
+            "type": "array",
             "items": {
-              "type": "string",
-              "enum": [
-                "none",
-                "admin",
-                "gov",
-                "hr",
-                "it",
-                "itsm",
-                "qms"
-              ]
+              "type": "string"
             }
           },
           "recurrenceMonths": {
@@ -40866,22 +40857,13 @@
             ]
           },
           "targetDepartments": {
-            "type": "array",
-            "description": "Departments that must take it. Empty means every department.",
+            "description": "Departments that must take it, built-in (e.g. \"it\") or custom, matched against the member department. Empty means every department.",
             "example": [
               "it"
             ],
+            "type": "array",
             "items": {
-              "type": "string",
-              "enum": [
-                "none",
-                "admin",
-                "gov",
-                "hr",
-                "it",
-                "itsm",
-                "qms"
-              ]
+              "type": "string"
             }
           },
           "recurrenceMonths": {
