@@ -17,12 +17,15 @@ import {
   generateTaskSummaryPDF,
   sanitizeFilename,
 } from './evidence-pdf-generator';
+import { renderTaskAutoEvidence } from './task-platform-evidence';
 
 export type TaskBundle = {
   title: string;
   summaryPdf: Buffer;
   automationPdfs: Array<{ name: string; pdf: Buffer }>;
   attachments: TaskAttachment[];
+  /** Fresh Auto-evidence snapshot; only when the audit period includes today. */
+  autoEvidence?: { name: string; buffer: Buffer } | null;
 };
 
 /** True when `date` falls inside the (inclusive, day-granular) audit period. */
@@ -47,10 +50,12 @@ export async function loadTaskBundle({
   organizationId,
   taskId,
   period = {},
+  now = new Date(),
 }: {
   organizationId: string;
   taskId: string;
   period?: AuditPeriod;
+  now?: Date;
 }): Promise<TaskBundle> {
   const [headers, allAttachments] = await Promise.all([
     getAutomationHeaders({ organizationId, taskId }),
@@ -79,6 +84,10 @@ export async function loadTaskBundle({
     }),
     automationPdfs,
     attachments,
+    // A snapshot dated today is not evidence for a past audit period.
+    autoEvidence: inPeriod(now, period)
+      ? await renderTaskAutoEvidence({ organizationId, taskId, now })
+      : null,
   };
 }
 
@@ -103,6 +112,11 @@ export async function appendTaskEvidence({
       attachment,
       folderPath: `${folderPath}/attachments`,
       uniqueName,
+    });
+  }
+  if (bundle.autoEvidence) {
+    archive.append(bundle.autoEvidence.buffer, {
+      name: `${folderPath}/attachments/${uniqueName(bundle.autoEvidence.name)}`,
     });
   }
 }

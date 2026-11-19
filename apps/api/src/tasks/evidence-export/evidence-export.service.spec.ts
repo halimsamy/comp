@@ -114,10 +114,16 @@ jest.mock('./evidence-pdf-generator', () => ({
       .slice(0, 50) || 'export',
 }));
 
+// Auto-evidence and Structured evidence have their own spec.
+jest.mock('./task-platform-evidence', () => ({
+  appendTaskPlatformEvidence: jest.fn(),
+}));
+
 import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { s3Client } from '../../app/s3';
 import { EvidenceExportService } from './evidence-export.service';
 import { generateTaskSummaryPDF } from './evidence-pdf-generator';
+import { appendTaskPlatformEvidence } from './task-platform-evidence';
 
 describe('EvidenceExportService — streaming ZIPs', () => {
   let service: EvidenceExportService;
@@ -220,6 +226,21 @@ describe('EvidenceExportService — streaming ZIPs', () => {
       expect(generateTaskSummaryPDF).toHaveBeenCalledWith(
         expect.any(Object),
         { attachmentsCount: 1 },
+      );
+    });
+
+    it('adds Auto-evidence and Structured evidence to 01-attachments', async () => {
+      primeTaskQueries({});
+
+      const { archive } = await service.streamTaskEvidenceZip('org_1', 'tsk_123');
+      await (archive as unknown as MockArchive).finalized;
+
+      expect(appendTaskPlatformEvidence).toHaveBeenCalledWith(
+        expect.objectContaining({
+          organizationId: 'org_1',
+          taskId: 'tsk_123',
+          folderPath: 'acme-corp_soc-2-access-review_evidence/01-attachments',
+        }),
       );
     });
 

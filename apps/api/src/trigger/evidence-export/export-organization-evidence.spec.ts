@@ -65,6 +65,9 @@ jest.mock('@/tasks/evidence-export/evidence-attachment-streamer', () => ({
   appendAttachmentToArchive: jest.fn(),
   createFilenameTracker: jest.fn(),
 }));
+jest.mock('@/tasks/evidence-export/task-platform-evidence', () => ({
+  appendTaskPlatformEvidence: jest.fn(),
+}));
 
 import {
   exportOrganizationEvidenceTask,

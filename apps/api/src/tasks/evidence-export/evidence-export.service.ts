@@ -28,6 +28,7 @@ import {
   streamAutomationRuns,
   findTasksWithEvidence,
 } from './evidence-data-loader';
+import { appendTaskPlatformEvidence } from './task-platform-evidence';
 
 const safeStringify = configureStringify({
   bigint: true,
@@ -245,6 +246,7 @@ export class EvidenceExportService {
       folderName,
       options,
       perAutomationSubfolders: true,
+      platformEvidence: { organizationId, taskId },
     });
 
     await archive.finalize();
@@ -267,6 +269,8 @@ export class EvidenceExportService {
     folderName: string;
     options: { includeRawJson?: boolean };
     perAutomationSubfolders: boolean;
+    /** Adds Auto-evidence and Structured evidence to 01-attachments. */
+    platformEvidence?: { organizationId: string; taskId: string };
   }): Promise<void> {
     const {
       archive,
@@ -275,6 +279,7 @@ export class EvidenceExportService {
       folderName,
       options,
       perAutomationSubfolders,
+      platformEvidence,
     } = params;
 
     const summaryPdf = generateTaskSummaryPDF(headers, {
@@ -282,16 +287,22 @@ export class EvidenceExportService {
     });
     archive.append(summaryPdf, { name: `${folderName}/00-summary.pdf` });
 
-    if (attachments.length > 0) {
-      const uniqueName = createFilenameTracker();
-      for (const attachment of attachments) {
-        await appendAttachmentToArchive({
-          archive,
-          attachment,
-          folderPath: `${folderName}/01-attachments`,
-          uniqueName,
-        });
-      }
+    const uniqueName = createFilenameTracker();
+    for (const attachment of attachments) {
+      await appendAttachmentToArchive({
+        archive,
+        attachment,
+        folderPath: `${folderName}/01-attachments`,
+        uniqueName,
+      });
+    }
+    if (platformEvidence) {
+      await appendTaskPlatformEvidence({
+        archive,
+        ...platformEvidence,
+        folderPath: `${folderName}/01-attachments`,
+        uniqueName,
+      });
     }
 
     for (const automationHeader of headers.automations) {
@@ -434,6 +445,7 @@ export class EvidenceExportService {
           folderName: taskFolder,
           options,
           perAutomationSubfolders: false,
+          platformEvidence: { organizationId, taskId },
         });
 
         manifestEntries.push({

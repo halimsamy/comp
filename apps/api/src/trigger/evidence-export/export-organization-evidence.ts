@@ -24,6 +24,7 @@ import {
   appendAttachmentToArchive,
   createFilenameTracker,
 } from '@/tasks/evidence-export/evidence-attachment-streamer';
+import { appendTaskPlatformEvidence } from '@/tasks/evidence-export/task-platform-evidence';
 import { configure as configureStringify } from 'safe-stable-stringify';
 
 const safeStringify = configureStringify({
@@ -246,17 +247,22 @@ async function populateArchive({
       });
       archive.append(summaryPdf, { name: `${taskFolder}/00-summary.pdf` });
 
-      if (attachments.length > 0) {
-        const uniqueName = createFilenameTracker();
-        for (const attachment of attachments) {
-          await appendAttachmentToArchive({
-            archive,
-            attachment,
-            folderPath: `${taskFolder}/01-attachments`,
-            uniqueName,
-          });
-        }
+      const uniqueName = createFilenameTracker();
+      for (const attachment of attachments) {
+        await appendAttachmentToArchive({
+          archive,
+          attachment,
+          folderPath: `${taskFolder}/01-attachments`,
+          uniqueName,
+        });
       }
+      await appendTaskPlatformEvidence({
+        archive,
+        organizationId,
+        taskId,
+        folderPath: `${taskFolder}/01-attachments`,
+        uniqueName,
+      });
 
       for (const automationHeader of headers.automations) {
         const typePrefix =
