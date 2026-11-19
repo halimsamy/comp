@@ -32,7 +32,7 @@ const control = {
   tasks: [{ id: 'tsk_1', status: 'done' }],
   frameworkTaskLinks: [],
   controlDocumentTypes: [{ formType: 'access_request' }, { formType: 'rbac_matrix' }],
-  frameworkDocumentLinks: [{ formType: 'account_types' }],
+  frameworkDocumentLinks: [{ formType: 'tabletop_exercise' }],
   ismsDocumentLinks: [{ ismsDocument: { id: 'doc', status: 'draft', currentVersionId: 'v1' } }],
 };
 
@@ -52,10 +52,10 @@ describe('ControlsOverviewService', () => {
 
   it('unions both link kinds and scores evidence per kind', async () => {
     mockDb.control.findMany.mockResolvedValue([control]);
-    mockDb.evidenceFormSetting.findMany.mockResolvedValue([{ formType: 'rbac_matrix' }]);
+    mockDb.evidenceFormSetting.findMany.mockResolvedValue([{ formType: 'rbac_matrix', isNotRelevant: true }]);
     mockDb.evidenceSubmission.groupBy.mockResolvedValue([
       { formType: 'access_request', _max: { submittedAt: new Date() } },
-      { formType: 'account_types', _max: { submittedAt: new Date('2020-01-01') } },
+      { formType: 'tabletop_exercise', _max: { submittedAt: new Date('2020-01-01') } },
     ]);
 
     const { data } = await service.list('org_1');
@@ -66,7 +66,7 @@ describe('ControlsOverviewService', () => {
     expect(data[0].evidence).toEqual({
       policies: { total: 2, completed: 1 },
       tasks: { total: 1, completed: 1 },
-      forms: { total: 2, completed: 1 }, // rbac_matrix is not relevant; account_types is stale
+      forms: { total: 2, completed: 1 }, // rbac_matrix is not relevant (and retired); tabletop_exercise is stale
       ismsDocuments: { total: 1, completed: 1 },
     });
     expect(data[0].status).toBe('in_progress');

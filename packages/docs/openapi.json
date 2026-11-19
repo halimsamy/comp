@@ -57,6 +57,24 @@
                       "description": "Organization website URL",
                       "example": "https://acme-corp.com"
                     },
+                    "legalName": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "Registered legal name of the company",
+                      "example": "Acme Corp Ltd"
+                    },
+                    "registeredAddress": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "Registered office address",
+                      "example": "1 Main St, London EC1A 1AA, UK"
+                    },
+                    "phone": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "Company phone number",
+                      "example": "+44 20 7946 0000"
+                    },
                     "onboardingCompleted": {
                       "type": "boolean",
                       "description": "Whether onboarding is completed",
@@ -185,6 +203,21 @@
                     "description": "Organization website URL",
                     "example": "https://acme-corp.com"
                   },
+                  "legalName": {
+                    "type": "string",
+                    "description": "Registered legal name of the company",
+                    "example": "Acme Corp Ltd"
+                  },
+                  "registeredAddress": {
+                    "type": "string",
+                    "description": "Registered office address",
+                    "example": "1 Main St, London EC1A 1AA, UK"
+                  },
+                  "phone": {
+                    "type": "string",
+                    "description": "Company phone number",
+                    "example": "+44 20 7946 0000"
+                  },
                   "onboardingCompleted": {
                     "type": "boolean",
                     "description": "Whether onboarding is completed",
@@ -286,6 +319,24 @@
                       "nullable": true,
                       "description": "Organization website URL",
                       "example": "https://acme-corp.com"
+                    },
+                    "legalName": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "Registered legal name of the company",
+                      "example": "Acme Corp Ltd"
+                    },
+                    "registeredAddress": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "Registered office address",
+                      "example": "1 Main St, London EC1A 1AA, UK"
+                    },
+                    "phone": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "Company phone number",
+                      "example": "+44 20 7946 0000"
                     },
                     "onboardingCompleted": {
                       "type": "boolean",
@@ -718,6 +769,15 @@
                           "type": "boolean"
                         },
                         "findingNotifications": {
+                          "type": "boolean"
+                        },
+                        "complianceDigest": {
+                          "type": "boolean"
+                        },
+                        "ownershipAssignments": {
+                          "type": "boolean"
+                        },
+                        "slaAlerts": {
                           "type": "boolean"
                         }
                       }
@@ -2282,50 +2342,6 @@
         }
       }
     },
-    "/v1/people/{id}/access": {
-      "get": {
-        "description": "Aggregates the latest Employee Access check results from every connected integration bound to the Employee Access task, matched to the member by email.",
-        "operationId": "PeopleController_getMemberAccess_v1",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "description": "Member ID",
-            "schema": {
-              "example": "mem_abc123def456",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "apikey": []
-          }
-        ],
-        "summary": "Member's access across connected integrations",
-        "tags": [
-          "People"
-        ],
-        "x-mint": {
-          "metadata": {
-            "title": "Member's access across connected integrations | Comp AI API",
-            "sidebarTitle": "Member's access across connected integrations",
-            "description": "Aggregates the latest Employee Access check results from every connected integration bound to the Employee Access task, matched to the member by email.",
-            "og:title": "Member's access across connected integrations | Comp AI API",
-            "og:description": "Aggregates the latest Employee Access check results from every connected integration bound to the Employee Access task, matched to the member by email."
-          }
-        },
-        "x-speakeasy-mcp": {
-          "name": "get-member-access"
-        }
-      }
-    },
     "/v1/people/{id}/training-videos": {
       "get": {
         "operationId": "PeopleController_getTrainingVideos_v1",
@@ -2973,6 +2989,90 @@
         },
         "x-speakeasy-mcp": {
           "name": "update-email-preferences"
+        }
+      },
+      "patch": {
+        "description": "Merges the sent keys into the current user email preferences (unsent keys keep their value). Includes the compliance digest, ownership assignment and SLA alert emails.",
+        "operationId": "MyEmailPreferencesController_patch_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatchEmailPreferencesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "Change some of my email preferences",
+        "tags": [
+          "People"
+        ],
+        "x-mint": {
+          "metadata": {
+            "title": "Change some of my email preferences | Comp AI API",
+            "sidebarTitle": "Change some of my email preferences",
+            "description": "Merges the sent keys into the current user email preferences (unsent keys keep their value). Includes the compliance digest, ownership assignment and SLA.",
+            "og:title": "Change some of my email preferences | Comp AI API",
+            "og:description": "Merges the sent keys into the current user email preferences (unsent keys keep their value). Includes the compliance digest, ownership assignment and SLA."
+          }
+        },
+        "x-speakeasy-mcp": {
+          "name": "patch"
+        }
+      }
+    },
+    "/v1/people/background-checks/verified-externally": {
+      "post": {
+        "description": "Records that the selected members were screened outside Comp AI (provider and date, optional proof file). Members whose check is already complete are skipped.",
+        "operationId": "PeopleBackgroundCheckController_verifyExternally_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyBackgroundExternallyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "Mark background checks verified externally",
+        "tags": [
+          "People"
+        ],
+        "x-mint": {
+          "metadata": {
+            "title": "Mark background checks verified externally | Comp AI API",
+            "sidebarTitle": "Mark background checks verified externally",
+            "description": "Records that the selected members were screened outside Comp AI (provider and date, optional proof file). Members whose check is already complete are skipped.",
+            "og:title": "Mark background checks verified externally | Comp AI API",
+            "og:description": "Records that the selected members were screened outside Comp AI (provider and date, optional proof file). Members whose check is already complete are skipped."
+          }
+        },
+        "x-speakeasy-mcp": {
+          "name": "verify-externally"
         }
       }
     },
@@ -7786,7 +7886,7 @@
     },
     "/v1/risk-management/settings": {
       "get": {
-        "description": "Returns the settings the ISMS 6.1.2 Risk Assessment Methodology sets for the Risks module: the lowest residual level that needs risk-owner acceptance and the months between periodic risk reviews.",
+        "description": "Returns the settings the ISMS 6.1.2 Risk Assessment Methodology sets for the Risks module: the lowest residual level that needs risk-owner acceptance, the months between periodic risk reviews, and the definition of each likelihood.",
         "operationId": "RiskWorkspaceController_getSettings_v1",
         "parameters": [],
         "responses": {
@@ -7807,9 +7907,9 @@
           "metadata": {
             "title": "Get risk methodology settings | Comp AI API",
             "sidebarTitle": "Get risk methodology settings",
-            "description": "Returns the settings the ISMS 6.1.2 Risk Assessment Methodology sets for the Risks module: the lowest residual level that needs risk-owner acceptance.",
+            "description": "Returns the settings the ISMS 6.1.2 Risk Assessment Methodology sets for the Risks module: the lowest residual level that needs risk-owner acceptance, the.",
             "og:title": "Get risk methodology settings | Comp AI API",
-            "og:description": "Returns the settings the ISMS 6.1.2 Risk Assessment Methodology sets for the Risks module: the lowest residual level that needs risk-owner acceptance."
+            "og:description": "Returns the settings the ISMS 6.1.2 Risk Assessment Methodology sets for the Risks module: the lowest residual level that needs risk-owner acceptance, the."
           }
         },
         "x-speakeasy-mcp": {
@@ -7852,7 +7952,7 @@
     },
     "/v1/risk-management/risks/bulk": {
       "post": {
-        "description": "Creates up to 50 risks from library templates or AI suggestions. Titles already in the register are skipped and returned in skipped.",
+        "description": "Creates up to 50 risks from library templates or AI suggestions. Titles already in the register are skipped and returned in skipped. Each new risk is owned by the caller, linked to the evidence tasks of the controls its references map to.",
         "operationId": "RiskWorkspaceController_bulkCreateRisks_v1",
         "parameters": [],
         "requestBody": {
@@ -7883,9 +7983,9 @@
           "metadata": {
             "title": "Add several risks at once | Comp AI API",
             "sidebarTitle": "Add several risks at once",
-            "description": "Creates up to 50 risks from library templates or AI suggestions. Titles already in the register are skipped and returned in skipped.",
+            "description": "Creates up to 50 risks from library templates or AI suggestions. Titles already in the register are skipped and returned in skipped. Each new risk is owned.",
             "og:title": "Add several risks at once | Comp AI API",
-            "og:description": "Creates up to 50 risks from library templates or AI suggestions. Titles already in the register are skipped and returned in skipped."
+            "og:description": "Creates up to 50 risks from library templates or AI suggestions. Titles already in the register are skipped and returned in skipped. Each new risk is owned."
           }
         },
         "x-speakeasy-mcp": {
@@ -7990,6 +8090,39 @@
         },
         "x-speakeasy-mcp": {
           "name": "list-actions"
+        }
+      }
+    },
+    "/v1/risk-management/linked-tasks": {
+      "get": {
+        "description": "Lists the control evidence tasks linked to each risk with status, owner, due date and controls: the controls side of the risk treatment plan (ISO 27001 6.1.3).",
+        "operationId": "RiskWorkspaceController_listLinkedTasks_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "List evidence tasks linked to risks",
+        "tags": [
+          "Risks"
+        ],
+        "x-mint": {
+          "metadata": {
+            "title": "List evidence tasks linked to risks | Comp AI API",
+            "sidebarTitle": "List evidence tasks linked to risks",
+            "description": "Lists the control evidence tasks linked to each risk with status, owner, due date and controls: the controls side of the risk treatment plan (ISO 27001.",
+            "og:title": "List evidence tasks linked to risks | Comp AI API",
+            "og:description": "Lists the control evidence tasks linked to each risk with status, owner, due date and controls: the controls side of the risk treatment plan (ISO 27001."
+          }
+        },
+        "x-speakeasy-mcp": {
+          "name": "list-linked-tasks"
         }
       }
     },
@@ -8156,7 +8289,58 @@
       "get": {
         "description": "List third-party vendors with risk level, owner, assessment status, and Trust Center visibility for vendor risk management.",
         "operationId": "VendorsController_getAllVendors_v1",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Only vendors with this assessment status",
+            "schema": {
+              "example": "not_assessed",
+              "type": "string",
+              "enum": [
+                "not_assessed",
+                "in_progress",
+                "assessed"
+              ]
+            }
+          },
+          {
+            "name": "criticality",
+            "required": false,
+            "in": "query",
+            "description": "Only vendors with this criticality; \"unset\" = not classified",
+            "schema": {
+              "example": "unset",
+              "type": "string",
+              "enum": [
+                "critical",
+                "high",
+                "medium",
+                "low",
+                "unset"
+              ]
+            }
+          },
+          {
+            "name": "archived",
+            "required": false,
+            "in": "query",
+            "description": "true = only archived vendors (relationship ended). Default: only current vendors.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "attention",
+            "required": false,
+            "in": "query",
+            "description": "true = only vendors that need attention (not assessed, unclassified, review overdue or never reviewed while in scope, documents expiring).",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Vendors retrieved successfully",
@@ -10198,6 +10382,147 @@
         }
       }
     },
+    "/v1/vendors/bulk-update": {
+      "post": {
+        "description": "Applies per-vendor changes to criticality, PCI DSS scope flags, contract and assurance fields and the owner in one transaction. Use to classify vendors in bulk or import TPSP data from a spreadsheet.",
+        "operationId": "VendorRegisterController_bulkUpdateVendors_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkUpdateVendorsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "Update several vendors at once",
+        "tags": [
+          "Vendors"
+        ],
+        "x-mint": {
+          "metadata": {
+            "title": "Update several vendors at once | Comp AI API",
+            "sidebarTitle": "Update several vendors at once",
+            "description": "Applies per-vendor changes to criticality, PCI DSS scope flags, contract and assurance fields and the owner in one transaction. Use to classify vendors in.",
+            "og:title": "Update several vendors at once | Comp AI API",
+            "og:description": "Applies per-vendor changes to criticality, PCI DSS scope flags, contract and assurance fields and the owner in one transaction. Use to classify vendors in."
+          }
+        },
+        "x-speakeasy-mcp": {
+          "name": "bulk-update-vendors"
+        }
+      }
+    },
+    "/v1/vendors/{id}/archive": {
+      "post": {
+        "description": "Marks the vendor relationship as ended. Archived vendors leave the current vendor register, reminders and the trust portal subprocessor list; their reviews and documents are kept.",
+        "operationId": "VendorRegisterController_archiveVendor_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Vendor ID",
+            "schema": {
+              "example": "vnd_abc123",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ArchiveVendorDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "Archive a vendor",
+        "tags": [
+          "Vendors"
+        ],
+        "x-mint": {
+          "metadata": {
+            "title": "Archive a vendor | Comp AI API",
+            "sidebarTitle": "Archive a vendor",
+            "description": "Marks the vendor relationship as ended. Archived vendors leave the current vendor register, reminders and the trust portal subprocessor list; their reviews.",
+            "og:title": "Archive a vendor | Comp AI API",
+            "og:description": "Marks the vendor relationship as ended. Archived vendors leave the current vendor register, reminders and the trust portal subprocessor list; their reviews."
+          }
+        },
+        "x-speakeasy-mcp": {
+          "name": "archive-vendor"
+        }
+      }
+    },
+    "/v1/vendors/{id}/unarchive": {
+      "post": {
+        "description": "Restore an archived vendor in Comp AI. Manage third-party vendors, global vendor search, risk assessment triggers, and Trust Center vendor visibility.",
+        "operationId": "VendorRegisterController_unarchiveVendor_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Vendor ID",
+            "schema": {
+              "example": "vnd_abc123",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "Restore an archived vendor",
+        "tags": [
+          "Vendors"
+        ],
+        "x-mint": {
+          "metadata": {
+            "title": "Restore an archived vendor | Comp AI API",
+            "sidebarTitle": "Restore an archived vendor",
+            "description": "Restore an archived vendor in Comp AI. Manage third-party vendors, global vendor search, risk assessment triggers, and Trust Center vendor visibility.",
+            "og:title": "Restore an archived vendor | Comp AI API",
+            "og:description": "Restore an archived vendor in Comp AI. Manage third-party vendors, global vendor search, risk assessment triggers, and Trust Center vendor visibility."
+          }
+        },
+        "x-speakeasy-mcp": {
+          "name": "unarchive-vendor"
+        }
+      }
+    },
     "/v1/context": {
       "get": {
         "description": "List organization context entries used as approved source material for evidence, questionnaires, policies, and AI workflows.",
@@ -11365,6 +11690,92 @@
         }
       }
     },
+    "/v1/policies/bulk/submit-for-approval": {
+      "post": {
+        "description": "Sends each selected policy to the same approver as its own approval request: never-published policies submit their current draft, published ones their newest unpublished version. Policies already pending or without a new version are.",
+        "operationId": "PolicyBulkController_submitForApproval_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkSubmitForApprovalDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "Submit several policies for approval",
+        "tags": [
+          "Policies"
+        ],
+        "x-speakeasy-mcp": {
+          "name": "bulk-submit-policies-for-approval"
+        },
+        "x-mint": {
+          "metadata": {
+            "title": "Submit several policies for approval | Comp AI API",
+            "sidebarTitle": "Submit several policies for approval",
+            "description": "Sends each selected policy to the same approver as its own approval request: never-published policies submit their current draft, published ones their.",
+            "og:title": "Submit several policies for approval | Comp AI API",
+            "og:description": "Sends each selected policy to the same approver as its own approval request: never-published policies submit their current draft, published ones their."
+          }
+        }
+      }
+    },
+    "/v1/policies/bulk/owner": {
+      "post": {
+        "description": "Set the owner of several policies in Comp AI. Create, version, publish, export, map, and improve compliance policies with AI-assisted drafting and approval workflows.",
+        "operationId": "PolicyBulkController_setOwner_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkSetOwnerDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "Set the owner of several policies",
+        "tags": [
+          "Policies"
+        ],
+        "x-speakeasy-mcp": {
+          "name": "bulk-set-policy-owner"
+        },
+        "x-mint": {
+          "metadata": {
+            "title": "Set the owner of several policies | Comp AI API",
+            "sidebarTitle": "Set the owner of several policies",
+            "description": "Set the owner of several policies in Comp AI. Create, version, publish, export, map, and improve compliance policies with AI-assisted drafting and approval.",
+            "og:title": "Set the owner of several policies | Comp AI API",
+            "og:description": "Set the owner of several policies in Comp AI. Create, version, publish, export, map, and improve compliance policies with AI-assisted drafting and approval."
+          }
+        }
+      }
+    },
     "/v1/policies": {
       "get": {
         "description": "Lists active compliance policies by default. Use includeArchived=true to include archived rows and excludeContent=true when you only need policy metadata.",
@@ -11663,49 +12074,6 @@
         },
         "x-speakeasy-mcp": {
           "name": "create-policy"
-        }
-      }
-    },
-    "/v1/policies/publish-all": {
-      "post": {
-        "operationId": "PoliciesController_publishAllPolicies_v1",
-        "parameters": [
-          {
-            "name": "X-Organization-Id",
-            "in": "header",
-            "description": "Organization ID (required for session auth, optional for API key auth)",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "apikey": []
-          }
-        ],
-        "summary": "Publish all draft policies",
-        "tags": [
-          "Policies"
-        ],
-        "description": "Publish draft policies in bulk so approved policy content can power Trust Center sharing, questionnaire answers, and audit evidence.",
-        "x-mint": {
-          "metadata": {
-            "title": "Publish all draft policies | Comp AI API",
-            "sidebarTitle": "Publish all draft policies",
-            "description": "Publish draft policies in bulk so approved policy content can power Trust Center sharing, questionnaire answers, and audit evidence.",
-            "og:title": "Publish all draft policies | Comp AI API",
-            "og:description": "Publish draft policies in bulk so approved policy content can power Trust Center sharing, questionnaire answers, and audit evidence."
-          }
-        },
-        "x-speakeasy-mcp": {
-          "name": "publish-all-policies"
         }
       }
     },
@@ -14213,7 +14581,7 @@
     },
     "/v1/policies/{id}/acknowledgements/remind": {
       "post": {
-        "description": "Emails every employee who has not yet acknowledged the current published version of a policy. Sends at most one reminder per employee per day.",
+        "description": "Emails every employee who has not yet acknowledged the current approved version of a policy, at most once per employee per day. Returns counts: sent, alreadyRemindedToday, unsubscribed, failed and pending.",
         "operationId": "PolicyLifecycleController_remindAcknowledgements_v1",
         "parameters": [
           {
@@ -14248,9 +14616,9 @@
           "metadata": {
             "title": "Remind employees to acknowledge a policy | Comp AI API",
             "sidebarTitle": "Remind employees to acknowledge a policy",
-            "description": "Emails every employee who has not yet acknowledged the current published version of a policy. Sends at most one reminder per employee per day.",
+            "description": "Emails every employee who has not yet acknowledged the current approved version of a policy, at most once per employee per day. Returns counts: sent.",
             "og:title": "Remind employees to acknowledge a policy | Comp AI API",
-            "og:description": "Emails every employee who has not yet acknowledged the current published version of a policy. Sends at most one reminder per employee per day."
+            "og:description": "Emails every employee who has not yet acknowledged the current approved version of a policy, at most once per employee per day. Returns counts: sent."
           }
         }
       }
@@ -14301,7 +14669,7 @@
     },
     "/v1/policy-acknowledgements/export": {
       "get": {
-        "description": "Returns every recorded policy acknowledgement (policy, version, employee, time) as CSV text. Filter by policyId or memberId. Use as audit evidence of policy sign-off.",
+        "description": "Returns CSV text with one row per employee who must acknowledge each policy: status (Acknowledged, Pending, Outdated), current and acknowledged version, acknowledgement and last reminder time, owner and approval. Without policyId it.",
         "operationId": "PolicyAcknowledgementsController_exportCsv_v1",
         "parameters": [
           {
@@ -14341,9 +14709,9 @@
           "metadata": {
             "title": "Export policy acknowledgements as CSV | Comp AI API",
             "sidebarTitle": "Export policy acknowledgements as CSV",
-            "description": "Returns every recorded policy acknowledgement (policy, version, employee, time) as CSV text. Filter by policyId or memberId. Use as audit evidence of policy.",
+            "description": "Returns CSV text with one row per employee who must acknowledge each policy: status (Acknowledged, Pending, Outdated), current and acknowledged version.",
             "og:title": "Export policy acknowledgements as CSV | Comp AI API",
-            "og:description": "Returns every recorded policy acknowledgement (policy, version, employee, time) as CSV text. Filter by policyId or memberId. Use as audit evidence of policy."
+            "og:description": "Returns CSV text with one row per employee who must acknowledge each policy: status (Acknowledged, Pending, Outdated), current and acknowledged version."
           }
         },
         "x-speakeasy-mcp": {
@@ -14841,6 +15209,191 @@
         },
         "x-speakeasy-mcp": {
           "name": "revoke-agent-access"
+        }
+      }
+    },
+    "/v1/tasks/bulk/due-date": {
+      "patch": {
+        "description": "Sets (or clears, with null) the due date of the given evidence tasks. Overdue and due-soon views and the deadline queue read this date.",
+        "operationId": "TaskReviewActionsController_setDueDates_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkTaskDueDateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "Set the due date of several tasks",
+        "tags": [
+          "Tasks"
+        ],
+        "x-speakeasy-mcp": {
+          "name": "set-tasks-due-date"
+        },
+        "x-mint": {
+          "metadata": {
+            "title": "Set the due date of several tasks | Comp AI API",
+            "sidebarTitle": "Set the due date of several tasks",
+            "description": "Sets (or clears, with null) the due date of the given evidence tasks. Overdue and due-soon views and the deadline queue read this date.",
+            "og:title": "Set the due date of several tasks | Comp AI API",
+            "og:description": "Sets (or clears, with null) the due date of the given evidence tasks. Overdue and due-soon views and the deadline queue read this date."
+          }
+        }
+      }
+    },
+    "/v1/tasks/{taskId}/withdraw-review": {
+      "post": {
+        "description": "Withdraws an open review request: the task returns to its previous status and keeps its approver. Logged as a withdrawal, not a rejection.",
+        "operationId": "TaskReviewActionsController_withdrawReview_v1",
+        "parameters": [
+          {
+            "name": "taskId",
+            "required": true,
+            "in": "path",
+            "description": "Task ID",
+            "schema": {
+              "example": "tsk_abc123def456",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "Withdraw a task review request",
+        "tags": [
+          "Tasks"
+        ],
+        "x-speakeasy-mcp": {
+          "name": "withdraw-task-review-request"
+        },
+        "x-mint": {
+          "metadata": {
+            "title": "Withdraw a task review request | Comp AI API",
+            "sidebarTitle": "Withdraw a task review request",
+            "description": "Withdraws an open review request: the task returns to its previous status and keeps its approver. Logged as a withdrawal, not a rejection.",
+            "og:title": "Withdraw a task review request | Comp AI API",
+            "og:description": "Withdraws an open review request: the task returns to its previous status and keeps its approver. Logged as a withdrawal, not a rejection."
+          }
+        }
+      }
+    },
+    "/v1/tasks/{taskId}/forms": {
+      "get": {
+        "description": "The company forms (structured evidence) that the task’s controls ask for, with their due status. Forms replaced by a module name that module.",
+        "operationId": "TaskReviewActionsController_listForms_v1",
+        "parameters": [
+          {
+            "name": "taskId",
+            "required": true,
+            "in": "path",
+            "description": "Task ID",
+            "schema": {
+              "example": "tsk_abc123def456",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "List the company forms that prove a task",
+        "tags": [
+          "Tasks"
+        ],
+        "x-speakeasy-mcp": {
+          "name": "list-task-structured-forms"
+        },
+        "x-mint": {
+          "metadata": {
+            "title": "List the company forms that prove a task | Comp AI API",
+            "sidebarTitle": "List the company forms that prove a task",
+            "description": "The company forms (structured evidence) that the task’s controls ask for, with their due status. Forms replaced by a module name that module.",
+            "og:title": "List the company forms that prove a task | Comp AI API",
+            "og:description": "The company forms (structured evidence) that the task’s controls ask for, with their due status. Forms replaced by a module name that module."
+          }
+        }
+      }
+    },
+    "/v1/tasks/{taskId}/attachments/validity": {
+      "patch": {
+        "description": "Sets the validity window of every evidence file on a task. After validUntil a file needs an update, and audit exports only take files valid in the period.",
+        "operationId": "TaskReviewActionsController_setAttachmentsValidity_v1",
+        "parameters": [
+          {
+            "name": "taskId",
+            "required": true,
+            "in": "path",
+            "description": "Task ID",
+            "schema": {
+              "example": "tsk_abc123def456",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskAttachmentsValidityDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "Set validity for all files on a task",
+        "tags": [
+          "Tasks"
+        ],
+        "x-speakeasy-mcp": {
+          "name": "set-task-files-validity"
+        },
+        "x-mint": {
+          "metadata": {
+            "title": "Set validity for all files on a task | Comp AI API",
+            "sidebarTitle": "Set validity for all files on a task",
+            "description": "Sets the validity window of every evidence file on a task. After validUntil a file needs an update, and audit exports only take files valid in the period.",
+            "og:title": "Set validity for all files on a task | Comp AI API",
+            "og:description": "Sets the validity window of every evidence file on a task. After validUntil a file needs an update, and audit exports only take files valid in the period."
+          }
         }
       }
     },
@@ -17556,7 +18109,7 @@
     },
     "/v1/evidence-export/frameworks/{frameworkInstanceId}": {
       "post": {
-        "description": "Starts a job building a ZIP with one folder per requirement: policies, tasks, documents, ISMS documents, SoA and registers. Optional audit period. Poll GET /v1/job-runs/:runId for the download URL.",
+        "description": "Starts a job building a ZIP with one folder per requirement: applicability, approved policies, tasks, documents, ISMS documents, SoA and registers, plus vendor documents and risk review PDFs. Optional audit period and audit engagement.",
         "operationId": "FrameworkEvidenceExportController_exportFrameworkEvidence_v1",
         "parameters": [
           {
@@ -17585,7 +18138,10 @@
             "description": "Export job started"
           },
           "400": {
-            "description": "Invalid audit period"
+            "description": "Invalid audit period, or the audit is for another framework"
+          },
+          "403": {
+            "description": "Audit export without audit read access"
           },
           "404": {
             "description": "Framework not found"
@@ -17604,9 +18160,9 @@
           "metadata": {
             "title": "Export framework evidence as ZIP | Comp AI API",
             "sidebarTitle": "Export framework evidence as ZIP",
-            "description": "Starts a job building a ZIP with one folder per requirement: policies, tasks, documents, ISMS documents, SoA and registers. Optional audit period. Poll GET.",
+            "description": "Starts a job building a ZIP with one folder per requirement: applicability, approved policies, tasks, documents, ISMS documents, SoA and registers, plus.",
             "og:title": "Export framework evidence as ZIP | Comp AI API",
-            "og:description": "Starts a job building a ZIP with one folder per requirement: policies, tasks, documents, ISMS documents, SoA and registers. Optional audit period. Poll GET."
+            "og:description": "Starts a job building a ZIP with one folder per requirement: applicability, approved policies, tasks, documents, ISMS documents, SoA and registers, plus."
           }
         },
         "x-speakeasy-mcp": {
@@ -17908,6 +18464,53 @@
         },
         "x-speakeasy-mcp": {
           "name": "export-vulnerabilities"
+        }
+      }
+    },
+    "/v1/register-exports/risk-reviews/{id}": {
+      "get": {
+        "description": "Download the risk register as frozen when a periodic risk review was signed off (levels, owner, treatment, acceptance, open actions). Evidence for ISO 27001 clause 8.2.",
+        "operationId": "RegisterExportsController_exportRiskReview_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Risk review id",
+            "schema": {
+              "example": "rskrv_abc123",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Risk review snapshot CSV"
+          },
+          "404": {
+            "description": "Risk review not found"
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "Export one risk review as CSV",
+        "tags": [
+          "Evidence Export"
+        ],
+        "x-mint": {
+          "metadata": {
+            "title": "Export one risk review as CSV | Comp AI API",
+            "sidebarTitle": "Export one risk review as CSV",
+            "description": "Download the risk register as frozen when a periodic risk review was signed off (levels, owner, treatment, acceptance, open actions). Evidence for ISO 27001.",
+            "og:title": "Export one risk review as CSV | Comp AI API",
+            "og:description": "Download the risk register as frozen when a periodic risk review was signed off (levels, owner, treatment, acceptance, open actions). Evidence for ISO 27001."
+          }
+        },
+        "x-speakeasy-mcp": {
+          "name": "export-risk-review"
         }
       }
     },
@@ -25252,6 +25855,49 @@
         }
       }
     },
+    "/v1/isms/nonconformities/import": {
+      "post": {
+        "description": "Logs the rows of an existing nonconformity log (for example a CSV export from a spreadsheet) in one go, numbered in order.",
+        "operationId": "IsmsNonconformitiesController_importMany_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportNonconformitiesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Number of nonconformities logged"
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "Import ISMS nonconformities",
+        "tags": [
+          "ISMS"
+        ],
+        "x-mint": {
+          "metadata": {
+            "title": "Import ISMS nonconformities | Comp AI API",
+            "sidebarTitle": "Import ISMS nonconformities",
+            "description": "Logs the rows of an existing nonconformity log (for example a CSV export from a spreadsheet) in one go, numbered in order.",
+            "og:title": "Import ISMS nonconformities | Comp AI API",
+            "og:description": "Logs the rows of an existing nonconformity log (for example a CSV export from a spreadsheet) in one go, numbered in order."
+          }
+        },
+        "x-speakeasy-mcp": {
+          "name": "import-many"
+        }
+      }
+    },
     "/v1/isms/nonconformities/{id}": {
       "patch": {
         "description": "Updates a standalone nonconformity: root cause, corrective action, owner, due date, status, closure evidence or effectiveness review.",
@@ -26524,6 +27170,178 @@
         }
       }
     },
+    "/v1/training/me/certificate": {
+      "post": {
+        "description": "Generates the signed-in member's certificate for their latest completed cycle of a training (security awareness by default), with validity, certificate ID, requirement and modules.",
+        "operationId": "TrainingRecordsController_myCertificate_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MyCertificateDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "Download my latest training certificate",
+        "tags": [
+          "Training"
+        ],
+        "x-speakeasy-mcp": {
+          "disabled": true
+        },
+        "x-mint": {
+          "metadata": {
+            "title": "Download my latest training certificate | Comp AI API",
+            "sidebarTitle": "Download my latest training certificate",
+            "description": "Generates the signed-in member's certificate for their latest completed cycle of a training (security awareness by default), with validity, certificate ID.",
+            "og:title": "Download my latest training certificate | Comp AI API",
+            "og:description": "Generates the signed-in member's certificate for their latest completed cycle of a training (security awareness by default), with validity, certificate ID."
+          }
+        }
+      }
+    },
+    "/v1/training/records": {
+      "get": {
+        "description": "Returns every training completion in the organization (security awareness, HIPAA and role-based modules) with member, date, expiry and source (portal, admin, import).",
+        "operationId": "TrainingRecordsController_list_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "List training records",
+        "tags": [
+          "Training"
+        ],
+        "x-mint": {
+          "metadata": {
+            "title": "List training records | Comp AI API",
+            "sidebarTitle": "List training records",
+            "description": "Returns every training completion in the organization (security awareness, HIPAA and role-based modules) with member, date, expiry and source (portal.",
+            "og:title": "List training records | Comp AI API",
+            "og:description": "Returns every training completion in the organization (security awareness, HIPAA and role-based modules) with member, date, expiry and source (portal."
+          }
+        },
+        "x-speakeasy-mcp": {
+          "name": "training-records-list"
+        }
+      }
+    },
+    "/v1/training/members/{memberId}/records": {
+      "post": {
+        "description": "Records training a member completed outside the portal, on a given date (not in the future), with an optional certificate. Security awareness and HIPAA records count as the member being trained.",
+        "operationId": "TrainingRecordsController_record_v1",
+        "parameters": [
+          {
+            "name": "memberId",
+            "required": true,
+            "in": "path",
+            "description": "Member ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RecordTrainingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "Record a completed training",
+        "tags": [
+          "Training"
+        ],
+        "x-mint": {
+          "metadata": {
+            "title": "Record a completed training | Comp AI API",
+            "sidebarTitle": "Record a completed training",
+            "description": "Records training a member completed outside the portal, on a given date (not in the future), with an optional certificate. Security awareness and HIPAA.",
+            "og:title": "Record a completed training | Comp AI API",
+            "og:description": "Records training a member completed outside the portal, on a given date (not in the future), with an optional certificate. Security awareness and HIPAA."
+          }
+        },
+        "x-speakeasy-mcp": {
+          "name": "record"
+        }
+      }
+    },
+    "/v1/training/records/import": {
+      "post": {
+        "description": "Imports completions from a CSV export (email, training, completion date). Rows that do not match a member or training are returned as errors; the others are recorded.",
+        "operationId": "TrainingRecordsController_import_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportTrainingRecordsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "Import training records",
+        "tags": [
+          "Training"
+        ],
+        "x-mint": {
+          "metadata": {
+            "title": "Import training records | Comp AI API",
+            "sidebarTitle": "Import training records",
+            "description": "Imports completions from a CSV export (email, training, completion date). Rows that do not match a member or training are returned as errors; the others are.",
+            "og:title": "Import training records | Comp AI API",
+            "og:description": "Imports completions from a CSV export (email, training, completion date). Rows that do not match a member or training are returned as errors; the others are."
+          }
+        },
+        "x-speakeasy-mcp": {
+          "name": "import"
+        }
+      }
+    },
     "/v1/org-chart/snapshots": {
       "get": {
         "description": "Lists the dated snapshots of the organization chart, newest first, so auditors can see roles and reporting lines as they were at a point in time.",
@@ -26948,7 +27766,7 @@
     },
     "/v1/overview/attention": {
       "get": {
-        "description": "Returns one card per compliance area (tasks, policies, acknowledgements, training, vendors, integration checks, findings, access reviews) with needs-attention, OK and total counts, reasons and a deep link.",
+        "description": "Returns one card per compliance area (evidence tasks, policies, acknowledgements, training, people, vendors, risks, assets, vulnerabilities, integration checks, corrective actions, documents (ISMS documents and company forms).",
         "operationId": "OverviewController_getAttention_v1",
         "parameters": [],
         "responses": {
@@ -26969,9 +27787,9 @@
           "metadata": {
             "title": "Get needs-attention cards | Comp AI API",
             "sidebarTitle": "Get needs-attention cards",
-            "description": "Returns one card per compliance area (tasks, policies, acknowledgements, training, vendors, integration checks, findings, access reviews).",
+            "description": "Returns one card per compliance area (evidence tasks, policies, acknowledgements, training, people, vendors, risks, assets, vulnerabilities, integration.",
             "og:title": "Get needs-attention cards | Comp AI API",
-            "og:description": "Returns one card per compliance area (tasks, policies, acknowledgements, training, vendors, integration checks, findings, access reviews)."
+            "og:description": "Returns one card per compliance area (evidence tasks, policies, acknowledgements, training, people, vendors, risks, assets, vulnerabilities, integration."
           }
         },
         "x-speakeasy-mcp": {
@@ -26981,7 +27799,7 @@
     },
     "/v1/overview/deadlines": {
       "get": {
-        "description": "Returns one queue of overdue and due-soon items across evidence tasks, policy reviews, vendor reviews and documents, training renewals and access reviews, sorted by due date, with deep links.",
+        "description": "Returns one queue of overdue and due-soon items across evidence tasks, policy reviews and approvals, vendor reviews and documents, training renewals, access reviews, timeline phases, auditor requests, questionnaire reviews, vulnerability.",
         "operationId": "OverviewController_getDeadlines_v1",
         "parameters": [
           {
@@ -27016,9 +27834,9 @@
           "metadata": {
             "title": "Get overdue and due-soon items | Comp AI API",
             "sidebarTitle": "Get overdue and due-soon items",
-            "description": "Returns one queue of overdue and due-soon items across evidence tasks, policy reviews, vendor reviews and documents, training renewals and access reviews.",
+            "description": "Returns one queue of overdue and due-soon items across evidence tasks, policy reviews and approvals, vendor reviews and documents, training renewals, access.",
             "og:title": "Get overdue and due-soon items | Comp AI API",
-            "og:description": "Returns one queue of overdue and due-soon items across evidence tasks, policy reviews, vendor reviews and documents, training renewals and access reviews."
+            "og:description": "Returns one queue of overdue and due-soon items across evidence tasks, policy reviews and approvals, vendor reviews and documents, training renewals, access."
           }
         },
         "x-speakeasy-mcp": {
@@ -27140,6 +27958,92 @@
         },
         "x-speakeasy-mcp": {
           "name": "get-index"
+        }
+      }
+    },
+    "/v1/evidence-forms/settings/bulk-owner": {
+      "patch": {
+        "description": "Assigns (or clears, with null) the accountable owner of the given company forms. Owners appear on the Documents table and in deadline reminders.",
+        "operationId": "EvidenceFormsSettingsController_bulkSetOwner_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkFormOwnerDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "Set the owner of several company forms",
+        "tags": [
+          "Evidence Forms"
+        ],
+        "x-speakeasy-mcp": {
+          "name": "set-company-forms-owner"
+        },
+        "x-mint": {
+          "metadata": {
+            "title": "Set the owner of several company forms | Comp AI API",
+            "sidebarTitle": "Set the owner of several company forms",
+            "description": "Assigns (or clears, with null) the accountable owner of the given company forms. Owners appear on the Documents table and in deadline reminders.",
+            "og:title": "Set the owner of several company forms | Comp AI API",
+            "og:description": "Assigns (or clears, with null) the accountable owner of the given company forms. Owners appear on the Documents table and in deadline reminders."
+          }
+        }
+      }
+    },
+    "/v1/evidence-forms/{formType}/module-status": {
+      "get": {
+        "description": "For a form replaced by a module (Assets, People > Access, ISMS management review), returns that module and its record count. For the penetration test form, also the latest recorded pentest.",
+        "operationId": "EvidenceFormsSettingsController_getModuleStatus_v1",
+        "parameters": [
+          {
+            "name": "formType",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "example": "infrastructure-inventory",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "Get where a company form’s evidence now lives",
+        "tags": [
+          "Evidence Forms"
+        ],
+        "x-speakeasy-mcp": {
+          "name": "get-company-form-module-status"
+        },
+        "x-mint": {
+          "metadata": {
+            "title": "Get where a company form’s evidence now lives | Comp AI API",
+            "sidebarTitle": "Get where a company form’s evidence now lives",
+            "description": "For a form replaced by a module (Assets, People > Access, ISMS management review), returns that module and its record count. For the penetration test form.",
+            "og:title": "Get where a company form’s evidence now lives | Comp AI API",
+            "og:description": "For a form replaced by a module (Assets, People > Access, ISMS management review), returns that module and its record count. For the penetration test form."
+          }
         }
       }
     },
@@ -28718,7 +29622,7 @@
     },
     "/v1/frameworks/{id}/requirements/{requirementKey}/applicability": {
       "put": {
-        "description": "Marks a framework requirement applicable, not applicable, or (PCI DSS) met by compensating controls or the customized approach. A justification is required unless applicable. Scoring excludes N/A.",
+        "description": "Marks a framework requirement applicable, not applicable, or (PCI DSS) met by compensating controls or the customized approach. A justification is required unless applicable; compensating and customized need their PCI worksheet in.",
         "operationId": "RequirementApplicabilityController_set_v1",
         "parameters": [
           {
@@ -28904,7 +29808,7 @@
             "name": "search",
             "required": false,
             "in": "query",
-            "description": "Text to find in the event description",
+            "description": "Text to find in the event description, the record name or a changed field name",
             "schema": {
               "example": "signed in",
               "type": "string"
@@ -29008,7 +29912,7 @@
             "name": "search",
             "required": false,
             "in": "query",
-            "description": "Text to find in the event description",
+            "description": "Text to find in the event description, the record name or a changed field name",
             "schema": {
               "example": "signed in",
               "type": "string"
@@ -29167,6 +30071,126 @@
         },
         "x-speakeasy-mcp": {
           "name": "get-session-policy"
+        }
+      }
+    },
+    "/v1/controls/evidence": {
+      "get": {
+        "description": "Merges the policies, tasks, evidence forms and ISMS documents of the given controls, with status, owner and last update. Pass the controls mapped to a requirement to see everything that satisfies it.",
+        "operationId": "ControlsMappingController_evidence_v1",
+        "parameters": [
+          {
+            "name": "controlIds",
+            "required": true,
+            "in": "query",
+            "description": "Comma-separated control IDs (max 200)",
+            "schema": {
+              "example": "ctl_abc123,ctl_def456",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the evidence behind controls",
+        "tags": [
+          "Controls"
+        ],
+        "x-mint": {
+          "metadata": {
+            "title": "List the evidence behind controls | Comp AI API",
+            "sidebarTitle": "List the evidence behind controls",
+            "description": "Merges the policies, tasks, evidence forms and ISMS documents of the given controls, with status, owner and last update. Pass the controls mapped to a.",
+            "og:title": "List the evidence behind controls | Comp AI API",
+            "og:description": "Merges the policies, tasks, evidence forms and ISMS documents of the given controls, with status, owner and last update. Pass the controls mapped to a."
+          }
+        },
+        "x-speakeasy-mcp": {
+          "name": "evidence"
+        }
+      }
+    },
+    "/v1/controls/owner-suggestions": {
+      "get": {
+        "description": "For each control without an active owner, suggests the ISMS role holder for its theme (A.5 SPO, A.6 HR, A.8 CTO, PCI 12 executive owner). Nothing is saved.",
+        "operationId": "ControlsMappingController_ownerSuggestions_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Suggest control owners from ISMS roles",
+        "tags": [
+          "Controls"
+        ],
+        "x-mint": {
+          "metadata": {
+            "title": "Suggest control owners from ISMS roles | Comp AI API",
+            "sidebarTitle": "Suggest control owners from ISMS roles",
+            "description": "For each control without an active owner, suggests the ISMS role holder for its theme (A.5 SPO, A.6 HR, A.8 CTO, PCI 12 executive owner). Nothing is saved.",
+            "og:title": "Suggest control owners from ISMS roles | Comp AI API",
+            "og:description": "For each control without an active owner, suggests the ISMS role holder for its theme (A.5 SPO, A.6 HR, A.8 CTO, PCI 12 executive owner). Nothing is saved."
+          }
+        },
+        "x-speakeasy-mcp": {
+          "name": "owner-suggestions"
+        }
+      }
+    },
+    "/v1/controls/bulk-owner": {
+      "patch": {
+        "description": "Assigns (or clears) the owner of up to 500 controls in one transaction. With assignLinkedWork, linked tasks and policies with no assignee are assigned to the new owner too.",
+        "operationId": "ControlsMappingController_bulkOwner_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkControlOwnerDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Set the owner of many controls",
+        "tags": [
+          "Controls"
+        ],
+        "x-mint": {
+          "metadata": {
+            "title": "Set the owner of many controls | Comp AI API",
+            "sidebarTitle": "Set the owner of many controls",
+            "description": "Assigns (or clears) the owner of up to 500 controls in one transaction. With assignLinkedWork, linked tasks and policies with no assignee are assigned.",
+            "og:title": "Set the owner of many controls | Comp AI API",
+            "og:description": "Assigns (or clears) the owner of up to 500 controls in one transaction. With assignLinkedWork, linked tasks and policies with no assignee are assigned."
+          }
+        },
+        "x-speakeasy-mcp": {
+          "name": "bulk-owner"
         }
       }
     },
@@ -30841,7 +31865,7 @@
     },
     "/v1/offboarding-checklist/export-all": {
       "get": {
-        "description": "Exports a zip archive containing the offboarding checklist evidence for every member in the organization, for audits, handovers, or record-keeping.",
+        "description": "Exports a zip archive with the offboarding register (CSV) and, for everyone with an offboard date, the checklist, access removal and evidence files. 404 when nobody has an offboard date.",
         "operationId": "OffboardingChecklistController_exportAllEvidence_v1",
         "parameters": [],
         "responses": {
@@ -30862,9 +31886,9 @@
           "metadata": {
             "title": "Export all offboarding evidence as a zip file | Comp AI API",
             "sidebarTitle": "Export all offboarding evidence as a zip file",
-            "description": "Exports a zip archive containing the offboarding checklist evidence for every member in the organization, for audits, handovers, or record-keeping.",
+            "description": "Exports a zip archive with the offboarding register (CSV) and, for everyone with an offboard date, the checklist, access removal and evidence files. 404.",
             "og:title": "Export all offboarding evidence as a zip file | Comp AI API",
-            "og:description": "Exports a zip archive containing the offboarding checklist evidence for every member in the organization, for audits, handovers, or record-keeping."
+            "og:description": "Exports a zip archive with the offboarding register (CSV) and, for everyone with an offboard date, the checklist, access removal and evidence files. 404."
           }
         },
         "x-speakeasy-mcp": {
@@ -31085,8 +32109,8 @@
     },
     "/v1/offboarding-checklist/member/{memberId}/access-revocations": {
       "get": {
-        "description": "Lists the vendors a departing member had access to and whether each has been revoked, so you can confirm all vendor access is removed during offboarding.",
-        "operationId": "OffboardingChecklistController_getAccessRevocations_v1",
+        "description": "Lists the systems where a departing member has accounts in the access inventory, with each account's status and whether access was revoked. Systems whose accounts are gone or disabled are marked revoked automatically. Vendors without an.",
+        "operationId": "AccessRevocationController_list_v1",
         "parameters": [
           {
             "name": "memberId",
@@ -31108,28 +32132,28 @@
             "apikey": []
           }
         ],
-        "summary": "Get vendor access revocation status for a member",
+        "summary": "Get access revocation status for a member",
         "tags": [
           "Offboarding Checklist"
         ],
         "x-mint": {
           "metadata": {
-            "title": "Get vendor access revocation status for a | Comp AI API",
-            "sidebarTitle": "Get vendor access revocation status for a member",
-            "description": "Lists the vendors a departing member had access to and whether each has been revoked, so you can confirm all vendor access is removed during offboarding.",
-            "og:title": "Get vendor access revocation status for a | Comp AI API",
-            "og:description": "Lists the vendors a departing member had access to and whether each has been revoked, so you can confirm all vendor access is removed during offboarding."
+            "title": "Get access revocation status for a member | Comp AI API",
+            "sidebarTitle": "Get access revocation status for a member",
+            "description": "Lists the systems where a departing member has accounts in the access inventory, with each account's status and whether access was revoked. Systems whose.",
+            "og:title": "Get access revocation status for a member | Comp AI API",
+            "og:description": "Lists the systems where a departing member has accounts in the access inventory, with each account's status and whether access was revoked. Systems whose."
           }
         },
         "x-speakeasy-mcp": {
-          "name": "get-access-revocations"
+          "name": "access-revocation-list"
         }
       }
     },
     "/v1/offboarding-checklist/member/{memberId}/access-revocations/confirm-all": {
       "post": {
-        "description": "Marks every vendor access record for a departing member as revoked in one step, recording who confirmed it, to complete access removal during offboarding.",
-        "operationId": "OffboardingChecklistController_revokeAllVendorAccess_v1",
+        "description": "Marks every inventory system of a departing member as revoked in one step, recording who confirmed it. Optional vendor rows are left as they are.",
+        "operationId": "AccessRevocationController_revokeAll_v1",
         "parameters": [
           {
             "name": "memberId",
@@ -31151,28 +32175,28 @@
             "apikey": []
           }
         ],
-        "summary": "Confirm all vendor access as revoked",
+        "summary": "Confirm access revoked on every system",
         "tags": [
           "Offboarding Checklist"
         ],
         "x-mint": {
           "metadata": {
-            "title": "Confirm all vendor access as revoked | Comp AI API",
-            "sidebarTitle": "Confirm all vendor access as revoked",
-            "description": "Marks every vendor access record for a departing member as revoked in one step, recording who confirmed it, to complete access removal during offboarding.",
-            "og:title": "Confirm all vendor access as revoked | Comp AI API",
-            "og:description": "Marks every vendor access record for a departing member as revoked in one step, recording who confirmed it, to complete access removal during offboarding."
+            "title": "Confirm access revoked on every system | Comp AI API",
+            "sidebarTitle": "Confirm access revoked on every system",
+            "description": "Marks every inventory system of a departing member as revoked in one step, recording who confirmed it. Optional vendor rows are left as they are.",
+            "og:title": "Confirm access revoked on every system | Comp AI API",
+            "og:description": "Marks every inventory system of a departing member as revoked in one step, recording who confirmed it. Optional vendor rows are left as they are."
           }
         },
         "x-speakeasy-mcp": {
-          "name": "revoke-all-vendor-access"
+          "name": "revoke-all"
         }
       }
     },
-    "/v1/offboarding-checklist/member/{memberId}/access-revocations/{vendorId}": {
+    "/v1/offboarding-checklist/member/{memberId}/access-revocations/{systemKey}": {
       "post": {
-        "description": "Marks a single vendor's access for a departing member as revoked, optionally attaching evidence and notes, as part of offboarding access removal.",
-        "operationId": "OffboardingChecklistController_revokeVendorAccess_v1",
+        "description": "Marks a departing member's access to one system as revoked, with optional notes and a proof file. If the inventory still shows an active account, the row is reported as revoked but still active.",
+        "operationId": "AccessRevocationController_revoke_v1",
         "parameters": [
           {
             "name": "memberId",
@@ -31184,15 +32208,25 @@
             }
           },
           {
-            "name": "vendorId",
+            "name": "systemKey",
             "required": true,
             "in": "path",
-            "description": "Vendor ID",
+            "description": "System key from the revocation list ('compai', 'connection:<id>', 'manual:<id>' or 'vendor:<id>'); a bare vendor id is also accepted",
             "schema": {
               "type": "string"
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevokeAccessDto"
+              }
+            }
+          }
+        },
         "responses": {
           "201": {
             "description": ""
@@ -31203,26 +32237,26 @@
             "apikey": []
           }
         ],
-        "summary": "Mark vendor access as revoked",
+        "summary": "Mark access to a system as revoked",
         "tags": [
           "Offboarding Checklist"
         ],
         "x-mint": {
           "metadata": {
-            "title": "Mark vendor access as revoked | Comp AI API",
-            "sidebarTitle": "Mark vendor access as revoked",
-            "description": "Marks a single vendor's access for a departing member as revoked, optionally attaching evidence and notes, as part of offboarding access removal.",
-            "og:title": "Mark vendor access as revoked | Comp AI API",
-            "og:description": "Marks a single vendor's access for a departing member as revoked, optionally attaching evidence and notes, as part of offboarding access removal."
+            "title": "Mark access to a system as revoked | Comp AI API",
+            "sidebarTitle": "Mark access to a system as revoked",
+            "description": "Marks a departing member's access to one system as revoked, with optional notes and a proof file. If the inventory still shows an active account, the row is.",
+            "og:title": "Mark access to a system as revoked | Comp AI API",
+            "og:description": "Marks a departing member's access to one system as revoked, with optional notes and a proof file. If the inventory still shows an active account, the row is."
           }
         },
         "x-speakeasy-mcp": {
-          "name": "revoke-vendor-access"
+          "name": "revoke"
         }
       },
       "delete": {
-        "description": "Reverses a vendor access revocation for a member, marking that vendor's access as not revoked again, in case it was confirmed by mistake during offboarding.",
-        "operationId": "OffboardingChecklistController_undoVendorRevocation_v1",
+        "description": "Undo an access revocation in Comp AI.",
+        "operationId": "AccessRevocationController_undo_v1",
         "parameters": [
           {
             "name": "memberId",
@@ -31234,10 +32268,10 @@
             }
           },
           {
-            "name": "vendorId",
+            "name": "systemKey",
             "required": true,
             "in": "path",
-            "description": "Vendor ID",
+            "description": "System key from the revocation list ('compai', 'connection:<id>', 'manual:<id>' or 'vendor:<id>'); a bare vendor id is also accepted",
             "schema": {
               "type": "string"
             }
@@ -31253,150 +32287,21 @@
             "apikey": []
           }
         ],
-        "summary": "Undo vendor access revocation",
+        "summary": "Undo an access revocation",
         "tags": [
           "Offboarding Checklist"
         ],
         "x-mint": {
           "metadata": {
-            "title": "Undo vendor access revocation | Comp AI API",
-            "sidebarTitle": "Undo vendor access revocation",
-            "description": "Reverses a vendor access revocation for a member, marking that vendor's access as not revoked again, in case it was confirmed by mistake during offboarding.",
-            "og:title": "Undo vendor access revocation | Comp AI API",
-            "og:description": "Reverses a vendor access revocation for a member, marking that vendor's access as not revoked again, in case it was confirmed by mistake during offboarding."
+            "title": "Undo an access revocation | Comp AI API",
+            "sidebarTitle": "Undo an access revocation",
+            "description": "Undo an access revocation in Comp AI.",
+            "og:title": "Undo an access revocation | Comp AI API",
+            "og:description": "Undo an access revocation in Comp AI."
           }
         },
         "x-speakeasy-mcp": {
-          "name": "undo-vendor-revocation"
-        }
-      }
-    },
-    "/v1/people-lifecycle/members/{memberId}/compliance": {
-      "get": {
-        "description": "Returns one row per people-security obligation for a member (policies, training, role training, device, background check, onboarding, offboarding) with status and dates.",
-        "operationId": "PeopleLifecycleController_getCompliance_v1",
-        "parameters": [
-          {
-            "name": "memberId",
-            "required": true,
-            "in": "path",
-            "description": "Member ID",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "apikey": []
-          }
-        ],
-        "summary": "Get a member's compliance checklist",
-        "tags": [
-          "People"
-        ],
-        "x-mint": {
-          "metadata": {
-            "title": "Get a member's compliance checklist | Comp AI API",
-            "sidebarTitle": "Get a member's compliance checklist",
-            "description": "Returns one row per people-security obligation for a member (policies, training, role training, device, background check, onboarding, offboarding).",
-            "og:title": "Get a member's compliance checklist | Comp AI API",
-            "og:description": "Returns one row per people-security obligation for a member (policies, training, role training, device, background check, onboarding, offboarding)."
-          }
-        },
-        "x-speakeasy-mcp": {
-          "name": "get-compliance"
-        }
-      }
-    },
-    "/v1/people-lifecycle/members/{memberId}/onboarding": {
-      "get": {
-        "description": "Returns a member's onboarding checklist with due dates from their start date, overdue flags, and items completed automatically from policies, training, device and background check.",
-        "operationId": "PeopleLifecycleController_getOnboarding_v1",
-        "parameters": [
-          {
-            "name": "memberId",
-            "required": true,
-            "in": "path",
-            "description": "Member ID",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "apikey": []
-          }
-        ],
-        "summary": "Get a member's onboarding checklist",
-        "tags": [
-          "People"
-        ],
-        "x-mint": {
-          "metadata": {
-            "title": "Get a member's onboarding checklist | Comp AI API",
-            "sidebarTitle": "Get a member's onboarding checklist",
-            "description": "Returns a member's onboarding checklist with due dates from their start date, overdue flags, and items completed automatically from policies, training.",
-            "og:title": "Get a member's onboarding checklist | Comp AI API",
-            "og:description": "Returns a member's onboarding checklist with due dates from their start date, overdue flags, and items completed automatically from policies, training."
-          }
-        },
-        "x-speakeasy-mcp": {
-          "name": "people-lifecycle-get-onboarding"
-        }
-      }
-    },
-    "/v1/people-lifecycle/members/{memberId}/offboarding": {
-      "get": {
-        "description": "Returns a member's offboarding checklist with due dates counted from their offboard date and overdue flags, so departures are closed out on time.",
-        "operationId": "PeopleLifecycleController_getOffboarding_v1",
-        "parameters": [
-          {
-            "name": "memberId",
-            "required": true,
-            "in": "path",
-            "description": "Member ID",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "apikey": []
-          }
-        ],
-        "summary": "Get a member's offboarding checklist with SLA",
-        "tags": [
-          "People"
-        ],
-        "x-mint": {
-          "metadata": {
-            "title": "Get a member's offboarding checklist with SLA | Comp AI API",
-            "sidebarTitle": "Get a member's offboarding checklist with SLA",
-            "description": "Returns a member's offboarding checklist with due dates counted from their offboard date and overdue flags, so departures are closed out on time.",
-            "og:title": "Get a member's offboarding checklist with SLA | Comp AI API",
-            "og:description": "Returns a member's offboarding checklist with due dates counted from their offboard date and overdue flags, so departures are closed out on time."
-          }
-        },
-        "x-speakeasy-mcp": {
-          "name": "get-offboarding"
+          "name": "undo"
         }
       }
     },
@@ -31476,16 +32381,25 @@
     },
     "/v1/access/accounts": {
       "get": {
-        "description": "Returns the accounts of a system with owner, roles, MFA, last login and flags (owner left, no owner, admin, no MFA, inactive 90+ days). Use for access inventory evidence.",
+        "description": "Returns the accounts of a system (or, with member, one person's accounts across every system) with owner, roles, MFA, last login and flags (owner left, no owner, admin, no MFA, inactive or never used for 90+ days, unapproved role, account.",
         "operationId": "AccessAccountsController_listAccounts_v1",
         "parameters": [
           {
             "name": "system",
-            "required": true,
+            "required": false,
             "in": "query",
-            "description": "System key: 'compai', 'connection:<connectionId>' or 'manual:<systemId>'",
+            "description": "System key: 'compai', 'connection:<connectionId>' or 'manual:<systemId>'. Required unless member is given.",
             "schema": {
               "example": "compai",
+              "type": "string"
+            }
+          },
+          {
+            "name": "member",
+            "required": false,
+            "in": "query",
+            "description": "Member id: returns that member's accounts across every system",
+            "schema": {
               "type": "string"
             }
           }
@@ -31500,17 +32414,17 @@
             "apikey": []
           }
         ],
-        "summary": "List the accounts of one system",
+        "summary": "List the accounts of one system or one member",
         "tags": [
           "Access"
         ],
         "x-mint": {
           "metadata": {
-            "title": "List the accounts of one system | Comp AI API",
-            "sidebarTitle": "List the accounts of one system",
-            "description": "Returns the accounts of a system with owner, roles, MFA, last login and flags (owner left, no owner, admin, no MFA, inactive 90+ days). Use for access.",
-            "og:title": "List the accounts of one system | Comp AI API",
-            "og:description": "Returns the accounts of a system with owner, roles, MFA, last login and flags (owner left, no owner, admin, no MFA, inactive 90+ days). Use for access."
+            "title": "List the accounts of one system or one member | Comp AI API",
+            "sidebarTitle": "List the accounts of one system or one member",
+            "description": "Returns the accounts of a system (or, with member, one person's accounts across every system) with owner, roles, MFA, last login and flags (owner left, no.",
+            "og:title": "List the accounts of one system or one member | Comp AI API",
+            "og:description": "Returns the accounts of a system (or, with member, one person's accounts across every system) with owner, roles, MFA, last login and flags (owner left, no."
           }
         },
         "x-speakeasy-mcp": {
@@ -31817,7 +32731,7 @@
     },
     "/v1/access-reviews/{id}/decisions": {
       "post": {
-        "description": "Sets keep, revoke or modify on one or more accounts of an open access review. Modify needs a note describing the change.",
+        "description": "Sets keep, revoke or modify on accounts of an open access review. With several ids only undecided accounts change. Modify, and keeping a flagged account, need a note. Reviewers cannot decide on their own account or on a system assigned.",
         "operationId": "AccessReviewsController_decide_v1",
         "parameters": [
           {
@@ -31858,9 +32772,9 @@
           "metadata": {
             "title": "Record access review decisions | Comp AI API",
             "sidebarTitle": "Record access review decisions",
-            "description": "Sets keep, revoke or modify on one or more accounts of an open access review. Modify needs a note describing the change.",
+            "description": "Sets keep, revoke or modify on accounts of an open access review. With several ids only undecided accounts change. Modify, and keeping a flagged account.",
             "og:title": "Record access review decisions | Comp AI API",
-            "og:description": "Sets keep, revoke or modify on one or more accounts of an open access review. Modify needs a note describing the change."
+            "og:description": "Sets keep, revoke or modify on accounts of an open access review. With several ids only undecided accounts change. Modify, and keeping a flagged account."
           }
         },
         "x-speakeasy-mcp": {
@@ -31870,7 +32784,7 @@
     },
     "/v1/access-reviews/{id}/items/{itemId}/remediation": {
       "post": {
-        "description": "Mark an access change as done in Comp AI.",
+        "description": "Records that a revoke or modify decision was carried out in the system, with an optional note, ticket link and proof file.",
         "operationId": "AccessReviewsController_remediate_v1",
         "parameters": [
           {
@@ -31920,9 +32834,9 @@
           "metadata": {
             "title": "Mark an access change as done | Comp AI API",
             "sidebarTitle": "Mark an access change as done",
-            "description": "Mark an access change as done in Comp AI.",
+            "description": "Records that a revoke or modify decision was carried out in the system, with an optional note, ticket link and proof file.",
             "og:title": "Mark an access change as done | Comp AI API",
-            "og:description": "Mark an access change as done in Comp AI."
+            "og:description": "Records that a revoke or modify decision was carried out in the system, with an optional note, ticket link and proof file."
           }
         },
         "x-speakeasy-mcp": {
@@ -31932,7 +32846,7 @@
     },
     "/v1/access-reviews/{id}/sign-off": {
       "post": {
-        "description": "Management acknowledges access remains appropriate. Needs every account decided and every change done; attaches the PDF to the Access Review Log task.",
+        "description": "Management acknowledges access remains appropriate. Needs every account decided and every change done, and a signer who neither started the review nor owns an account in it. Attaches the PDF to the Access Review Log task (sent.",
         "operationId": "AccessReviewsController_signOff_v1",
         "parameters": [
           {
@@ -31973,9 +32887,9 @@
           "metadata": {
             "title": "Sign off an access review | Comp AI API",
             "sidebarTitle": "Sign off an access review",
-            "description": "Management acknowledges access remains appropriate. Needs every account decided and every change done; attaches the PDF to the Access Review Log task.",
+            "description": "Management acknowledges access remains appropriate. Needs every account decided and every change done, and a signer who neither started the review nor owns.",
             "og:title": "Sign off an access review | Comp AI API",
-            "og:description": "Management acknowledges access remains appropriate. Needs every account decided and every change done; attaches the PDF to the Access Review Log task."
+            "og:description": "Management acknowledges access remains appropriate. Needs every account decided and every change done, and a signer who neither started the review nor owns."
           }
         },
         "x-speakeasy-mcp": {
@@ -32023,6 +32937,593 @@
             "og:title": "Download the access review report | Comp AI API",
             "og:description": "Generates the PDF report of an access review: scope, reviewers, every account with its decision, access changes and the management sign-off."
           }
+        }
+      }
+    },
+    "/v1/access/roles": {
+      "get": {
+        "description": "Returns the approved roles of every system (or one system) with permission scope, privileged flag, approver and last review. Accounts holding other roles are flagged in access reviews.",
+        "operationId": "AccessRolesController_list_v1",
+        "parameters": [
+          {
+            "name": "system",
+            "required": false,
+            "in": "query",
+            "description": "Only roles of this system key",
+            "schema": {
+              "example": "compai",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "List approved roles",
+        "tags": [
+          "Access"
+        ],
+        "x-mint": {
+          "metadata": {
+            "title": "List approved roles | Comp AI API",
+            "sidebarTitle": "List approved roles",
+            "description": "Returns the approved roles of every system (or one system) with permission scope, privileged flag, approver and last review. Accounts holding other roles.",
+            "og:title": "List approved roles | Comp AI API",
+            "og:description": "Returns the approved roles of every system (or one system) with permission scope, privileged flag, approver and last review. Accounts holding other roles."
+          }
+        },
+        "x-speakeasy-mcp": {
+          "name": "access-roles-list"
+        }
+      },
+      "post": {
+        "description": "Add an approved role in Comp AI.",
+        "operationId": "AccessRolesController_create_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAccessRoleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "Add an approved role",
+        "tags": [
+          "Access"
+        ],
+        "x-mint": {
+          "metadata": {
+            "title": "Add an approved role | Comp AI API",
+            "sidebarTitle": "Add an approved role",
+            "description": "Add an approved role in Comp AI.",
+            "og:title": "Add an approved role | Comp AI API",
+            "og:description": "Add an approved role in Comp AI."
+          }
+        },
+        "x-speakeasy-mcp": {
+          "name": "access-roles-create"
+        }
+      }
+    },
+    "/v1/access/roles/{id}": {
+      "patch": {
+        "description": "Update an approved role in Comp AI.",
+        "operationId": "AccessRolesController_update_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Role id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAccessRoleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "Update an approved role",
+        "tags": [
+          "Access"
+        ],
+        "x-mint": {
+          "metadata": {
+            "title": "Update an approved role | Comp AI API",
+            "sidebarTitle": "Update an approved role",
+            "description": "Update an approved role in Comp AI.",
+            "og:title": "Update an approved role | Comp AI API",
+            "og:description": "Update an approved role in Comp AI."
+          }
+        },
+        "x-speakeasy-mcp": {
+          "name": "access-roles-update"
+        }
+      },
+      "delete": {
+        "description": "Delete an approved role in Comp AI.",
+        "operationId": "AccessRolesController_remove_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Role id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "Delete an approved role",
+        "tags": [
+          "Access"
+        ],
+        "x-mint": {
+          "metadata": {
+            "title": "Delete an approved role | Comp AI API",
+            "sidebarTitle": "Delete an approved role",
+            "description": "Delete an approved role in Comp AI.",
+            "og:title": "Delete an approved role | Comp AI API",
+            "og:description": "Delete an approved role in Comp AI."
+          }
+        },
+        "x-speakeasy-mcp": {
+          "name": "access-roles-remove"
+        }
+      }
+    },
+    "/v1/access/systems/{id}/allowed-types": {
+      "put": {
+        "description": "Records whether human, service and shared accounts are allowed on the system, with a justification. Accounts of a disallowed type are flagged.",
+        "operationId": "AccessRolesController_setAllowedTypes_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Manual system id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AllowedAccountTypesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "Set allowed account types of a manual system",
+        "tags": [
+          "Access"
+        ],
+        "x-mint": {
+          "metadata": {
+            "title": "Set allowed account types of a manual system | Comp AI API",
+            "sidebarTitle": "Set allowed account types of a manual system",
+            "description": "Records whether human, service and shared accounts are allowed on the system, with a justification. Accounts of a disallowed type are flagged.",
+            "og:title": "Set allowed account types of a manual system | Comp AI API",
+            "og:description": "Records whether human, service and shared accounts are allowed on the system, with a justification. Accounts of a disallowed type are flagged."
+          }
+        },
+        "x-speakeasy-mcp": {
+          "name": "set-allowed-types"
+        }
+      }
+    },
+    "/v1/access/import-from-rbac-matrix": {
+      "post": {
+        "description": "Without groups, returns the proposed systems (form system names merged when they differ only in case or a \"(...)\" suffix). With confirmed groups, creates manual systems and their approved roles, mapping \"approved by\" to a member. Safe.",
+        "operationId": "AccessRolesController_importRbacMatrix_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportRbacMatrixDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "Import the RBAC matrix form into systems and roles",
+        "tags": [
+          "Access"
+        ],
+        "x-mint": {
+          "metadata": {
+            "title": "Import the RBAC matrix form into systems and | Comp AI API",
+            "sidebarTitle": "Import the RBAC matrix form into systems and roles",
+            "description": "Without groups, returns the proposed systems (form system names merged when they differ only in case or a \"(...)\" suffix). With confirmed groups, creates.",
+            "og:title": "Import the RBAC matrix form into systems and | Comp AI API",
+            "og:description": "Without groups, returns the proposed systems (form system names merged when they differ only in case or a \"(...)\" suffix). With confirmed groups, creates."
+          }
+        },
+        "x-speakeasy-mcp": {
+          "name": "import-rbac-matrix"
+        }
+      }
+    },
+    "/v1/access/privileged-accounts": {
+      "get": {
+        "description": "List privileged accounts in Comp AI.",
+        "operationId": "AccessRolesController_privileged_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "List privileged accounts",
+        "tags": [
+          "Access"
+        ],
+        "x-mint": {
+          "metadata": {
+            "title": "List privileged accounts | Comp AI API",
+            "sidebarTitle": "List privileged accounts",
+            "description": "List privileged accounts in Comp AI.",
+            "og:title": "List privileged accounts | Comp AI API",
+            "og:description": "List privileged accounts in Comp AI."
+          }
+        },
+        "x-speakeasy-mcp": {
+          "name": "privileged"
+        }
+      }
+    },
+    "/v1/people-lifecycle/compliance": {
+      "get": {
+        "description": "Returns, per member, the status of policies, security and role-based training, device, background check, onboarding and offboarding, plus one overall status. Respects the organization device and background-check settings; former members.",
+        "operationId": "PeopleLifecycleController_getOrgCompliance_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "Get people compliance for every member",
+        "tags": [
+          "People"
+        ],
+        "x-mint": {
+          "metadata": {
+            "title": "Get people compliance for every member | Comp AI API",
+            "sidebarTitle": "Get people compliance for every member",
+            "description": "Returns, per member, the status of policies, security and role-based training, device, background check, onboarding and offboarding, plus one overall.",
+            "og:title": "Get people compliance for every member | Comp AI API",
+            "og:description": "Returns, per member, the status of policies, security and role-based training, device, background check, onboarding and offboarding, plus one overall."
+          }
+        },
+        "x-speakeasy-mcp": {
+          "name": "get-org-compliance"
+        }
+      }
+    },
+    "/v1/people-lifecycle/members/{memberId}/compliance": {
+      "get": {
+        "description": "Returns one row per people-security obligation for a member (policies, training, role training, device, background check, onboarding, offboarding) with status and dates.",
+        "operationId": "PeopleLifecycleController_getCompliance_v1",
+        "parameters": [
+          {
+            "name": "memberId",
+            "required": true,
+            "in": "path",
+            "description": "Member ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "Get a member's compliance checklist",
+        "tags": [
+          "People"
+        ],
+        "x-mint": {
+          "metadata": {
+            "title": "Get a member's compliance checklist | Comp AI API",
+            "sidebarTitle": "Get a member's compliance checklist",
+            "description": "Returns one row per people-security obligation for a member (policies, training, role training, device, background check, onboarding, offboarding).",
+            "og:title": "Get a member's compliance checklist | Comp AI API",
+            "og:description": "Returns one row per people-security obligation for a member (policies, training, role training, device, background check, onboarding, offboarding)."
+          }
+        },
+        "x-speakeasy-mcp": {
+          "name": "get-compliance"
+        }
+      }
+    },
+    "/v1/people-lifecycle/members/{memberId}/onboarding": {
+      "get": {
+        "description": "Returns a member's onboarding checklist with due dates from their start date, overdue flags, and items completed automatically from policies, training, device and background check.",
+        "operationId": "PeopleLifecycleController_getOnboarding_v1",
+        "parameters": [
+          {
+            "name": "memberId",
+            "required": true,
+            "in": "path",
+            "description": "Member ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "Get a member's onboarding checklist",
+        "tags": [
+          "People"
+        ],
+        "x-mint": {
+          "metadata": {
+            "title": "Get a member's onboarding checklist | Comp AI API",
+            "sidebarTitle": "Get a member's onboarding checklist",
+            "description": "Returns a member's onboarding checklist with due dates from their start date, overdue flags, and items completed automatically from policies, training.",
+            "og:title": "Get a member's onboarding checklist | Comp AI API",
+            "og:description": "Returns a member's onboarding checklist with due dates from their start date, overdue flags, and items completed automatically from policies, training."
+          }
+        },
+        "x-speakeasy-mcp": {
+          "name": "people-lifecycle-get-onboarding"
+        }
+      }
+    },
+    "/v1/people-lifecycle/members/{memberId}/offboarding": {
+      "get": {
+        "description": "Returns a member's offboarding checklist with due dates counted from their offboard date and overdue flags, so departures are closed out on time.",
+        "operationId": "PeopleLifecycleController_getOffboarding_v1",
+        "parameters": [
+          {
+            "name": "memberId",
+            "required": true,
+            "in": "path",
+            "description": "Member ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "Get a member's offboarding checklist with SLA",
+        "tags": [
+          "People"
+        ],
+        "x-mint": {
+          "metadata": {
+            "title": "Get a member's offboarding checklist with SLA | Comp AI API",
+            "sidebarTitle": "Get a member's offboarding checklist with SLA",
+            "description": "Returns a member's offboarding checklist with due dates counted from their offboard date and overdue flags, so departures are closed out on time.",
+            "og:title": "Get a member's offboarding checklist with SLA | Comp AI API",
+            "og:description": "Returns a member's offboarding checklist with due dates counted from their offboard date and overdue flags, so departures are closed out on time."
+          }
+        },
+        "x-speakeasy-mcp": {
+          "name": "get-offboarding"
+        }
+      }
+    },
+    "/v1/people-lifecycle/reminders": {
+      "post": {
+        "description": "Emails \"Your security tasks\" (policies to accept, training, device) to the given members, or to everyone with open tasks. Members with nothing open are skipped. Each email is written to the audit log.",
+        "operationId": "PeopleLifecycleController_sendReminders_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendRemindersDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "Send security task reminders",
+        "tags": [
+          "People"
+        ],
+        "x-mint": {
+          "metadata": {
+            "title": "Send security task reminders | Comp AI API",
+            "sidebarTitle": "Send security task reminders",
+            "description": "Emails \"Your security tasks\" (policies to accept, training, device) to the given members, or to everyone with open tasks. Members with nothing open are.",
+            "og:title": "Send security task reminders | Comp AI API",
+            "og:description": "Emails \"Your security tasks\" (policies to accept, training, device) to the given members, or to everyone with open tasks. Members with nothing open are."
+          }
+        },
+        "x-speakeasy-mcp": {
+          "name": "send-reminders"
+        }
+      }
+    },
+    "/v1/people-lifecycle/reminder-settings": {
+      "get": {
+        "description": "Get the employee reminder schedule in Comp AI. Invite and manage workforce members, training status, device compliance, email preferences, and employee evidence records.",
+        "operationId": "PeopleLifecycleController_getReminderSettings_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "Get the employee reminder schedule",
+        "tags": [
+          "People"
+        ],
+        "x-mint": {
+          "metadata": {
+            "title": "Get the employee reminder schedule | Comp AI API",
+            "sidebarTitle": "Get the employee reminder schedule",
+            "description": "Get the employee reminder schedule in Comp AI. Invite and manage workforce members, training status, device compliance, email preferences, and employee.",
+            "og:title": "Get the employee reminder schedule | Comp AI API",
+            "og:description": "Get the employee reminder schedule in Comp AI. Invite and manage workforce members, training status, device compliance, email preferences, and employee."
+          }
+        },
+        "x-speakeasy-mcp": {
+          "name": "get-reminder-settings"
+        }
+      },
+      "put": {
+        "description": "Set the employee reminder schedule in Comp AI. Invite and manage workforce members, training status, device compliance, email preferences, and employee evidence records.",
+        "operationId": "PeopleLifecycleController_setReminderSettings_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReminderSettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "Set the employee reminder schedule",
+        "tags": [
+          "People"
+        ],
+        "x-mint": {
+          "metadata": {
+            "title": "Set the employee reminder schedule | Comp AI API",
+            "sidebarTitle": "Set the employee reminder schedule",
+            "description": "Set the employee reminder schedule in Comp AI. Invite and manage workforce members, training status, device compliance, email preferences, and employee.",
+            "og:title": "Set the employee reminder schedule | Comp AI API",
+            "og:description": "Set the employee reminder schedule in Comp AI. Invite and manage workforce members, training status, device compliance, email preferences, and employee."
+          }
+        },
+        "x-speakeasy-mcp": {
+          "name": "set-reminder-settings"
         }
       }
     },
@@ -32586,6 +34087,59 @@
         }
       }
     },
+    "/v1/audits/{auditId}/requests/team": {
+      "post": {
+        "description": "The team logs requests the auditor sent outside Comp AI (a PBC list by email or spreadsheet): one request or many, each optionally tied to a requirement, with a due date and an owner, who is notified.",
+        "operationId": "AuditRequestsController_createTeam_v1",
+        "parameters": [
+          {
+            "name": "auditId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "example": "aud_abc123",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTeamAuditRequestsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "Log the auditor's request list",
+        "tags": [
+          "Audits"
+        ],
+        "x-mint": {
+          "metadata": {
+            "title": "Log the auditor's request list | Comp AI API",
+            "sidebarTitle": "Log the auditor's request list",
+            "description": "The team logs requests the auditor sent outside Comp AI (a PBC list by email or spreadsheet): one request or many, each optionally tied to a requirement.",
+            "og:title": "Log the auditor's request list | Comp AI API",
+            "og:description": "The team logs requests the auditor sent outside Comp AI (a PBC list by email or spreadsheet): one request or many, each optionally tied to a requirement."
+          }
+        },
+        "x-speakeasy-mcp": {
+          "name": "create-team"
+        }
+      }
+    },
     "/v1/audits/{auditId}/requests/{requestId}/response": {
       "patch": {
         "description": "Saves the team's answer to an auditor's evidence request and marks it submitted for the auditor to review. Attach files with the attachments endpoint.",
@@ -32774,7 +34328,7 @@
     },
     "/v1/assets": {
       "get": {
-        "description": "Returns the system inventory: cloud resources, repositories and devices found by integrations plus manual items, with owner, environment, PCI CDE scope, classification and open vulnerabilities.",
+        "description": "Returns the system inventory: cloud resources, repositories and devices found by integrations plus manual items, with owner, environment, location, vendor, PCI CDE scope, classification and open vulnerabilities. Also returns the latest.",
         "operationId": "AssetsController_listAssets_v1",
         "parameters": [
           {
@@ -32804,9 +34358,9 @@
           "metadata": {
             "title": "List assets | Comp AI API",
             "sidebarTitle": "List assets",
-            "description": "Returns the system inventory: cloud resources, repositories and devices found by integrations plus manual items, with owner, environment, PCI CDE scope.",
+            "description": "Returns the system inventory: cloud resources, repositories and devices found by integrations plus manual items, with owner, environment, location, vendor.",
             "og:title": "List assets | Comp AI API",
-            "og:description": "Returns the system inventory: cloud resources, repositories and devices found by integrations plus manual items, with owner, environment, PCI CDE scope."
+            "og:description": "Returns the system inventory: cloud resources, repositories and devices found by integrations plus manual items, with owner, environment, location, vendor."
           }
         },
         "x-speakeasy-mcp": {
@@ -32855,6 +34409,115 @@
         }
       }
     },
+    "/v1/assets/import-from-form": {
+      "post": {
+        "description": "Turns each row of the latest Infrastructure Inventory submission into an asset: name, description, environment, location, owner (matched by member name or email), vendor (matched by name) and last review date. Re-running updates the same.",
+        "operationId": "AssetsController_importFromForm_v1",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "Import the Infrastructure Inventory form",
+        "tags": [
+          "Assets"
+        ],
+        "x-mint": {
+          "metadata": {
+            "title": "Import the Infrastructure Inventory form | Comp AI API",
+            "sidebarTitle": "Import the Infrastructure Inventory form",
+            "description": "Turns each row of the latest Infrastructure Inventory submission into an asset: name, description, environment, location, owner (matched by member name.",
+            "og:title": "Import the Infrastructure Inventory form | Comp AI API",
+            "og:description": "Turns each row of the latest Infrastructure Inventory submission into an asset: name, description, environment, location, owner (matched by member name."
+          }
+        },
+        "x-speakeasy-mcp": {
+          "name": "import-from-form"
+        }
+      }
+    },
+    "/v1/assets/import": {
+      "post": {
+        "description": "Adds or updates manual assets from a CSV with a name column and optional description, type, environment, location, owner, vendor, version, end of support and last reviewed columns. Rows upsert by name.",
+        "operationId": "AssetsController_importCsv_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportAssetsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "Import assets from CSV",
+        "tags": [
+          "Assets"
+        ],
+        "x-mint": {
+          "metadata": {
+            "title": "Import assets from CSV | Comp AI API",
+            "sidebarTitle": "Import assets from CSV",
+            "description": "Adds or updates manual assets from a CSV with a name column and optional description, type, environment, location, owner, vendor, version, end of support.",
+            "og:title": "Import assets from CSV | Comp AI API",
+            "og:description": "Adds or updates manual assets from a CSV with a name column and optional description, type, environment, location, owner, vendor, version, end of support."
+          }
+        },
+        "x-speakeasy-mcp": {
+          "name": "import-csv"
+        }
+      }
+    },
+    "/v1/assets/review": {
+      "post": {
+        "description": "Records that the signed-in member reviewed every active asset and confirmed PCI DSS scope (12.5.1 inventory review, 12.5.2 annual scope confirmation). Stamps each asset and writes an audit log entry.",
+        "operationId": "AssetsController_markReviewed_v1",
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "Mark the inventory reviewed",
+        "tags": [
+          "Assets"
+        ],
+        "x-mint": {
+          "metadata": {
+            "title": "Mark the inventory reviewed | Comp AI API",
+            "sidebarTitle": "Mark the inventory reviewed",
+            "description": "Records that the signed-in member reviewed every active asset and confirmed PCI DSS scope (12.5.1 inventory review, 12.5.2 annual scope confirmation).",
+            "og:title": "Mark the inventory reviewed | Comp AI API",
+            "og:description": "Records that the signed-in member reviewed every active asset and confirmed PCI DSS scope (12.5.1 inventory review, 12.5.2 annual scope confirmation)."
+          }
+        },
+        "x-speakeasy-mcp": {
+          "name": "mark-reviewed"
+        }
+      }
+    },
     "/v1/assets/sync": {
       "post": {
         "description": "Rebuilds the asset inventory and integration vulnerabilities from the latest integration check results and enrolled devices. Runs daily on its own; call after a new scan.",
@@ -32890,7 +34553,7 @@
     },
     "/v1/assets/{id}": {
       "patch": {
-        "description": "Sets the owner, environment, PCI DSS CDE scope (in scope, connected, out of scope), data classification or description of an asset. Synced assets keep these values across syncs.",
+        "description": "Sets the owner, environment, location, vendor, version, end of support, PCI DSS CDE scope (in scope, connected, out of scope with a justification), data classification or description of an asset. Scope changes are kept in the audit log.",
         "operationId": "AssetsController_updateAsset_v1",
         "parameters": [
           {
@@ -32932,9 +34595,9 @@
           "metadata": {
             "title": "Update an asset | Comp AI API",
             "sidebarTitle": "Update an asset",
-            "description": "Sets the owner, environment, PCI DSS CDE scope (in scope, connected, out of scope), data classification or description of an asset. Synced assets keep these.",
+            "description": "Sets the owner, environment, location, vendor, version, end of support, PCI DSS CDE scope (in scope, connected, out of scope with a justification), data.",
             "og:title": "Update an asset | Comp AI API",
-            "og:description": "Sets the owner, environment, PCI DSS CDE scope (in scope, connected, out of scope), data classification or description of an asset. Synced assets keep these."
+            "og:description": "Sets the owner, environment, location, vendor, version, end of support, PCI DSS CDE scope (in scope, connected, out of scope with a justification), data."
           }
         },
         "x-speakeasy-mcp": {
@@ -33060,7 +34723,7 @@
     },
     "/v1/vulnerabilities/import": {
       "post": {
-        "description": "Imports an ASV scan (PCI DSS 11.3.2) or penetration test (11.4) CSV export. Rows dedupe per host and CVE or title; a rescan updates them and can resolve findings no longer listed.",
+        "description": "Imports an ASV scan (PCI DSS 11.3.2), internal scan (11.3.1) or penetration test (11.4) CSV export and records the scan with its date, vendor, verdict and optional report. Rows link to assets by IP, DNS name or host (unknown hosts are.",
         "operationId": "VulnerabilitiesController_importVulnerabilities_v1",
         "parameters": [],
         "requestBody": {
@@ -33083,17 +34746,17 @@
             "apikey": []
           }
         ],
-        "summary": "Import ASV or pentest findings from CSV",
+        "summary": "Import a scan or pentest from CSV",
         "tags": [
           "Vulnerabilities"
         ],
         "x-mint": {
           "metadata": {
-            "title": "Import ASV or pentest findings from CSV | Comp AI API",
-            "sidebarTitle": "Import ASV or pentest findings from CSV",
-            "description": "Imports an ASV scan (PCI DSS 11.3.2) or penetration test (11.4) CSV export. Rows dedupe per host and CVE or title; a rescan updates them and can resolve.",
-            "og:title": "Import ASV or pentest findings from CSV | Comp AI API",
-            "og:description": "Imports an ASV scan (PCI DSS 11.3.2) or penetration test (11.4) CSV export. Rows dedupe per host and CVE or title; a rescan updates them and can resolve."
+            "title": "Import a scan or pentest from CSV | Comp AI API",
+            "sidebarTitle": "Import a scan or pentest from CSV",
+            "description": "Imports an ASV scan (PCI DSS 11.3.2), internal scan (11.3.1) or penetration test (11.4) CSV export and records the scan with its date, vendor, verdict.",
+            "og:title": "Import a scan or pentest from CSV | Comp AI API",
+            "og:description": "Imports an ASV scan (PCI DSS 11.3.2), internal scan (11.3.1) or penetration test (11.4) CSV export and records the scan with its date, vendor, verdict."
           }
         },
         "x-speakeasy-mcp": {
@@ -33103,7 +34766,7 @@
     },
     "/v1/vulnerabilities/{id}": {
       "patch": {
-        "description": "Assigns a remediation owner or changes status: resolve a manual or imported finding, or ignore any finding as accepted risk or false positive with a reason.",
+        "description": "Assigns a remediation owner or asset, or changes status: resolve a manual or imported finding, mark a false positive (with a note and optional evidence file), or accept the risk until a date with another member as approver (not allowed.",
         "operationId": "VulnerabilitiesController_updateVulnerability_v1",
         "parameters": [
           {
@@ -33145,13 +34808,163 @@
           "metadata": {
             "title": "Update a vulnerability | Comp AI API",
             "sidebarTitle": "Update a vulnerability",
-            "description": "Assigns a remediation owner or changes status: resolve a manual or imported finding, or ignore any finding as accepted risk or false positive with a reason.",
+            "description": "Assigns a remediation owner or asset, or changes status: resolve a manual or imported finding, mark a false positive (with a note and optional evidence.",
             "og:title": "Update a vulnerability | Comp AI API",
-            "og:description": "Assigns a remediation owner or changes status: resolve a manual or imported finding, or ignore any finding as accepted risk or false positive with a reason."
+            "og:description": "Assigns a remediation owner or asset, or changes status: resolve a manual or imported finding, mark a false positive (with a note and optional evidence."
           }
         },
         "x-speakeasy-mcp": {
           "name": "update-vulnerability"
+        }
+      }
+    },
+    "/v1/vulnerabilities/scans": {
+      "get": {
+        "description": "Returns imported internal, ASV and penetration test scans with date, vendor, verdict and report, the last four quarters per kind, last passing scan and next due date, and in-scope or connected assets with no scan in 90 days.",
+        "operationId": "VulnerabilityProgramController_listScans_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "List vulnerability scans",
+        "tags": [
+          "Vulnerabilities"
+        ],
+        "x-mint": {
+          "metadata": {
+            "title": "List vulnerability scans | Comp AI API",
+            "sidebarTitle": "List vulnerability scans",
+            "description": "Returns imported internal, ASV and penetration test scans with date, vendor, verdict and report, the last four quarters per kind, last passing scan and next.",
+            "og:title": "List vulnerability scans | Comp AI API",
+            "og:description": "Returns imported internal, ASV and penetration test scans with date, vendor, verdict and report, the last four quarters per kind, last passing scan and next."
+          }
+        },
+        "x-speakeasy-mcp": {
+          "name": "list-scans"
+        }
+      }
+    },
+    "/v1/vulnerabilities/files/{attachmentId}/download": {
+      "get": {
+        "description": "Download a scan report or evidence file in Comp AI.",
+        "operationId": "VulnerabilityProgramController_downloadFile_v1",
+        "parameters": [
+          {
+            "name": "attachmentId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "example": "att_abc123",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "Download a scan report or evidence file",
+        "tags": [
+          "Vulnerabilities"
+        ],
+        "x-mint": {
+          "metadata": {
+            "title": "Download a scan report or evidence file | Comp AI API",
+            "sidebarTitle": "Download a scan report or evidence file",
+            "description": "Download a scan report or evidence file in Comp AI.",
+            "og:title": "Download a scan report or evidence file | Comp AI API",
+            "og:description": "Download a scan report or evidence file in Comp AI."
+          }
+        },
+        "x-speakeasy-mcp": {
+          "name": "download-file"
+        }
+      }
+    },
+    "/v1/vulnerabilities/sla-policy": {
+      "get": {
+        "description": "Returns the remediation days per severity (defaults until saved) and the linked vulnerability / patch management policy.",
+        "operationId": "VulnerabilityProgramController_getSlaPolicy_v1",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "Get the remediation SLA policy",
+        "tags": [
+          "Vulnerabilities"
+        ],
+        "x-mint": {
+          "metadata": {
+            "title": "Get the remediation SLA policy | Comp AI API",
+            "sidebarTitle": "Get the remediation SLA policy",
+            "description": "Returns the remediation days per severity (defaults until saved) and the linked vulnerability / patch management policy.",
+            "og:title": "Get the remediation SLA policy | Comp AI API",
+            "og:description": "Returns the remediation days per severity (defaults until saved) and the linked vulnerability / patch management policy."
+          }
+        },
+        "x-speakeasy-mcp": {
+          "name": "get-sla-policy"
+        }
+      },
+      "put": {
+        "description": "Sets remediation days per severity (critical at most 30, PCI DSS 6.3.3). Due dates of open findings are recomputed; closed findings keep theirs. The change is kept in the audit log.",
+        "operationId": "VulnerabilityProgramController_updateSlaPolicy_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSlaPolicyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "Update the remediation SLA policy",
+        "tags": [
+          "Vulnerabilities"
+        ],
+        "x-mint": {
+          "metadata": {
+            "title": "Update the remediation SLA policy | Comp AI API",
+            "sidebarTitle": "Update the remediation SLA policy",
+            "description": "Sets remediation days per severity (critical at most 30, PCI DSS 6.3.3). Due dates of open findings are recomputed; closed findings keep theirs. The change.",
+            "og:title": "Update the remediation SLA policy | Comp AI API",
+            "og:description": "Sets remediation days per severity (critical at most 30, PCI DSS 6.3.3). Due dates of open findings are recomputed; closed findings keep theirs. The change."
+          }
+        },
+        "x-speakeasy-mcp": {
+          "name": "update-sla-policy"
         }
       }
     }
@@ -33817,6 +35630,45 @@
           "preferences"
         ]
       },
+      "VerifyBackgroundExternallyDto": {
+        "type": "object",
+        "properties": {
+          "memberIds": {
+            "description": "Members whose background was screened outside Comp AI",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "provider": {
+            "type": "string",
+            "description": "Who screened them (agency, HR provider)",
+            "example": "Sterling"
+          },
+          "verifiedAt": {
+            "type": "string",
+            "description": "When the screening was completed (ISO date, not in the future)",
+            "example": "2026-03-01"
+          },
+          "fileName": {
+            "type": "string",
+            "description": "Proof file name (with fileType and fileData), attached to every member"
+          },
+          "fileType": {
+            "type": "string",
+            "description": "File MIME type"
+          },
+          "fileData": {
+            "type": "string",
+            "description": "File content, base64"
+          }
+        },
+        "required": [
+          "memberIds",
+          "provider",
+          "verifiedAt"
+        ]
+      },
       "AttachmentEntityType": {
         "type": "string",
         "enum": [
@@ -33830,7 +35682,11 @@
           "employment_onboard",
           "employment_offboard",
           "offboarding_checklist",
-          "audit_request"
+          "audit_request",
+          "vulnerability_scan",
+          "vulnerability",
+          "access_review_item",
+          "training_record"
         ],
         "description": "Type of entity the attachment belongs to"
       },
@@ -34604,6 +36460,17 @@
           "treatmentStrategyDescription": {
             "type": "string",
             "description": "Suggested mitigation plan"
+          },
+          "references": {
+            "description": "Framework references, e.g. \"PCI DSS 6.4.3\" or \"ISO A.8.28\". Stored on the risk and resolved to the org controls and evidence tasks, which are linked.",
+            "example": [
+              "PCI DSS 6.4.3",
+              "ISO A.8.28"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
@@ -34651,6 +36518,81 @@
             "description": "Member who signs the review off. Defaults to the caller."
           }
         }
+      },
+      "EmailPreferencesPatchDto": {
+        "type": "object",
+        "properties": {
+          "policyNotifications": {
+            "type": "boolean",
+            "example": true
+          },
+          "taskReminders": {
+            "type": "boolean",
+            "example": true
+          },
+          "weeklyTaskDigest": {
+            "type": "boolean",
+            "example": true
+          },
+          "unassignedItemsNotifications": {
+            "type": "boolean",
+            "example": true
+          },
+          "taskMentions": {
+            "type": "boolean",
+            "example": true
+          },
+          "taskAssignments": {
+            "type": "boolean",
+            "example": true
+          },
+          "findingNotifications": {
+            "type": "boolean",
+            "example": true
+          },
+          "complianceDigest": {
+            "type": "boolean",
+            "description": "Compliance digest (needs-attention summary)",
+            "example": true
+          },
+          "ownershipAssignments": {
+            "type": "boolean",
+            "description": "Emails when you are made owner of a record",
+            "example": true
+          },
+          "slaAlerts": {
+            "type": "boolean",
+            "description": "Vulnerability and review SLA alerts",
+            "example": true
+          },
+          "digestFrequency": {
+            "type": "string",
+            "enum": [
+              "daily",
+              "weekly"
+            ],
+            "example": "weekly"
+          },
+          "complianceDigestFrequency": {
+            "type": "string",
+            "enum": [
+              "daily",
+              "weekly"
+            ],
+            "example": "weekly"
+          }
+        }
+      },
+      "PatchEmailPreferencesDto": {
+        "type": "object",
+        "properties": {
+          "preferences": {
+            "$ref": "#/components/schemas/EmailPreferencesPatchDto"
+          }
+        },
+        "required": [
+          "preferences"
+        ]
       },
       "CreateVendorDto": {
         "type": "object",
@@ -34792,6 +36734,10 @@
             "type": "string",
             "description": "Notes",
             "example": "Per AOC section 1d"
+          },
+          "confirmed": {
+            "type": "boolean",
+            "description": "The split was confirmed against the TPSP (AOC or written agreement). A matrix counts as done only when every row is confirmed and each shared row has a note."
           }
         }
       },
@@ -35195,6 +37141,38 @@
           "checklist": {
             "$ref": "#/components/schemas/VendorReviewChecklistDto"
           },
+          "pciStatus": {
+            "type": "string",
+            "enum": [
+              "compliant",
+              "non_compliant",
+              "in_progress",
+              "not_applicable",
+              "unknown"
+            ],
+            "description": "PCI DSS status the reviewer confirmed. Required (and not \"unknown\") when checklist.pciStatusConfirmed is true (PCI DSS 12.8.4).",
+            "example": "compliant"
+          },
+          "reviewedDocumentIds": {
+            "description": "IDs of the vendor documents (SOC 2, ISO certificate, AOC, ...) the reviewer looked at.",
+            "example": [
+              "vdoc_abc123"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "conditions": {
+            "description": "Conditions of an \"approved_with_conditions\" outcome (at least one required). Each becomes an action on the vendor.",
+            "example": [
+              "Map CUEC 3 to our quarterly access review"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "notes": {
             "type": "string",
             "description": "Reviewer notes, conditions or follow-ups",
@@ -35210,6 +37188,169 @@
           "outcome",
           "checklist"
         ]
+      },
+      "BulkVendorUpdateItemDto": {
+        "type": "object",
+        "properties": {
+          "criticality": {
+            "type": "string",
+            "enum": [
+              "critical",
+              "high",
+              "medium",
+              "low"
+            ],
+            "nullable": true
+          },
+          "handlesCardholderData": {
+            "type": "boolean",
+            "description": "Account data is shared with this vendor (PCI DSS 12.8.1)"
+          },
+          "affectsCdeSecurity": {
+            "type": "boolean",
+            "description": "Vendor can affect the security of account data / the CDE"
+          },
+          "dataTypes": {
+            "type": "array",
+            "description": "Types of data the vendor processes",
+            "items": {
+              "type": "string",
+              "enum": [
+                "cardholder_data",
+                "sensitive_authentication_data",
+                "customer_pii",
+                "employee_pii",
+                "financial",
+                "credentials",
+                "source_code",
+                "health",
+                "confidential_business",
+                "public"
+              ]
+            }
+          },
+          "contractStartDate": {
+            "type": "object",
+            "format": "date-time",
+            "nullable": true
+          },
+          "contractEndDate": {
+            "type": "object",
+            "format": "date-time",
+            "nullable": true
+          },
+          "securityClausesConfirmed": {
+            "type": "boolean",
+            "description": "Contract has information security clauses (ISO A.5.20)"
+          },
+          "confidentialityClausesConfirmed": {
+            "type": "boolean",
+            "description": "Contract has confidentiality clauses"
+          },
+          "tpspAcknowledgementDate": {
+            "type": "object",
+            "description": "Date the TPSP's written acknowledgement of responsibility was received (PCI DSS 12.8.2)",
+            "format": "date-time",
+            "nullable": true
+          },
+          "responsibilityMatrix": {
+            "description": "PCI DSS 12.8.5 responsibility matrix",
+            "nullable": true,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ResponsibilityMatrixRowDto"
+            }
+          },
+          "assuranceType": {
+            "type": "string",
+            "enum": [
+              "soc2_type1",
+              "soc2_type2",
+              "iso27001",
+              "pci_aoc",
+              "pci_roc",
+              "other",
+              "none"
+            ],
+            "nullable": true
+          },
+          "assurancePeriodStart": {
+            "type": "object",
+            "format": "date-time",
+            "nullable": true
+          },
+          "assurancePeriodEnd": {
+            "type": "object",
+            "format": "date-time",
+            "nullable": true
+          },
+          "assuranceExpiresAt": {
+            "type": "object",
+            "format": "date-time",
+            "nullable": true
+          },
+          "pciStatus": {
+            "type": "string",
+            "enum": [
+              "compliant",
+              "non_compliant",
+              "in_progress",
+              "not_applicable",
+              "unknown"
+            ],
+            "nullable": true
+          },
+          "pciStatusCheckedAt": {
+            "type": "object",
+            "description": "When PCI DSS compliance status was last checked (12.8.4)",
+            "format": "date-time",
+            "nullable": true
+          },
+          "nextReviewDue": {
+            "type": "object",
+            "description": "Override the next periodic review due date",
+            "format": "date-time",
+            "nullable": true
+          },
+          "id": {
+            "type": "string",
+            "description": "Vendor ID",
+            "example": "vnd_abc123"
+          },
+          "assigneeId": {
+            "type": "object",
+            "description": "Owner (member ID); null clears it",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "BulkUpdateVendorsDto": {
+        "type": "object",
+        "properties": {
+          "updates": {
+            "description": "Per-vendor changes (1-500). Fields left out are unchanged.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BulkVendorUpdateItemDto"
+            }
+          }
+        },
+        "required": [
+          "updates"
+        ]
+      },
+      "ArchiveVendorDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "description": "Why the relationship ended",
+            "example": "Contract ended; data deletion confirmed on 2026-11-01"
+          }
+        }
       },
       "CreateContextDto": {
         "type": "object",
@@ -35881,6 +38022,54 @@
           "authType"
         ]
       },
+      "BulkSubmitForApprovalDto": {
+        "type": "object",
+        "properties": {
+          "policyIds": {
+            "description": "Policy IDs to act on (max 200)",
+            "example": [
+              "pol_abc123def456"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "approverId": {
+            "type": "string",
+            "description": "Member ID of the approver for every selected policy",
+            "example": "mem_abc123def456"
+          }
+        },
+        "required": [
+          "policyIds",
+          "approverId"
+        ]
+      },
+      "BulkSetOwnerDto": {
+        "type": "object",
+        "properties": {
+          "policyIds": {
+            "description": "Policy IDs to act on (max 200)",
+            "example": [
+              "pol_abc123def456"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "ownerId": {
+            "type": "string",
+            "description": "Member ID of the new policy owner",
+            "example": "mem_abc123def456"
+          }
+        },
+        "required": [
+          "policyIds",
+          "ownerId"
+        ]
+      },
       "PolicyResponseDto": {
         "type": "object",
         "properties": {
@@ -35951,6 +38140,7 @@
             "enum": [
               "monthly",
               "quarterly",
+              "semiannually",
               "yearly"
             ],
             "example": "yearly",
@@ -36201,6 +38391,7 @@
             "enum": [
               "monthly",
               "quarterly",
+              "semiannually",
               "yearly"
             ],
             "example": "yearly"
@@ -36317,6 +38508,7 @@
             "enum": [
               "monthly",
               "quarterly",
+              "semiannually",
               "yearly"
             ],
             "example": "yearly"
@@ -36555,6 +38747,49 @@
         "type": "object",
         "properties": {}
       },
+      "BulkTaskDueDateDto": {
+        "type": "object",
+        "properties": {
+          "taskIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "tsk_abc123"
+            ]
+          },
+          "dueDate": {
+            "type": "string",
+            "description": "Due date (YYYY-MM-DD), or null to clear it",
+            "example": "2026-12-31",
+            "nullable": true
+          }
+        },
+        "required": [
+          "taskIds",
+          "dueDate"
+        ]
+      },
+      "TaskAttachmentsValidityDto": {
+        "type": "object",
+        "properties": {
+          "validFrom": {
+            "type": "string",
+            "description": "First day the files are valid (YYYY-MM-DD); omitted keeps each file’s own start",
+            "example": "2026-01-01"
+          },
+          "validUntil": {
+            "type": "string",
+            "description": "Last day the files are valid (YYYY-MM-DD), or null for no end date",
+            "example": "2026-12-31",
+            "nullable": true
+          }
+        },
+        "required": [
+          "validUntil"
+        ]
+      },
       "TaskResponseDto": {
         "type": "object",
         "properties": {
@@ -36700,6 +38935,11 @@
             "type": "string",
             "description": "Last day of the audit period (YYYY-MM-DD), inclusive. Evidence after it is left out.",
             "example": "2026-12-31"
+          },
+          "auditId": {
+            "type": "string",
+            "description": "An audit engagement of this framework. Adds audit-trail.csv (readiness, auditor decisions, comments) and Requests/ (evidence requests with responses and files). Requires audit read.",
+            "example": "aud_abc123"
           }
         }
       },
@@ -37455,6 +39695,14 @@
             ],
             "default": "medium"
           },
+          "auditId": {
+            "type": "string",
+            "description": "Audit engagement the finding was raised in (from the audit workspace)"
+          },
+          "requirementId": {
+            "type": "string",
+            "description": "Requirement of that audit the finding is about (needs auditId)"
+          },
           "content": {
             "type": "string",
             "description": "Finding content/message",
@@ -37943,12 +40191,12 @@
         "properties": {
           "period": {
             "type": "string",
-            "description": "Period to record: the current one, or the one that just ended. Periods that already have a value are skipped.",
+            "description": "previous (default) records the period that just ended; current takes a provisional snapshot of the running period, which the close-of-period value later replaces. Periods with a final value are skipped.",
             "enum": [
               "current",
               "previous"
             ],
-            "example": "current"
+            "example": "previous"
           }
         }
       },
@@ -38022,6 +40270,21 @@
         },
         "required": [
           "description"
+        ]
+      },
+      "ImportNonconformitiesDto": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "description": "Rows of an existing nonconformity log (e.g. a CSV export), logged in order",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreateNonconformityDto"
+            }
+          }
+        },
+        "required": [
+          "rows"
         ]
       },
       "UpdateNonconformityDto": {
@@ -38661,6 +40924,86 @@
           "completedAt"
         ]
       },
+      "MyCertificateDto": {
+        "type": "object",
+        "properties": {
+          "moduleId": {
+            "type": "string",
+            "description": "'general' (default), 'hipaa-sat-1' or a training module id",
+            "example": "general"
+          }
+        }
+      },
+      "RecordTrainingDto": {
+        "type": "object",
+        "properties": {
+          "module": {
+            "type": "string",
+            "description": "'general' (security awareness), 'hipaa', or a training module id or title",
+            "example": "general"
+          },
+          "completedAt": {
+            "type": "string",
+            "description": "When the training was taken (ISO date, not in the future)",
+            "example": "2026-03-01"
+          },
+          "fileName": {
+            "type": "string",
+            "description": "Certificate or sign-in sheet file name (with fileType and fileData)"
+          },
+          "fileType": {
+            "type": "string",
+            "description": "File MIME type"
+          },
+          "fileData": {
+            "type": "string",
+            "description": "File content, base64"
+          }
+        },
+        "required": [
+          "module",
+          "completedAt"
+        ]
+      },
+      "ImportTrainingRowDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Member email",
+            "example": "jane@acme.com"
+          },
+          "module": {
+            "type": "string",
+            "description": "'Security awareness', 'HIPAA', or a module title",
+            "example": "Security awareness"
+          },
+          "completedAt": {
+            "type": "string",
+            "description": "Completion date (ISO)",
+            "example": "2026-03-01"
+          }
+        },
+        "required": [
+          "email",
+          "module",
+          "completedAt"
+        ]
+      },
+      "ImportTrainingRecordsDto": {
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImportTrainingRowDto"
+            }
+          }
+        },
+        "required": [
+          "rows"
+        ]
+      },
       "CreateOrgChartSnapshotDto": {
         "type": "object",
         "properties": {
@@ -38705,6 +41048,48 @@
         },
         "required": [
           "reason"
+        ]
+      },
+      "BulkFormOwnerDto": {
+        "type": "object",
+        "properties": {
+          "formTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "board-meeting",
+                "it-leadership-meeting",
+                "risk-committee-meeting",
+                "meeting",
+                "access-request",
+                "whistleblower-report",
+                "penetration-test",
+                "rbac-matrix",
+                "infrastructure-inventory",
+                "employee-performance-evaluation",
+                "network-diagram",
+                "tabletop-exercise",
+                "account-types",
+                "cryptographic-inventory",
+                "targeted-risk-analysis",
+                "significant-change-record"
+              ]
+            },
+            "example": [
+              "penetration-test"
+            ]
+          },
+          "ownerMemberId": {
+            "type": "string",
+            "description": "Member ID of the owner, or null to clear",
+            "example": "mem_abc123",
+            "nullable": true
+          }
+        },
+        "required": [
+          "formTypes",
+          "ownerMemberId"
         ]
       },
       "AddFrameworksDto": {
@@ -38841,6 +41226,28 @@
             "description": "Why the requirement is excluded or met another way. Required unless applicable.",
             "example": "No wireless networks connect to the CDE.",
             "maxLength": 4000
+          },
+          "details": {
+            "type": "object",
+            "description": "Structured worksheet. compensating_control: { kind, constraints, objective, identifiedRisk, compensatingControlIds[], validation, maintenance, revalidateAt (YYYY-MM-DD) } (PCI Appendix C). customized_approach: { kind, objective, matrix: [{ control, howMeetsObjective }], targetedRiskAnalysisSubmissionId } (PCI Appendix E). Ignored for applicable.",
+            "additionalProperties": true,
+            "example": {
+              "kind": "compensating_control",
+              "constraints": "Legacy HSM cannot rotate keys automatically.",
+              "objective": "Keys are rotated at the end of their cryptoperiod.",
+              "identifiedRisk": "Stale keys widen the exposure window.",
+              "compensatingControlIds": [
+                "ctl_abc123"
+              ],
+              "validation": "Quarterly key ceremony log reviewed by the CISO.",
+              "maintenance": "Ceremony scheduled in the compliance calendar.",
+              "revalidateAt": "2027-11-18"
+            }
+          },
+          "applyToChildren": {
+            "type": "boolean",
+            "description": "Not applicable only: also mark every sub-requirement (identifier prefix, e.g. 1.2 -> 1.2.1, 1.2.2) not applicable with the same justification.",
+            "example": true
           }
         },
         "required": [
@@ -38883,6 +41290,37 @@
             ]
           }
         }
+      },
+      "BulkControlOwnerDto": {
+        "type": "object",
+        "properties": {
+          "controlIds": {
+            "description": "Controls to update",
+            "example": [
+              "ctl_abc123",
+              "ctl_def456"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "ownerId": {
+            "type": "string",
+            "description": "Member ID of the new owner; null clears the owner",
+            "example": "mem_abc123",
+            "nullable": true
+          },
+          "assignLinkedWork": {
+            "type": "boolean",
+            "description": "Also assign the linked tasks and policies that have no assignee yet to the new owner",
+            "example": true
+          }
+        },
+        "required": [
+          "controlIds",
+          "ownerId"
+        ]
       },
       "LinkRelatedControlsDto": {
         "type": "object",
@@ -39195,6 +41633,20 @@
               "device",
               "background_check"
             ]
+          },
+          "appliesToRoles": {
+            "description": "Member roles the item applies to; empty means everyone",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "appliesToDepartments": {
+            "description": "Departments the item applies to; empty means every department",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [
@@ -39234,6 +41686,20 @@
               "background_check"
             ],
             "nullable": true
+          },
+          "appliesToRoles": {
+            "description": "Member roles the item applies to; empty means everyone",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "appliesToDepartments": {
+            "description": "Departments the item applies to; empty means every department",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -39259,6 +41725,27 @@
           "s3Key": {
             "type": "string",
             "description": "Key of an evidence file already uploaded via /v1/uploads/presign (purpose=evidence). The server fetches the bytes from storage — no base64 needed. Provide fileData or s3Key (not both)."
+          }
+        }
+      },
+      "RevokeAccessDto": {
+        "type": "object",
+        "properties": {
+          "notes": {
+            "type": "string",
+            "description": "How access was removed, e.g. a ticket link"
+          },
+          "fileName": {
+            "type": "string",
+            "description": "Proof file name (with fileType and fileData)"
+          },
+          "fileType": {
+            "type": "string",
+            "description": "Proof file MIME type"
+          },
+          "fileData": {
+            "type": "string",
+            "description": "Proof file content, base64"
           }
         }
       },
@@ -39331,8 +41818,17 @@
             "type": "string",
             "enum": [
               "human",
-              "service"
+              "service",
+              "shared"
             ]
+          },
+          "owner": {
+            "type": "string",
+            "description": "Owner email or member name (maps the account to a member)"
+          },
+          "justification": {
+            "type": "string",
+            "description": "Why a service or shared account exists"
           },
           "status": {
             "type": "string",
@@ -39463,7 +41959,24 @@
         "properties": {
           "note": {
             "type": "string",
-            "description": "What was done, e.g. a ticket link"
+            "description": "What was done"
+          },
+          "url": {
+            "type": "string",
+            "description": "Ticket or change link as proof",
+            "example": "https://acme.atlassian.net/browse/IT-42"
+          },
+          "fileName": {
+            "type": "string",
+            "description": "Proof file name (with fileType and fileData)"
+          },
+          "fileType": {
+            "type": "string",
+            "description": "Proof file MIME type"
+          },
+          "fileData": {
+            "type": "string",
+            "description": "Proof file content, base64"
           }
         }
       },
@@ -39475,6 +41988,166 @@
             "description": "Sign-off note"
           }
         }
+      },
+      "CreateAccessRoleDto": {
+        "type": "object",
+        "properties": {
+          "systemKey": {
+            "type": "string",
+            "description": "System key",
+            "example": "manual:asy_abc"
+          },
+          "systemName": {
+            "type": "string",
+            "description": "System name shown in exports",
+            "example": "Bank portal"
+          },
+          "name": {
+            "type": "string",
+            "description": "Role, group or permission set name",
+            "example": "Finance approver"
+          },
+          "permissionsScope": {
+            "type": "string",
+            "description": "What the role can do (least privilege scope)"
+          },
+          "isPrivileged": {
+            "type": "boolean",
+            "description": "Administrative / privileged role"
+          },
+          "approvedById": {
+            "type": "string",
+            "description": "Member who approved the role; defaults to the caller"
+          }
+        },
+        "required": [
+          "systemKey",
+          "systemName",
+          "name"
+        ]
+      },
+      "UpdateAccessRoleDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Role name"
+          },
+          "permissionsScope": {
+            "type": "object",
+            "description": "What the role can do",
+            "nullable": true
+          },
+          "isPrivileged": {
+            "type": "boolean",
+            "description": "Administrative / privileged role"
+          },
+          "approvedById": {
+            "type": "object",
+            "description": "Approving member; null clears the approval",
+            "nullable": true
+          }
+        }
+      },
+      "AllowedAccountTypeDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "human",
+              "service",
+              "shared"
+            ]
+          },
+          "allowed": {
+            "type": "boolean",
+            "description": "Whether this account type is allowed on the system"
+          },
+          "justification": {
+            "type": "string",
+            "description": "Why it is allowed (required for shared accounts by PCI DSS 8.2.2)"
+          }
+        },
+        "required": [
+          "type",
+          "allowed"
+        ]
+      },
+      "AllowedAccountTypesDto": {
+        "type": "object",
+        "properties": {
+          "types": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AllowedAccountTypeDto"
+            }
+          }
+        },
+        "required": [
+          "types"
+        ]
+      },
+      "RbacImportGroupDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "System name to create or reuse"
+          },
+          "sources": {
+            "description": "Form system names folded into this system",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "sources"
+        ]
+      },
+      "ImportRbacMatrixDto": {
+        "type": "object",
+        "properties": {
+          "groups": {
+            "description": "Confirmed systems. Omit to preview the proposed grouping without saving.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RbacImportGroupDto"
+            }
+          }
+        }
+      },
+      "SendRemindersDto": {
+        "type": "object",
+        "properties": {
+          "memberIds": {
+            "description": "Members to remind; omit to remind everyone with open security tasks",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ReminderSettingsDto": {
+        "type": "object",
+        "properties": {
+          "frequency": {
+            "type": "string",
+            "enum": [
+              "off",
+              "weekly",
+              "daily"
+            ],
+            "example": "weekly"
+          }
+        },
+        "required": [
+          "frequency"
+        ]
       },
       "CreateAuditDto": {
         "type": "object",
@@ -39510,6 +42183,13 @@
           },
           "auditorMemberIds": {
             "description": "Member ids of the auditors (members with the auditor role)",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "pendingAuditorEmails": {
+            "description": "Emails of auditors invited to the organization who have not joined yet; each is assigned to this audit when they first sign in",
             "type": "array",
             "items": {
               "type": "string"
@@ -39559,6 +42239,13 @@
           },
           "auditorMemberIds": {
             "description": "Replaces the auditors of the audit",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "pendingAuditorEmails": {
+            "description": "Emails of auditors invited to the organization who have not joined yet; each is assigned to this audit when they first sign in",
             "type": "array",
             "items": {
               "type": "string"
@@ -39628,6 +42315,52 @@
         },
         "required": [
           "title"
+        ]
+      },
+      "TeamAuditRequestDto": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "What the auditor needs",
+            "example": "Population of new hires in 2026"
+          },
+          "description": {
+            "type": "string",
+            "description": "Details of the request"
+          },
+          "requirementId": {
+            "type": "string",
+            "description": "Requirement the request is for"
+          },
+          "dueDate": {
+            "type": "string",
+            "description": "Due date (YYYY-MM-DD)",
+            "example": "2026-12-15"
+          },
+          "ownerMemberId": {
+            "type": "string",
+            "description": "Team member who prepares the evidence",
+            "example": "mem_abc123"
+          }
+        },
+        "required": [
+          "title"
+        ]
+      },
+      "CreateTeamAuditRequestsDto": {
+        "type": "object",
+        "properties": {
+          "requests": {
+            "description": "Requests from the auditor's request list (PBC list), logged by the team",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TeamAuditRequestDto"
+            }
+          }
+        },
+        "required": [
+          "requests"
         ]
       },
       "RespondAuditRequestDto": {
@@ -39705,6 +42438,34 @@
             "description": "Function / purpose of the asset",
             "nullable": true
           },
+          "scopeJustification": {
+            "type": "object",
+            "description": "Why the asset is out of PCI DSS scope; required when cdeScope is out_of_scope",
+            "nullable": true
+          },
+          "location": {
+            "type": "object",
+            "description": "Where it runs (region, data centre, SaaS)",
+            "example": "AWS eu-central-1",
+            "nullable": true
+          },
+          "vendorId": {
+            "type": "object",
+            "description": "Hosting or supplying vendor id",
+            "example": "vnd_abc123",
+            "nullable": true
+          },
+          "version": {
+            "type": "object",
+            "description": "Software / OS version",
+            "nullable": true
+          },
+          "endOfSupportAt": {
+            "type": "object",
+            "description": "Vendor end of support date (YYYY-MM-DD)",
+            "example": "2027-06-30",
+            "nullable": true
+          },
           "name": {
             "type": "string",
             "description": "Asset name",
@@ -39733,6 +42494,18 @@
         "required": [
           "name",
           "type"
+        ]
+      },
+      "ImportAssetsDto": {
+        "type": "object",
+        "properties": {
+          "csv": {
+            "type": "string",
+            "description": "CSV text with a header row. Recognised columns: name/asset/system (required), description, type, environment, location/region, owner (name or email), vendor/provider, version, end of support, last reviewed."
+          }
+        },
+        "required": [
+          "csv"
         ]
       },
       "UpdateAssetDto": {
@@ -39780,6 +42553,34 @@
           "description": {
             "type": "object",
             "description": "Function / purpose of the asset",
+            "nullable": true
+          },
+          "scopeJustification": {
+            "type": "object",
+            "description": "Why the asset is out of PCI DSS scope; required when cdeScope is out_of_scope",
+            "nullable": true
+          },
+          "location": {
+            "type": "object",
+            "description": "Where it runs (region, data centre, SaaS)",
+            "example": "AWS eu-central-1",
+            "nullable": true
+          },
+          "vendorId": {
+            "type": "object",
+            "description": "Hosting or supplying vendor id",
+            "example": "vnd_abc123",
+            "nullable": true
+          },
+          "version": {
+            "type": "object",
+            "description": "Software / OS version",
+            "nullable": true
+          },
+          "endOfSupportAt": {
+            "type": "object",
+            "description": "Vendor end of support date (YYYY-MM-DD)",
+            "example": "2027-06-30",
             "nullable": true
           },
           "name": {
@@ -39868,6 +42669,28 @@
             "type": "boolean",
             "description": "Mark open findings from this source that are absent from this file as resolved (a passing rescan)",
             "default": false
+          },
+          "scannedAt": {
+            "type": "string",
+            "description": "Date the scan or test ran (YYYY-MM-DD); defaults to today",
+            "example": "2026-11-01"
+          },
+          "vendor": {
+            "type": "string",
+            "description": "Scanning vendor or tester",
+            "example": "Qualys (ASV)"
+          },
+          "passed": {
+            "type": "boolean",
+            "description": "Scan verdict from the report. Defaults to: ASV passes with nothing at CVSS >= 4.0, internal passes with no high/critical, pentest has no verdict."
+          },
+          "report": {
+            "description": "The original report (PDF), kept as audit evidence",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UploadAttachmentDto"
+              }
+            ]
           }
         },
         "required": [
@@ -39882,9 +42705,10 @@
             "enum": [
               "open",
               "resolved",
-              "ignored"
+              "false_positive",
+              "risk_accepted"
             ],
-            "description": "open, resolved (fixed) or ignored (accepted risk / false positive; needs a statusNote)"
+            "description": "open, resolved (fixed), false_positive (needs a statusNote; optional evidence file) or risk_accepted (needs statusNote, acceptedUntil and an acceptedById other than you; not allowed for critical/high findings on in-scope or connected assets)"
           },
           "ownerId": {
             "type": "object",
@@ -39892,12 +42716,64 @@
             "example": "mem_abc123",
             "nullable": true
           },
+          "assetId": {
+            "type": "object",
+            "description": "Affected asset id; null unlinks the asset",
+            "example": "ast_abc123",
+            "nullable": true
+          },
           "statusNote": {
             "type": "object",
-            "description": "Why it was ignored or how it was fixed",
+            "description": "Why it is a false positive / accepted risk, or how it was fixed",
             "nullable": true
+          },
+          "acceptedUntil": {
+            "type": "string",
+            "description": "Risk acceptance expiry (YYYY-MM-DD); the finding reopens after it",
+            "example": "2027-02-01"
+          },
+          "acceptedById": {
+            "type": "string",
+            "description": "Member who approves the risk acceptance (must not be the requester)",
+            "example": "mem_abc123"
+          },
+          "evidence": {
+            "description": "Evidence file for a false positive (scanner dispute, vendor statement)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/UploadAttachmentDto"
+              }
+            ]
           }
         }
+      },
+      "UpdateSlaPolicyDto": {
+        "type": "object",
+        "properties": {
+          "criticalDays": {
+            "type": "number",
+            "description": "Critical: at most 30 days (PCI DSS 6.3.3)",
+            "example": 30
+          },
+          "highDays": {
+            "type": "number",
+            "example": 30
+          },
+          "mediumDays": {
+            "type": "number",
+            "example": 90
+          },
+          "lowDays": {
+            "type": "number",
+            "example": 180
+          }
+        },
+        "required": [
+          "criticalDays",
+          "highDays",
+          "mediumDays",
+          "lowDays"
+        ]
       }
     }
   },

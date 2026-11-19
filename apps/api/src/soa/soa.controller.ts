@@ -18,6 +18,7 @@ import {
   ApiBody,
 } from '@nestjs/swagger';
 import { SOAService } from './soa.service';
+import { SkipAuditLog } from '../audit/skip-audit-log.decorator';
 import { SaveSOAAnswerDto } from './dto/save-soa-answer.dto';
 import { AutoFillSOADto } from './dto/auto-fill-soa.dto';
 import { CreateSOADocumentDto } from './dto/create-soa-document.dto';
@@ -337,6 +338,8 @@ export class SOAController {
   @Post('ensure-setup')
   @HttpCode(HttpStatus.OK)
   @RequirePermission('audit', 'create')
+  // Idempotent and called on every SoA page load; logging it filled the event log with fake "Created" rows.
+  @SkipAuditLog()
   @ApiOperation({ summary: 'Ensure SOA configuration and document exist' })
   @ApiConsumes('application/json')
   @ApiOkResponse({

@@ -179,10 +179,11 @@ function AppShellWrapperContent({
         <AppShellNavbar
           startContent={
             <HStack gap="xs" align="center">
-              <Link href="/">
+              {/* Below sm the wordmark and separator are dropped so Ask AI and the avatar fit at 375px. */}
+              <Link href="/" className="hidden sm:inline-flex">
                 <Logo style={{ height: 22, width: 'auto' }} variant={logoVariant} />
               </Link>
-              <span className="pl-3 pr-1 text-muted-foreground">/</span>
+              <span className="hidden pl-3 pr-1 text-muted-foreground sm:inline">/</span>
               {/* Below sm the switcher is clipped so the avatar stays on screen. */}
               <div className="min-w-0 max-w-[38vw] overflow-hidden sm:max-w-none">
                 <OrganizationSwitcher

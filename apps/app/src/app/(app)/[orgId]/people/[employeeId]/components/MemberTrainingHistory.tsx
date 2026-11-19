@@ -4,9 +4,10 @@ import type { MemberTrainingModule, TrainingCycle } from '@/hooks/use-member-tra
 import { useMemberTraining } from '@/hooks/use-member-training';
 import { usePermissions } from '@/hooks/use-permissions';
 import { Badge, Button, Section, Stack, Text } from '@trycompai/design-system';
-import { Certificate, Launch } from '@trycompai/design-system/icons';
+import { Add, Certificate, Launch } from '@trycompai/design-system/icons';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { RecordTrainingDialog } from './RecordTrainingDialog';
 
 const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
@@ -26,8 +27,10 @@ export function MemberTrainingHistory({ memberId }: MemberTrainingHistoryProps) 
   const { hasPermission } = usePermissions();
   // The record-completion endpoint requires training:update.
   const canEdit = hasPermission('training', 'update');
-  const { cycles, modules, isLoading, recordCompletion, downloadCertificate } = useMemberTraining(memberId);
+  const { cycles, modules, isLoading, recordCompletion, recordTraining, downloadCertificate } =
+    useMemberTraining(memberId);
   const [busyKey, setBusyKey] = useState<string | null>(null);
+  const [recordOpen, setRecordOpen] = useState(false);
 
   const handleRecord = async (module: MemberTrainingModule) => {
     setBusyKey(module.id);
@@ -101,6 +104,13 @@ export function MemberTrainingHistory({ memberId }: MemberTrainingHistoryProps) 
       <Section
         title="Training history"
         description="Every completed training cycle. Training is valid for 12 months, then it is assigned again."
+        actions={
+          canEdit ? (
+            <Button size="sm" variant="outline" iconLeft={<Add size={14} />} onClick={() => setRecordOpen(true)}>
+              Record training
+            </Button>
+          ) : undefined
+        }
       >
         {isLoading && <Text variant="muted">Loading history...</Text>}
         {!isLoading && cycles.length === 0 && (
@@ -141,6 +151,7 @@ export function MemberTrainingHistory({ memberId }: MemberTrainingHistoryProps) 
           </ul>
         )}
       </Section>
+      <RecordTrainingDialog open={recordOpen} onOpenChange={setRecordOpen} modules={modules} onRecord={recordTraining} />
     </Stack>
   );
 }

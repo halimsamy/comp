@@ -96,12 +96,23 @@ function makePolicy(): PolicyFixture {
   };
 }
 
-type PolicyLookup = {
-  where: Partial<PolicyFixture> & {
-    OR?: Array<{ visibility: string; visibleToDepartments?: { has: string } }>;
-  };
-  select?: Record<string, unknown>;
-};
+type Where = Record<string, unknown>;
+type PolicyLookup = { where: Where; select?: Record<string, unknown> };
+
+// Minimal Prisma where evaluator: equality, AND/OR, `has` and `not`.
+function matchesWhere(record: Record<string, unknown>, where: Where): boolean {
+  return Object.entries(where).every(([key, value]) => {
+    if (key === 'AND') return (value as Where[]).every((w) => matchesWhere(record, w));
+    if (key === 'OR') return (value as Where[]).some((w) => matchesWhere(record, w));
+    const field = record[key] ?? null;
+    if (value && typeof value === 'object' && !(value instanceof Date)) {
+      const op = value as { has?: string; not?: unknown };
+      if ('has' in op) return Array.isArray(field) && field.includes(op.has);
+      if ('not' in op) return field !== op.not;
+    }
+    return field === value;
+  });
+}
 type MemberLookup = {
   where: { userId: string; organizationId: string; deactivated?: boolean; isActive?: boolean };
 };
@@ -132,16 +143,7 @@ describe('Portal policy page authorization', () => {
     // Model database filtering, rather than returning a policy regardless of
     // its query. An id-only lookup must reproduce the original disclosure.
     mocks.policyFindFirst.mockImplementation(({ where, select }: PolicyLookup) => {
-      const matches = Object.entries(where)
-        .filter(([key]) => key !== 'OR')
-        .every(([key, value]) => policy[key as keyof PolicyFixture] === value);
-      const visible = where.OR?.some(
-        (condition) =>
-          condition.visibility === policy.visibility &&
-          (!condition.visibleToDepartments ||
-            policy.visibleToDepartments.includes(condition.visibleToDepartments.has)),
-      );
-      if (!matches || !visible) return Promise.resolve(null);
+      if (!matchesWhere(policy, where)) return Promise.resolve(null);
       if (!select) return Promise.resolve(policy);
       return Promise.resolve(
         Object.fromEntries(Object.entries(policy).filter(([key]) => select[key])),

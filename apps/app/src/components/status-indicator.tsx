@@ -54,8 +54,10 @@ export const STATUS_COLORS: Record<StatusType, string> = {
   // In Review - Orange
   in_review: 'bg-orange-500 dark:bg-orange-400',
 
+  // Policy waiting for approval (not a review-due warning; that is derived from reviewDate)
+  needs_review: 'bg-yellow-500 dark:bg-yellow-400',
+
   // Warning/Error - Red
-  needs_review: 'bg-red-600 dark:bg-red-400',
   not_started: 'bg-red-600 dark:bg-red-400',
   // Failed - Red
   failed: 'bg-red-600 dark:bg-red-400',
@@ -79,7 +81,7 @@ export const getStatusTranslation = (status: StatusType) => {
     case 'archived':
       return 'Archived';
     case 'needs_review':
-      return 'Needs Review';
+      return 'Pending approval';
     case 'open':
       return 'Open';
     case 'pending':

@@ -191,12 +191,12 @@ export function EditableSOAFields({
 
   if (!isEditing) {
     return (
-      <div className="group relative flex w-full items-center justify-center">
-        <ApplicableReadOnlyDisplay isApplicable={isApplicable} />
+      <div className="group flex w-full items-center justify-center gap-1.5">
+        <ApplicableSwatchRow isApplicable={isApplicable} />
         <button
           type="button"
           onClick={handleEditClick}
-          className="absolute right-0 flex h-6 w-6 items-center justify-center rounded border border-border bg-background text-muted-foreground opacity-100 shadow-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded border border-border bg-background text-muted-foreground opacity-100 shadow-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           aria-label="Edit answer"
           title="Edit answer"
         >

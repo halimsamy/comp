@@ -149,7 +149,7 @@ describe('employee portal policy authorization', () => {
   );
 
   it('rejects a corrupt current-version reference to a foreign policy', async () => {
-    policy.currentVersion = { id: 'pv_own', policyId: 'pol_foreign', pdfUrl: 'foreign.pdf' };
+    policy.currentVersion = { id: 'pv_own', policyId: 'pol_foreign', pdfUrl: 'foreign.pdf', version: 1 };
     expect((await GET(pdf('pv_own'))).status).toBe(404);
     expect(mocks.sign).not.toHaveBeenCalled();
   });

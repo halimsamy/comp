@@ -74,6 +74,9 @@ export function PolicyAssigneeChart({ data }: PolicyAssigneeChartProps) {
   const actualChartHeight = Math.max(chartHeight, containerHeight);
 
   const showingLimited = data.length > MAX_BARS;
+  // ~7px per 12px glyph plus the tick margin, so "Unassigned" or long first names are not clipped.
+  const longestName = Math.max(...chartData.map((item) => item.name.length), 0);
+  const yAxisWidth = Math.min(120, Math.max(60, longestName * 7 + 12));
 
   return (
     <Card title="Policies by Owner" width="full" size="sm" spacing="tight">
@@ -99,7 +102,7 @@ export function PolicyAssigneeChart({ data }: PolicyAssigneeChartProps) {
                 axisLine={false}
                 fontSize={12}
                 stroke="hsl(var(--muted-foreground))"
-                width={60}
+                width={yAxisWidth}
               />
               <ChartTooltip
                 cursor={false}
