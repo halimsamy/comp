@@ -1,42 +1,15 @@
 'use client';
 
-import { Loader2 } from 'lucide-react';
-import type {
-  SOAFieldSavePayload,
-  SOAProcessedResult,
-  SOATableAnswerData,
-} from './EditableSOAFields';
+import { Spinner } from '@trycompai/design-system';
 import { EditableSOAFields } from './EditableSOAFields';
+import { SOAControlCode } from './SOAControlCode';
 import { resolveSoaDisplay } from './soa-display';
+import type { SOARowProps } from './soa-row-types';
 
-type SOAColumn = {
-  name: string;
-  type: 'string' | 'boolean' | 'text';
-};
-
-type SOAQuestion = {
-  id: string;
-  text: string;
-  columnMapping: {
-    closure: string;
-    title: string;
-    control_objective: string | null;
-    isApplicable: boolean | null;
-    justification?: string | null;
-  };
-};
-
-interface SOAMobileRowProps {
-  question: SOAQuestion;
-  columns: SOAColumn[];
-  answerData?: SOATableAnswerData;
-  questionStatus?: string;
-  processedResult?: SOAProcessedResult;
-  isFullyRemote: boolean;
-  documentId: string;
-  isPendingApproval: boolean;
-  organizationId: string;
-  onUpdate?: (payload: SOAFieldSavePayload) => void;
+function Label({ children }: { children: string }) {
+  return (
+    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{children}</p>
+  );
 }
 
 export function SOAMobileRow({
@@ -48,11 +21,11 @@ export function SOAMobileRow({
   documentId,
   isPendingApproval,
   organizationId,
+  link,
   onUpdate,
-}: SOAMobileRowProps) {
+}: SOARowProps) {
   const isProcessing = questionStatus === 'processing';
-  const controlClosure = question.columnMapping.closure || '';
-  const isControl7 = controlClosure.startsWith('7.');
+  const closure = question.columnMapping.closure || '';
 
   // Applicability + justification are per-organization values from this
   // document's own answers or an in-session autofill result — never from the
@@ -61,31 +34,33 @@ export function SOAMobileRow({
     answerData,
     processedResult,
     isFullyRemote,
-    isControl7,
+    isControl7: closure.startsWith('7.'),
   });
 
   return (
     <div className="p-4 space-y-3">
-      {/* Control title */}
       <div>
-        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Control</p>
-        <p className="text-sm font-medium text-foreground mt-0.5">{question.columnMapping.title}</p>
+        <Label>Control</Label>
+        <p className="mt-0.5 flex flex-wrap items-baseline gap-2 text-sm font-medium text-foreground">
+          <SOAControlCode closure={closure} href={link?.href} />
+          <span>{question.columnMapping.title}</span>
+        </p>
       </div>
 
-      {/* Control objective */}
       {question.columnMapping.control_objective && (
         <div>
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Control Objective</p>
-          <p className="text-sm text-foreground mt-0.5 leading-relaxed">{question.columnMapping.control_objective}</p>
+          <Label>Control Objective</Label>
+          <p className="text-sm text-foreground mt-0.5 leading-relaxed">
+            {question.columnMapping.control_objective}
+          </p>
         </div>
       )}
 
-      {/* Applicable */}
-      <div className="flex items-center justify-between">
-        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Applicable</p>
+      <div className="flex items-center justify-between gap-3">
+        <Label>Applicable</Label>
         {isProcessing ? (
           <div className="flex items-center gap-2">
-            <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+            <Spinner />
             <span className="text-xs text-muted-foreground">Processing...</span>
           </div>
         ) : (
@@ -94,6 +69,7 @@ export function SOAMobileRow({
             questionId={question.id}
             isApplicable={displayIsApplicable}
             justification={justificationValue}
+            inheritedVendorId={answerData?.inheritedVendorId ?? null}
             isPendingApproval={isPendingApproval}
             organizationId={organizationId}
             onUpdate={onUpdate}
@@ -101,10 +77,17 @@ export function SOAMobileRow({
         )}
       </div>
 
+      {displayIsApplicable === true && link?.implementation && (
+        <div className="flex items-center justify-between gap-3">
+          <Label>Implementation</Label>
+          <span className="text-sm text-muted-foreground">{link.implementation}</span>
+        </div>
+      )}
+
       {/* Justification (shown for both Applicable and Not Applicable per ISO 27001) */}
       {!isProcessing && (
         <div>
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Justification</p>
+          <Label>Justification</Label>
           <p className="text-sm text-foreground mt-0.5 leading-relaxed whitespace-pre-wrap">
             {justificationValue || '—'}
           </p>

@@ -10,6 +10,7 @@ import { HybridAuthGuard } from '../auth/hybrid-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
 import { PERMISSIONS_KEY } from '../auth/permission.guard';
 import { ControlsMappingController } from './controls-mapping.controller';
+import { ControlsBulkOwnerService } from './controls-bulk-owner.service';
 import { ControlsOverviewService } from './controls-overview.service';
 import { RelatedControlsService } from './related-controls.service';
 
@@ -17,6 +18,7 @@ describe('ControlsMappingController', () => {
   let controller: ControlsMappingController;
   const overview = { list: jest.fn(), setOwner: jest.fn(), crosswalkCsv: jest.fn() };
   const related = { list: jest.fn(), link: jest.fn(), unlink: jest.fn() };
+  const bulk = { setOwner: jest.fn() };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -25,6 +27,7 @@ describe('ControlsMappingController', () => {
       providers: [
         { provide: ControlsOverviewService, useValue: overview },
         { provide: RelatedControlsService, useValue: related },
+        { provide: ControlsBulkOwnerService, useValue: bulk },
       ],
     })
       .overrideGuard(HybridAuthGuard)
@@ -44,6 +47,21 @@ describe('ControlsMappingController', () => {
     expect(perm('link')).toEqual([{ resource: 'control', actions: ['update'] }]);
     expect(perm('unlink')).toEqual([{ resource: 'control', actions: ['update'] }]);
     expect(perm('setOwner')).toEqual([{ resource: 'control', actions: ['update'] }]);
+    expect(perm('bulkOwner')).toEqual([{ resource: 'control', actions: ['update'] }]);
+    expect(perm('evidence')).toEqual([{ resource: 'control', actions: ['read'] }]);
+    expect(perm('ownerSuggestions')).toEqual([{ resource: 'control', actions: ['read'] }]);
+  });
+
+  it('passes bulk owner changes to the service with the caller organization', async () => {
+    const dto = { controlIds: ['ctl_1', 'ctl_2'], ownerId: 'mem_1', assignLinkedWork: true };
+    await controller.bulkOwner('org_1', dto);
+    expect(bulk.setOwner).toHaveBeenCalledWith({ organizationId: 'org_1', dto });
+  });
+
+  it('caps the evidence lookup at 200 controls', async () => {
+    const ids = Array.from({ length: 201 }, (_, i) => `ctl_${i}`).join(',');
+    await expect(controller.evidence('org_1', ids)).rejects.toThrow('at most 200');
+    await expect(controller.evidence('org_1', '')).resolves.toEqual({ data: [], count: 0 });
   });
 
   it('scopes every call to the caller organization', async () => {

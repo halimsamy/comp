@@ -67,10 +67,40 @@ export function resolveSoaDisplay({
     };
   }
 
-  // No answer for this control yet — default to applicable, matching the
-  // server default and the pre-existing UX for an ungenerated SoA.
+  // No answer yet: not decided. Never assume applicable — submit stays
+  // blocked until every control has a decision (ISO 27001 6.1.3 d).
   return {
-    displayIsApplicable: true,
+    displayIsApplicable: null,
     justificationValue: null,
   };
+}
+
+/** Annex A code for a SoA row, e.g. closure "5.1" -> "A.5.1". */
+export const toAnnexCode = (closure: string) => (closure ? `A.${closure}` : '');
+
+/** Codes of the rows that still have no decision, in table order. */
+export function listUndecidedCodes({
+  questions,
+  answersMap,
+  processedResults,
+  isFullyRemote,
+}: {
+  questions: { id: string; columnMapping: { closure: string } }[];
+  answersMap: Map<string, SOATableAnswerData>;
+  processedResults: Map<string, SOAProcessedResult>;
+  isFullyRemote: boolean;
+}): string[] {
+  return questions
+    .filter((q) => {
+      const closure = q.columnMapping.closure || '';
+      return (
+        resolveSoaDisplay({
+          answerData: answersMap.get(q.id),
+          processedResult: processedResults.get(q.id),
+          isFullyRemote,
+          isControl7: closure.startsWith('7.'),
+        }).displayIsApplicable === null
+      );
+    })
+    .map((q) => toAnnexCode(q.columnMapping.closure));
 }

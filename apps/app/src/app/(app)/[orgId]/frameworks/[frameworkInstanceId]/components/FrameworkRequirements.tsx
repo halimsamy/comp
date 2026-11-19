@@ -23,6 +23,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { ExpandableDescription } from './ExpandableDescription';
 import { ApplicabilityTag } from './ApplicabilityTag';
 import { buildRequirementItems, compareRequirementsByOrder } from './framework-controls-shared';
+import { filterRequirementItems } from './table-filters';
+import { stripIdentifier } from './requirement-name';
+import { RequirementTableFilters, useRequirementTableFilters } from './TableFilters';
 import {
   REQUIREMENTS_TABLE_COLUMN_COUNT,
   REQUIREMENTS_TABLE_STYLE,
@@ -35,9 +38,11 @@ const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 export function FrameworkRequirements({
   requirementDefinitions,
   scores,
+  descriptionLabel,
 }: {
   requirementDefinitions: FrameworkEditorRequirement[];
   scores: FrameworkScores | null | undefined;
+  descriptionLabel?: string;
 }) {
   const router = useRouter();
   const { orgId, frameworkInstanceId } = useParams<{
@@ -57,16 +62,22 @@ export function FrameworkRequirements({
   // unset last), falling back to identifier for ties.
   const sortedItems = useMemo(() => [...items].sort(compareRequirementsByOrder), [items]);
 
+  const tableFilters = useRequirementTableFilters();
   const filteredItems = useMemo(() => {
-    if (!searchTerm.trim()) return sortedItems;
+    const narrowed = filterRequirementItems({
+      items: sortedItems,
+      status: tableFilters.status,
+      applicability: tableFilters.applicability,
+    });
+    if (!searchTerm.trim()) return narrowed;
     const lowerSearch = searchTerm.toLowerCase();
-    return sortedItems.filter(
+    return narrowed.filter(
       (item) =>
         item.name.toLowerCase().includes(lowerSearch) ||
         item.identifier?.toLowerCase().includes(lowerSearch) ||
         item.description?.toLowerCase().includes(lowerSearch),
     );
-  }, [items, searchTerm]);
+  }, [sortedItems, searchTerm, tableFilters.status, tableFilters.applicability]);
 
   const pageCount = Math.max(1, Math.ceil(filteredItems.length / pageSize));
   const paginatedItems = useMemo(
@@ -85,6 +96,7 @@ export function FrameworkRequirements({
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
       <div className="w-full max-w-sm">
         <InputGroup>
           <InputGroupAddon>
@@ -99,6 +111,9 @@ export function FrameworkRequirements({
           />
         </InputGroup>
       </div>
+        <RequirementTableFilters filters={tableFilters} />
+      </div>
+      <div className="overflow-x-auto">
       <Table
         variant="bordered"
         style={REQUIREMENTS_TABLE_STYLE}
@@ -115,7 +130,7 @@ export function FrameworkRequirements({
         }}
       >
         <RequirementsTableColumnGroup />
-        <RequirementsTableHeader />
+        <RequirementsTableHeader descriptionLabel={descriptionLabel} />
         <TableBody>
           {paginatedItems.length === 0 ? (
             <TableRow>
@@ -150,7 +165,7 @@ export function FrameworkRequirements({
                   </TableCell>
                   <TableCell>
                     <span className="block truncate text-sm" title={item.name}>
-                      {item.name}
+                      {stripIdentifier({ name: item.name, identifier })}
                     </span>
                   </TableCell>
                   <TableCell>
@@ -161,6 +176,9 @@ export function FrameworkRequirements({
                     />
                   </TableCell>
                   <TableCell>
+                    {item.status === 'not_applicable' ? (
+                      <Text size="sm" variant="muted">—</Text>
+                    ) : (
                     <div className="flex min-w-0 items-center gap-2">
                       <div className="h-1.5 min-w-0 flex-1 rounded-full bg-muted/50">
                         <div
@@ -174,6 +192,7 @@ export function FrameworkRequirements({
                         </Text>
                       </div>
                     </div>
+                    )}
                   </TableCell>
                   <TableCell>
                     <div className="flex flex-wrap items-center gap-1">
@@ -216,6 +235,7 @@ export function FrameworkRequirements({
           )}
         </TableBody>
       </Table>
+      </div>
     </div>
   );
 }

@@ -13,7 +13,13 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/hooks/use-permissions', () => ({
   usePermissions: () => ({ permissions: {}, hasPermission: mockHasPermission }),
 }));
-const overviewState = { controls: CONTROLS, isLoading: false, error: undefined as Error | undefined };
+const bulkSetOwner = vi.fn().mockResolvedValue({ controls: 1, tasks: 2, policies: 0 });
+const overviewState = {
+  controls: CONTROLS,
+  isLoading: false,
+  error: undefined as Error | undefined,
+  bulkSetOwner,
+};
 vi.mock('@/hooks/use-controls-overview', () => ({
   useControlsOverview: () => overviewState,
 }));
@@ -25,12 +31,20 @@ vi.mock('@/lib/evidence-download', () => ({
   downloadControlCrosswalkCsv: () => downloadControlCrosswalkCsv(),
 }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock('@/hooks/use-organization-members', () => ({
+  useOrganizationMembers: () => ({
+    members: [{ id: 'mem_ada', deactivated: false, user: { name: 'Ada', email: 'ada@x.io' } }],
+    isLoading: false,
+  }),
+}));
+vi.mock('@/hooks/use-api-swr', () => ({ useApiSWR: () => ({ data: undefined, isLoading: false }) }));
 
 beforeEach(() => {
   overviewState.controls = CONTROLS;
   overviewState.isLoading = false;
   overviewState.error = undefined;
   push.mockClear();
+  setMockPermissions({ control: ['read'] });
 });
 
 describe('ControlsOverview', () => {
@@ -66,6 +80,24 @@ describe('ControlsOverview', () => {
     overviewState.error = new Error('boom');
     render(<ControlsOverview />);
     expect(screen.getByText(/Could not load controls/)).toBeInTheDocument();
+  });
+});
+
+describe('ControlsOverview bulk owners', () => {
+  it('lets editors select rows and set one owner for all of them', async () => {
+    setMockPermissions({ control: ['read', 'update'] });
+    render(<ControlsOverview />);
+    expect(screen.getByText('Suggest owners')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Access Rights' }));
+    expect(screen.getByRole('region', { name: 'Bulk actions' })).toHaveTextContent('1 selected');
+  });
+
+  it('hides selection, bulk actions and suggestions from read-only users', () => {
+    setMockPermissions({ control: ['read'] });
+    render(<ControlsOverview />);
+    expect(screen.queryByRole('checkbox', { name: 'Select Access Rights' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Suggest owners')).not.toBeInTheDocument();
+    expect(screen.getByText('Ada')).toBeInTheDocument();
   });
 });
 

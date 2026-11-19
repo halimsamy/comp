@@ -22,8 +22,10 @@ const REQUIREMENTS_TABLE_COLUMNS = [
 
 export const REQUIREMENTS_TABLE_COLUMN_COUNT = REQUIREMENTS_TABLE_COLUMNS.length;
 
+// Fixed layout needs a floor width, otherwise narrow columns squeeze their headers into each other.
 export const REQUIREMENTS_TABLE_STYLE: CSSProperties = {
   tableLayout: 'fixed',
+  minWidth: '960px',
 };
 
 export function RequirementsTableColumnGroup() {
@@ -36,7 +38,8 @@ export function RequirementsTableColumnGroup() {
   );
 }
 
-export function RequirementsTableHeader() {
+/** PCI catalog descriptions list the evidence an assessor expects, so the column says so. */
+export function RequirementsTableHeader({ descriptionLabel = 'Description' }: { descriptionLabel?: string } = {}) {
   return (
     <TableHeader>
       <TableRow>
@@ -46,7 +49,9 @@ export function RequirementsTableHeader() {
             style={{ width: column.width }}
             title={'title' in column ? column.title : undefined}
           >
-            {column.label}
+            <span className="block truncate">
+              {column.id === 'description' ? descriptionLabel : column.label}
+            </span>
           </TableHead>
         ))}
       </TableRow>

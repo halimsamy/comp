@@ -1,137 +1,80 @@
 'use client';
 
-import type {
-  FrameworkEditorFramework,
-  FrameworkEditorRequirement,
-  FrameworkInstance,
-  RequirementMap,
-} from '@db';
-import { InputGroup, InputGroupAddon, InputGroupInput } from '@trycompai/design-system';
-import { Search } from '@trycompai/design-system/icons';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-  Text,
-} from '@trycompai/design-system';
-import { useRouter } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { stripIdentifier } from '@/app/(app)/[orgId]/frameworks/[frameworkInstanceId]/components/requirement-name';
+import { APPLICABILITY_LABELS, type ApplicabilityStatus } from '@/lib/control-compliance';
+import { Badge, Heading, Text } from '@trycompai/design-system';
+import Link from 'next/link';
 
-interface RequirementsTableProps {
-  requirements: (RequirementMap & {
-    frameworkInstance: FrameworkInstance & {
-      framework: FrameworkEditorFramework;
-    };
-    requirement: FrameworkEditorRequirement;
-  })[];
-  orgId: string;
+export interface MappedRequirement {
+  id: string;
+  frameworkInstanceId: string;
+  requirementId: string | null;
+  customRequirementId: string | null;
+  frameworkInstance: {
+    framework: { name: string } | null;
+    customFramework?: { name: string } | null;
+  };
+  requirement: { identifier: string; name: string } | null;
+  customRequirement?: { identifier: string; name: string } | null;
 }
 
-export function RequirementsTable({ requirements, orgId }: RequirementsTableProps) {
-  const router = useRouter();
-  const [searchTerm, setSearchTerm] = useState('');
-
-  // Filter requirements data based on search term
-  const filteredRequirements = useMemo(() => {
-    if (!searchTerm.trim()) return requirements;
-
-    const searchLower = searchTerm.toLowerCase();
-    return requirements.filter((req) => {
-      // Search in ID, name, and description from the nested requirement object
-      return (
-        (req.requirement.id?.toLowerCase() || '').includes(searchLower) ||
-        (req.requirement.name?.toLowerCase() || '').includes(searchLower) ||
-        (req.requirement.description?.toLowerCase() || '').includes(searchLower) ||
-        (req.requirement.identifier?.toLowerCase() || '').includes(searchLower) // Also search identifier
-      );
-    });
-  }, [requirements, searchTerm]);
-
-  const handleRowClick = (requirement: RequirementMap) => {
-    router.push(
-      `/${orgId}/frameworks/${requirement.frameworkInstanceId}/requirements/${requirement.requirementId}`,
+/** Mapped requirements grouped by framework, each with its applicability. */
+export function RequirementsTable({
+  requirements,
+  applicability,
+  orgId,
+}: {
+  requirements: MappedRequirement[];
+  /** Status keyed `${frameworkInstanceId}:${requirementKey}`; missing means applicable. */
+  applicability: Record<string, string>;
+  orgId: string;
+}) {
+  if (requirements.length === 0) {
+    return (
+      <Text size="sm" variant="muted">
+        This control is not mapped to any requirement yet.
+      </Text>
     );
-  };
+  }
+
+  const groups = new Map<string, { name: string; rows: MappedRequirement[] }>();
+  for (const row of requirements) {
+    const name = row.frameworkInstance.framework?.name ?? row.frameworkInstance.customFramework?.name ?? 'Framework';
+    const group = groups.get(row.frameworkInstanceId) ?? { name, rows: [] };
+    group.rows.push(row);
+    groups.set(row.frameworkInstanceId, group);
+  }
 
   return (
-    <div className="space-y-4">
-      <div className="w-full max-w-sm">
-        <InputGroup>
-          <InputGroupAddon>
-            <Search size={16} />
-          </InputGroupAddon>
-          <InputGroupInput
-            placeholder="Search requirements..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </InputGroup>
-      </div>
-
-      <Table variant="bordered">
-        <TableHeader>
-          <TableRow>
-            <TableHead>Identifier</TableHead>
-            <TableHead>Name</TableHead>
-            <TableHead>Description</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {filteredRequirements.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={3}>
-                <Text size="sm" variant="muted">
-                  No requirements found.
-                </Text>
-              </TableCell>
-            </TableRow>
-          ) : (
-            filteredRequirements.map((requirement) => {
-              const identifier = requirement.requirement.identifier?.trim();
-              const name = requirement.requirement.name;
-              const description = requirement.requirement.description;
+    <div className="flex flex-col gap-6">
+      {[...groups.entries()].map(([frameworkInstanceId, group]) => (
+        <section key={frameworkInstanceId} className="flex flex-col gap-2">
+          <Heading level="4">{`${group.name} (${group.rows.length})`}</Heading>
+          <ul className="divide-y rounded-md border">
+            {group.rows.map((row) => {
+              const req = row.requirement ?? row.customRequirement;
+              const key = row.requirementId ?? row.customRequirementId ?? '';
+              const status = (applicability[`${frameworkInstanceId}:${key}`] ?? 'applicable') as ApplicabilityStatus;
               return (
-                <TableRow
-                  key={requirement.id}
-                  role="button"
-                  tabIndex={0}
-                  style={{ cursor: 'pointer' }}
-                  onClick={() => handleRowClick(requirement)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault();
-                      handleRowClick(requirement);
-                    }
-                  }}
-                >
-                  <TableCell>
-                    <span className="text-sm">{identifier || '—'}</span>
-                  </TableCell>
-                  <TableCell>
-                    <span
-                      className="block max-w-[280px] truncate text-sm"
-                      title={name}
-                    >
-                      {name}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <span
-                      className="block max-w-[420px] truncate text-sm"
-                      title={description}
-                    >
-                      {description}
-                    </span>
-                  </TableCell>
-                </TableRow>
+                <li key={row.id} className="flex flex-col gap-1 p-3 sm:flex-row sm:items-center sm:justify-between">
+                  <Link
+                    href={`/${orgId}/frameworks/${frameworkInstanceId}/requirements/${key}`}
+                    className="min-w-0 text-sm hover:underline"
+                  >
+                    <span className="font-mono">{req?.identifier}</span>{' '}
+                    <span>{req ? stripIdentifier({ name: req.name, identifier: req.identifier }) : key}</span>
+                  </Link>
+                  <div className="shrink-0">
+                    <Badge variant={status === 'applicable' ? 'secondary' : 'outline'}>
+                      {APPLICABILITY_LABELS[status] ?? status}
+                    </Badge>
+                  </div>
+                </li>
               );
-            })
-          )}
-        </TableBody>
-      </Table>
+            })}
+          </ul>
+        </section>
+      ))}
     </div>
   );
 }

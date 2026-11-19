@@ -195,7 +195,7 @@ export function FrameworksTable({
                   style={{ cursor: 'pointer' }}
                   onClick={() => handleSort('compliance')}
                 >
-                  <span>Compliance</span>
+                  <span title="Weighted by how much of each control's evidence is done">Evidence progress</span>
                   <SortIcon
                     column="compliance"
                     sortColumn={sortColumn}
@@ -210,7 +210,7 @@ export function FrameworksTable({
                   style={{ cursor: 'pointer' }}
                   onClick={() => handleSort('controls')}
                 >
-                  <span>Controls</span>
+                  <span>Controls OK</span>
                   <SortIcon
                     column="controls"
                     sortColumn={sortColumn}

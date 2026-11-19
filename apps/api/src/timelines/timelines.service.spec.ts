@@ -34,6 +34,27 @@ jest.mock('../frameworks/frameworks-scores.helper', () => ({
   getOverviewScores: jest.fn(),
 }));
 
+// Per-framework % mirrors the mocked overview scores so the specs drive both.
+jest.mock('./timeline-progress', () => ({
+  loadAuditWindows: jest.fn().mockResolvedValue(new Map()),
+  loadTimelinePercentages: jest.fn(
+    async ({ frameworkInstanceIds }: { frameworkInstanceIds: string[] }) => {
+      const { getOverviewScores: scoresFn } = jest.requireMock(
+        '../frameworks/frameworks-scores.helper',
+      );
+      const scores = await scoresFn();
+      if (!scores) throw new Error('no scores');
+      const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 100) : 0);
+      const map = {
+        AUTO_POLICIES: pct(scores.policies.published, scores.policies.total),
+        AUTO_TASKS: pct(scores.tasks.done, scores.tasks.total),
+        AUTO_PEOPLE: pct(scores.people.completed, scores.people.total),
+      };
+      return new Map(frameworkInstanceIds.map((id) => [id, map]));
+    },
+  ),
+}));
+
 jest.mock('./timelines-backfill.helper', () => ({
   backfillTimeline: jest.fn(),
 }));

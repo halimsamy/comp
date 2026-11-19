@@ -26,12 +26,13 @@ export function GroupedControlRow({
   const badge = getStatusBadge(status);
   const documents = documentCounts(counts);
 
-  const controlHref = `/${orgId}/frameworks/${frameworkInstanceId}/controls/${control.id}`;
+  const controlHref = `/${orgId}/controls/${control.id}?framework=${frameworkInstanceId}`;
 
   const handleRowClick = () => {
     onRowClick(control.id);
   };
 
+  const owner = control.owner && !control.owner.deactivated ? control.owner.user.name || control.owner.user.email : null;
   const reqLabel =
     requirements.length > 0
       ? requirements.map((r) => r.identifier || r.name).join(', ')
@@ -53,6 +54,11 @@ export function GroupedControlRow({
             className="shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
           />
         </Link>
+      </TableCell>
+      <TableCell>
+        <span className={`block max-w-[160px] truncate text-sm ${owner ? '' : 'text-muted-foreground'}`} title={owner ?? undefined}>
+          {owner ?? 'Unassigned'}
+        </span>
       </TableCell>
       <TableCell>
         {reqLabel ? (

@@ -23,14 +23,29 @@ const scores: FrameworkScores = {
 };
 
 describe('FrameworkProgress', () => {
-  it('renders the API score with N/M controls and excluded requirements', () => {
+  it('headlines controls OK and labels the weighted score as evidence progress', () => {
     render(<FrameworkProgress scores={scores} />);
+    expect(screen.getByText('Controls OK')).toBeInTheDocument();
+    expect(screen.getByText('20/34 (59%)')).toBeInTheDocument();
+    expect(screen.getByText('Evidence progress')).toBeInTheDocument();
     expect(screen.getByText('64%')).toBeInTheDocument();
-    expect(screen.getByText('20/34 controls complete')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'About Evidence progress' })).toBeInTheDocument();
     expect(screen.getByText('150/270')).toBeInTheDocument();
     expect(screen.getByText('10 not applicable, excluded')).toBeInTheDocument();
     expect(screen.getByText('7/20')).toBeInTheDocument();
     expect(screen.getByText('4/12 ISMS documents published')).toBeInTheDocument();
+  });
+
+  it('links each card to the filtered tab behind it', () => {
+    render(<FrameworkProgress scores={scores} basePath="/org_1/frameworks/fi_1" />);
+    expect(screen.getByText('Controls OK').closest('a')).toHaveAttribute(
+      'href',
+      '/org_1/frameworks/fi_1?tab=controls&cstatus=incomplete',
+    );
+    expect(screen.getByText('Requirements satisfied').closest('a')).toHaveAttribute(
+      'href',
+      '/org_1/frameworks/fi_1?tab=requirements&rstatus=open',
+    );
   });
 
   it('renders nothing while scores are missing', () => {

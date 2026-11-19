@@ -11,6 +11,10 @@ export interface SOAExportQuestion {
     control_objective: string | null;
     isApplicable: boolean | null;
     justification: string | null;
+    /** Implemented / In progress / Not started, from the mapped controls. */
+    implementation?: string | null;
+    /** Supplier that operates the control, when inherited. */
+    inheritedFrom?: string | null;
   };
   answer: string | null;
 }
@@ -136,12 +140,7 @@ function generateSOAPDF(
       justification: null,
     };
 
-    const isApplicableLabel =
-      mapped.isApplicable === true
-        ? 'Yes'
-        : mapped.isApplicable === false
-          ? 'No'
-          : 'N/A';
+    const isApplicableLabel = applicabilityLabel(mapped.isApplicable);
 
     const justification =
       typeof mapped.justification === 'string' && mapped.justification.trim()
@@ -149,13 +148,16 @@ function generateSOAPDF(
         : question.answer || 'No justification provided';
 
     const title = `${i + 1}. ${mapped.title || question.text || 'Untitled Control'}`;
-    const closure = mapped.closure
-      ? `Closure: ${mapped.closure}`
-      : null;
+    const closure = mapped.closure ? `Control: ${toAnnexCode(mapped.closure)}` : null;
     const objective = mapped.control_objective
       ? `Objective: ${mapped.control_objective}`
       : null;
-    const applicability = `Applicable: ${isApplicableLabel}`;
+    const inherited = mapped.inheritedFrom ? ` (inherited from ${mapped.inheritedFrom})` : '';
+    const applicability = `Applicable: ${isApplicableLabel}${inherited}`;
+    const implementation =
+      mapped.isApplicable === true && mapped.implementation
+        ? `Implementation: ${mapped.implementation}`
+        : null;
     const justificationText = `Justification: ${justification}`;
 
     const titleLines = pdf.splitTextToSize(title, contentWidth);
@@ -166,6 +168,9 @@ function generateSOAPDF(
       ? pdf.splitTextToSize(objective, contentWidth)
       : [];
     const applicabilityLines = pdf.splitTextToSize(applicability, contentWidth);
+    const implementationLines = implementation
+      ? pdf.splitTextToSize(implementation, contentWidth)
+      : [];
     const justificationLines = pdf.splitTextToSize(
       justificationText,
       contentWidth,
@@ -174,12 +179,25 @@ function generateSOAPDF(
     writeLines(closureLines);
     writeLines(objectiveLines);
     writeLines(applicabilityLines);
+    writeLines(implementationLines);
     writeLines(justificationLines);
     ensureSpace(lineHeight * 0.5);
     y += lineHeight * 0.5;
   }
 
   return Buffer.from(pdf.output('arraybuffer'));
+}
+
+/** Yes / No, or "Not yet decided" for a control without an answer (never shown as Yes). */
+export function applicabilityLabel(isApplicable: boolean | null | undefined): string {
+  if (isApplicable === true) return 'Yes';
+  if (isApplicable === false) return 'No';
+  return 'Not yet decided';
+}
+
+/** "5.15" -> "A.5.15" (ISO 27001 Annex A reference). */
+export function toAnnexCode(closure: string): string {
+  return closure.startsWith('A.') ? closure : `A.${closure}`;
 }
 
 function sanitizeFrameworkName(frameworkName: string): string {

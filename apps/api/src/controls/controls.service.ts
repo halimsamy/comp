@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { db, EvidenceFormType, Prisma } from '@db';
+import { loadMappedApplicability } from './control-applicability';
 import { CreateControlDto } from './dto/create-control.dto';
 import { deduplicateById, deduplicateByFormType } from '../utils/deduplicate';
 import { syncDirectLinksToAllFrameworks } from './sync-framework-links';
@@ -195,9 +196,14 @@ export class ControlsService {
     }
 
     const completed = policyCompleted + taskCompleted;
+    const applicability = await loadMappedApplicability({
+      organizationId,
+      maps: control.requirementsMapped,
+    });
 
     return {
       ...rest,
+      applicability,
       policies,
       tasks,
       controlDocumentTypes: controlDocumentTypes.map(
@@ -876,11 +882,10 @@ export class ControlsService {
       return { success: true };
     }
     return db.$transaction(async (tx) => {
-      const deleted = await tx.controlDocumentType.deleteMany({
+      await tx.controlDocumentType.deleteMany({
         where: { controlId, formType },
       });
-      if (deleted.count === 0) return { success: true };
-      // The direct link was fanned out to every framework instance; remove it everywhere.
+      // Unscoped (the control page): remove the direct link and every framework link.
       await tx.frameworkControlDocumentTypeLink.deleteMany({
         where: { controlId, formType, frameworkInstance: { organizationId } },
       });

@@ -66,11 +66,27 @@ export function useControlsOverview({
     await mutate();
   };
 
+  /** One transaction; optionally hands the new owner the linked tasks and policies nobody owns. */
+  const bulkSetOwner = async (payload: {
+    controlIds: string[];
+    ownerId: string | null;
+    assignLinkedWork?: boolean;
+  }) => {
+    const res = await apiClient.patch<{ controls: number; tasks: number; policies: number }>(
+      '/v1/controls/bulk-owner',
+      payload,
+    );
+    if (res.error) throw new Error(res.error);
+    await mutate();
+    return res.data ?? { controls: 0, tasks: 0, policies: 0 };
+  };
+
   return {
     controls: Array.isArray(data) ? data : [],
     isLoading: isLoading && !data,
     error: error as Error | undefined,
     mutate,
     setOwner,
+    bulkSetOwner,
   };
 }

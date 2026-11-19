@@ -1,4 +1,4 @@
-import { IsString } from 'class-validator';
+import { IsBoolean, IsOptional, IsString } from 'class-validator';
 
 export class AutoFillSOADto {
   @IsString()
@@ -6,4 +6,9 @@ export class AutoFillSOADto {
 
   @IsString()
   documentId!: string;
+
+  /** Only fill controls without a decision yet ("Fill remaining"). */
+  @IsOptional()
+  @IsBoolean()
+  onlyUnanswered?: boolean;
 }

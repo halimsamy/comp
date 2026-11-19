@@ -68,7 +68,7 @@ export function RequirementControlsTable({
   }, [page, pageCount]);
 
   const getControlHref = (controlId: string) =>
-    `/${orgId}/frameworks/${frameworkInstanceId}/controls/${controlId}`;
+    `/${orgId}/controls/${controlId}?framework=${frameworkInstanceId}`;
 
   const handleRowClick = (controlId: string) => {
     router.push(getControlHref(controlId));

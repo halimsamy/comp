@@ -8,7 +8,7 @@ import {
   TimelineStatus,
 } from '@db';
 import { TimelinesService } from '../timelines/timelines.service';
-import { getOverviewScores } from './frameworks-scores.helper';
+import { loadTimelinePercentages } from '../timelines/timeline-progress';
 
 const logger = new Logger('FrameworksTimelineHelper');
 
@@ -241,9 +241,10 @@ async function runPhaseAdvancement({
         })
       : Promise.resolve([]);
 
-  const [tasks, scores] = await Promise.all([
+  // Policies and people use the same per-framework % the timeline shows.
+  const [tasks, pctMaps] = await Promise.all([
     tasksPromise,
-    getOverviewScores(organizationId),
+    loadTimelinePercentages({ organizationId, frameworkInstanceIds }),
   ]);
 
   const frameworkTaskIdsMap = new Map<string, Set<string>>();
@@ -323,12 +324,11 @@ async function runPhaseAdvancement({
       shouldComplete = fiTasks.every(
         (t) => t.status === 'done' || t.status === 'not_relevant',
       );
-    } else if (phase.completionType === PhaseCompletionType.AUTO_POLICIES) {
-      const { total, published } = scores.policies;
-      shouldComplete = total > 0 && published >= total;
-    } else if (phase.completionType === PhaseCompletionType.AUTO_PEOPLE) {
-      const { total, completed } = scores.people;
-      shouldComplete = total > 0 && completed >= total;
+    } else if (
+      phase.completionType === PhaseCompletionType.AUTO_POLICIES ||
+      phase.completionType === PhaseCompletionType.AUTO_PEOPLE
+    ) {
+      shouldComplete = (pctMaps.get(fiId)?.[phase.completionType] ?? 0) >= 100;
     } else if (phase.completionType === PhaseCompletionType.AUTO_FINDINGS) {
       if (!phase.startDate) continue;
 

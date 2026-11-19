@@ -27,10 +27,12 @@ export function RequirementControls({
   const compliantControls = requirementScore?.controlsComplete ?? 0;
   const percent = requirementScore?.percent ?? 0;
   const badge = getRequirementStatusBadge(requirementScore?.status ?? 'no_controls');
+  // Out of scope: no compliance bar, it would read as 0% done.
+  const isNotApplicable = requirementScore?.status === 'not_applicable';
 
   return (
     <div className="space-y-4">
-      {totalControls > 0 && (
+      {totalControls > 0 && !isNotApplicable && (
         <div className="flex flex-col gap-4">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
             <Badge variant={badge.variant}>{badge.label}</Badge>

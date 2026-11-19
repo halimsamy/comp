@@ -5,7 +5,7 @@ import { APPLICABILITY_LABELS } from '@/lib/control-compliance';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Button,
-  Label,
+  Checkbox,
   RadioGroup,
   RadioGroupItem,
   Sheet,
@@ -15,7 +15,6 @@ import {
   SheetHeader,
   SheetTitle,
   Text,
-  Textarea,
 } from '@trycompai/design-system';
 import { useRouter } from 'next/navigation';
 import { Controller, useForm } from 'react-hook-form';
@@ -25,7 +24,11 @@ import {
   type ApplicabilityForm,
   type ApplicabilityRules,
   applicabilityFormSchema,
+  buildApplicabilityPayload,
 } from './applicability-schema';
+import { ApplicabilityTextField } from './ApplicabilityTextField';
+import { CompensatingControlFields, type ControlOption } from './CompensatingControlFields';
+import { CustomizedApproachFields } from './CustomizedApproachFields';
 
 export function RequirementApplicabilitySheet({
   open,
@@ -34,6 +37,8 @@ export function RequirementApplicabilitySheet({
   requirementKey,
   rules,
   defaultValues,
+  childCount = 0,
+  controlOptions = [],
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -41,24 +46,33 @@ export function RequirementApplicabilitySheet({
   requirementKey: string;
   rules: ApplicabilityRules;
   defaultValues: ApplicabilityForm;
+  /** Sub-requirements (identifier prefix) that "Apply to sub-requirements" would also mark. */
+  childCount?: number;
+  controlOptions?: ControlOption[];
 }) {
   const router = useRouter();
   const form = useForm<ApplicabilityForm>({
     resolver: zodResolver(applicabilityFormSchema),
     values: defaultValues,
   });
-  const { errors, isSubmitting } = form.formState;
+  const { isSubmitting } = form.formState;
+  const status = form.watch('status');
 
   const handleSubmit = form.handleSubmit(async (values) => {
-    const response = await apiClient.put(
+    const response = await apiClient.put<{ cascaded?: number }>(
       `/v1/frameworks/${frameworkInstanceId}/requirements/${requirementKey}/applicability`,
-      { status: values.status, justification: values.justification.trim() || undefined },
+      buildApplicabilityPayload(values),
     );
     if (response.error) {
       toast.error(response.error);
       return;
     }
-    toast.success('Applicability saved');
+    const cascaded = response.data?.cascaded ?? 0;
+    toast.success(
+      cascaded > 0
+        ? `Applicability saved for this requirement and ${cascaded} sub-requirements`
+        : 'Applicability saved',
+    );
     onOpenChange(false);
     router.refresh();
   });
@@ -69,8 +83,9 @@ export function RequirementApplicabilitySheet({
         <SheetHeader>
           <SheetTitle>Applicability</SheetTitle>
           <SheetDescription>
-            Decide whether this requirement applies. Not applicable requirements are excluded
-            from the framework score.
+            {rules.managedBy === 'soa'
+              ? 'Saved to the Statement of Applicability, the source of truth for Annex A.'
+              : 'Decide whether this requirement applies. Not applicable requirements are excluded from the framework score.'}
           </SheetDescription>
         </SheetHeader>
         <SheetBody>
@@ -80,18 +95,18 @@ export function RequirementApplicabilitySheet({
               name="status"
               render={({ field }) => (
                 <RadioGroup value={field.value} onValueChange={field.onChange} aria-label="Status">
-                  {rules.allowedStatuses.map((status) => (
+                  {rules.allowedStatuses.map((option) => (
                     <label
-                      key={status}
+                      key={option}
                       className="flex cursor-pointer items-start gap-3 rounded-md border p-3 hover:bg-muted/40"
                     >
-                      <RadioGroupItem value={status} />
+                      <RadioGroupItem value={option} />
                       <div className="flex flex-col gap-0.5">
                         <Text size="sm" weight="medium">
-                          {APPLICABILITY_LABELS[status]}
+                          {APPLICABILITY_LABELS[option]}
                         </Text>
                         <Text size="xs" variant="muted">
-                          {APPLICABILITY_HELP[status]}
+                          {APPLICABILITY_HELP[option]}
                         </Text>
                       </div>
                     </label>
@@ -99,20 +114,36 @@ export function RequirementApplicabilitySheet({
                 </RadioGroup>
               )}
             />
-            <div className="grid gap-1.5">
-              <Label htmlFor="applicability-justification">Justification</Label>
-              <Textarea
-                id="applicability-justification"
+            {rules.reason && (
+              <Text size="xs" variant="muted">
+                {rules.reason}
+              </Text>
+            )}
+            {status !== 'applicable' && (
+              <ApplicabilityTextField
+                form={form}
+                name="justification"
+                label="Justification"
                 rows={5}
                 placeholder="e.g., No wireless networks connect to or are in the CDE."
-                {...form.register('justification')}
               />
-              {errors.justification && (
-                <Text size="xs" variant="destructive">
-                  {errors.justification.message}
-                </Text>
-              )}
-            </div>
+            )}
+            {status === 'not_applicable' && childCount > 0 && rules.managedBy !== 'soa' && (
+              <Controller
+                control={form.control}
+                name="applyToChildren"
+                render={({ field }) => (
+                  <label className="flex cursor-pointer items-center gap-2">
+                    <Checkbox checked={field.value} onCheckedChange={(checked) => field.onChange(checked === true)} />
+                    <span className="text-sm">{`Apply to sub-requirements (${childCount})`}</span>
+                  </label>
+                )}
+              />
+            )}
+            {status === 'compensating_control' && (
+              <CompensatingControlFields form={form} controlOptions={controlOptions} />
+            )}
+            {status === 'customized_approach' && <CustomizedApproachFields form={form} />}
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel

@@ -1,6 +1,7 @@
 export type SOAFieldSavePayload = {
   isApplicable: boolean | null;
   justification: string | null;
+  inheritedVendorId?: string | null;
 };
 
 /**
@@ -25,4 +26,5 @@ export type SOATableAnswerData = {
   answerVersion: number;
   isApplicable?: boolean | null;
   savedIsApplicable?: boolean | null;
+  inheritedVendorId?: string | null;
 };

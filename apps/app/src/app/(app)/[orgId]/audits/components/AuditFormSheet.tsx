@@ -19,6 +19,18 @@ import { toast } from 'sonner';
 import { auditSchema, toAuditFormValues, toAuditPayload, type AuditFormValues } from '../lib/audit-schema';
 import { AuditFormFields, type Option } from './AuditFormFields';
 
+function startValues({
+  audit,
+  defaultFrameworkInstanceId,
+}: {
+  audit: Audit | null;
+  defaultFrameworkInstanceId?: string;
+}): AuditFormValues {
+  const values = toAuditFormValues(audit);
+  if (audit || !defaultFrameworkInstanceId) return values;
+  return { ...values, frameworkInstanceId: defaultFrameworkInstanceId };
+}
+
 /** Add or edit an audit engagement. */
 export function AuditFormSheet({
   open,
@@ -28,6 +40,7 @@ export function AuditFormSheet({
   auditors,
   onSubmit,
   onDelete,
+  defaultFrameworkInstanceId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -37,16 +50,18 @@ export function AuditFormSheet({
   auditors: Option[];
   onSubmit: (payload: AuditPayload) => Promise<void>;
   onDelete: (audit: Audit) => Promise<void>;
+  /** Pre-selects the framework when adding (e.g. "Plan audit" on a framework page). */
+  defaultFrameworkInstanceId?: string;
 }) {
   const [isDeleting, setIsDeleting] = useState(false);
   const form = useForm<AuditFormValues>({
     resolver: zodResolver(auditSchema),
-    defaultValues: toAuditFormValues(audit),
+    defaultValues: startValues({ audit, defaultFrameworkInstanceId }),
   });
 
   useEffect(() => {
-    if (open) form.reset(toAuditFormValues(audit));
-  }, [open, audit, form]);
+    if (open) form.reset(startValues({ audit, defaultFrameworkInstanceId }));
+  }, [open, audit, defaultFrameworkInstanceId, form]);
 
   const handleSubmit = form.handleSubmit(async (values) => {
     try {

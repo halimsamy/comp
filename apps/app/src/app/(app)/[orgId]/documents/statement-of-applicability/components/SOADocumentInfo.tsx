@@ -24,8 +24,16 @@ interface SOADocumentInfoProps {
   canApprove: boolean;
   isAutoFillingSSE: boolean;
   onAutoFill: () => void;
+  /** Auto-fill only the rows that have no decision yet. */
+  onFillRemaining: () => void;
+  /** Annex A codes of rows without a decision; submit is blocked until empty. */
+  undecidedCodes: string[];
+  showUndecidedOnly: boolean;
+  onToggleUndecidedOnly: () => void;
   onSubmitForApproval: () => void;
 }
+
+const MAX_LISTED = 8;
 
 export function SOADocumentInfo({
   document,
@@ -34,8 +42,16 @@ export function SOADocumentInfo({
   canApprove,
   isAutoFillingSSE,
   onAutoFill,
+  onFillRemaining,
+  undecidedCodes,
+  showUndecidedOnly,
+  onToggleUndecidedOnly,
   onSubmitForApproval,
 }: SOADocumentInfoProps) {
+  const undecidedCount = undecidedCodes.length;
+  const listed = undecidedCodes.slice(0, MAX_LISTED).join(', ');
+  const more = undecidedCount > MAX_LISTED ? ` and ${undecidedCount - MAX_LISTED} more` : '';
+
   const progressPercentage = document.totalQuestions > 0
     ? Math.round((document.answeredQuestions / document.totalQuestions) * 100)
     : 0;
@@ -51,15 +67,30 @@ export function SOADocumentInfo({
   return (
     <div className="space-y-3">
       {/* Actions */}
-      <div className="flex items-center justify-end gap-2">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {(undecidedCount > 0 || showUndecidedOnly) && (
+          <Button onClick={onToggleUndecidedOnly} size="sm" variant="ghost">
+            {showUndecidedOnly ? 'Show all controls' : `Show not decided (${undecidedCount})`}
+          </Button>
+        )}
         {!isPendingApproval && canApprove && document.status !== 'needs_review' && (
           <Button
             onClick={onSubmitForApproval}
             size="sm"
             variant="outline"
-            disabled={!!document.approvedAt}
+            disabled={!!document.approvedAt || undecidedCount > 0}
           >
             Submit for Approval
+          </Button>
+        )}
+        {undecidedCount > 0 && !isPendingApproval && (
+          <Button
+            onClick={onFillRemaining}
+            disabled={isAutoFillingSSE}
+            size="sm"
+            variant="outline"
+          >
+            {`Fill remaining ${undecidedCount}`}
           </Button>
         )}
         <Button
@@ -71,6 +102,11 @@ export function SOADocumentInfo({
           {isAutoFillingSSE ? 'Auto-Filling...' : 'Auto-Fill All'}
         </Button>
       </div>
+      {undecidedCount > 0 && !isPendingApproval && (
+        <p className="text-right text-xs text-muted-foreground" role="status">
+          {`Decide every control before submitting. Not decided: ${listed}${more}.`}
+        </p>
+      )}
 
       {/* Metrics */}
       <Card className="p-4">

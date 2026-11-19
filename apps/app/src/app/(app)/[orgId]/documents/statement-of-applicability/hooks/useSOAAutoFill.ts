@@ -6,16 +6,7 @@ import { env } from '@/env.mjs';
 import type { SOAProcessedResult } from '../components/soa-field-types';
 
 interface UseSOAAutoFillProps {
-  questions: Array<{
-    id: string;
-    text: string;
-    columnMapping: {
-      title: string;
-      control_objective: string | null;
-      isApplicable: boolean | null;
-      justification: string | null;
-    };
-  }>;
+  questions: Array<{ id: string }>;
   documentId: string;
   organizationId: string;
   onUpdate: (payload?: { total?: number; answered?: number }) => void;
@@ -29,12 +20,20 @@ export function useSOAAutoFill({ questions, documentId, organizationId, onUpdate
   >(new Map());
   const isAutoFillProcessStartedRef = useRef(false);
 
-  const triggerAutoFill = async () => {
+  /** Pass `questionIds` to fill only those (the undecided rows); earlier results are kept. */
+  const triggerAutoFill = async ({ questionIds }: { questionIds?: string[] } = {}) => {
     setIsAutoFilling(true);
     isAutoFillProcessStartedRef.current = true;
-    // Set all questions to 'processing' immediately for instant spinner feedback
-    setQuestionStatuses(new Map(questions.map((q) => [q.id, 'processing'])));
-    setProcessedResults(new Map());
+    const onlyUnanswered = Array.isArray(questionIds);
+    const targets = onlyUnanswered ? questionIds : questions.map((q) => q.id);
+    // Set the target questions to 'processing' immediately for instant spinner feedback
+    setQuestionStatuses((prev) => {
+      const next = new Map(prev);
+      if (!onlyUnanswered) next.clear();
+      for (const id of targets) next.set(id, 'processing');
+      return next;
+    });
+    if (!onlyUnanswered) setProcessedResults(new Map());
 
     try {
       const response = await fetch(
@@ -48,6 +47,7 @@ export function useSOAAutoFill({ questions, documentId, organizationId, onUpdate
           body: JSON.stringify({
             documentId,
             organizationId,
+            ...(onlyUnanswered ? { onlyUnanswered: true } : {}),
           }),
         },
       );

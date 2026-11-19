@@ -136,7 +136,7 @@ export class SOAController {
       }
 
       const configuration = fullDocument.configuration;
-      const questions = configuration.questions as Array<{
+      const allQuestions = configuration.questions as Array<{
         id: string;
         text: string;
         columnMapping: {
@@ -147,6 +147,15 @@ export class SOAController {
           justification: string | null;
         };
       }>;
+      // "Fill remaining": leave every decided control untouched.
+      const decided = new Set(
+        dto.onlyUnanswered
+          ? (fullDocument.answers ?? [])
+              .filter((a) => a.isApplicable !== null)
+              .map((a) => a.questionId)
+          : [],
+      );
+      const questions = allQuestions.filter((q) => !decided.has(q.id));
 
       // Send initial progress
       send({
@@ -267,11 +276,11 @@ export class SOAController {
       // scoped to the document's configured questions.
       const answeredCount = await this.soaService.countAnsweredAnswers(
         dto.documentId,
-        questions.map((q) => q.id),
+        allQuestions.map((q) => q.id),
       );
       await this.soaService.updateDocumentAfterAutoFill(
         dto.documentId,
-        questions.length,
+        allQuestions.length,
         answeredCount,
       );
 
@@ -412,9 +421,10 @@ export class SOAController {
   async submitForApproval(
     @Body() dto: SubmitSOAForApprovalDto,
     @OrganizationId() organizationId: string,
+    @AuthContext() authContext?: AuthContextType,
   ) {
     dto.organizationId = organizationId;
-    return this.soaService.submitForApproval(dto);
+    return this.soaService.submitForApproval(dto, authContext?.userId);
   }
 
   @Post('export')

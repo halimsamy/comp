@@ -102,4 +102,42 @@ describe('RequirementApplicabilityCard', () => {
     );
     expect(mockRefresh).toHaveBeenCalled();
   });
+
+  it('says an Annex A control is not decided in the SoA and links to its row', () => {
+    setMockPermissions(ADMIN_PERMISSIONS);
+    render(
+      <RequirementApplicabilityCard
+        orgId="org_1"
+        frameworkInstanceId="fi_1"
+        requirementKey="req_1"
+        record={null}
+        rules={{ ...soaRules, editable: true }}
+        identifier="A.7.4"
+      />,
+    );
+    expect(screen.getByText('Not decided')).toBeInTheDocument();
+    expect(screen.getByText(/Not decided in the SoA/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /decide in the statement of applicability/i })).toHaveAttribute(
+      'href',
+      '/org_1/documents/statement-of-applicability#A.7.4',
+    );
+  });
+
+  it('offers "Apply to sub-requirements" for not applicable when there are children', async () => {
+    setMockPermissions(ADMIN_PERMISSIONS);
+    render(
+      <RequirementApplicabilityCard
+        orgId="org_1"
+        frameworkInstanceId="fi_1"
+        requirementKey="req_1"
+        record={null}
+        rules={pciRules}
+        identifier="1.2"
+        childCount={3}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /change/i }));
+    fireEvent.click(await screen.findByRole('radio', { name: /not applicable/i }));
+    expect(screen.getByText('Apply to sub-requirements (3)')).toBeInTheDocument();
+  });
 });

@@ -1,9 +1,10 @@
 'use client';
 
-import { StatusIndicator } from '@/components/status-indicator';
-import { InputGroup, InputGroupAddon, InputGroupInput } from '@trycompai/design-system';
-import { Search } from '@trycompai/design-system/icons';
+import { usePermissions } from '@/hooks/use-permissions';
+import { apiClient } from '@/lib/api-client';
 import {
+  Badge,
+  Button,
   Table,
   TableBody,
   TableCell,
@@ -12,105 +13,119 @@ import {
   TableRow,
   Text,
 } from '@trycompai/design-system';
+import { TrashCan } from '@trycompai/design-system/icons';
 import { useRouter } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
+import { toast } from 'sonner';
+import { getDocumentTypeLabel, toDocumentUrlSlug } from './documentTypeLabels';
 
-export interface DocumentTypeWithStatus {
+interface DocumentTypeRow {
   formType: string;
-  title: string;
-  category: string;
-  lastSubmittedAt: string | null;
-  isCurrent: boolean;
+  submissionCount: number;
+  isNotRelevant: boolean;
 }
 
-interface DocumentsTableProps {
-  documents: DocumentTypeWithStatus[];
+export function DocumentsTable({
+  controlId,
+  orgId,
+  rows,
+}: {
+  controlId: string;
   orgId: string;
-}
-
-export function DocumentsTable({ documents, orgId }: DocumentsTableProps) {
+  rows: DocumentTypeRow[];
+}) {
+  const { hasPermission } = usePermissions();
   const router = useRouter();
-  const [searchTerm, setSearchTerm] = useState('');
+  const [pending, setPending] = useState<string | null>(null);
 
-  const filteredDocuments = useMemo(() => {
-    if (!searchTerm.trim()) return documents;
+  const canUpdate = hasPermission('control', 'update');
 
-    const searchLower = searchTerm.toLowerCase();
-    return documents.filter(
-      (doc) =>
-        doc.title.toLowerCase().includes(searchLower) ||
-        doc.category.toLowerCase().includes(searchLower),
-    );
-  }, [documents, searchTerm]);
-
-  const handleRowClick = (formType: string) => {
-    router.push(`/${orgId}/documents/${formType}`);
+  const handleUnlink = async (formType: string) => {
+    if (pending) return;
+    setPending(formType);
+    try {
+      const response = await apiClient.delete(
+        // Unscoped: removes the link from every framework, matching the merged list shown here.
+        `/v1/controls/${controlId}/document-types/${formType}`,
+      );
+      if (response.error) throw new Error(response.error);
+      toast.success('Document unlinked');
+      router.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to unlink document');
+    } finally {
+      setPending(null);
+    }
   };
 
-  return (
-    <div className="space-y-4">
-      <div className="w-full max-w-sm">
-        <InputGroup>
-          <InputGroupAddon>
-            <Search size={16} />
-          </InputGroupAddon>
-          <InputGroupInput
-            placeholder="Search documents..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </InputGroup>
+  if (rows.length === 0) {
+    return (
+      <div className="flex h-32 items-center justify-center">
+        <Text variant="muted">No required documents yet.</Text>
       </div>
+    );
+  }
 
-      <Table variant="bordered">
-        <TableHeader>
-          <TableRow>
-            <TableHead>Document</TableHead>
-            <TableHead>Category</TableHead>
-            <TableHead>Last Submitted</TableHead>
-            <TableHead>Status</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {filteredDocuments.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={4}>
-                <Text size="sm" variant="muted">
-                  No documents linked.
-                </Text>
+  return (
+    <Table variant="bordered">
+      <TableHeader>
+        <TableRow>
+          <TableHead>Document Type</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead>Submissions</TableHead>
+          {canUpdate ? <TableHead /> : null}
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.map((row) => {
+          const label = getDocumentTypeLabel(row.formType);
+          const satisfied = row.submissionCount > 0;
+          const badgeLabel = row.isNotRelevant
+            ? 'Not relevant'
+            : satisfied
+              ? 'Submitted'
+              : 'Missing';
+          const badgeVariant = row.isNotRelevant
+            ? 'secondary'
+            : satisfied
+              ? 'default'
+              : 'destructive';
+          return (
+            <TableRow
+              key={row.formType}
+              onClick={() => router.push(`/${orgId}/documents/${toDocumentUrlSlug(row.formType)}`)}
+              style={{ cursor: 'pointer' }}
+            >
+              <TableCell>
+                <span className="block max-w-[320px] truncate text-sm" title={label}>
+                  {label}
+                </span>
               </TableCell>
+              <TableCell>
+                <Badge variant={badgeVariant}>{badgeLabel}</Badge>
+              </TableCell>
+              <TableCell>
+                <span className="tabular-nums text-sm">{row.submissionCount}</span>
+              </TableCell>
+              {canUpdate ? (
+                <TableCell>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={pending !== null}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleUnlink(row.formType);
+                    }}
+                  >
+                    <TrashCan size={16} />
+                  </Button>
+                </TableCell>
+              ) : null}
             </TableRow>
-          ) : (
-            filteredDocuments.map((doc) => (
-              <TableRow
-                key={doc.formType}
-                role="button"
-                tabIndex={0}
-                onClick={() => handleRowClick(doc.formType)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    handleRowClick(doc.formType);
-                  }
-                }}
-              >
-                <TableCell>{doc.title}</TableCell>
-                <TableCell>{doc.category}</TableCell>
-                <TableCell>
-                  {doc.lastSubmittedAt
-                    ? new Date(doc.lastSubmittedAt).toLocaleDateString()
-                    : 'Never'}
-                </TableCell>
-                <TableCell>
-                  <StatusIndicator
-                    status={doc.isCurrent ? 'completed' : 'not_started'}
-                  />
-                </TableCell>
-              </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
-    </div>
+          );
+        })}
+      </TableBody>
+    </Table>
   );
 }

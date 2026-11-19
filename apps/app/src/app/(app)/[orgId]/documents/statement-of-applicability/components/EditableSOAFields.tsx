@@ -20,6 +20,7 @@ import { Close, Edit } from '@trycompai/design-system/icons';
 import { toast } from 'sonner';
 import { useSOADocument } from '../hooks/useSOADocument';
 import { ApplicableReadOnlyDisplay, ApplicableSwatchRow } from './ApplicableSwatch';
+import { InheritedVendorSelect } from './InheritedVendorSelect';
 import type { SOAFieldSavePayload } from './soa-field-types';
 
 export type {
@@ -33,6 +34,7 @@ interface EditableSOAFieldsProps {
   questionId: string;
   isApplicable: boolean | null;
   justification: string | null;
+  inheritedVendorId?: string | null;
   isPendingApproval: boolean;
   organizationId: string;
   /** Called after a successful save so the table can override autofill/cache without a full reload. */
@@ -44,6 +46,7 @@ export function EditableSOAFields({
   questionId,
   isApplicable: initialIsApplicable,
   justification: initialJustification,
+  inheritedVendorId: initialVendorId = null,
   isPendingApproval,
   organizationId,
   onUpdate,
@@ -52,6 +55,7 @@ export function EditableSOAFields({
   const [isEditing, setIsEditing] = useState(false);
   const [isApplicable, setIsApplicable] = useState<boolean | null>(initialIsApplicable);
   const [justification, setJustification] = useState<string | null>(initialJustification);
+  const [vendorId, setVendorId] = useState<string | null>(initialVendorId);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const justificationTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -61,7 +65,8 @@ export function EditableSOAFields({
   useEffect(() => {
     setIsApplicable(initialIsApplicable);
     setJustification(initialJustification);
-  }, [initialIsApplicable, initialJustification]);
+    setVendorId(initialVendorId);
+  }, [initialIsApplicable, initialJustification, initialVendorId]);
 
   // Editing is only locked while the document is pending approval. Physical-
   // security (7.x) controls on a fully remote org are auto-filled to Not
@@ -69,7 +74,6 @@ export function EditableSOAFields({
   // time, so answers are never locked.
   const isDisabled = isPendingApproval;
 
-  // Auto-focus justification field when dialog opens
   useEffect(() => {
     if (isJustificationDialogOpen && justificationTextareaRef.current) {
       setTimeout(() => {
@@ -89,6 +93,7 @@ export function EditableSOAFields({
         answer: nextJustification,
         isApplicable: nextIsApplicable,
         justification: nextJustification,
+        inheritedVendorId: nextIsApplicable === true ? vendorId : null,
       });
 
       // Update local state
@@ -100,6 +105,7 @@ export function EditableSOAFields({
       onUpdate?.({
         isApplicable: nextIsApplicable,
         justification: nextJustification,
+        inheritedVendorId: nextIsApplicable === true ? vendorId : null,
       });
       return true;
     } catch (err) {
@@ -107,6 +113,7 @@ export function EditableSOAFields({
       if (!isJustificationDialogOpen) {
         setIsApplicable(initialIsApplicable);
         setJustification(initialJustification);
+        setVendorId(initialVendorId);
         setJustificationDialogOpen(false);
       }
       setError(message);
@@ -121,6 +128,7 @@ export function EditableSOAFields({
     setIsEditing(false);
     setIsApplicable(initialIsApplicable);
     setJustification(initialJustification);
+    setVendorId(initialVendorId);
     setError(null);
     setJustificationDialogOpen(false);
   };
@@ -130,10 +138,7 @@ export function EditableSOAFields({
   };
 
   const handleSelectChange = (value: string | null) => {
-    if (value !== 'yes' && value !== 'no' && value !== 'null') {
-      return;
-    }
-
+    if (value !== 'yes' && value !== 'no' && value !== 'null') return;
     const newValue = value === 'yes' ? true : value === 'no' ? false : null;
     setIsApplicable(newValue);
     setError(null);
@@ -155,9 +160,7 @@ export function EditableSOAFields({
     }
 
     const success = await executeSave(isApplicable, justification);
-    if (!success) {
-      return;
-    }
+    if (!success) return;
     dialogSavedRef.current = true;
     setJustificationDialogOpen(false);
   };
@@ -169,6 +172,7 @@ export function EditableSOAFields({
       } else {
         setIsApplicable(initialIsApplicable);
         setJustification(initialJustification);
+        setVendorId(initialVendorId);
       }
       setError(null);
     }
@@ -266,9 +270,10 @@ export function EditableSOAFields({
             size="full"
             required={isApplicable === false}
           />
-          {error && (
-            <p className="text-xs text-destructive">{error}</p>
+          {isApplicable === true && (
+            <InheritedVendorSelect value={vendorId} onChange={setVendorId} disabled={isSaving} />
           )}
+          {error && <p className="text-xs text-destructive">{error}</p>}
           <DialogFooter>
             <Button
               variant="ghost"

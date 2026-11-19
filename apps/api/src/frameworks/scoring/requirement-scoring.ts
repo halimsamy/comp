@@ -7,6 +7,7 @@ export const applicabilitySelect = {
   requirementKey: true,
   status: true,
   justification: true,
+  details: true,
   source: true,
   updatedAt: true,
   updatedBy: { select: { id: true, user: { select: { name: true, email: true } } } },

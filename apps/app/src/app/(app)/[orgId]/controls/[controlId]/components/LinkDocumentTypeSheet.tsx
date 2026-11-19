@@ -27,7 +27,8 @@ export function LinkDocumentTypeSheet({
   alreadyLinkedFormTypes,
 }: {
   controlId: string;
-  frameworkInstanceId: string;
+  /** Link only within this framework; omit to link the control everywhere. */
+  frameworkInstanceId?: string | null;
   alreadyLinkedFormTypes: string[];
 }) {
   const { hasPermission } = usePermissions();
@@ -65,7 +66,7 @@ export function LinkDocumentTypeSheet({
     setIsSubmitting(true);
     try {
       const response = await apiClient.post(
-        `/v1/controls/${controlId}/document-types/link?frameworkInstanceId=${frameworkInstanceId}`,
+        `/v1/controls/${controlId}/document-types/link${frameworkInstanceId ? `?frameworkInstanceId=${frameworkInstanceId}` : ''}`,
         { formTypes: Array.from(selected) },
       );
       if (response.error) throw new Error(response.error);

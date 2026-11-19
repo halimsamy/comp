@@ -1,5 +1,6 @@
 import { ISO27001_FRAMEWORK_NAMES } from '../../soa/utils/constants';
 import type { ApplicabilityStatus } from '../scoring/framework-scoring';
+import { isCustomizedApproachEligible } from './applicability-details';
 
 export interface ApplicabilityRules {
   editable: boolean;
@@ -17,9 +18,11 @@ const isPciFramework = (name: string | null | undefined) => !!name && /pci/i.tes
 /**
  * What a requirement's applicability may be set to.
  * - ISO 27001: clauses 4–10 can never be excluded (clause 1); Annex A
- *   applicability comes from the Statement of Applicability (6.1.3 d).
+ *   applicability lives in the Statement of Applicability (6.1.3 d), so an
+ *   edit on the requirement page is written to the SoA.
  * - PCI DSS: N/A, compensating controls (Appendix B/C) or the customized
- *   approach (Appendix D), each with a justification for the ROC.
+ *   approach (Appendix D/E, not for requirements without a customized
+ *   approach objective), each with a justification for the ROC.
  */
 export function applicabilityRules({
   frameworkName,
@@ -31,10 +34,10 @@ export function applicabilityRules({
   if (isIsoFramework(frameworkName)) {
     if ((requirementIdentifier ?? '').startsWith('A.')) {
       return {
-        editable: false,
+        editable: true,
         allowedStatuses: ['applicable', 'not_applicable'],
         managedBy: 'soa',
-        reason: 'Annex A applicability is set in the Statement of Applicability.',
+        reason: 'Saved to the Statement of Applicability, the source of truth for Annex A.',
       };
     }
     return {
@@ -47,9 +50,13 @@ export function applicabilityRules({
   if (isPciFramework(frameworkName)) {
     return {
       editable: true,
-      allowedStatuses: ['applicable', 'not_applicable', 'compensating_control', 'customized_approach'],
+      allowedStatuses: isCustomizedApproachEligible(requirementIdentifier)
+        ? ['applicable', 'not_applicable', 'compensating_control', 'customized_approach']
+        : ['applicable', 'not_applicable', 'compensating_control'],
       managedBy: null,
-      reason: null,
+      reason: isCustomizedApproachEligible(requirementIdentifier)
+        ? null
+        : 'PCI DSS has no customized approach objective for this requirement.',
     };
   }
   return {

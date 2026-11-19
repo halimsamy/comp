@@ -67,6 +67,10 @@ export async function saveAnswersToDatabase(
             questionId: question.id,
             answer: answerValue,
             isApplicable: result.isApplicable,
+            // A supplier-operated control stays inherited while it stays applicable.
+            inheritedVendorId: result.isApplicable
+              ? (existingAnswer?.inheritedVendorId ?? null)
+              : null,
             status: 'generated',
             generatedAt: new Date(),
             answerVersion: nextVersion,

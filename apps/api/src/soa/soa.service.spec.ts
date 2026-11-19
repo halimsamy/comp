@@ -30,7 +30,8 @@ jest.mock('@db', () => ({
     member: { findFirst: jest.fn() },
     user: { findUnique: jest.fn() },
     organization: { findUnique: jest.fn() },
-    sOAAnswer: { findFirst: jest.fn(), create: jest.fn(), update: jest.fn() },
+    sOAAnswer: { findFirst: jest.fn(), findMany: jest.fn(), create: jest.fn(), update: jest.fn() },
+    vendor: { findFirst: jest.fn() },
     $transaction: jest.fn((ops: unknown[]) => Promise.all(ops)),
   },
 }));
@@ -60,6 +61,9 @@ jest.mock('./utils/soa-storage', () => ({
 }));
 jest.mock('./utils/export-generator', () => ({
   generateSOAExportFile: jest.fn(),
+}));
+jest.mock('./utils/soa-implementation', () => ({
+  loadSoaImplementation: jest.fn().mockResolvedValue(new Map([['5.1', 'Implemented']])),
 }));
 jest.mock('./utils/soa-applicability-sync', () => ({
   syncSoaApplicability: jest.fn().mockResolvedValue(0),
@@ -465,7 +469,19 @@ describe('SOAService', () => {
       (mockDb.sOADocument.findFirst as jest.Mock).mockResolvedValue({
         id: 'doc-1',
         status: 'draft',
+        configurationId: 'cfg-1',
       });
+      (mockDb.sOAFrameworkConfiguration.findUnique as jest.Mock).mockResolvedValue({
+        questions: [
+          { id: 'q-1', columnMapping: { closure: '5.1' } },
+          { id: 'q-2', columnMapping: { closure: '7.4' } },
+        ],
+      });
+      (mockDb.sOAAnswer.findMany as jest.Mock).mockResolvedValue([
+        { questionId: 'q-1', isApplicable: true },
+      ]);
+      // Fully remote: the unanswered physical row defaults to N/A, so it counts as decided.
+      mockCheckIfFullyRemote.mockResolvedValue(true);
       (mockDb.sOADocument.update as jest.Mock).mockResolvedValue({
         id: 'doc-1',
         status: 'needs_review',
@@ -480,6 +496,56 @@ describe('SOAService', () => {
           approvedAt: null,
           declinedAt: null,
         }),
+      });
+    });
+
+    it('blocks submission while controls are not decided and names them', async () => {
+      (mockDb.member.findFirst as jest.Mock).mockResolvedValue({
+        id: 'mem-1',
+        userId: 'user-1',
+        role: 'owner',
+      });
+      (mockDb.user.findUnique as jest.Mock).mockResolvedValue({ role: 'user' });
+      (mockDb.sOADocument.findFirst as jest.Mock).mockResolvedValue({
+        id: 'doc-1',
+        status: 'in_progress',
+        configurationId: 'cfg-1',
+      });
+      (mockDb.sOAFrameworkConfiguration.findUnique as jest.Mock).mockResolvedValue({
+        questions: [
+          { id: 'q-1', columnMapping: { closure: '5.1' } },
+          { id: 'q-2', columnMapping: { closure: '5.2' } },
+        ],
+      });
+      (mockDb.sOAAnswer.findMany as jest.Mock).mockResolvedValue([
+        { questionId: 'q-1', isApplicable: null },
+      ]);
+      mockCheckIfFullyRemote.mockResolvedValue(false);
+      await expect(service.submitForApproval(dto)).rejects.toThrow('A.5.1, A.5.2');
+      expect(mockDb.sOADocument.update).not.toHaveBeenCalled();
+    });
+
+    it('records the submitting member as the preparer', async () => {
+      (mockDb.member.findFirst as jest.Mock)
+        .mockResolvedValueOnce({ id: 'mem-1', userId: 'user-1', role: 'owner' })
+        .mockResolvedValueOnce({ user: { name: 'Halim', email: 'h@x.io' } });
+      (mockDb.user.findUnique as jest.Mock).mockResolvedValue({ role: 'user' });
+      (mockDb.sOADocument.findFirst as jest.Mock).mockResolvedValue({
+        id: 'doc-1',
+        status: 'completed',
+        configurationId: 'cfg-1',
+      });
+      (mockDb.sOAFrameworkConfiguration.findUnique as jest.Mock).mockResolvedValue({
+        questions: [{ id: 'q-1', columnMapping: { closure: '5.1' } }],
+      });
+      (mockDb.sOAAnswer.findMany as jest.Mock).mockResolvedValue([
+        { questionId: 'q-1', isApplicable: false },
+      ]);
+      mockCheckIfFullyRemote.mockResolvedValue(false);
+      (mockDb.sOADocument.update as jest.Mock).mockResolvedValue({ id: 'doc-1' });
+      await service.submitForApproval(dto, 'user-2');
+      expect(mockDb.sOADocument.update.mock.calls[0][0].data).toMatchObject({
+        preparedBy: 'Halim',
       });
     });
   });
@@ -570,6 +636,8 @@ describe('SOAService', () => {
               // From the org's own answer — NOT the shared config's `true`.
               isApplicable: false,
               justification: 'Our own justification',
+              implementation: null,
+              inheritedFrom: null,
             },
             answer: 'Our own justification',
           },
@@ -583,6 +651,8 @@ describe('SOAService', () => {
               // No answer for this org → blank, not another org's data.
               isApplicable: null,
               justification: null,
+              implementation: null,
+              inheritedFrom: null,
             },
             answer: null,
           },

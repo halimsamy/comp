@@ -20,6 +20,7 @@ import { Suspense, useCallback, useMemo, useState } from 'react';
 import { AddCustomRequirementSheet } from './AddCustomRequirementSheet';
 import { EditCustomFrameworkSheet } from './EditCustomFrameworkSheet';
 import { FrameworkActionsMenu } from './FrameworkActionsMenu';
+import { FrameworkAuditCard } from './FrameworkAuditCard';
 import { FrameworkControls } from './FrameworkControls';
 import { FrameworkControlsGrouped } from './FrameworkControlsGrouped';
 import { FrameworkDeleteDialog } from './FrameworkDeleteDialog';
@@ -64,6 +65,7 @@ export function FrameworkDetailContent({
   };
 
   const frameworkName = framework.framework?.name ?? framework.customFramework?.name ?? 'Framework';
+  const descriptionLabel = /pci/i.test(frameworkName) ? 'Expected evidence' : 'Description';
   const frameworkDescription =
     framework.framework?.description ?? framework.customFramework?.description ?? '';
 
@@ -176,13 +178,18 @@ export function FrameworkDetailContent({
           hasActiveAudit={false}
         />
 
+        <FrameworkAuditCard orgId={orgId} frameworkInstanceId={frameworkInstanceId} frameworkName={frameworkName} />
+
         {!complianceTimelineEnabled && (
-          <FrameworkProgress scores={scores} />
+          <FrameworkProgress scores={scores} basePath={pathname} />
         )}
 
         {complianceTimelineEnabled && (
           <TabsContent value="progress">
-            <FrameworkTimeline frameworkInstanceId={frameworkInstanceId} />
+            <div className="flex flex-col gap-6">
+              <FrameworkProgress scores={scores} basePath={pathname} />
+              <FrameworkTimeline frameworkInstanceId={frameworkInstanceId} />
+            </div>
           </TabsContent>
         )}
 
@@ -196,11 +203,13 @@ export function FrameworkDetailContent({
               />
             </Suspense>
           ) : (
-            <FrameworkControls
-              frameworkInstanceWithControls={frameworkInstanceWithControls}
-              requirementDefinitions={requirementDefinitions}
-              scores={scores}
-            />
+            <Suspense>
+              <FrameworkControls
+                frameworkInstanceWithControls={frameworkInstanceWithControls}
+                requirementDefinitions={requirementDefinitions}
+                scores={scores}
+              />
+            </Suspense>
           )}
         </TabsContent>
 
@@ -210,13 +219,17 @@ export function FrameworkDetailContent({
               <FrameworkRequirementsGrouped
                 requirementDefinitions={requirementDefinitions}
                 scores={scores}
+                descriptionLabel={descriptionLabel}
               />
             </Suspense>
           ) : (
-            <FrameworkRequirements
-              requirementDefinitions={requirementDefinitions}
-              scores={scores}
-            />
+            <Suspense>
+              <FrameworkRequirements
+                requirementDefinitions={requirementDefinitions}
+                scores={scores}
+                descriptionLabel={descriptionLabel}
+              />
+            </Suspense>
           )}
         </TabsContent>
 

@@ -28,4 +28,14 @@ describe('requirements table layout', () => {
     );
     expect(REQUIREMENTS_TABLE_STYLE).toMatchObject({ tableLayout: 'fixed' });
   });
+
+  it('labels the description column "Expected evidence" when asked (PCI)', () => {
+    render(
+      <table>
+        <RequirementsTableHeader descriptionLabel="Expected evidence" />
+      </table>,
+    );
+    expect(screen.getByRole('columnheader', { name: 'Expected evidence' })).toBeInTheDocument();
+    expect(screen.queryByRole('columnheader', { name: 'Description' })).not.toBeInTheDocument();
+  });
 });

@@ -18,6 +18,7 @@ export type FrameworkInstanceWithControls = FrameworkInstance & {
       status: PolicyStatus;
     }>;
     requirementsMapped: RequirementMap[];
+    owner?: { id: string; deactivated: boolean; user: { name: string | null; email: string } } | null;
     controlDocumentTypes?: Array<{
       formType: string;
       isNotRelevant?: boolean;

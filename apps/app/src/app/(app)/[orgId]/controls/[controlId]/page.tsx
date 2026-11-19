@@ -1,86 +1,63 @@
 import { serverApi } from '@/lib/api-server';
-import { Breadcrumb, PageHeader, PageLayout } from '@trycompai/design-system';
-import type {
-  Control,
-  FrameworkEditorFramework,
-  FrameworkEditorRequirement,
-  FrameworkInstance,
-  Policy,
-  RequirementMap,
-  Task,
-} from '@db';
-import Link from 'next/link';
+import { PageHeader, PageHeaderDescription, PageLayout } from '@trycompai/design-system';
+import type { Control } from '@db';
 import { redirect } from 'next/navigation';
 import { ControlHeaderActions } from './components/ControlHeaderActions';
 import { ControlOwnerSelect, type ControlOwnerSummary } from './components/ControlOwnerSelect';
-import { SingleControl } from './components/SingleControl';
-import type { ControlProgressResponse } from './data/getOrganizationControlProgress';
+import { ControlEvidenceStatus, SingleControl, type UnifiedControl } from './components/SingleControl';
 
-type ControlDetail = Control & {
-  policies: Policy[];
-  tasks: Task[];
-  requirementsMapped: (RequirementMap & {
-    frameworkInstance: FrameworkInstance & {
-      framework: FrameworkEditorFramework;
-    };
-    requirement: FrameworkEditorRequirement;
-  })[];
-  progress: ControlProgressResponse;
-  owner: ControlOwnerSummary | null;
-};
+type ControlDetail = Control & UnifiedControl & { owner: ControlOwnerSummary | null };
 
 interface ControlPageProps {
-  params: {
-    controlId: string;
-    orgId: string;
-  };
+  params: Promise<{ controlId: string; orgId: string }>;
+  searchParams: Promise<{ framework?: string }>;
 }
 
-export default async function ControlPage({ params }: ControlPageProps) {
-  const { controlId, orgId } = await Promise.resolve(params);
+/** The one control page; framework pages link here with ?framework=<instance id>. */
+export default async function ControlPage({ params, searchParams }: ControlPageProps) {
+  const { controlId, orgId } = await params;
+  const { framework } = await searchParams;
 
-  const controlRes = await serverApi.get<ControlDetail>(
-    `/v1/controls/${controlId}`,
-  );
-
+  const controlRes = await serverApi.get<ControlDetail>(`/v1/controls/${controlId}`);
   if (!controlRes.data || controlRes.error) {
-    redirect('/');
+    redirect(`/${orgId}/controls`);
   }
-
   const control = controlRes.data;
-  const controlProgress: ControlProgressResponse = control.progress ?? {
-    total: 0,
-    completed: 0,
-    progress: 0,
-    byType: {},
-  };
+
+  // Only honour ?framework= for a framework this control is mapped in.
+  const fromFramework = control.requirementsMapped.find((r) => r.frameworkInstanceId === framework);
+  const frameworkName =
+    fromFramework?.frameworkInstance.framework?.name ?? fromFramework?.frameworkInstance.customFramework?.name;
+  const breadcrumbs = fromFramework
+    ? [
+        { label: 'Frameworks', href: `/${orgId}/frameworks` },
+        { label: frameworkName ?? 'Framework', href: `/${orgId}/frameworks/${fromFramework.frameworkInstanceId}` },
+        { label: control.name, isCurrent: true },
+      ]
+    : [
+        { label: 'Controls', href: `/${orgId}/controls` },
+        { label: control.name, isCurrent: true },
+      ];
 
   return (
     <PageLayout>
-      <Breadcrumb
-        items={[
-          {
-            label: 'Controls',
-            href: `/${orgId}/controls`,
-            props: { render: <Link href={`/${orgId}/controls`} /> },
-          },
-          { label: control.name, isCurrent: true },
-        ]}
-      />
       <PageHeader
         title={control.name}
+        breadcrumbs={breadcrumbs}
         actions={
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
             <ControlOwnerSelect controlId={control.id} owner={control.owner ?? null} />
             <ControlHeaderActions control={control} />
           </div>
         }
-      />
+      >
+        {control.description ? <PageHeaderDescription>{control.description}</PageHeaderDescription> : null}
+      </PageHeader>
+      <ControlEvidenceStatus controlId={control.id} />
       <SingleControl
+        orgId={orgId}
         control={control}
-        controlProgress={controlProgress}
-        relatedPolicies={control.policies}
-        relatedTasks={control.tasks}
+        frameworkInstanceId={fromFramework?.frameworkInstanceId ?? null}
       />
     </PageLayout>
   );

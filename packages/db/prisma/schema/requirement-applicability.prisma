@@ -24,6 +24,10 @@ model RequirementApplicability {
   status              RequirementApplicabilityStatus @default(applicable)
   justification       String?
   source              RequirementApplicabilitySource @default(manual)
+  // PCI DSS structured worksheet: Appendix C compensating-control worksheet or
+  // Appendix E customized-approach controls matrix; `sourceRequirementId` when
+  // cascaded from a parent requirement. Validated by a zod union in the API.
+  details             Json?
   updatedById         String?
   updatedBy           Member?                        @relation("RequirementApplicabilityUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
   createdAt           DateTime                       @default(now())

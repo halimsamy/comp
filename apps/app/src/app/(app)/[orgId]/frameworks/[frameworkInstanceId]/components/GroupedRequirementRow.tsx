@@ -7,6 +7,7 @@ import { Launch } from '@trycompai/design-system/icons';
 import Link from 'next/link';
 import { ExpandableDescription } from './ExpandableDescription';
 import type { RequirementItem } from './framework-controls-shared';
+import { stripIdentifier } from './requirement-name';
 
 export function GroupedRequirementRow({
   item,
@@ -22,6 +23,8 @@ export function GroupedRequirementRow({
   const status = getRequirementStatusBadge(item.status);
   const documents = documentCounts(item.artifactCounts);
   const identifier = item.identifier?.trim();
+  const name = stripIdentifier({ name: item.name, identifier });
+  const isNotApplicable = item.status === 'not_applicable';
   const href = `/${orgId}/frameworks/${frameworkInstanceId}/requirements/${item.id}`;
 
   return (
@@ -40,8 +43,8 @@ export function GroupedRequirementRow({
         </Link>
       </TableCell>
       <TableCell>
-        <span className="block truncate text-sm" title={item.name}>
-          {item.name}
+        <span className="block truncate text-sm" title={name}>
+          {name}
         </span>
       </TableCell>
       <TableCell>
@@ -52,6 +55,9 @@ export function GroupedRequirementRow({
         />
       </TableCell>
       <TableCell>
+        {isNotApplicable ? (
+          <Text size="sm" variant="muted">—</Text>
+        ) : (
         <div className="flex min-w-0 items-center gap-2">
           <div className="h-1.5 min-w-0 flex-1 rounded-full bg-muted/50">
             <div
@@ -65,6 +71,7 @@ export function GroupedRequirementRow({
             </Text>
           </div>
         </div>
+        )}
       </TableCell>
       <TableCell>
         <div className="flex flex-wrap items-center gap-1">

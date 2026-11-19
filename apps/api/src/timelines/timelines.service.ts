@@ -10,7 +10,8 @@ import {
   resolveTemplate,
   createInstanceFromTemplate,
 } from './timelines-template-resolver';
-import { getOverviewScores } from '../frameworks/frameworks-scores.helper';
+import { loadAuditWindows, loadTimelinePercentages } from './timeline-progress';
+import { type AuditWindow, projectPhases } from './timeline-projection';
 
 const AUTO_PHASE_TYPES = new Set([
   'AUTO_POLICIES',
@@ -54,23 +55,36 @@ export class TimelinesService {
       },
     });
 
-    // Enrich AUTO_* phases with live completion percentages in-memory.
-    const scores = await getOverviewScores(organizationId).catch(() => null);
-    if (!scores) return timelines;
+    // Enrich AUTO_* phases with each framework's live completion %, and
+    // project dates: overdue phases push later estimates out, an audit
+    // engagement pins the audit phase to its period.
+    const [pctMaps, audits] = await Promise.all([
+      loadTimelinePercentages({
+        organizationId,
+        frameworkInstanceIds: timelines.map((t) => t.frameworkInstanceId),
+      }).catch(() => new Map<string, Record<string, number>>()),
+      loadAuditWindows(organizationId).catch(() => new Map<string, AuditWindow>()),
+    ]);
+    const now = new Date();
 
-    const pctMap = this.buildAutoPctMap(scores);
-
-    for (const timeline of timelines) {
-      if (timeline.status !== 'ACTIVE') continue;
-      for (const phase of timeline.phases) {
-        const livePct = pctMap[phase.completionType];
-        if (livePct !== undefined) {
-          (phase as any).completionPercent = livePct;
-        }
-      }
-    }
-
-    return timelines;
+    return timelines.map((timeline) => {
+      const pctMap = pctMaps.get(timeline.frameworkInstanceId) ?? {};
+      const isActive = timeline.status === 'ACTIVE';
+      const phases = isActive
+        ? projectPhases({
+            phases: timeline.phases,
+            now,
+            audit: audits.get(timeline.frameworkInstanceId) ?? null,
+          })
+        : timeline.phases.map((phase) => ({ ...phase, isOverdue: false }));
+      return {
+        ...timeline,
+        phases: phases.map((phase) => {
+          const livePct = isActive ? pctMap[phase.completionType] : undefined;
+          return livePct === undefined ? phase : { ...phase, completionPercent: livePct };
+        }),
+      };
+    });
   }
 
   /**
@@ -85,11 +99,6 @@ export class TimelinesService {
     organizationId: string,
     options: TimelinesQueryOptions = {},
   ): Promise<void> {
-    const scores = await getOverviewScores(organizationId).catch(() => null);
-    if (!scores) return;
-
-    const pctMap = this.buildAutoPctMap(scores);
-
     const fetchTimelines = () =>
       db.timelineInstance.findMany({
         where: { organizationId },
@@ -97,6 +106,11 @@ export class TimelinesService {
       });
 
     let timelines = await fetchTimelines();
+    const pctMaps = await loadTimelinePercentages({
+      organizationId,
+      frameworkInstanceIds: timelines.map((t) => t.frameworkInstanceId),
+    }).catch(() => null);
+    if (!pctMaps) return;
 
     const maxSyncPasses = 20;
     for (let pass = 0; pass < maxSyncPasses; pass++) {
@@ -107,6 +121,7 @@ export class TimelinesService {
           continue;
         }
 
+        const pctMap = pctMaps.get(timeline.frameworkInstanceId) ?? {};
         const locked =
           timeline.status === 'COMPLETED' || !!timeline.lockedAt;
         const canAutoTransition = timeline.status === 'ACTIVE' && !locked;
@@ -201,20 +216,6 @@ export class TimelinesService {
       if (!changed) break;
       timelines = await fetchTimelines();
     }
-  }
-
-  private buildAutoPctMap(scores: {
-    policies: { total: number; published: number };
-    tasks: { total: number; done: number };
-    people: { total: number; completed: number };
-  }): Record<string, number> {
-    const pct = (num: number, den: number) =>
-      den > 0 ? Math.round((num / den) * 100) : 0;
-    return {
-      AUTO_POLICIES: pct(scores.policies.published, scores.policies.total),
-      AUTO_TASKS: pct(scores.tasks.done, scores.tasks.total),
-      AUTO_PEOPLE: pct(scores.people.completed, scores.people.total),
-    };
   }
 
   private async reopenFromRegressedPhase(

@@ -3,32 +3,17 @@
 import { Card } from '@trycompai/ui';
 import { Button } from '@trycompai/design-system';
 import { ChevronUp, ChevronDown } from '@trycompai/design-system/icons';
+import type { SoaRowLink } from '../hooks/useSoaRequirementLinks';
 import type {
   SOAFieldSavePayload,
   SOAProcessedResult,
   SOATableAnswerData,
 } from './EditableSOAFields';
+import { SOA_COLUMN_LABELS, type SOAColumn, type SOAQuestion } from './soa-row-types';
 import { SOATableRow } from './SOATableRow';
 import { SOAMobileRow } from './SOAMobileRow';
 
 export type { SOATableAnswerData };
-
-type SOAColumn = {
-  name: string;
-  type: 'string' | 'boolean' | 'text';
-};
-
-type SOAQuestion = {
-  id: string;
-  text: string;
-  columnMapping: {
-    closure: string;
-    title: string;
-    control_objective: string | null;
-    isApplicable: boolean | null;
-    justification?: string | null;
-  };
-};
 
 interface SOATableProps {
   columns: SOAColumn[];
@@ -42,18 +27,21 @@ interface SOATableProps {
   documentId: string;
   isPendingApproval: boolean;
   organizationId: string;
+  rowLinks: Map<string, SoaRowLink>;
   onAnswerUpdate?: (questionId: string, payload: SOAFieldSavePayload) => void;
 }
 
-const columnLabelMap: Record<string, string> = {
-  title: 'Control',
-  control_objective: 'Control Objective',
-  isApplicable: 'Applicable',
-  justification: 'Justification',
-};
+/** The configured columns plus the read-only Implementation column after Applicable. */
+export function withImplementationColumn(columns: SOAColumn[]): SOAColumn[] {
+  if (columns.some((c) => c.name === 'implementation')) return columns;
+  const at = columns.findIndex((c) => c.name === 'isApplicable');
+  const implementation: SOAColumn = { name: 'implementation', type: 'string' };
+  if (at < 0) return [...columns, implementation];
+  return [...columns.slice(0, at + 1), implementation, ...columns.slice(at + 1)];
+}
 
 export function SOATable({
-  columns,
+  columns: configuredColumns,
   questions,
   answersMap,
   questionStatuses,
@@ -64,8 +52,10 @@ export function SOATable({
   documentId,
   isPendingApproval,
   organizationId,
+  rowLinks,
   onAnswerUpdate,
 }: SOATableProps) {
+  const columns = withImplementationColumn(configuredColumns);
   const displayedQuestions = isExpanded ? questions : questions.slice(0, 5);
   const hasMoreQuestions = questions.length > 5;
 
@@ -79,14 +69,23 @@ export function SOATable({
     documentId,
     isPendingApproval,
     organizationId,
+    link: rowLinks.get(question.columnMapping.closure),
     onUpdate: (payload: SOAFieldSavePayload) => onAnswerUpdate?.(question.id, payload),
   });
+
+  if (questions.length === 0) {
+    return (
+      <Card className="p-8 text-center text-sm text-muted-foreground">
+        Every control has a decision.
+      </Card>
+    );
+  }
 
   return (
     <Card className="overflow-hidden">
       {/* Desktop table */}
       <div className="hidden lg:block overflow-x-auto">
-        <table className="w-full border-separate border-spacing-0" style={{ minWidth: '800px' }}>
+        <table className="w-full border-separate border-spacing-0" style={{ minWidth: '900px' }}>
           <colgroup>
             {columns.map((column) => (
               <col key={column.name} style={{ width: getColumnWidth(column.name) }} />
@@ -98,10 +97,10 @@ export function SOATable({
                 <th
                   key={column.name}
                   className={`py-4 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground ${
-                    index === 0 ? 'pl-6 pr-6' : index === columns.length - 1 ? 'px-6 pr-6' : 'px-6'
+                    index === 0 ? 'pl-6 pr-6' : 'px-6'
                   }`}
                 >
-                  {columnLabelMap[column.name] ?? column.name.replace(/_/g, ' ')}
+                  {SOA_COLUMN_LABELS[column.name] ?? column.name.replace(/_/g, ' ')}
                 </th>
               ))}
             </tr>
@@ -139,10 +138,12 @@ export function SOATable({
 
 function getColumnWidth(colName: string): string {
   switch (colName) {
-    case 'isApplicable': return '15%';
-    case 'title': return '20%';
-    case 'control_objective': return '35%';
-    case 'justification': return '30%';
-    default: return '20%';
+    case 'closure': return '8%';
+    case 'isApplicable': return '12%';
+    case 'implementation': return '10%';
+    case 'title': return '15%';
+    case 'control_objective': return '30%';
+    case 'justification': return '25%';
+    default: return '15%';
   }
 }

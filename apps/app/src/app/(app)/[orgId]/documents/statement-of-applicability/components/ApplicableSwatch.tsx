@@ -8,7 +8,7 @@ export function ApplicableSwatchRow({ isApplicable }: { isApplicable: boolean | 
       : isApplicable === false
         ? 'bg-red-600 dark:bg-red-400'
         : 'bg-gray-400 dark:bg-gray-500';
-  const label = isApplicable === true ? 'Yes' : isApplicable === false ? 'No' : '\u2014';
+  const label = isApplicable === true ? 'Yes' : isApplicable === false ? 'No' : 'Not decided';
 
   return (
     <span className="flex items-center gap-2 text-sm text-foreground">

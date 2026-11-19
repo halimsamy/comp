@@ -1,7 +1,7 @@
 'use client';
 
 import { Card } from '@trycompai/ui';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useSOAAutoFill } from '../hooks/useSOAAutoFill';
 import { useSOADocument } from '../hooks/useSOADocument';
@@ -10,8 +10,12 @@ import { SOADocumentInfo } from './SOADocumentInfo';
 import { SOAPendingApprovalAlert } from './SOAPendingApprovalAlert';
 import { SubmitApprovalDialog } from './SubmitApprovalDialog';
 import { SOATable } from './SOATable';
-import type { SOAFieldSavePayload, SOATableAnswerData } from './EditableSOAFields';
+import type { SOAFieldSavePayload } from './EditableSOAFields';
 import type { FrameworkWithLatestDocument } from '../types';
+import { useSoaRequirementLinks } from '../hooks/useSoaRequirementLinks';
+import { listUndecidedCodes, toAnnexCode } from './soa-display';
+import { toAnswersMap, withAnsweredCount } from './soa-document-cache';
+import type { SOAColumn, SOAQuestion } from './soa-row-types';
 
 type Framework = FrameworkWithLatestDocument['framework'];
 type Configuration = FrameworkWithLatestDocument['configuration'];
@@ -34,42 +38,8 @@ interface SOAFrameworkTableProps {
   canCurrentUserApprove?: boolean;
   currentMemberId?: string | null;
   ownerAdminMembers?: (Member & { user: User })[];
-}
-
-type SOAColumn = {
-  name: string;
-  type: 'string' | 'boolean' | 'text';
-};
-
-type SOAQuestion = {
-  id: string;
-  text: string;
-  columnMapping: {
-    closure: string;
-    title: string;
-    control_objective: string | null;
-    isApplicable: boolean | null;
-    justification?: string | null;
-  };
-};
-
-type SOAAnswerRecord = {
-  questionId: string;
-  answer: string | null;
-  isApplicable: boolean | null;
-  answerVersion: number;
-};
-
-// Map a persisted answer to row state. `isApplicable` carries the persisted
-// value; `savedIsApplicable` is deliberately left unset here — it is reserved
-// for a manual save this session (set in handleAnswerUpdate) so it doesn't
-// shadow in-session autofill results in resolveSoaDisplay.
-function toAnswerData(answer: SOAAnswerRecord): SOATableAnswerData {
-  return {
-    answer: answer.answer,
-    answerVersion: answer.answerVersion,
-    isApplicable: answer.isApplicable,
-  };
+  /** The org's ISO 27001 instance, for requirement links and implementation status. */
+  frameworkInstanceId?: string | null;
 }
 
 type SOADocumentInfoDocument = Parameters<typeof SOADocumentInfo>[0]['document'];
@@ -86,8 +56,16 @@ export function SOAFrameworkTable({
   canCurrentUserApprove = false,
   currentMemberId = null,
   ownerAdminMembers = [],
+  frameworkInstanceId = null,
 }: SOAFrameworkTableProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [showUndecidedOnly, setShowUndecidedOnly] = useState(false);
+  const rowLinks = useSoaRequirementLinks({ orgId: organizationId, frameworkInstanceId });
+
+  // Deep links from requirement pages (#A.5.1) need the full table.
+  useEffect(() => {
+    if (window.location.hash.startsWith('#A.')) setIsExpanded(true);
+  }, []);
 
   const {
     document: swrDocument,
@@ -116,31 +94,13 @@ export function SOAFrameworkTable({
   const columns = configuration.columns as SOAColumn[];
   const questions = configuration.questions as SOAQuestion[];
 
-  // Create answers map from document answers. Applicability + justification are
-  // per-organization values that live on the answer, so the table reads them
-  // from here — never from the shared framework configuration.
-  const [answersMap, setAnswersMap] = useState<Map<string, SOATableAnswerData>>(() => {
-    return new Map(
-      (document?.answers || []).map((answer: SOAAnswerRecord) => [
-        answer.questionId,
-        toAnswerData(answer),
-      ])
-    );
-  });
+  // Applicability + justification are per-organization values that live on the
+  // answer, so the table reads them from here — never from the shared configuration.
+  const [answersMap, setAnswersMap] = useState(() => toAnswersMap(document?.answers));
 
   // Update answersMap when the live document changes
   useEffect(() => {
-    if (!Array.isArray(resolvedDocument?.answers)) {
-      return;
-    }
-    setAnswersMap(
-      new Map(
-        resolvedDocument.answers.map((answer: SOAAnswerRecord) => [
-          answer.questionId,
-          toAnswerData(answer),
-        ])
-      )
-    );
+    if (Array.isArray(resolvedDocument?.answers)) setAnswersMap(toAnswersMap(resolvedDocument.answers));
   }, [resolvedDocument?.answers]);
 
   const handleAnswerUpdate = (questionId: string, payload: SOAFieldSavePayload) => {
@@ -158,43 +118,22 @@ export function SOAFrameworkTable({
         answer: payload.justification,
         answerVersion: existing ? existing.answerVersion + 1 : 1,
         savedIsApplicable: payload.isApplicable,
+        inheritedVendorId: payload.inheritedVendorId ?? null,
       });
       return newMap;
     });
 
-    void mutateSOADocument((current) => {
-      if (!current) return current;
-
-      const totalQuestions = current.totalQuestions as number | undefined;
-      const currentAnsweredQuestions = current.answeredQuestions as number | undefined;
-
-      if (
-        typeof totalQuestions !== 'number' ||
-        typeof currentAnsweredQuestions !== 'number'
-      ) {
-        return current;
-      }
-
-      const nextIsApplicable = payload.isApplicable ?? null;
-      let answeredQuestions = currentAnsweredQuestions;
-
-      if (previousIsApplicable === null && nextIsApplicable !== null) {
-        answeredQuestions += 1;
-      } else if (previousIsApplicable !== null && nextIsApplicable === null) {
-        answeredQuestions -= 1;
-      }
-
-      answeredQuestions = Math.max(0, Math.min(totalQuestions, answeredQuestions));
-
-      return {
-        ...current,
-        answeredQuestions,
-        status: answeredQuestions === totalQuestions ? 'completed' : 'in_progress',
-        approverId: null,
-        approvedAt: null,
-        declinedAt: null,
-      };
-    }, false);
+    const nextIsApplicable = payload.isApplicable ?? null;
+    const delta =
+      previousIsApplicable === null && nextIsApplicable !== null
+        ? 1
+        : previousIsApplicable !== null && nextIsApplicable === null
+          ? -1
+          : 0;
+    void mutateSOADocument(
+      (current) => withAnsweredCount(current, { answered: (count) => count + delta }),
+      false,
+    );
   };
 
   const [isSubmitApprovalDialogOpen, setIsSubmitApprovalDialogOpen] = useState(false);
@@ -203,49 +142,27 @@ export function SOAFrameworkTable({
   const [isDeclining, setIsDeclining] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Map questions to match hook's expected type
-  const questionsForHook = useMemo(() => {
-    return questions.map((q) => ({
-      ...q,
-      columnMapping: {
-        ...q.columnMapping,
-        justification: q.columnMapping.justification ?? null,
-      },
-    }));
-  }, [questions]);
-
   const { isAutoFilling: isAutoFillingSSE, questionStatuses, processedResults, triggerAutoFill } = useSOAAutoFill({
-    questions: questionsForHook,
+    questions,
     documentId: document?.id || '',
     organizationId,
     onUpdate: ({ total, answered } = {}) => {
       // Keep SOA info card in sync immediately after auto-fill completion.
-      void mutateSOADocument((current) => {
-        if (!current) return current;
-        const totalQuestions =
-          typeof total === 'number' ? total : (current.totalQuestions as number | undefined);
-        const answeredQuestions =
-          typeof answered === 'number'
-            ? answered
-            : (current.answeredQuestions as number | undefined);
-
-        if (typeof totalQuestions !== 'number' || typeof answeredQuestions !== 'number') {
-          return current;
-        }
-
-        return {
-          ...current,
-          totalQuestions,
-          answeredQuestions,
-          status:
-            answeredQuestions === totalQuestions ? 'completed' : 'in_progress',
-          approverId: null,
-          approvedAt: null,
-          declinedAt: null,
-        };
-      }, false);
+      void mutateSOADocument((current) => withAnsweredCount(current, { total, answered }), false);
     },
   });
+
+  const undecidedCodes = listUndecidedCodes({
+    questions,
+    answersMap,
+    processedResults,
+    isFullyRemote,
+  });
+  const undecided = new Set(undecidedCodes);
+  const undecidedQuestions = questions.filter((q) =>
+    undecided.has(toAnnexCode(q.columnMapping.closure)),
+  );
+  const visibleQuestions = showUndecidedOnly ? undecidedQuestions : questions;
 
   // Document should always exist at this point
   if (!document) {
@@ -261,50 +178,61 @@ export function SOAFrameworkTable({
   // Use the resolved SWR document so approval status updates instantly without page refresh.
   const docForInfo = resolvedDocument as unknown as SOADocumentInfoDocument;
 
-  const handleAutoFill = async () => {
-    if (!document) return;
-    triggerAutoFill();
-  };
+  const handleAutoFill = () => triggerAutoFill();
+  const handleFillRemaining = () =>
+    triggerAutoFill({ questionIds: undecidedQuestions.map((q) => q.id) });
 
-  const handleApprove = async () => {
-    if (!document) return;
-    setIsApproving(true);
+  const runWithToast = async ({
+    action,
+    setBusy,
+    success,
+    failure,
+  }: {
+    action: () => Promise<unknown>;
+    setBusy: (busy: boolean) => void;
+    success: string;
+    failure: string;
+  }) => {
+    setBusy(true);
     try {
-      await approve();
-      toast.success('SOA document approved successfully');
+      await action();
+      toast.success(success);
+      return true;
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to approve SOA document');
+      toast.error(error instanceof Error ? error.message : failure);
+      return false;
     } finally {
-      setIsApproving(false);
+      setBusy(false);
     }
   };
 
-  const handleDecline = async () => {
-    if (!document) return;
-    setIsDeclining(true);
-    try {
-      await decline();
-      toast.success('SOA document declined successfully');
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to decline SOA document');
-    } finally {
-      setIsDeclining(false);
-    }
-  };
+  const handleApprove = () =>
+    runWithToast({
+      action: approve,
+      setBusy: setIsApproving,
+      success: 'SOA document approved successfully',
+      failure: 'Failed to approve SOA document',
+    });
+
+  const handleDecline = () =>
+    runWithToast({
+      action: decline,
+      setBusy: setIsDeclining,
+      success: 'SOA document declined successfully',
+      failure: 'Failed to decline SOA document',
+    });
 
   const handleSubmitForApproval = async () => {
-    if (!document || !selectedApproverId) return;
-    setIsSubmitting(true);
-    try {
-      await submitForApproval(selectedApproverId);
-      toast.success('SOA document submitted for approval successfully');
-      setIsSubmitApprovalDialogOpen(false);
-      setSelectedApproverId(null);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to submit SOA document for approval');
-    } finally {
-      setIsSubmitting(false);
-    }
+    if (!selectedApproverId) return;
+    const ok = await runWithToast({
+      action: () => submitForApproval(selectedApproverId),
+      setBusy: setIsSubmitting,
+      success: 'SOA document submitted for approval successfully',
+      failure: 'Failed to submit SOA document for approval',
+    });
+    if (!ok) return;
+    setIsSubmitApprovalDialogOpen(false);
+    setSelectedApproverId(null);
   };
 
   return (
@@ -331,13 +259,17 @@ export function SOAFrameworkTable({
         canApprove={canApprove}
         isAutoFillingSSE={isAutoFillingSSE}
         onAutoFill={handleAutoFill}
+        onFillRemaining={handleFillRemaining}
+        undecidedCodes={undecidedCodes}
+        showUndecidedOnly={showUndecidedOnly}
+        onToggleUndecidedOnly={() => setShowUndecidedOnly((v) => !v)}
         onSubmitForApproval={() => setIsSubmitApprovalDialogOpen(true)}
       />
 
       {/* Table */}
       <SOATable
         columns={columns}
-        questions={questions}
+        questions={visibleQuestions}
         answersMap={answersMap}
         questionStatuses={questionStatuses}
         processedResults={processedResults}
@@ -347,6 +279,7 @@ export function SOAFrameworkTable({
         documentId={resolvedDocument?.id ?? document.id}
         isPendingApproval={derivedIsPendingApproval}
         organizationId={organizationId}
+        rowLinks={rowLinks}
         onAnswerUpdate={handleAnswerUpdate}
       />
 

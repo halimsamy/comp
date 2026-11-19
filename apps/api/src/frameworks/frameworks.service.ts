@@ -8,6 +8,7 @@ import { db, type EvidenceFormType } from '@db';
 
 import { tasks } from '@trycompai/jobs';
 import { getOverviewScores, getCurrentMember } from './frameworks-scores.helper';
+import { controlSummarySelect } from '../controls/control-requirements';
 import { loadFrameworkScores } from './scoring/framework-scoring.loader';
 import { loadInstanceScoring, loadRequirementScoring } from './scoring/requirement-scoring';
 import { upsertOrgFrameworkStructure } from './frameworks-upsert.helper';
@@ -179,6 +180,7 @@ export class FrameworksService {
                   select: { controlFamily: true },
                   take: 1,
                 },
+                owner: controlSummarySelect.owner,
               },
             },
           },

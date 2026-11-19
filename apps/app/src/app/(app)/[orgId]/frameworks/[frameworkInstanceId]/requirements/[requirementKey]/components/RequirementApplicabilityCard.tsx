@@ -6,7 +6,13 @@ import { Badge, Button, Card, Text } from '@trycompai/design-system';
 import { Edit } from '@trycompai/design-system/icons';
 import Link from 'next/link';
 import { useState } from 'react';
-import type { ApplicabilityRecord, ApplicabilityRules } from './applicability-schema';
+import {
+  type ApplicabilityRecord,
+  type ApplicabilityRules,
+  toFormValues,
+} from './applicability-schema';
+import { ApplicabilityDetailsSummary } from './ApplicabilityDetailsSummary';
+import type { ControlOption } from './CompensatingControlFields';
 import { RequirementApplicabilitySheet } from './RequirementApplicabilitySheet';
 
 const STATUS_VARIANT: Record<ApplicabilityStatus, 'default' | 'secondary' | 'outline'> = {
@@ -30,18 +36,27 @@ export function RequirementApplicabilityCard({
   requirementKey,
   record,
   rules,
+  identifier = null,
+  childCount = 0,
+  controlOptions = [],
 }: {
   orgId: string;
   frameworkInstanceId: string;
   requirementKey: string;
   record: ApplicabilityRecord | null;
   rules: ApplicabilityRules;
+  identifier?: string | null;
+  childCount?: number;
+  controlOptions?: ControlOption[];
 }) {
   const { hasPermission } = usePermissions();
   const [isOpen, setIsOpen] = useState(false);
   const status: ApplicabilityStatus = record?.status ?? 'applicable';
   const canEdit = rules.editable && hasPermission('framework', 'update');
   const updatedBy = record?.updatedBy?.user?.name || record?.updatedBy?.user?.email;
+  // Annex A rows without an SoA answer have no record: nothing is decided yet.
+  const notDecided = rules.managedBy === 'soa' && !record;
+  const soaHref = `/${orgId}/documents/statement-of-applicability${identifier ? `#${identifier}` : ''}`;
 
   return (
     <Card width="full" size="sm">
@@ -51,9 +66,15 @@ export function RequirementApplicabilityCard({
             <Text size="sm" weight="medium">
               Applicability
             </Text>
-            <Badge variant={STATUS_VARIANT[status]}>{APPLICABILITY_LABELS[status]}</Badge>
+            <Badge variant={notDecided ? 'outline' : STATUS_VARIANT[status]}>
+              {notDecided ? 'Not decided' : APPLICABILITY_LABELS[status]}
+            </Badge>
           </div>
-          {record?.justification ? (
+          {notDecided ? (
+            <Text size="sm" variant="muted">
+              Not decided in the SoA yet. Until it is, the requirement counts as applicable.
+            </Text>
+          ) : record?.justification ? (
             <Text size="sm">{record.justification}</Text>
           ) : (
             <Text size="sm" variant="muted">
@@ -62,6 +83,7 @@ export function RequirementApplicabilityCard({
                 : 'No justification recorded.'}
             </Text>
           )}
+          <ApplicabilityDetailsSummary details={record?.details} controlOptions={controlOptions} />
           {record ? (
             <Text size="xs" variant="muted">
               {record.source === 'soa' ? 'From the Statement of Applicability' : 'Set manually'}
@@ -74,7 +96,7 @@ export function RequirementApplicabilityCard({
             </Text>
           ) : null}
         </div>
-        <div className="shrink-0">
+        <div className="flex shrink-0 flex-col items-start gap-2 sm:items-end">
           {canEdit ? (
             <Button
               size="sm"
@@ -86,11 +108,8 @@ export function RequirementApplicabilityCard({
             </Button>
           ) : null}
           {rules.managedBy === 'soa' ? (
-            <Link
-              href={`/${orgId}/documents/statement-of-applicability`}
-              className="text-sm text-primary hover:underline"
-            >
-              Open Statement of Applicability
+            <Link href={soaHref} className="text-sm text-primary hover:underline">
+              {notDecided ? 'Decide in the Statement of Applicability' : 'Open Statement of Applicability'}
             </Link>
           ) : null}
         </div>
@@ -102,7 +121,9 @@ export function RequirementApplicabilityCard({
           frameworkInstanceId={frameworkInstanceId}
           requirementKey={requirementKey}
           rules={rules}
-          defaultValues={{ status, justification: record?.justification ?? '' }}
+          defaultValues={toFormValues({ status, record })}
+          childCount={childCount}
+          controlOptions={controlOptions}
         />
       ) : null}
     </Card>

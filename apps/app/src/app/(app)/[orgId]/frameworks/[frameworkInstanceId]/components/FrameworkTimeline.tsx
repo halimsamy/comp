@@ -150,7 +150,9 @@ function PhaseCard({
 
   const borderClass = isCompleted
     ? 'border-primary/30 bg-primary/5'
-    : isActive
+    : phase.isOverdue
+      ? 'border-destructive/60 bg-destructive/5'
+      : isActive
       ? 'border-primary/50 bg-primary/10'
       : 'border-border bg-muted/30 opacity-70';
 
@@ -166,6 +168,10 @@ function PhaseCard({
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium">{phase.name}</span>
             <StatusBadge status={phase.status} />
+            {phase.isOverdue && <span className="text-xs font-medium text-destructive">Overdue</span>}
+            {isActive && phase.completionPercent !== undefined && (
+              <span className="text-xs tabular-nums text-muted-foreground">{phase.completionPercent}% done</span>
+            )}
           </div>
           {phase.description && (
             <div>
@@ -249,9 +255,11 @@ function PhaseMetadata({ phase }: { phase: TimelinePhase }) {
             <span>Started {formatDate(phase.startDate)}</span>
           )}
           {phase.endDate && (
-            <span>Due {formatDate(phase.endDate)}</span>
+            <span className={phase.isOverdue ? 'font-medium text-destructive' : undefined}>
+              {phase.isOverdue ? 'Was due' : 'Due'} {formatDate(phase.endDate)}
+            </span>
           )}
-          {getTimeRemaining(phase.endDate) && (
+          {!phase.isOverdue && getTimeRemaining(phase.endDate) && (
             <span className="font-medium text-primary">
               {getTimeRemaining(phase.endDate)}
             </span>

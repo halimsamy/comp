@@ -31,7 +31,7 @@ export class RequirementApplicabilityController {
   @ApiOperation({
     summary: 'Set requirement applicability',
     description:
-      'Marks a framework requirement applicable, not applicable, or (PCI DSS) met by compensating controls or the customized approach. A justification is required unless applicable. Scoring excludes N/A.',
+      'Marks a framework requirement applicable, not applicable, or (PCI DSS) met by compensating controls or the customized approach. A justification is required unless applicable; compensating and customized need their PCI worksheet in `details`. ISO 27001 Annex A changes are written to the Statement of Applicability. `applyToChildren` cascades N/A to sub-requirements. Scoring excludes N/A.',
   })
   @ApiBody({ type: SetRequirementApplicabilityDto })
   async set(
@@ -46,6 +46,7 @@ export class RequirementApplicabilityController {
       frameworkInstanceId: id,
       requirementKey,
       memberId: authContext.memberId ?? null,
+      userId: authContext.userId ?? null,
       dto,
     });
   }

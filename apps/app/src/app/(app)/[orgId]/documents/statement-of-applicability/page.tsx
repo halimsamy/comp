@@ -162,6 +162,7 @@ export default async function StatementOfApplicabilityPage({
           canCurrentUserApprove,
           currentMemberId: currentMember?.id || null,
           ownerAdminMembers,
+          frameworkInstanceId: isoFrameworkInstance.id,
         } as SOAData;
       } else if (!soaError) {
         soaError =

@@ -31,6 +31,8 @@ import {
   type RequirementFamilyGroup,
 } from './framework-controls-shared';
 import { GroupedRequirementRow } from './GroupedRequirementRow';
+import { filterRequirementItems } from './table-filters';
+import { RequirementTableFilters, useRequirementTableFilters } from './TableFilters';
 import {
   REQUIREMENTS_TABLE_COLUMN_COUNT,
   REQUIREMENTS_TABLE_STYLE,
@@ -41,9 +43,11 @@ import {
 export function FrameworkRequirementsGrouped({
   requirementDefinitions,
   scores,
+  descriptionLabel,
 }: {
   requirementDefinitions: FrameworkEditorRequirement[];
   scores: FrameworkScores | null | undefined;
+  descriptionLabel?: string;
 }) {
   const { orgId, frameworkInstanceId } = useParams<{
     orgId: string;
@@ -67,6 +71,7 @@ export function FrameworkRequirementsGrouped({
     parseAsArrayOf(parseAsString, '|').withDefault([]).withOptions({ shallow: true }),
   );
   const [expandedFamilies, setExpandedFamilies] = useState<Set<string>>(new Set());
+  const tableFilters = useRequirementTableFilters();
 
   const selectedFamilyFilter = useMemo(() => new Set(familyFilterParam), [familyFilterParam]);
 
@@ -76,15 +81,20 @@ export function FrameworkRequirementsGrouped({
   );
 
   const filteredItems = useMemo(() => {
-    if (!searchTerm.trim()) return allItems;
+    const narrowed = filterRequirementItems({
+      items: allItems,
+      status: tableFilters.status,
+      applicability: tableFilters.applicability,
+    });
+    if (!searchTerm.trim()) return narrowed;
     const lower = searchTerm.toLowerCase();
-    return allItems.filter(
+    return narrowed.filter(
       (item) =>
         item.name.toLowerCase().includes(lower) ||
         item.identifier?.toLowerCase().includes(lower) ||
         item.description?.toLowerCase().includes(lower),
     );
-  }, [allItems, searchTerm]);
+  }, [allItems, searchTerm, tableFilters.status, tableFilters.applicability]);
 
   const allGroups = useMemo(() => groupRequirementsByFamily(filteredItems), [filteredItems]);
 
@@ -99,7 +109,7 @@ export function FrameworkRequirementsGrouped({
     [allGroups],
   );
 
-  const isSearching = searchTerm.trim().length > 0;
+  const isSearching = searchTerm.trim().length > 0 || tableFilters.isActive;
   const visibleFamilyNames = useMemo(() => groups.map((g) => g.family), [groups]);
   const allExpanded = areAllFamiliesExpanded({
     expandedFamilies,
@@ -140,7 +150,7 @@ export function FrameworkRequirementsGrouped({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="w-full max-w-sm">
           <InputGroup>
             <InputGroupAddon>
@@ -160,15 +170,17 @@ export function FrameworkRequirementsGrouped({
           onToggleFamily={handleToggleFamilyFilter}
           onClear={handleClearFamilyFilter}
         />
+        <RequirementTableFilters filters={tableFilters} />
         {!isSearching && (
           <Button variant="ghost" onClick={handleToggleAll}>
             {allExpanded ? 'Collapse All' : 'Expand All'}
           </Button>
         )}
       </div>
+      <div className="overflow-x-auto">
       <Table variant="bordered" style={REQUIREMENTS_TABLE_STYLE}>
         <RequirementsTableColumnGroup />
-        <RequirementsTableHeader />
+        <RequirementsTableHeader descriptionLabel={descriptionLabel} />
         <TableBody>
           {groups.length === 0 ? (
             <TableRow>
@@ -193,6 +205,7 @@ export function FrameworkRequirementsGrouped({
           )}
         </TableBody>
       </Table>
+      </div>
     </div>
   );
 }

@@ -56,6 +56,7 @@ export function useSOADocument({ documentId, organizationId, fallbackData }: Use
     answer: string | null;
     isApplicable: boolean | null;
     justification: string | null;
+    inheritedVendorId?: string | null;
   }): Promise<boolean> => {
     if (!documentId) throw new Error('No document ID');
 

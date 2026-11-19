@@ -5,16 +5,12 @@ import type { ControlOverview } from '@/hooks/use-controls-overview';
 import {
   DataTableFilters,
   DataTableHeader,
+  Checkbox,
   DataTableSearch,
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyTitle,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   Table,
   TableBody,
   TableCell,
@@ -25,6 +21,7 @@ import {
 } from '@trycompai/design-system';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import {
   ALL,
   type ControlsFilters,
@@ -35,43 +32,24 @@ import {
   STATUS_LABEL,
   UNASSIGNED,
 } from '../lib/controls-overview';
+import { type BulkSetOwner, ControlsBulkBar } from './ControlsBulkBar';
 import { ControlStatusPill, EvidenceCount } from './ControlStatusPill';
+import { FilterSelect } from './FilterSelect';
+import { OwnerSelect, UNASSIGNED_OWNER } from './OwnerSelect';
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100];
 
-type Option = { value: string; label: string };
-
-function FilterSelect({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  options: Option[];
-  onChange: (value: string) => void;
-}) {
-  return (
-    <div className="w-full sm:w-44">
-      <Select items={options} value={value} onValueChange={(v) => onChange(String(v ?? ALL))}>
-        <SelectTrigger aria-label={label}>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent align="start">
-          {options.map((o) => (
-            <SelectItem key={o.value} value={o.value}>
-              {o.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
-}
-
 /** Vanta-style controls list: requirement chips across frameworks, owner, evidence, status. */
-export function ControlsOverviewTable({ controls }: { controls: ControlOverview[] }) {
+export function ControlsOverviewTable({
+  controls,
+  canEdit = false,
+  bulkSetOwner,
+}: {
+  controls: ControlOverview[];
+  /** control:update: row checkboxes, bulk bar and inline owner select. */
+  canEdit?: boolean;
+  bulkSetOwner?: BulkSetOwner;
+}) {
   const router = useRouter();
   const { orgId } = useParams<{ orgId: string }>();
   const [filters, setFilters] = useState<ControlsFilters>(EMPTY_FILTERS);
@@ -84,6 +62,34 @@ export function ControlsOverviewTable({ controls }: { controls: ControlOverview[
   const rows = filtered.slice((page - 1) * pageSize, page * pageSize);
 
   useEffect(() => setPage(1), [filters, pageSize]);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const editable = canEdit && !!bulkSetOwner;
+  const allOnPageSelected = rows.length > 0 && rows.every((r) => selected.has(r.id));
+
+  const handleToggleRow = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const handleTogglePage = () =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (const r of rows) {
+        if (allOnPageSelected) next.delete(r.id);
+        else next.add(r.id);
+      }
+      return next;
+    });
+  const handleRowOwner = async ({ controlId, ownerId }: { controlId: string; ownerId: string | null }) => {
+    if (!bulkSetOwner) return;
+    try {
+      await bulkSetOwner({ controlIds: [controlId], ownerId });
+    } catch {
+      toast.error('Failed to update owner');
+    }
+  };
 
   const handleFilter = (key: keyof ControlsFilters) => (value: string) =>
     setFilters((current) => ({ ...current, [key]: value }));
@@ -132,6 +138,14 @@ export function ControlsOverviewTable({ controls }: { controls: ControlOverview[
         </DataTableFilters>
       </DataTableHeader>
 
+      {editable && selected.size > 0 && bulkSetOwner && (
+        <ControlsBulkBar
+          selectedIds={[...selected]}
+          onClear={() => setSelected(new Set())}
+          onApply={bulkSetOwner}
+        />
+      )}
+
       {filtered.length === 0 ? (
         <Empty>
           <EmptyHeader>
@@ -157,6 +171,11 @@ export function ControlsOverviewTable({ controls }: { controls: ControlOverview[
         >
           <TableHeader>
             <TableRow>
+              {editable && (
+                <TableHead>
+                  <Checkbox aria-label="Select all on this page" checked={allOnPageSelected} onCheckedChange={handleTogglePage} />
+                </TableHead>
+              )}
               <TableHead>Control</TableHead>
               <TableHead>Owner</TableHead>
               <TableHead>Frameworks</TableHead>
@@ -177,6 +196,17 @@ export function ControlsOverviewTable({ controls }: { controls: ControlOverview[
                   handleOpen(control.id);
                 }}
               >
+                {editable && (
+                  <TableCell>
+                    <div onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        aria-label={`Select ${control.name}`}
+                        checked={selected.has(control.id)}
+                        onCheckedChange={() => handleToggleRow(control.id)}
+                      />
+                    </div>
+                  </TableCell>
+                )}
                 <TableCell>
                   <div className="flex max-w-[28rem] min-w-[14rem] flex-col gap-0.5 whitespace-normal">
                     <Text size="sm" weight="medium">
@@ -190,7 +220,16 @@ export function ControlsOverviewTable({ controls }: { controls: ControlOverview[
                   </div>
                 </TableCell>
                 <TableCell>
-                  {control.owner ? (
+                  {editable ? (
+                    <div className="w-44" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>
+                      <OwnerSelect
+                        label={`Owner of ${control.name}`}
+                        value={control.owner?.id ?? UNASSIGNED_OWNER}
+                        departed={control.owner?.deactivated ? control.owner : null}
+                        onChange={(ownerId) => handleRowOwner({ controlId: control.id, ownerId })}
+                      />
+                    </div>
+                  ) : control.owner ? (
                     <Text size="sm" variant={control.owner.deactivated ? 'warning' : undefined}>
                       {control.owner.name}
                       {control.owner.deactivated ? ' (left)' : ''}

@@ -54,4 +54,56 @@ describe('SOATableRow', () => {
       screen.getByRole('button', { name: 'Edit answer' }),
     ).toBeInTheDocument();
   });
+
+  it('shows the Annex A code linked to the requirement, and the implementation for applicable rows', () => {
+    render(
+      <table>
+        <tbody>
+          <SOATableRow
+            question={{ ...physicalSecurityQuestion, columnMapping: { ...physicalSecurityQuestion.columnMapping, closure: '5.1' } }}
+            columns={[
+              { name: 'closure', type: 'string' },
+              { name: 'implementation', type: 'string' },
+            ]}
+            answerData={{ answer: 'Needed', answerVersion: 1, isApplicable: true }}
+            isFullyRemote={false}
+            documentId="doc_1"
+            isPendingApproval={false}
+            organizationId="org_1"
+            link={{ href: '/org_1/frameworks/fi_1/requirements/req_1', implementation: 'In progress' }}
+          />
+        </tbody>
+      </table>,
+    );
+
+    expect(screen.getByRole('link', { name: 'A.5.1' })).toHaveAttribute(
+      'href',
+      '/org_1/frameworks/fi_1/requirements/req_1',
+    );
+    expect(screen.getByText('In progress')).toBeInTheDocument();
+  });
+
+  it('shows Not decided, without an implementation, when there is no answer', () => {
+    render(
+      <table>
+        <tbody>
+          <SOATableRow
+            question={{ ...physicalSecurityQuestion, columnMapping: { ...physicalSecurityQuestion.columnMapping, closure: '5.1' } }}
+            columns={[
+              { name: 'isApplicable', type: 'boolean' },
+              { name: 'implementation', type: 'string' },
+            ]}
+            isFullyRemote={false}
+            documentId="doc_1"
+            isPendingApproval={false}
+            organizationId="org_1"
+            link={{ href: '/x', implementation: 'Implemented' }}
+          />
+        </tbody>
+      </table>,
+    );
+
+    expect(screen.getByText('Not decided')).toBeInTheDocument();
+    expect(screen.queryByText('Implemented')).not.toBeInTheDocument();
+  });
 });

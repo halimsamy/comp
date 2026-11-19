@@ -102,6 +102,11 @@ model SOAAnswer {
   // Statement of Applicability reflects only its own answers.
   isApplicable Boolean? // true = applicable, false = not applicable, null = not yet answered
 
+  // Control operated by a supplier (e.g. a cloud provider's physical security);
+  // the control stays applicable and the SoA names the supplier.
+  inheritedVendorId String?
+  inheritedVendor   Vendor? @relation("SOAAnswerInheritedVendor", fields: [inheritedVendorId], references: [id], onDelete: SetNull)
+
   // Answer metadata
   status      SOAAnswerStatus @default(untouched) // untouched, generated, manual
   sources     Json? // Sources used for generated answers (similar to questionnaire)
@@ -124,6 +129,7 @@ model SOAAnswer {
   @@index([documentId, questionId])
   @@index([documentId, questionId, isLatestAnswer])
   @@index([status])
+  @@index([inheritedVendorId])
 }
 
 enum SOADocumentStatus {

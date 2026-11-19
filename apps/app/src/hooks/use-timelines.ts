@@ -22,6 +22,8 @@ interface TimelinePhase {
     | 'AUTO_UPLOAD'
     | 'MANUAL';
   completionPercent?: number;
+  /** In progress past its end date; later estimates are already moved out by the API. */
+  isOverdue?: boolean;
   readyForReview: boolean;
   readyForReviewAt: string | null;
 }

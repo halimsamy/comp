@@ -67,6 +67,7 @@ describe('RequirementApplicabilityController', () => {
       frameworkInstanceId: 'fi_1',
       requirementKey: 'req_1',
       memberId: 'mem_1',
+      userId: 'usr_1',
       dto,
     });
   });

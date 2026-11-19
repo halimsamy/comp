@@ -362,7 +362,7 @@ describe('SOAController', () => {
         'org_123',
       );
 
-      expect(soaService.submitForApproval).toHaveBeenCalledWith(dto);
+      expect(soaService.submitForApproval).toHaveBeenCalledWith(dto, undefined);
       expect(result).toEqual(submitted);
     });
 
@@ -374,6 +374,7 @@ describe('SOAController', () => {
 
       expect(soaService.submitForApproval).toHaveBeenCalledWith(
         expect.objectContaining({ organizationId: 'org_own' }),
+        undefined,
       );
     });
   });

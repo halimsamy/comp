@@ -46,12 +46,8 @@ jest.mock('@db', () => ({
   },
 }));
 
-jest.mock('./frameworks-scores.helper', () => ({
-  getOverviewScores: jest.fn().mockResolvedValue({
-    policies: { total: 1, published: 0 },
-    tasks: { total: 1, done: 0 },
-    people: { total: 1, completed: 0 },
-  }),
+jest.mock('../timelines/timeline-progress', () => ({
+  loadTimelinePercentages: jest.fn().mockResolvedValue(new Map()),
 }));
 
 import { db } from '@db';

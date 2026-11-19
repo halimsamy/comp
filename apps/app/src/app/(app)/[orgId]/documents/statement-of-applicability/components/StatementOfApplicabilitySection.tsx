@@ -18,6 +18,7 @@ export interface SOAData {
   canCurrentUserApprove: boolean;
   currentMemberId: string | null;
   ownerAdminMembers: SOAFrameworkTableProps['ownerAdminMembers'];
+  frameworkInstanceId?: string | null;
 }
 
 interface StatementOfApplicabilitySectionProps {
@@ -110,6 +111,7 @@ export function StatementOfApplicabilitySection({
           document={soaData.document}
           organizationId={organizationId}
           isFullyRemote={soaData.isFullyRemote}
+          frameworkInstanceId={soaData.frameworkInstanceId ?? null}
           canApprove={soaData.canApprove}
           approver={soaData.approver as Parameters<typeof SOAFrameworkTable>[0]['approver']}
           isPendingApproval={soaData.isPendingApproval}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FULLY_REMOTE_JUSTIFICATION, resolveSoaDisplay } from './soa-display';
+import { FULLY_REMOTE_JUSTIFICATION, listUndecidedCodes, resolveSoaDisplay } from './soa-display';
 
 describe('resolveSoaDisplay', () => {
   const base = { isFullyRemote: false, isControl7: false };
@@ -22,11 +22,11 @@ describe('resolveSoaDisplay', () => {
     });
   });
 
-  it('defaults to applicable with no justification when there is no answer at all', () => {
+  it('shows not decided (never applicable) when there is no answer at all', () => {
     const result = resolveSoaDisplay({ ...base, answerData: undefined });
 
     expect(result).toEqual({
-      displayIsApplicable: true,
+      displayIsApplicable: null,
       justificationValue: null,
     });
   });
@@ -123,5 +123,36 @@ describe('resolveSoaDisplay', () => {
       displayIsApplicable: false,
       justificationValue: FULLY_REMOTE_JUSTIFICATION,
     });
+  });
+});
+
+describe('listUndecidedCodes', () => {
+  const questions = [
+    { id: 'q1', columnMapping: { closure: '5.1' } },
+    { id: 'q2', columnMapping: { closure: '5.2' } },
+    { id: 'q3', columnMapping: { closure: '7.4' } },
+    { id: 'q4', columnMapping: { closure: '8.1' } },
+  ];
+
+  it('lists rows without a decision as Annex A codes', () => {
+    const answersMap = new Map([
+      ['q1', { answer: 'Yes', answerVersion: 1, isApplicable: true }],
+      ['q2', { answer: 'Legacy', answerVersion: 1, isApplicable: null }],
+    ]);
+    const processedResults = new Map([['q4', { success: true, isApplicable: false }]]);
+    expect(
+      listUndecidedCodes({ questions, answersMap, processedResults, isFullyRemote: false }),
+    ).toEqual(['A.5.2', 'A.7.4']);
+  });
+
+  it('treats a remote org’s unanswered physical controls as decided', () => {
+    expect(
+      listUndecidedCodes({
+        questions,
+        answersMap: new Map(),
+        processedResults: new Map(),
+        isFullyRemote: true,
+      }),
+    ).toEqual(['A.5.1', 'A.5.2', 'A.8.1']);
   });
 });

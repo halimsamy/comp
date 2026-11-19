@@ -44,10 +44,12 @@ import {
   saveAnswersToDatabase,
   updateDocumentAfterAutoFill,
   countAnsweredAnswers,
-  updateDocumentAnsweredCount,
   checkIfFullyRemote,
   type SOAStorageLogger,
 } from './utils/soa-storage';
+import { writeSoaAnswer } from './utils/soa-answer-writer';
+import { listUndecidedRows, summarizeCodes } from './utils/soa-open-rows';
+import { loadSoaImplementation } from './utils/soa-implementation';
 import { syncSoaApplicability } from './utils/soa-applicability-sync';
 
 @Injectable()
@@ -62,118 +64,17 @@ export class SOAService {
   }
 
   async saveAnswer(dto: SaveSOAAnswerDto, userId: string) {
-    // Verify document exists and belongs to organization
-    const document = await db.sOADocument.findFirst({
-      where: {
-        id: dto.documentId,
-        organizationId: dto.organizationId,
-      },
-      include: {
-        configuration: true,
-      },
+    return writeSoaAnswer({
+      organizationId: dto.organizationId,
+      documentId: dto.documentId,
+      questionId: dto.questionId,
+      isApplicable: dto.isApplicable,
+      // `answer` is the legacy name of the justification field.
+      justification: dto.justification !== undefined ? dto.justification : dto.answer,
+      inheritedVendorId: dto.inheritedVendorId,
+      userId,
+      logger: this.storageLogger,
     });
-
-    if (!document) {
-      throw new NotFoundException('SOA document not found');
-    }
-
-    // The question must belong to this document's configuration, so answers
-    // (and the answered-count) can't be created for arbitrary question IDs.
-    const configQuestions =
-      (document.configuration.questions as unknown as Array<{ id: string }>) ??
-      [];
-    if (!configQuestions.some((q) => q.id === dto.questionId)) {
-      throw new BadRequestException(
-        'Question does not belong to this SOA document',
-      );
-    }
-
-    // Get existing answer to determine the next version and to preserve prior
-    // values on partial edits.
-    const existingAnswer = await db.sOAAnswer.findFirst({
-      where: {
-        documentId: dto.documentId,
-        questionId: dto.questionId,
-        isLatestAnswer: true,
-      },
-      orderBy: {
-        answerVersion: 'desc',
-      },
-    });
-
-    // Applicability + justification are stored per organization on the answer.
-    // Omitted fields preserve the previous value, so a partial edit (e.g. one
-    // that sends only a justification) cannot wipe a prior applicability
-    // decision or justification.
-    const isApplicable =
-      dto.isApplicable === undefined
-        ? (existingAnswer?.isApplicable ?? null)
-        : dto.isApplicable;
-    const justification =
-      dto.justification !== undefined
-        ? dto.justification
-        : dto.answer !== undefined
-          ? dto.answer
-          : (existingAnswer?.answer ?? null);
-
-    // Validate BEFORE any write, so a rejected save leaves the prior answer
-    // intact. ISO 27001: a not-applicable control must carry a justification.
-    if (
-      isApplicable === false &&
-      (!justification || justification.trim().length === 0)
-    ) {
-      throw new BadRequestException(
-        'A justification is required when a control is not applicable',
-      );
-    }
-
-    const nextVersion = existingAnswer ? existingAnswer.answerVersion + 1 : 1;
-    const isAnswered = isApplicable !== null;
-
-    // Retire the prior answer and create the new version atomically, so a
-    // failure can never leave the control without a latest answer.
-    await db.$transaction([
-      ...(existingAnswer
-        ? [
-            db.sOAAnswer.update({
-              where: { id: existingAnswer.id },
-              data: { isLatestAnswer: false },
-            }),
-          ]
-        : []),
-      db.sOAAnswer.create({
-        data: {
-          documentId: dto.documentId,
-          questionId: dto.questionId,
-          answer: justification,
-          isApplicable,
-          status:
-            isAnswered || (justification && justification.trim().length > 0)
-              ? 'manual'
-              : 'untouched',
-          answerVersion: nextVersion,
-          isLatestAnswer: true,
-          createdBy: existingAnswer ? undefined : userId,
-          updatedBy: userId,
-        },
-      }),
-    ]);
-
-    // Update document answered questions count from the per-org answers,
-    // scoped to the document's configured questions.
-    const answeredCount = await countAnsweredAnswers(
-      dto.documentId,
-      configQuestions.map((q) => q.id),
-    );
-
-    await updateDocumentAnsweredCount(
-      dto.documentId,
-      document.totalQuestions,
-      answeredCount,
-    );
-    await this.syncApplicability(dto.documentId);
-
-    return { success: true };
   }
 
   /** Keeps ISO requirement applicability (and so framework scoring) in line with the SoA. */
@@ -431,7 +332,7 @@ export class SOAService {
     return { success: true, data: updatedDocument };
   }
 
-  async submitForApproval(dto: SubmitSOAForApprovalDto) {
+  async submitForApproval(dto: SubmitSOAForApprovalDto, userId?: string) {
     const approverMember = await db.member.findFirst({
       where: {
         id: dto.approverId,
@@ -479,9 +380,39 @@ export class SOAService {
       throw new BadRequestException('Document is already pending approval');
     }
 
+    // ISO 27001 6.1.3 d): every Annex A control needs a decision before sign-off.
+    const [configuration, answers, isFullyRemote, preparer] = await Promise.all([
+      db.sOAFrameworkConfiguration.findUnique({
+        where: { id: document.configurationId },
+        select: { questions: true },
+      }),
+      db.sOAAnswer.findMany({
+        where: { documentId: document.id, isLatestAnswer: true },
+        select: { questionId: true, isApplicable: true },
+      }),
+      checkIfFullyRemote(dto.organizationId, this.storageLogger),
+      userId
+        ? db.member.findFirst({
+            where: { userId, organizationId: dto.organizationId },
+            select: { user: { select: { name: true, email: true } } },
+          })
+        : null,
+    ]);
+    const undecided = listUndecidedRows({
+      questions: (configuration?.questions as unknown as SOAQuestion[]) ?? [],
+      answers,
+      isFullyRemote,
+    });
+    if (undecided.length > 0) {
+      throw new BadRequestException(
+        `Decide every control before submitting. Not decided: ${summarizeCodes(undecided.map((r) => r.code))}`,
+      );
+    }
+
     const updatedDocument = await db.sOADocument.update({
       where: { id: dto.documentId },
       data: {
+        ...(preparer ? { preparedBy: preparer.user.name || preparer.user.email } : {}),
         approverId: dto.approverId,
         approvedAt: null,
         declinedAt: null,
@@ -523,6 +454,7 @@ export class SOAService {
             questionId: true,
             answer: true,
             isApplicable: true,
+            inheritedVendor: { select: { name: true } },
           },
         },
       },
@@ -543,10 +475,13 @@ export class SOAService {
 
     // A fully remote org's physical-security (7.x) controls default to Not
     // Applicable, applied identically on screen and in this export.
-    const isFullyRemote = await checkIfFullyRemote(
-      dto.organizationId,
-      this.storageLogger,
-    );
+    const [isFullyRemote, implementation] = await Promise.all([
+      checkIfFullyRemote(dto.organizationId, this.storageLogger),
+      loadSoaImplementation({
+        organizationId: dto.organizationId,
+        frameworkId: document.frameworkId,
+      }).catch(() => new Map<string, string>()),
+    ]);
 
     const exportQuestions: SOAExportQuestion[] = questions.map((question) => {
       const answer = answersByQuestionId.get(question.id);
@@ -570,6 +505,8 @@ export class SOAService {
           control_objective: question.columnMapping?.control_objective ?? null,
           isApplicable: useRemoteDefault ? false : (answer?.isApplicable ?? null),
           justification,
+          implementation: closure ? (implementation.get(closure) ?? null) : null,
+          inheritedFrom: answer?.inheritedVendor?.name ?? null,
         },
         answer: justification,
       };

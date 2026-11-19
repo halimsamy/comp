@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -17,6 +18,7 @@ import {
   ApiOperation,
   ApiParam,
   ApiProduces,
+  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
@@ -26,7 +28,11 @@ import { HybridAuthGuard } from '../auth/hybrid-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
 import { OrganizationId } from '../auth/auth-context.decorator';
+import { ControlsBulkOwnerService } from './controls-bulk-owner.service';
+import { loadControlEvidence } from './controls-evidence';
 import { ControlsOverviewService } from './controls-overview.service';
+import { suggestControlOwners } from './controls-owner-suggestions';
+import { BulkControlOwnerDto } from './dto/bulk-owner.dto';
 import { RelatedControlsService } from './related-controls.service';
 import {
   LinkRelatedControlsDto,
@@ -47,7 +53,49 @@ export class ControlsMappingController {
   constructor(
     private readonly overviewService: ControlsOverviewService,
     private readonly relatedService: RelatedControlsService,
+    private readonly bulkOwnerService: ControlsBulkOwnerService,
   ) {}
+
+  @Get('evidence')
+  @RequirePermission('control', 'read')
+  @ApiOperation({
+    summary: 'List the evidence behind controls',
+    description:
+      'Merges the policies, tasks, evidence forms and ISMS documents of the given controls, with status, owner and last update. Pass the controls mapped to a requirement to see everything that satisfies it.',
+  })
+  @ApiQuery({ name: 'controlIds', description: 'Comma-separated control IDs (max 200)', example: 'ctl_abc123,ctl_def456' })
+  async evidence(
+    @OrganizationId() organizationId: string,
+    @Query('controlIds') controlIds?: string,
+  ) {
+    const ids = [...new Set((controlIds ?? '').split(',').map((id) => id.trim()).filter(Boolean))];
+    if (ids.length > 200) throw new BadRequestException('Pass at most 200 control IDs');
+    const data = ids.length > 0 ? await loadControlEvidence({ organizationId, controlIds: ids }) : [];
+    return { data, count: data.length };
+  }
+
+  @Get('owner-suggestions')
+  @RequirePermission('control', 'read')
+  @ApiOperation({
+    summary: 'Suggest control owners from ISMS roles',
+    description:
+      'For each control without an active owner, suggests the ISMS role holder for its theme (A.5 SPO, A.6 HR, A.8 CTO, PCI 12 executive owner). Nothing is saved.',
+  })
+  async ownerSuggestions(@OrganizationId() organizationId: string) {
+    return suggestControlOwners(organizationId);
+  }
+
+  @Patch('bulk-owner')
+  @RequirePermission('control', 'update')
+  @ApiOperation({
+    summary: 'Set the owner of many controls',
+    description:
+      'Assigns (or clears) the owner of up to 500 controls in one transaction. With assignLinkedWork, linked tasks and policies with no assignee are assigned to the new owner too.',
+  })
+  @ApiBody({ type: BulkControlOwnerDto })
+  async bulkOwner(@OrganizationId() organizationId: string, @Body() dto: BulkControlOwnerDto) {
+    return this.bulkOwnerService.setOwner({ organizationId, dto });
+  }
 
   @Get('overview')
   @RequirePermission('control', 'read')

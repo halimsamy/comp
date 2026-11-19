@@ -37,8 +37,10 @@ import {
   type FamilyGroup,
 } from './framework-controls-shared';
 import { GroupedControlRow } from './GroupedControlRow';
+import { filterControlItems } from './table-filters';
+import { ControlTableFilters, useControlTableFilters } from './TableFilters';
 
-const COLUMN_COUNT = 7;
+const COLUMN_COUNT = 8;
 
 export function FrameworkControlsGrouped({
   frameworkInstanceWithControls,
@@ -54,7 +56,7 @@ export function FrameworkControlsGrouped({
 
   const handleRowClick = useCallback(
     (controlId: string) => {
-      router.push(`/${orgId}/frameworks/${frameworkInstanceId}/controls/${controlId}`);
+      router.push(`/${orgId}/controls/${controlId}?framework=${frameworkInstanceId}`);
     },
     [orgId, frameworkInstanceId, router],
   );
@@ -62,6 +64,7 @@ export function FrameworkControlsGrouped({
   const [searchTerm, setSearchTerm] = useQueryState('q', parseAsString.withDefault('').withOptions({ shallow: true, throttleMs: 300 }));
   const [familyFilterParam, setFamilyFilterParam] = useQueryState('families', parseAsArrayOf(parseAsString, '|').withDefault([]).withOptions({ shallow: true }));
   const [expandedFamilies, setExpandedFamilies] = useState<Set<string>>(new Set());
+  const tableFilters = useControlTableFilters();
 
   const selectedFamilyFilter = useMemo(() => new Set(familyFilterParam), [familyFilterParam]);
 
@@ -76,9 +79,10 @@ export function FrameworkControlsGrouped({
   );
 
   const filteredItems = useMemo(() => {
-    if (!searchTerm.trim()) return allItems;
+    const narrowed = filterControlItems({ items: allItems, scores, owner: tableFilters.owner, status: tableFilters.status });
+    if (!searchTerm.trim()) return narrowed;
     const lower = searchTerm.toLowerCase();
-    return allItems.filter(
+    return narrowed.filter(
       (item) =>
         item.control.name.toLowerCase().includes(lower) ||
         item.control.description?.toLowerCase().includes(lower) ||
@@ -86,7 +90,7 @@ export function FrameworkControlsGrouped({
           (r) => r.name.toLowerCase().includes(lower) || r.identifier.toLowerCase().includes(lower),
         ),
     );
-  }, [allItems, searchTerm]);
+  }, [allItems, searchTerm, scores, tableFilters.owner, tableFilters.status]);
 
   const allGroups = useMemo(() => groupByFamily(filteredItems), [filteredItems]);
 
@@ -98,7 +102,8 @@ export function FrameworkControlsGrouped({
   const allFamilyNames = useMemo(() => allGroups.map((g) => g.family), [allGroups]);
   const familyCounts = useMemo(() => new Map(allGroups.map((g) => [g.family, g.items.length])), [allGroups]);
 
-  const isSearching = searchTerm.trim().length > 0;
+  // Searching or filtering opens every family so matches are visible.
+  const isSearching = searchTerm.trim().length > 0 || tableFilters.isActive;
   const visibleFamilyNames = useMemo(() => groups.map((g) => g.family), [groups]);
   const allExpanded = areAllFamiliesExpanded({
     expandedFamilies,
@@ -145,7 +150,7 @@ export function FrameworkControlsGrouped({
   return (
     <div className="space-y-4">
       <Heading level="2">Controls ({filteredItems.length})</Heading>
-      <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="w-full max-w-sm">
           <InputGroup>
             <InputGroupAddon>
@@ -165,6 +170,7 @@ export function FrameworkControlsGrouped({
           onToggleFamily={handleToggleFamilyFilter}
           onClear={handleClearFamilyFilter}
         />
+        <ControlTableFilters items={allItems} filters={tableFilters} />
         {!isSearching && (
           <Button variant="ghost" onClick={handleToggleAll}>
             {allExpanded ? 'Collapse All' : 'Expand All'}
@@ -175,6 +181,7 @@ export function FrameworkControlsGrouped({
         <TableHeader>
           <TableRow>
             <TableHead>Name</TableHead>
+            <TableHead>Owner</TableHead>
             <TableHead>Requirement</TableHead>
             <TableHead>Compliance</TableHead>
             <TableHead>Status</TableHead>

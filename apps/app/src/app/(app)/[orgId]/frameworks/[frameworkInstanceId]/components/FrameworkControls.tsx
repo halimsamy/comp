@@ -28,6 +28,8 @@ import { Launch, Search } from '@trycompai/design-system/icons';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
+import { filterControlItems } from './table-filters';
+import { ControlTableFilters, useControlTableFilters } from './TableFilters';
 
 export function FrameworkControls({
   frameworkInstanceWithControls,
@@ -57,10 +59,12 @@ export function FrameworkControls({
     [frameworkInstanceWithControls.controls, requirementMap],
   );
 
+  const tableFilters = useControlTableFilters();
   const filteredItems = useMemo(() => {
-    if (!searchTerm.trim()) return items;
+    const narrowed = filterControlItems({ items, scores, owner: tableFilters.owner, status: tableFilters.status });
+    if (!searchTerm.trim()) return narrowed;
     const searchLower = searchTerm.toLowerCase();
-    return items.filter(
+    return narrowed.filter(
       (item) =>
         item.control.name.toLowerCase().includes(searchLower) ||
         item.control.description?.toLowerCase().includes(searchLower) ||
@@ -70,7 +74,7 @@ export function FrameworkControls({
             r.identifier.toLowerCase().includes(searchLower),
         ),
     );
-  }, [items, searchTerm]);
+  }, [items, searchTerm, scores, tableFilters.owner, tableFilters.status]);
 
   const pageCount = Math.max(1, Math.ceil(filteredItems.length / pageSize));
   const paginatedItems = useMemo(
@@ -83,7 +87,7 @@ export function FrameworkControls({
   }, [page, pageCount]);
 
   const getControlHref = (controlId: string) =>
-    `/${orgId}/frameworks/${frameworkInstanceId}/controls/${controlId}`;
+    `/${orgId}/controls/${controlId}?framework=${frameworkInstanceId}`;
 
   const handleRowClick = (controlId: string) => {
     router.push(getControlHref(controlId));
@@ -91,17 +95,20 @@ export function FrameworkControls({
 
   return (
     <div className="space-y-4">
-      <div className="w-full max-w-sm">
-        <InputGroup>
-          <InputGroupAddon>
-            <Search size={16} />
-          </InputGroupAddon>
-          <InputGroupInput
-            placeholder="Search controls..."
-            value={searchTerm}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
-          />
-        </InputGroup>
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="w-full max-w-sm">
+          <InputGroup>
+            <InputGroupAddon>
+              <Search size={16} />
+            </InputGroupAddon>
+            <InputGroupInput
+              placeholder="Search controls..."
+              value={searchTerm}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
+            />
+          </InputGroup>
+        </div>
+        <ControlTableFilters items={items} filters={tableFilters} />
       </div>
       <Table
         variant="bordered"
@@ -120,6 +127,7 @@ export function FrameworkControls({
         <TableHeader>
           <TableRow>
             <TableHead>Name</TableHead>
+            <TableHead>Owner</TableHead>
             <TableHead>Requirement</TableHead>
             <TableHead>Compliance</TableHead>
             <TableHead>Status</TableHead>
@@ -131,7 +139,7 @@ export function FrameworkControls({
         <TableBody>
           {paginatedItems.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={7}>
+              <TableCell colSpan={8}>
                 <Text size="sm" variant="muted">
                   No controls found.
                 </Text>
@@ -166,6 +174,11 @@ export function FrameworkControls({
                         className="shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
                       />
                     </Link>
+                  </TableCell>
+                  <TableCell>
+                    <span className="block max-w-[160px] truncate text-sm">
+                      {(control.owner && !control.owner.deactivated && (control.owner.user.name || control.owner.user.email)) || 'Unassigned'}
+                    </span>
                   </TableCell>
                   <TableCell>
                     <RequirementCell requirements={requirements} />

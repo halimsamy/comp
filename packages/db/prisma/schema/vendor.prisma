@@ -45,6 +45,8 @@ model Vendor {
   acceptances                  RiskAcceptance[] // risk-owner residual-risk acceptance events (6.1.3(f))
   documents                    VendorDocument[]
   reviews                      VendorReview[]
+  assets                       Asset[]
+  soaInheritedAnswers          SOAAnswer[]                   @relation("SOAAnswerInheritedVendor")
 
   // Third-party service provider profile (ISO 27001 A.5.19-A.5.22, PCI DSS 12.8).
   // null criticality = not yet classified; drives the review cadence.
@@ -71,6 +73,11 @@ model Vendor {
   pciStatusCheckedAt              DateTime?
   lastReviewedAt                  DateTime?
   nextReviewDue                   DateTime?
+
+  // Archived vendors (relationship ended) leave the current register, reminders
+  // and the trust portal but keep their history for audits.
+  archivedAt    DateTime?
+  archiveReason String?
 
   @@index([organizationId])
   @@index([assigneeId])
@@ -203,6 +210,12 @@ model VendorReview {
   reviewedByName   String
   reviewedAt       DateTime            @default(now())
   nextReviewDue    DateTime
+  // PCI DSS 12.8.4 status the reviewer confirmed (null when not confirmed).
+  pciStatus           VendorPciStatus?
+  // VendorDocument ids the reviewer looked at (ISO 27001 A.5.22 evidence trail).
+  reviewedDocumentIds String[]            @default([])
+  // Conditions of an "approved with conditions" outcome; each becomes a TaskItem.
+  conditions          String[]            @default([])
 
   @@index([vendorId, reviewedAt])
   @@index([organizationId])

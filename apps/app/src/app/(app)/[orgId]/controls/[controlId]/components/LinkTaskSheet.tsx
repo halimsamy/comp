@@ -18,14 +18,15 @@ import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { useControlOptions } from './useControlOptions';
 
-export function LinkPolicySheet({
+export function LinkTaskSheet({
   controlId,
   frameworkInstanceId,
-  alreadyLinkedPolicyIds,
+  alreadyLinkedTaskIds,
 }: {
   controlId: string;
-  frameworkInstanceId: string;
-  alreadyLinkedPolicyIds: string[];
+  /** Link only within this framework; omit to link the control everywhere. */
+  frameworkInstanceId?: string | null;
+  alreadyLinkedTaskIds: string[];
 }) {
   const { hasPermission } = usePermissions();
   const router = useRouter();
@@ -33,14 +34,14 @@ export function LinkPolicySheet({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  const { policies, isLoading } = useControlOptions(isOpen);
+  const { tasks, isLoading } = useControlOptions(isOpen);
   const linked = useMemo(
-    () => new Set(alreadyLinkedPolicyIds),
-    [alreadyLinkedPolicyIds],
+    () => new Set(alreadyLinkedTaskIds),
+    [alreadyLinkedTaskIds],
   );
   const options = useMemo(
-    () => policies.filter((p) => !linked.has(p.id)),
-    [policies, linked],
+    () => tasks.filter((t) => !linked.has(t.id)),
+    [tasks, linked],
   );
 
   useEffect(() => {
@@ -63,16 +64,16 @@ export function LinkPolicySheet({
     setIsSubmitting(true);
     try {
       const response = await apiClient.post(
-        `/v1/controls/${controlId}/policies/link?frameworkInstanceId=${frameworkInstanceId}`,
-        { policyIds: Array.from(selected) },
+        `/v1/controls/${controlId}/tasks/link${frameworkInstanceId ? `?frameworkInstanceId=${frameworkInstanceId}` : ''}`,
+        { taskIds: Array.from(selected) },
       );
       if (response.error) throw new Error(response.error);
-      toast.success('Policies linked');
+      toast.success('Tasks linked');
       setIsOpen(false);
       router.refresh();
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : 'Failed to link policies',
+        error instanceof Error ? error.message : 'Failed to link tasks',
       );
     } finally {
       setIsSubmitting(false);
@@ -86,35 +87,35 @@ export function LinkPolicySheet({
         iconLeft={<LinkIcon size={16} />}
         onClick={() => setIsOpen(true)}
       >
-        Link Policy
+        Link Task
       </Button>
       <Sheet open={isOpen} onOpenChange={setIsOpen}>
         <SheetContent>
           <SheetHeader>
-            <SheetTitle>Link Existing Policies</SheetTitle>
+            <SheetTitle>Link Existing Tasks</SheetTitle>
           </SheetHeader>
           <SheetBody>
             {isLoading ? (
               <Text size="sm" variant="muted">
-                Loading policies…
+                Loading tasks…
               </Text>
             ) : options.length === 0 ? (
               <Text size="sm" variant="muted">
-                No additional policies available to link.
+                No additional tasks available to link.
               </Text>
             ) : (
               <div className="space-y-2">
-                {options.map((policy) => (
+                {options.map((task) => (
                   <label
-                    key={policy.id}
+                    key={task.id}
                     className="flex items-start gap-3 rounded border p-3 cursor-pointer hover:bg-muted/40"
                   >
                     <Checkbox
-                      checked={selected.has(policy.id)}
-                      onCheckedChange={() => toggle(policy.id)}
+                      checked={selected.has(task.id)}
+                      onCheckedChange={() => toggle(task.id)}
                     />
                     <div className="flex-1">
-                      <div className="font-medium text-sm">{policy.name}</div>
+                      <div className="font-medium text-sm">{task.title}</div>
                     </div>
                   </label>
                 ))}
@@ -123,8 +124,8 @@ export function LinkPolicySheet({
                     onClick={handleSubmit}
                     disabled={selected.size === 0 || isSubmitting}
                   >
-                    Link {selected.size || ''} Polic
-                    {selected.size === 1 ? 'y' : 'ies'}
+                    Link {selected.size || ''} Task
+                    {selected.size === 1 ? '' : 's'}
                   </Button>
                 </div>
               </div>

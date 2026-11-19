@@ -21,4 +21,8 @@ export class SaveSOAAnswerDto {
   @IsOptional()
   @IsString()
   justification?: string | null;
+
+  @IsOptional()
+  @IsString()
+  inheritedVendorId?: string | null;
 }
