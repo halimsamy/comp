@@ -42,10 +42,17 @@ vi.mock('./vendor-onboarding-context', () => ({
 }));
 
 // Mock next/navigation
+let mockSearch = '';
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
     push: vi.fn(),
   }),
+  useSearchParams: () => new URLSearchParams(mockSearch),
+}));
+
+vi.mock('./VendorBulkBar', () => ({
+  VendorBulkBar: ({ selectedIds }: { selectedIds: string[] }) =>
+    selectedIds.length ? <div data-testid="bulk-bar">{selectedIds.length} selected</div> : null,
 }));
 
 // Mock sonner
@@ -84,6 +91,14 @@ vi.mock('@trycompai/design-system', () => ({
   AvatarFallback: ({ children }: any) => <span>{children}</span>,
   AvatarImage: () => null,
   Badge: ({ children }: any) => <span>{children}</span>,
+  Checkbox: ({ checked, onCheckedChange, ...props }: any) => (
+    <input
+      type="checkbox"
+      checked={Boolean(checked)}
+      onChange={(e) => onCheckedChange(e.target.checked)}
+      {...props}
+    />
+  ),
   DropdownMenu: ({ children }: any) => <div>{children}</div>,
   DropdownMenuContent: ({ children }: any) => <div>{children}</div>,
   DropdownMenuItem: ({ children, ...props }: any) => (
@@ -349,5 +364,35 @@ describe('VendorsTable', () => {
     expect(within(row).getByText('Critical')).toBeInTheDocument();
     expect(within(row).getByText('Overdue')).toBeInTheDocument();
     expect(within(row).getByText('2 expiring docs')).toBeInTheDocument();
+  });
+
+  it('drops the STATUS column and filters from the URL', () => {
+    setMockPermissions({});
+    mockSearch = 'status=not_assessed';
+    render(
+      <VendorsTable
+        vendors={[mockVendors[0], { ...mockVendors[0], id: 'v-2', name: 'Fresh Co', status: 'not_assessed' }]}
+        assignees={mockAssignees}
+        orgId="org-1"
+      />,
+    );
+    mockSearch = '';
+    expect(screen.queryByText('STATUS')).not.toBeInTheDocument();
+    expect(screen.getByText('Fresh Co')).toBeInTheDocument();
+    expect(screen.queryByText('Acme Corp')).not.toBeInTheDocument();
+  });
+
+  it('lets editors select rows for bulk actions, read-only users cannot', () => {
+    setMockPermissions(ADMIN_PERMISSIONS);
+    const { unmount } = render(
+      <VendorsTable vendors={mockVendors} assignees={mockAssignees} orgId="org-1" />,
+    );
+    screen.getByLabelText(`Select ${mockVendors[0].name}`).click();
+    expect(screen.getByTestId('bulk-bar')).toHaveTextContent('1 selected');
+    unmount();
+
+    setMockPermissions(AUDITOR_PERMISSIONS);
+    render(<VendorsTable vendors={mockVendors} assignees={mockAssignees} orgId="org-1" />);
+    expect(screen.queryByLabelText(`Select ${mockVendors[0].name}`)).not.toBeInTheDocument();
   });
 });

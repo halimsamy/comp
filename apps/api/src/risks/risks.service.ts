@@ -5,32 +5,20 @@ import {
   Logger,
 } from '@nestjs/common';
 import { db, Prisma } from '@db';
+import { OwnershipNotifier } from '../notifications/ownership-notifier.service';
 import { isMemberOrgParticipant } from '../utils/org-participation';
 import { CreateRiskDto } from './dto/create-risk.dto';
 import { GetRisksQueryDto } from './dto/get-risks-query.dto';
 import { UpdateRiskDto } from './dto/update-risk.dto';
 import { resolveStrategyDescriptionUpdate } from './strategy-descriptions';
 
-export interface PaginatedRisksResult {
-  data: Prisma.RiskGetPayload<{
-    include: {
-      assignee: {
-        include: {
-          user: {
-            select: { id: true; name: true; email: true; image: true };
-          };
-        };
-      };
-    };
-  }>[];
-  totalCount: number;
-  page: number;
-  pageCount: number;
-}
+export type { PaginatedRisksResult } from './risk-list.types';
+import type { PaginatedRisksResult } from './risk-list.types';
 
 @Injectable()
 export class RisksService {
   private readonly logger = new Logger(RisksService.name);
+  constructor(private readonly owners: OwnershipNotifier) {}
 
   private async validateAssigneeNotPlatformAdmin(
     assigneeId: string,
@@ -199,6 +187,7 @@ export class RisksService {
     id: string,
     organizationId: string,
     updateRiskDto: UpdateRiskDto,
+    actorUserId?: string,
   ) {
     try {
       // Need the existing row to resolve strategy/description swaps below.
@@ -211,10 +200,7 @@ export class RisksService {
         );
       }
 
-      // Keep per-strategy descriptions independent in the strategyDescriptions
-      // JSON map: a Mitigate plan, an Accept rationale, and a Transfer
-      // rationale all live alongside each other, swapped in/out of the active
-      // `treatmentStrategyDescription` field as the user changes strategy.
+      // Per-strategy plans swap in/out of treatmentStrategyDescription (see strategy-descriptions.ts).
       const resolvedStrategyFields = resolveStrategyDescriptionUpdate(
         existing,
         updateRiskDto,
@@ -225,6 +211,19 @@ export class RisksService {
         data: { ...updateRiskDto, ...resolvedStrategyFields },
       });
 
+      if (
+        updatedRisk.assigneeId &&
+        updatedRisk.assigneeId !== existing.assigneeId
+      ) {
+        void this.owners.notify({
+          organizationId,
+          memberId: updatedRisk.assigneeId,
+          entityType: 'risk',
+          entityName: updatedRisk.title,
+          url: `/risk/${id}`,
+          assignedByUserId: actorUserId,
+        });
+      }
       this.logger.log(`Updated risk: ${updatedRisk.title} (${id})`);
       return updatedRisk;
     } catch (error) {

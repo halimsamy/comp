@@ -91,7 +91,8 @@ export async function buildRiskRegisterCsv({
       const residual = rating(risk.residualLikelihood, risk.residualImpact);
       const acceptance = risk.acceptances[0];
       return [
-        risk.id,
+        // Human ref (R-001) when assigned; the cuid for rows predating it.
+        risk.ref ?? risk.id,
         risk.title,
         risk.description,
         humanize(risk.category),

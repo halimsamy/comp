@@ -432,6 +432,7 @@ describe('RisksController', () => {
         'risk_1',
         orgId,
         updateDto,
+        authContext.userId,
       );
     });
 

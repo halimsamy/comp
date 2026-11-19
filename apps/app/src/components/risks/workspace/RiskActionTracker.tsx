@@ -29,6 +29,7 @@ import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { ACTION_FILTERS, countActions, filterActions, type ActionFilter } from './action-filters';
+import { announceActionCompleted } from './rerate-prompt';
 import { ACTION_STATUS_LABEL, buildRiskActionsCsv, downloadCsv } from './risk-actions-csv';
 import { RiskActionSheet, type RiskActionValues } from './RiskActionSheet';
 import { formatDay, memberLabel, type WorkspaceMember } from './workspace-types';
@@ -84,7 +85,11 @@ export function RiskActionTracker({ orgId, members }: { orgId: string; members: 
         });
       }
       await mutate();
-      toast.success(editing ? 'Action updated' : 'Action added');
+      if (editing && values.status === 'done' && editing.status !== 'done') {
+        announceActionCompleted({ actions, action: editing, orgId });
+      } else {
+        toast.success(editing ? 'Action updated' : 'Action added');
+      }
     } catch (caught) {
       toast.error(caught instanceof Error ? caught.message : 'Failed to save the action');
       throw caught;
@@ -95,7 +100,7 @@ export function RiskActionTracker({ orgId, members }: { orgId: string; members: 
     try {
       await updateTaskItem(action.id, { status: 'done' });
       await mutate();
-      toast.success('Action completed');
+      announceActionCompleted({ actions, action, orgId });
     } catch (caught) {
       toast.error(caught instanceof Error ? caught.message : 'Failed to complete the action');
     }

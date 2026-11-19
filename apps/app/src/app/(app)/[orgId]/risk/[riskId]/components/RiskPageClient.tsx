@@ -79,9 +79,14 @@ export function RiskPageClient({
   // incoming panel's `fade-in-0 duration-200` animation, which produces
   // a visible "both panels stacked" flash. Mounting only the active panel
   // sidesteps the transition window entirely.
-  const [activeTab, setActiveTab] = useQueryState('tab', {
+  const [tabParam, setActiveTab] = useQueryState('tab', {
     defaultValue: 'overview',
   });
+  // Treatment Plan + Risk Matrix merged into "Risk", Tasks renamed "Actions".
+  const activeTab =
+    ({ 'treatment-plan': 'risk', 'risk-matrix': 'risk', tasks: 'actions' } as Record<string, string>)[
+      tabParam
+    ] ?? tabParam;
   const isViewingTask = Boolean(taskItemId);
   const canUpdate = hasPermission('risk', 'update');
   const canUpdateTask = hasPermission('task', 'update');
@@ -242,7 +247,7 @@ export function RiskPageClient({
             ? [
                 { label: 'Risks', href: `/${orgId}/risk`, props: { render: <Link href={`/${orgId}/risk`} /> } },
                 { label: risk.title, href: `/${orgId}/risk/${riskId}`, props: { render: <Link href={`/${orgId}/risk/${riskId}`} /> } },
-                { label: 'Tasks', href: `/${orgId}/risk/${riskId}?tab=tasks`, props: { render: <Link href={`/${orgId}/risk/${riskId}?tab=tasks`} /> } },
+                { label: 'Actions', href: `/${orgId}/risk/${riskId}?tab=actions`, props: { render: <Link href={`/${orgId}/risk/${riskId}?tab=actions`} /> } },
                 { label: selectedTaskTitle || 'Task', isCurrent: true },
               ]
             : [
@@ -319,9 +324,8 @@ export function RiskPageClient({
           <Stack gap="lg">
             <TabsList variant="underline">
               <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="treatment-plan">Treatment Plan</TabsTrigger>
-              <TabsTrigger value="risk-matrix">Risk Matrix</TabsTrigger>
-              <TabsTrigger value="tasks">Tasks</TabsTrigger>
+              <TabsTrigger value="risk">Risk</TabsTrigger>
+              <TabsTrigger value="actions">Actions</TabsTrigger>
               <TabsTrigger value="comments">Comments</TabsTrigger>
               <TabsTrigger value="activity">Activity</TabsTrigger>
               <TabsTrigger value="settings">Settings</TabsTrigger>
@@ -333,8 +337,8 @@ export function RiskPageClient({
               </TabsContent>
             )}
 
-            {activeTab === 'treatment-plan' && (
-              <TabsContent value="treatment-plan">
+            {activeTab === 'risk' && (
+              <TabsContent value="risk">
                 <TreatmentPlanTab
                   orgId={orgId}
                   entity={{
@@ -391,20 +395,17 @@ export function RiskPageClient({
                     canUpdate={canUpdate}
                   />
                 </div>
+                <div className="mt-6">
+                  <Stack gap="lg">
+                    <InherentRiskChart risk={risk} />
+                    <ResidualRiskChart risk={risk} />
+                  </Stack>
+                </div>
               </TabsContent>
             )}
 
-            {activeTab === 'risk-matrix' && (
-              <TabsContent value="risk-matrix">
-                <Stack gap="lg">
-                  <InherentRiskChart risk={risk} />
-                  <ResidualRiskChart risk={risk} />
-                </Stack>
-              </TabsContent>
-            )}
-
-            {activeTab === 'tasks' && (
-              <TabsContent value="tasks">
+            {activeTab === 'actions' && (
+              <TabsContent value="actions">
                 <TaskItems entityId={riskId} entityType="risk" />
               </TabsContent>
             )}

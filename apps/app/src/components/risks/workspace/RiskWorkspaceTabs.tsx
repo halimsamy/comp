@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  Button,
   PageHeader,
   PageLayout,
   Tabs,
@@ -12,6 +13,7 @@ import { parseAsStringLiteral, useQueryState } from 'nuqs';
 import type { ReactNode } from 'react';
 import { RiskActionTracker } from './RiskActionTracker';
 import { RiskLibrary } from './RiskLibrary';
+import { RiskLinkedControls } from './RiskLinkedControls';
 import { RiskReviews } from './RiskReviews';
 import type { WorkspaceMember } from './workspace-types';
 
@@ -36,6 +38,11 @@ export function RiskWorkspaceTabs({
   const [tab, setTab] = useQueryState(
     'tab',
     parseAsStringLiteral(TABS).withDefault('register'),
+  );
+
+  const [actionsView, setActionsView] = useQueryState(
+    'actions',
+    parseAsStringLiteral(['treatment', 'controls'] as const).withDefault('treatment'),
   );
 
   const handleTabChange = (value: string) => {
@@ -63,7 +70,33 @@ export function RiskWorkspaceTabs({
       >
         <TabsContent value="register">{register}</TabsContent>
         <TabsContent value="actions">
-          {tab === 'actions' && <RiskActionTracker orgId={orgId} members={members} />}
+          {tab === 'actions' && (
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-wrap gap-2" role="group" aria-label="Action tracker view">
+                {(
+                  [
+                    ['treatment', 'Treatment actions'],
+                    ['controls', 'Controls'],
+                  ] as const
+                ).map(([value, label]) => (
+                  <Button
+                    key={value}
+                    size="sm"
+                    variant={actionsView === value ? 'default' : 'outline'}
+                    aria-pressed={actionsView === value}
+                    onClick={() => void setActionsView(value === 'treatment' ? null : value)}
+                  >
+                    {label}
+                  </Button>
+                ))}
+              </div>
+              {actionsView === 'controls' ? (
+                <RiskLinkedControls orgId={orgId} />
+              ) : (
+                <RiskActionTracker orgId={orgId} members={members} />
+              )}
+            </div>
+          )}
         </TabsContent>
         <TabsContent value="library">
           {tab === 'library' && <RiskLibrary />}

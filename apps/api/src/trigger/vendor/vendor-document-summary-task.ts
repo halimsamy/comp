@@ -7,6 +7,7 @@ import { generateObject } from 'ai';
 import { z } from 'zod';
 import {
   assuranceFromDocument,
+  pciStatusFromDocument,
   resolveDocumentExpiry,
 } from '../../vendors/tpsp/vendor-assurance';
 import {
@@ -53,7 +54,14 @@ export const vendorDocumentSummaryTask = schemaTask({
       where: { id: documentId, organizationId },
       include: {
         attachment: { select: { name: true, url: true } },
-        vendor: { select: { id: true, name: true, assuranceExpiresAt: true } },
+        vendor: {
+          select: {
+            id: true,
+            name: true,
+            assuranceExpiresAt: true,
+            pciStatus: true,
+          },
+        },
       },
     });
     if (!document) return { success: false, reason: 'not_found' };
@@ -113,10 +121,19 @@ export const vendorDocumentSummaryTask = schemaTask({
         document: { type: document.type, periodStart, periodEnd, expiresAt },
         vendor: document.vendor,
       });
-      if (assurance) {
+      // The AOC opinion is the 12.8.4 status, unless an older AOC would
+      // overwrite a status already set from a newer one.
+      const pci =
+        assurance || !document.vendor.pciStatus
+          ? pciStatusFromDocument({
+              type: document.type,
+              opinion: summary.opinion,
+            })
+          : null;
+      if (assurance || pci) {
         await db.vendor.update({
           where: { id: document.vendor.id },
-          data: assurance,
+          data: { ...assurance, ...pci },
         });
       }
       logger.info('Vendor document summarized', { documentId });

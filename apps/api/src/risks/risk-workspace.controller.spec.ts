@@ -33,7 +33,12 @@ const employee: AuthContext = { ...admin, userRoles: ['employee'], memberId: 'me
 
 describe('RiskWorkspaceController', () => {
   let controller: RiskWorkspaceController;
-  const workspace = { getLibrary: jest.fn(), bulkCreate: jest.fn(), listActions: jest.fn() };
+  const workspace = {
+    getLibrary: jest.fn(),
+    bulkCreate: jest.fn(),
+    listActions: jest.fn(),
+    listLinkedTasks: jest.fn(),
+  };
   const reviews = { list: jest.fn(), get: jest.fn(), create: jest.fn() };
   const suggestions = { suggest: jest.fn() };
 
@@ -61,6 +66,7 @@ describe('RiskWorkspaceController', () => {
     ['bulkCreateRisks', 'create'],
     ['suggestRisks', 'create'],
     ['listActions', 'read'],
+    ['listLinkedTasks', 'read'],
     ['listReviews', 'read'],
     ['getReview', 'read'],
     ['createReview', 'update'],
@@ -110,7 +116,20 @@ describe('RiskWorkspaceController', () => {
       { title: 'A', description: 'd', category: 'technology', likelihood: 'possible', impact: 'major' },
     ] as const;
     workspace.bulkCreate.mockResolvedValue({ created: [], skipped: [] });
-    await controller.bulkCreateRisks({ risks: [...risks] }, ORG);
-    expect(workspace.bulkCreate).toHaveBeenCalledWith({ organizationId: ORG, risks: [...risks] });
+    await controller.bulkCreateRisks({ risks: [...risks] }, ORG, admin);
+    expect(workspace.bulkCreate).toHaveBeenCalledWith({
+      organizationId: ORG,
+      risks: [...risks],
+      ownerMemberId: 'mem_admin',
+    });
+  });
+
+  it('scopes linked controls to an employee’s own risks', async () => {
+    workspace.listLinkedTasks.mockResolvedValue([]);
+    await controller.listLinkedTasks(ORG, employee);
+    expect(workspace.listLinkedTasks).toHaveBeenCalledWith({
+      organizationId: ORG,
+      assignmentFilter: { assigneeId: 'mem_emp' },
+    });
   });
 });

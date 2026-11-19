@@ -50,6 +50,19 @@ export class RiskDraftDto {
   @IsString()
   @MaxLength(5000)
   treatmentStrategyDescription?: string;
+
+  @ApiPropertyOptional({
+    type: [String],
+    description:
+      'Framework references, e.g. "PCI DSS 6.4.3" or "ISO A.8.28". Stored on the risk and resolved to the org controls and evidence tasks, which are linked.',
+    example: ['PCI DSS 6.4.3', 'ISO A.8.28'],
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(30)
+  @IsString({ each: true })
+  @MaxLength(50, { each: true })
+  references?: string[];
 }
 
 export class BulkCreateRisksDto {

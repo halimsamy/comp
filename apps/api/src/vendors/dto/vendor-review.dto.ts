@@ -1,6 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsDateString,
   IsEnum,
@@ -9,7 +11,7 @@ import {
   MaxLength,
   ValidateNested,
 } from 'class-validator';
-import { VendorReviewOutcome } from '@db';
+import { VendorPciStatus, VendorReviewOutcome } from '@db';
 
 export class VendorReviewChecklistDto {
   @ApiProperty({ description: 'Current SOC 2 / ISO / AOC report reviewed' })
@@ -40,6 +42,41 @@ export class CreateVendorReviewDto {
   @ValidateNested()
   @Type(() => VendorReviewChecklistDto)
   checklist!: VendorReviewChecklistDto;
+
+  @ApiPropertyOptional({
+    enum: VendorPciStatus,
+    description:
+      'PCI DSS status the reviewer confirmed. Required (and not "unknown") when checklist.pciStatusConfirmed is true (PCI DSS 12.8.4).',
+    example: 'compliant',
+  })
+  @IsOptional()
+  @IsEnum(VendorPciStatus)
+  pciStatus?: VendorPciStatus;
+
+  @ApiPropertyOptional({
+    type: [String],
+    description:
+      'IDs of the vendor documents (SOC 2, ISO certificate, AOC, ...) the reviewer looked at.',
+    example: ['vdoc_abc123'],
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50)
+  @IsString({ each: true })
+  reviewedDocumentIds?: string[];
+
+  @ApiPropertyOptional({
+    type: [String],
+    description:
+      'Conditions of an "approved_with_conditions" outcome (at least one required). Each becomes an action on the vendor.',
+    example: ['Map CUEC 3 to our quarterly access review'],
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsString({ each: true })
+  @MaxLength(500, { each: true })
+  conditions?: string[];
 
   @ApiPropertyOptional({
     description: 'Reviewer notes, conditions or follow-ups',

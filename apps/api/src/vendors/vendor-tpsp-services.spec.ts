@@ -1,7 +1,6 @@
 import { NotFoundException } from '@nestjs/common';
 import { tasks } from '@trycompai/jobs';
 import { VendorDocumentsService } from './vendor-documents.service';
-import { VendorReviewsService } from './vendor-reviews.service';
 
 jest.mock('@db', () => ({
   ...jest.requireActual('@prisma/client'),
@@ -18,7 +17,8 @@ jest.mock('@db', () => ({
       update: jest.fn(),
     },
     vendorReview: { findMany: jest.fn(), create: jest.fn() },
-    taskItem: { updateMany: jest.fn() },
+    taskItem: { updateMany: jest.fn(), createMany: jest.fn() },
+    member: { findFirst: jest.fn() },
     user: { findUnique: jest.fn() },
     $transaction: jest.fn(),
   },
@@ -209,91 +209,5 @@ describe('VendorDocumentsService', () => {
       where: { id: 'vdoc_1', vendorId: 'vnd_1', organizationId: orgId },
     });
     expect(attachments.deleteAttachment).toHaveBeenCalledWith(orgId, 'att_1');
-  });
-});
-
-describe('VendorReviewsService', () => {
-  const service = new VendorReviewsService();
-  const checklist = {
-    assuranceReviewed: true,
-    pciStatusConfirmed: true,
-    contractReviewed: true,
-    riskReassessed: false,
-  };
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-    db.$transaction.mockImplementation(async (ops: unknown[]) => ops);
-    db.vendorReview.create.mockImplementation((args: unknown) => args);
-    db.vendor.update.mockImplementation((args: unknown) => args);
-    db.taskItem.updateMany.mockImplementation((args: unknown) => args);
-    db.user.findUnique.mockResolvedValue({ name: 'Ada', email: 'ada@x.com' });
-  });
-
-  it('404s for a vendor outside the organization', async () => {
-    db.vendor.findFirst.mockResolvedValue(null);
-    await expect(
-      service.signOff({
-        vendorId: 'vnd_x',
-        organizationId: orgId,
-        userId: 'usr_1',
-        dto: { outcome: 'approved', checklist },
-      }),
-    ).rejects.toBeInstanceOf(NotFoundException);
-  });
-
-  it('signs off, schedules the next review by cadence and records the PCI check', async () => {
-    db.vendor.findFirst.mockResolvedValue({
-      id: 'vnd_1',
-      criticality: 'critical',
-      handlesCardholderData: true,
-      affectsCdeSecurity: false,
-    });
-    const before = Date.now();
-    const review = (await service.signOff({
-      vendorId: 'vnd_1',
-      organizationId: orgId,
-      userId: 'usr_1',
-      dto: { outcome: 'approved', checklist, notes: 'ok' },
-    })) as unknown as {
-      data: { nextReviewDue: Date; reviewedByName: string };
-    };
-
-    expect(review.data.reviewedByName).toBe('Ada');
-    const months =
-      (review.data.nextReviewDue.getTime() - before) / (30 * 86_400_000);
-    expect(months).toBeGreaterThan(5.8);
-    expect(months).toBeLessThan(6.3);
-    const vendorUpdate = db.vendor.update.mock.calls[0][0];
-    expect(vendorUpdate.data.pciStatusCheckedAt).toBeInstanceOf(Date);
-    expect(db.taskItem.updateMany.mock.calls[0][0].where).toMatchObject({
-      organizationId: orgId,
-      entityId: 'vnd_1',
-      title: 'Complete periodic vendor review',
-    });
-  });
-
-  it('uses an explicit next review date and skips the PCI check when unconfirmed', async () => {
-    db.vendor.findFirst.mockResolvedValue({
-      id: 'vnd_1',
-      criticality: null,
-      handlesCardholderData: false,
-      affectsCdeSecurity: false,
-    });
-    await service.signOff({
-      vendorId: 'vnd_1',
-      organizationId: orgId,
-      userId: 'usr_1',
-      dto: {
-        outcome: 'approved_with_conditions',
-        checklist: { ...checklist, pciStatusConfirmed: false },
-        nextReviewDue: '2027-01-01T00:00:00Z',
-      },
-    });
-    const vendorUpdate = db.vendor.update.mock.calls[0][0];
-    expect(vendorUpdate.data.nextReviewDue).toEqual(
-      new Date('2027-01-01T00:00:00Z'),
-    );
-    expect(vendorUpdate.data.pciStatusCheckedAt).toBeUndefined();
   });
 });

@@ -6,6 +6,7 @@ import type { ApiResponse } from '@/lib/api-client';
 import { fileToBase64 } from '@/lib/file-utils';
 import type {
   VendorCriticality,
+  VendorPciStatus,
   VendorDocumentSummaryStatus,
   VendorDocumentType,
   VendorReviewOutcome,
@@ -25,6 +26,8 @@ export interface VendorDocumentAiSummary {
   exceptions: { control: string; description: string }[];
   complementaryUserEntityControls: string[];
   subserviceOrganizations: string[];
+  /** PCI DSS AOC only (summaries made after Nov 2026): who manages requirements 1-12. */
+  pciResponsibilities?: { requirement: string; owner: 'tpsp' | 'entity' | 'shared' }[];
   keyRisks: string[];
   summary: string;
 }
@@ -57,6 +60,9 @@ export interface VendorReview {
   notes: string | null;
   checklist: VendorReviewChecklist;
   criticality: VendorCriticality | null;
+  pciStatus?: VendorPciStatus | null;
+  reviewedDocumentIds?: string[];
+  conditions?: string[];
   reviewedByName: string;
   reviewedAt: string;
   nextReviewDue: string;
@@ -74,6 +80,11 @@ export interface UploadVendorDocumentInput {
 export interface SignOffVendorReviewInput {
   outcome: VendorReviewOutcome;
   checklist: VendorReviewChecklist;
+  /** Required (and not "unknown") when checklist.pciStatusConfirmed. */
+  pciStatus?: VendorPciStatus;
+  reviewedDocumentIds?: string[];
+  /** Required for approved_with_conditions; each becomes a vendor action. */
+  conditions?: string[];
   notes?: string;
   nextReviewDue?: string;
 }

@@ -8,7 +8,20 @@ import {
   type RiskLibraryTemplate,
 } from '@/hooks/use-risk-workspace';
 import { getRiskLevelFromScore, getRiskScore, LEVEL_LABEL } from '@/lib/risk-score';
-import { Badge, Button, Spinner, Text } from '@trycompai/design-system';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  Badge,
+  Button,
+  Spinner,
+  Text,
+} from '@trycompai/design-system';
 import { Add, CheckmarkFilled } from '@trycompai/design-system/icons';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -38,6 +51,7 @@ export function RiskLibrary() {
   const { hasPermission } = usePermissions();
   const canCreate = hasPermission('risk', 'create');
   const [adding, setAdding] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState<RiskLibraryTemplate | null>(null);
   const groups = useMemo(() => groupTemplates(templates), [templates]);
   const addedCount = templates.filter((template) => template.added).length;
 
@@ -52,10 +66,18 @@ export function RiskLibrary() {
           likelihood: template.likelihood,
           impact: template.impact,
           treatmentStrategyDescription: template.treatment,
+          references: template.references,
         },
       ]);
       await Promise.all([mutate(), refreshRisks()]);
-      toast.success(result.created.length > 0 ? 'Risk added to the register' : 'Already in the register');
+      const created = result.created[0];
+      toast.success(
+        created
+          ? `${created.ref ?? 'Risk'} added with a treatment action${
+              created.linkedTasks ? ` and ${created.linkedTasks} linked evidence tasks` : ''
+            }`
+          : 'Already in the register',
+      );
     } catch (caught) {
       toast.error(caught instanceof Error ? caught.message : 'Failed to add the risk');
     } finally {
@@ -126,7 +148,11 @@ export function RiskLibrary() {
                           iconLeft={<Add size={14} />}
                           loading={adding === template.id}
                           disabled={adding !== null}
-                          onClick={() => void handleAdd(template)}
+                          onClick={() =>
+                            template.recommendedControls
+                              ? setConfirming(template)
+                              : void handleAdd(template)
+                          }
                         >
                           Add to register
                         </Button>
@@ -139,6 +165,35 @@ export function RiskLibrary() {
           </section>
         ))
       )}
+
+      <AlertDialog open={confirming !== null} onOpenChange={(open) => !open && setConfirming(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Link {confirming?.recommendedControls} recommended control
+              {confirming?.recommendedControls === 1 ? '' : 's'}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              &quot;{confirming?.title}&quot; is added with you as owner and a treatment action due in
+              90 days. Its references ({confirming?.references.join(', ')}) match controls in your
+              frameworks; their evidence tasks are linked as the treatment&apos;s controls. You can
+              unlink them later.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                const template = confirming;
+                setConfirming(null);
+                if (template) void handleAdd(template);
+              }}
+            >
+              Add and link
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

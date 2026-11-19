@@ -1,10 +1,21 @@
-import type { VendorTpspFields } from '@/hooks/use-vendors';
+import type { ResponsibilityMatrixRow, VendorTpspFields } from '@/hooks/use-vendors';
 import { daysUntil } from '../../../lib/vendor-tpsp';
 
 export interface TpspCheck {
   id: string;
   label: string;
   done: boolean;
+}
+
+/**
+ * 12.8.5 is done only when every row was confirmed against the TPSP and each
+ * shared requirement says how the work is split.
+ */
+export function isMatrixComplete(rows: ResponsibilityMatrixRow[] | null | undefined): boolean {
+  if (!rows?.length) return false;
+  return rows.every(
+    (row) => row.confirmed && (row.owner !== 'shared' || Boolean(row.notes?.trim())),
+  );
 }
 
 /**
@@ -24,8 +35,12 @@ export function tpspChecklist({
     vendor.assuranceType !== 'none' &&
     (!vendor.assuranceExpiresAt || daysUntil({ date: vendor.assuranceExpiresAt, now }) >= 0),
   );
+  // 12.8.4: a real status (not "unknown") checked within the last 12 months.
   const pciCheckedRecently = Boolean(
-    vendor.pciStatusCheckedAt && daysUntil({ date: vendor.pciStatusCheckedAt, now }) > -365,
+    vendor.pciStatus &&
+    vendor.pciStatus !== 'unknown' &&
+    vendor.pciStatusCheckedAt &&
+    daysUntil({ date: vendor.pciStatusCheckedAt, now }) > -365,
   );
   const checks: (TpspCheck | false)[] = [
     { id: 'criticality', label: 'Criticality classified', done: Boolean(vendor.criticality) },
@@ -43,8 +58,8 @@ export function tpspChecklist({
     },
     inPciScope && {
       id: 'matrix',
-      label: 'Responsibility matrix (12.8.5)',
-      done: (vendor.responsibilityMatrix?.length ?? 0) > 0,
+      label: 'Responsibility matrix confirmed (12.8.5)',
+      done: isMatrixComplete(vendor.responsibilityMatrix),
     },
     inPciScope && {
       id: 'pci-status',

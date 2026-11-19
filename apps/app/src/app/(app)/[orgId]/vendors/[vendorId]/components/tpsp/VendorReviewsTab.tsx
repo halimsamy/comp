@@ -1,6 +1,10 @@
 'use client';
 
-import { useVendorReviews, type SignOffVendorReviewInput } from '@/hooks/use-vendor-tpsp';
+import {
+  useVendorDocuments,
+  useVendorReviews,
+  type SignOffVendorReviewInput,
+} from '@/hooks/use-vendor-tpsp';
 import { useVendor } from '@/hooks/use-vendors';
 import {
   Badge,
@@ -17,6 +21,7 @@ import { toast } from 'sonner';
 import {
   daysUntil,
   formatDate,
+  PCI_STATUS,
   REVIEW_OUTCOME,
   REVIEW_STATUS,
   reviewCadenceMonths,
@@ -48,6 +53,8 @@ export function VendorReviewsTab({
 }) {
   const { vendor, mutate: refreshVendor } = useVendor(vendorId);
   const { reviews, error, isLoading, signOffReview } = useVendorReviews(vendorId);
+  const { documents } = useVendorDocuments(vendorId);
+  const inPciScope = Boolean(vendor?.handlesCardholderData || vendor?.affectsCdeSecurity);
   const [signing, setSigning] = useState(false);
 
   const status = REVIEW_STATUS[vendor?.reviewStatus ?? 'never_reviewed'];
@@ -136,9 +143,17 @@ export function VendorReviewsTab({
                           <CircleDash size={14} />
                         )}
                         {CHECK_LABELS[key]}
+                        {key === 'pciStatusConfirmed' && review.pciStatus
+                          ? `: ${PCI_STATUS[review.pciStatus].label}`
+                          : ''}
                       </span>
                     ))}
                   </div>
+                  {(review.conditions?.length ?? 0) > 0 && (
+                    <ul className="flex list-disc flex-col gap-0.5 pl-5 text-sm">
+                      {review.conditions?.map((condition) => <li key={condition}>{condition}</li>)}
+                    </ul>
+                  )}
                   {review.notes && (
                     <p className="whitespace-pre-wrap text-sm text-muted-foreground">
                       {review.notes}
@@ -156,6 +171,9 @@ export function VendorReviewsTab({
         onOpenChange={setSigning}
         cadenceLabel={cadenceLabel}
         onSignOff={handleSignOff}
+        inPciScope={inPciScope}
+        documents={documents}
+        currentPciStatus={vendor?.pciStatus}
       />
     </div>
   );

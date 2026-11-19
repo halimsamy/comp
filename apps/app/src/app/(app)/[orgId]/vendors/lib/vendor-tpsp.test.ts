@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_TPSP_FILTERS,
   expiryLabel,
+  filtersFromSearchParams,
   matchesTpspFilters,
   reviewCadenceMonths,
 } from './vendor-tpsp';
@@ -21,7 +22,37 @@ describe('expiryLabel', () => {
 });
 
 describe('matchesTpspFilters', () => {
-  const vendor = { criticality: null, reviewStatus: 'overdue' as const, expiringDocumentsCount: 0 };
+  const vendor = {
+    criticality: null,
+    reviewStatus: 'overdue' as const,
+    expiringDocumentsCount: 0,
+    status: 'assessed' as const,
+    attentionReasons: ['review_overdue' as const],
+  };
+
+  it('filters unassessed vendors and vendors needing attention', () => {
+    const notAssessed = { ...DEFAULT_TPSP_FILTERS, assessment: 'not_assessed' as const };
+    expect(matchesTpspFilters({ vendor, filters: notAssessed })).toBe(false);
+    expect(
+      matchesTpspFilters({ vendor: { ...vendor, status: 'not_assessed' }, filters: notAssessed }),
+    ).toBe(true);
+    const attention = { ...DEFAULT_TPSP_FILTERS, assessment: 'needs_attention' as const };
+    expect(matchesTpspFilters({ vendor, filters: attention })).toBe(true);
+    expect(
+      matchesTpspFilters({ vendor: { ...vendor, attentionReasons: [] }, filters: attention }),
+    ).toBe(false);
+  });
+
+  it('reads filters from the URL', () => {
+    const params = new URLSearchParams('status=not_assessed&criticality=unset');
+    expect(filtersFromSearchParams(params)).toMatchObject({
+      assessment: 'not_assessed',
+      criticality: 'unset',
+    });
+    expect(filtersFromSearchParams(new URLSearchParams('criticality=bogus'))).toEqual(
+      DEFAULT_TPSP_FILTERS,
+    );
+  });
 
   it('passes everything with the default filters', () => {
     expect(matchesTpspFilters({ vendor, filters: DEFAULT_TPSP_FILTERS })).toBe(true);

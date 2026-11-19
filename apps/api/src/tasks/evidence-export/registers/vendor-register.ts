@@ -32,7 +32,7 @@ export async function buildVendorRegisterCsv({
   organizationId,
 }: RegisterParams): Promise<string> {
   const vendors = await db.vendor.findMany({
-    where: { organizationId },
+    where: { organizationId, archivedAt: null },
     include: {
       assignee: { select: { user: { select: { name: true, email: true } } } },
       contacts: { select: { name: true, email: true } },

@@ -94,6 +94,43 @@ describe('vendorDocumentSummaryTask', () => {
     });
   });
 
+  it('sets the PCI DSS status from a compliant or non-compliant AOC', async () => {
+    mocked.vendorDocument.findFirst.mockResolvedValue({
+      ...baseDocument,
+      type: 'pci_aoc',
+      attachment: { name: 'aoc.pdf', url: 'x' },
+      vendor: { ...baseDocument.vendor, pciStatus: null },
+    });
+    (generateObject as jest.Mock).mockResolvedValue({
+      object: {
+        periodStart: null,
+        periodEnd: '2026-06-30',
+        expiresAt: null,
+        opinion: 'non_compliant',
+      },
+    });
+    await run({ documentId: 'vdoc_1', organizationId: 'org_1' });
+    const { data } = mocked.vendor.update.mock.calls[0][0];
+    expect(data).toMatchObject({
+      assuranceType: 'pci_aoc',
+      pciStatus: 'non_compliant',
+    });
+    expect(data.pciStatusCheckedAt).toBeInstanceOf(Date);
+  });
+
+  it('leaves the PCI status alone when the AOC opinion is unclear', async () => {
+    mocked.vendorDocument.findFirst.mockResolvedValue({
+      ...baseDocument,
+      type: 'pci_aoc',
+      attachment: { name: 'aoc.pdf', url: 'x' },
+    });
+    (generateObject as jest.Mock).mockResolvedValue({
+      object: { periodStart: null, periodEnd: null, expiresAt: null, opinion: 'not_stated' },
+    });
+    await run({ documentId: 'vdoc_1', organizationId: 'org_1' });
+    expect(mocked.vendor.update).not.toHaveBeenCalled();
+  });
+
   it('marks the summary failed for unsupported files without calling the model', async () => {
     mocked.vendorDocument.findFirst.mockResolvedValue({
       ...baseDocument,

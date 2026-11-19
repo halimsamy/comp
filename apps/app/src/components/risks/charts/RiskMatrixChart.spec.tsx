@@ -3,6 +3,8 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { RiskMatrixChart } from './RiskMatrixChart';
 
+vi.mock('@/hooks/use-risk-workspace', () => ({ useRiskSettings: () => ({ settings: null }) }));
+
 describe('RiskMatrixChart', () => {
   it('renders the legend', () => {
     render(

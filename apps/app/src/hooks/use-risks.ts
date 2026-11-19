@@ -35,6 +35,8 @@ export interface RiskAssignee {
 
 export interface Risk {
   id: string;
+  /** Human-readable per-org reference, e.g. R-001. */
+  ref?: string | null;
   title: string;
   description: string;
   category: RiskCategory;

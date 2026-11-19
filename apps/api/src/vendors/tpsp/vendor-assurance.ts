@@ -1,4 +1,8 @@
-import type { VendorAssuranceType, VendorDocumentType } from '@db';
+import type {
+  VendorAssuranceType,
+  VendorDocumentType,
+  VendorPciStatus,
+} from '@db';
 import { addMonths } from './vendor-review-status';
 
 /** Document types that count as the vendor's independent assurance. */
@@ -70,4 +74,22 @@ export function assuranceFromDocument({
     assurancePeriodEnd: document.periodEnd,
     assuranceExpiresAt: document.expiresAt,
   };
+}
+
+/**
+ * PCI DSS 12.8.4 status read from an AOC's opinion. Only a clear compliant /
+ * non-compliant AOC sets it; anything else leaves the status for a human.
+ */
+export function pciStatusFromDocument({
+  type,
+  opinion,
+  now = new Date(),
+}: {
+  type: VendorDocumentType;
+  opinion: string | null | undefined;
+  now?: Date;
+}): { pciStatus: VendorPciStatus; pciStatusCheckedAt: Date } | null {
+  if (type !== 'pci_aoc') return null;
+  if (opinion !== 'compliant' && opinion !== 'non_compliant') return null;
+  return { pciStatus: opinion, pciStatusCheckedAt: now };
 }

@@ -8,6 +8,7 @@ import {
   resolveDocumentExpiry,
 } from './vendor-assurance';
 import {
+  ARCHIVE_OR_RENEW_TASK_TITLE,
   CONTRACT_RENEWAL_TASK_TITLE,
   documentRenewalTitle,
   planVendorReminders,
@@ -71,10 +72,12 @@ describe('vendorComplianceSummary', () => {
         lastReviewedAt: null,
         nextReviewDue: daysFromNow(200),
         documents: [
-          { expiresAt: daysFromNow(300) },
-          { expiresAt: daysFromNow(20) },
-          { expiresAt: null },
-          { expiresAt: daysFromNow(-5) },
+          { type: 'soc2_type2', expiresAt: daysFromNow(300) },
+          { type: 'pci_aoc', expiresAt: daysFromNow(20) },
+          { type: 'dpa', expiresAt: null },
+          { type: 'iso27001_certificate', expiresAt: daysFromNow(-5) },
+          // Superseded by the newer SOC 2 above: not counted.
+          { type: 'soc2_type2', expiresAt: daysFromNow(-50) },
         ],
       },
       now,
@@ -136,6 +139,8 @@ describe('planVendorReminders', () => {
     criticality: 'medium',
     handlesCardholderData: false,
     affectsCdeSecurity: false,
+    inherentProbability: 'possible',
+    inherentImpact: 'moderate',
     lastReviewedAt: daysFromNow(-360),
     nextReviewDue: daysFromNow(5),
     contractEndDate: null,
@@ -220,7 +225,7 @@ describe('planVendorReminders', () => {
     expect(planned[0].priority).toBe('high');
   });
 
-  it('stops reminding about contracts that ended long ago', () => {
+  it('proposes archive or renew once the contract has ended', () => {
     expect(
       planVendorReminders({
         vendor: {
@@ -228,6 +233,33 @@ describe('planVendorReminders', () => {
           nextReviewDue: daysFromNow(200),
           contractEndDate: daysFromNow(-90),
         },
+        existingTitles: new Set(),
+        now,
+      }).map((p) => p.title),
+    ).toEqual([ARCHIVE_OR_RENEW_TASK_TITLE]);
+  });
+
+  it('asks for a review of unclassified vendors with a high inherent risk', () => {
+    const planned = planVendorReminders({
+      vendor: {
+        ...vendor,
+        criticality: null,
+        inherentProbability: 'likely',
+        inherentImpact: 'major',
+        lastReviewedAt: null,
+        nextReviewDue: null,
+      },
+      existingTitles: new Set(),
+      now,
+    });
+    expect(planned[0]).toMatchObject({ title: VENDOR_REVIEW_TASK_TITLE });
+    expect(planned[0].description).toContain('Set its criticality first');
+  });
+
+  it('never reminds about archived vendors', () => {
+    expect(
+      planVendorReminders({
+        vendor: { ...vendor, archivedAt: daysFromNow(-1) },
         existingTitles: new Set(),
         now,
       }),

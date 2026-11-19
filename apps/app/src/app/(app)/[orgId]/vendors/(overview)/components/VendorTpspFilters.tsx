@@ -14,6 +14,7 @@ import {
   CRITICALITY_OPTIONS,
   daysUntil,
   REVIEW_STATUS,
+  type AssessmentFilter,
   type CriticalityFilter,
   type DocumentFilter,
   type VendorTpspFilters as Filters,
@@ -32,6 +33,12 @@ const REVIEW_ITEMS: { value: ReviewFilter; label: string }[] = [
   { value: 'due_soon', label: 'Review due soon' },
   { value: 'never_reviewed', label: 'Never reviewed' },
   { value: 'current', label: 'Reviewed' },
+];
+
+const ASSESSMENT_ITEMS: { value: AssessmentFilter; label: string }[] = [
+  { value: 'all', label: 'All vendors' },
+  { value: 'needs_attention', label: 'Needs attention' },
+  { value: 'not_assessed', label: 'Not assessed' },
 ];
 
 const DOCUMENT_ITEMS: { value: DocumentFilter; label: string }[] = [
@@ -68,7 +75,7 @@ function FilterSelect<T extends string>({
   );
 }
 
-/** Criticality, review status and expiring-document filters for the vendors table. */
+/** Attention, criticality, review status and expiring-document filters for the vendors table. */
 export function VendorTpspFilters({
   filters,
   onChange,
@@ -78,6 +85,12 @@ export function VendorTpspFilters({
 }) {
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+      <FilterSelect
+        label="Assessment"
+        value={filters.assessment}
+        items={ASSESSMENT_ITEMS}
+        onChange={(assessment) => onChange({ ...filters, assessment })}
+      />
       <FilterSelect
         label="Criticality"
         value={filters.criticality}

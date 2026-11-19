@@ -2521,6 +2521,7 @@ export class TrustAccessService {
       where: {
         organizationId: trust.organizationId,
         showOnTrustPortal: true,
+        archivedAt: null,
       },
       orderBy: [{ trustPortalOrder: 'asc' }, { name: 'asc' }],
       select: {

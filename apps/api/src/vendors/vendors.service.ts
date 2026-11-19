@@ -13,7 +13,12 @@ import type { TriggerVendorRiskAssessmentVendorDto } from './dto/trigger-vendor-
 import { resolveTaskCreatorAndAssignee } from '../trigger/vendor/vendor-risk-assessment/assignee';
 import { resolveStrategyDescriptionUpdate } from '../risks/strategy-descriptions';
 import { isMemberOrgParticipant } from '../utils/org-participation';
-import { vendorComplianceSummary } from './tpsp/vendor-review-status';
+import { OwnershipNotifier } from '../notifications/ownership-notifier.service';
+import {
+  vendorComplianceSummary,
+  vendorNeedsAttention,
+} from './tpsp/vendor-review-status';
+import type { ListVendorsQueryDto } from './dto/list-vendors-query.dto';
 import {
   responsibilityMatrixUpdate,
   tpspDateUpdate,
@@ -70,6 +75,7 @@ const VERIFY_RISK_ASSESSMENT_TASK_TITLE = 'Verify risk assessment' as const;
 @Injectable()
 export class VendorsService {
   private readonly logger = new Logger(VendorsService.name);
+  constructor(private readonly owners: OwnershipNotifier) {}
 
   async searchGlobal(name: string) {
     const whereClause = name.trim()
@@ -95,10 +101,21 @@ export class VendorsService {
     return { vendors };
   }
 
-  async findAllByOrganization(organizationId: string) {
+  async findAllByOrganization(
+    organizationId: string,
+    filters: ListVendorsQueryDto = {},
+  ) {
     try {
+      const { criticality } = filters;
       const vendors = await db.vendor.findMany({
-        where: { organizationId },
+        where: {
+          organizationId,
+          archivedAt: filters.archived ? { not: null } : null,
+          ...(filters.status && { status: filters.status }),
+          ...(criticality && {
+            criticality: criticality === 'unset' ? null : criticality,
+          }),
+        },
         orderBy: { createdAt: 'desc' },
         include: {
           assignee: {
@@ -118,7 +135,7 @@ export class VendorsService {
           // reflects treatment progress, not just the static residual
           // probability/impact. Mirrors the risks service.
           tasks: { select: { id: true, status: true } },
-          documents: { select: { expiresAt: true } },
+          documents: { select: { type: true, expiresAt: true } },
         },
       });
 
@@ -126,10 +143,17 @@ export class VendorsService {
         `Retrieved ${vendors.length} vendors for organization ${organizationId}`,
       );
       const now = new Date();
-      return vendors.map((vendor) => {
+      const rows = vendors.map((vendor) => {
         const { documents, ...vendorFields } = vendor;
-        return { ...vendorFields, ...vendorComplianceSummary({ vendor, now }) };
+        return {
+          ...vendorFields,
+          ...vendorComplianceSummary({ vendor, now }),
+          attentionReasons: vendorNeedsAttention({ vendor, now }),
+        };
       });
+      return filters.attention
+        ? rows.filter((row) => row.attentionReasons.length > 0)
+        : rows;
     } catch (error) {
       this.logger.error(
         `Failed to retrieve vendors for organization ${organizationId}:`,
@@ -167,7 +191,7 @@ export class VendorsService {
               controls: { select: { id: true, name: true } },
             },
           },
-          documents: { select: { expiresAt: true } },
+          documents: { select: { type: true, expiresAt: true } },
         },
       });
 
@@ -214,6 +238,7 @@ export class VendorsService {
       const vendorWithRiskAssessment = {
         ...vendorFields,
         ...vendorComplianceSummary({ vendor }),
+        attentionReasons: vendorNeedsAttention({ vendor }),
         riskAssessmentData: globalVendorData?.riskAssessmentData ?? null,
         riskAssessmentVersion: globalVendorData?.riskAssessmentVersion ?? null,
         riskAssessmentUpdatedAt:
@@ -640,6 +665,7 @@ export class VendorsService {
     id: string,
     organizationId: string,
     updateVendorDto: UpdateVendorDto,
+    actorUserId?: string,
   ) {
     try {
       // First check if the vendor exists in the organization
@@ -674,6 +700,19 @@ export class VendorsService {
         },
       });
 
+      if (
+        updatedVendor.assigneeId &&
+        updatedVendor.assigneeId !== existing.assigneeId
+      ) {
+        void this.owners.notify({
+          organizationId,
+          memberId: updatedVendor.assigneeId,
+          entityType: 'vendor',
+          entityName: updatedVendor.name,
+          url: `/vendors/${id}`,
+          assignedByUserId: actorUserId,
+        });
+      }
       this.logger.log(`Updated vendor: ${updatedVendor.name} (${id})`);
       return updatedVendor;
     } catch (error) {

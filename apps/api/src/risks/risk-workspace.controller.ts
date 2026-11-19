@@ -21,6 +21,7 @@ import {
   ListRiskActionsQueryDto,
 } from './dto/risk-workspace.dto';
 import { loadRiskMethodologySettings } from './load-risk-methodology-settings';
+import { loadRiskScaleDescriptions } from './risk-scale-descriptions';
 import { RiskReviewsService } from './risk-reviews.service';
 import { RiskSuggestionsService } from './risk-suggestions.service';
 import { RiskWorkspaceService } from './risk-workspace.service';
@@ -46,10 +47,14 @@ export class RiskWorkspaceController {
   @ApiOperation({
     summary: 'Get risk methodology settings',
     description:
-      'Returns the settings the ISMS 6.1.2 Risk Assessment Methodology sets for the Risks module: the lowest residual level that needs risk-owner acceptance and the months between periodic risk reviews.',
+      'Returns the settings the ISMS 6.1.2 Risk Assessment Methodology sets for the Risks module: the lowest residual level that needs risk-owner acceptance, the months between periodic risk reviews, and the definition of each likelihood and impact level (ascending).',
   })
   async getSettings(@OrganizationId() organizationId: string) {
-    return loadRiskMethodologySettings({ organizationId });
+    const [settings, scale] = await Promise.all([
+      loadRiskMethodologySettings({ organizationId }),
+      loadRiskScaleDescriptions({ organizationId }),
+    ]);
+    return { ...settings, ...scale };
   }
 
   @Get('library')
@@ -68,14 +73,19 @@ export class RiskWorkspaceController {
   @ApiOperation({
     summary: 'Add several risks at once',
     description:
-      'Creates up to 50 risks from library templates or AI suggestions. Titles already in the register are skipped and returned in skipped.',
+      'Creates up to 50 risks from library templates or AI suggestions. Titles already in the register are skipped and returned in skipped. Each new risk is owned by the caller, linked to the evidence tasks of the controls its references map to, and gets a treatment action due in 90 days.',
   })
   @ApiBody({ type: BulkCreateRisksDto })
   async bulkCreateRisks(
     @Body() body: BulkCreateRisksDto,
     @OrganizationId() organizationId: string,
+    @AuthContext() authContext: AuthContextType,
   ) {
-    return this.workspace.bulkCreate({ organizationId, risks: body.risks });
+    return this.workspace.bulkCreate({
+      organizationId,
+      risks: body.risks,
+      ownerMemberId: authContext.memberId,
+    });
   }
 
   @Post('suggestions')
@@ -108,6 +118,27 @@ export class RiskWorkspaceController {
     );
     return {
       data: await this.workspace.listActions({ organizationId, query, assignmentFilter }),
+    };
+  }
+
+  @Get('linked-tasks')
+  @RequirePermission('risk', 'read')
+  @ApiOperation({
+    summary: 'List evidence tasks linked to risks',
+    description:
+      'Lists the control evidence tasks linked to each risk with status, owner, due date and controls: the controls side of the risk treatment plan (ISO 27001 6.1.3).',
+  })
+  async listLinkedTasks(
+    @OrganizationId() organizationId: string,
+    @AuthContext() authContext: AuthContextType,
+  ) {
+    const assignmentFilter = buildRiskAssignmentFilter(
+      authContext.memberId,
+      authContext.userRoles,
+      { isApiKey: authContext.isApiKey },
+    );
+    return {
+      data: await this.workspace.listLinkedTasks({ organizationId, assignmentFilter }),
     };
   }
 

@@ -59,7 +59,7 @@ export class RiskSuggestionsService {
       }),
       db.risk.findMany({ where: { organizationId }, select: { title: true } }),
       db.vendor.findMany({
-        where: { organizationId },
+        where: { organizationId, archivedAt: null },
         select: { name: true, category: true, description: true },
         take: 60,
       }),

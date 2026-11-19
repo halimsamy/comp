@@ -1,4 +1,4 @@
-import type { Vendor, VendorReviewStatus } from '@/hooks/use-vendors';
+import type { Vendor, VendorAttentionReason, VendorReviewStatus } from '@/hooks/use-vendors';
 import type {
   VendorAssuranceType,
   VendorCriticality,
@@ -112,26 +112,57 @@ export function expiryLabel({
 export type CriticalityFilter = VendorCriticality | 'unset' | 'all';
 export type ReviewFilter = VendorReviewStatus | 'all';
 export type DocumentFilter = 'expiring' | 'all';
+export type AssessmentFilter = 'all' | 'not_assessed' | 'needs_attention';
 
 export interface VendorTpspFilters {
   criticality: CriticalityFilter;
   review: ReviewFilter;
   documents: DocumentFilter;
+  assessment: AssessmentFilter;
 }
 
 export const DEFAULT_TPSP_FILTERS: VendorTpspFilters = {
   criticality: 'all',
   review: 'all',
   documents: 'all',
+  assessment: 'all',
+};
+
+/**
+ * Filters from the URL, so dashboard links like `?status=not_assessed`,
+ * `?criticality=unset` or `?attention=true` open the list pre-filtered.
+ */
+export function filtersFromSearchParams(params: { get: (key: string) => string | null }) {
+  const filters = { ...DEFAULT_TPSP_FILTERS };
+  const criticality = params.get('criticality');
+  if (criticality && ['unset', ...CRITICALITY_OPTIONS.map((o) => o.value)].includes(criticality)) {
+    filters.criticality = criticality as CriticalityFilter;
+  }
+  if (params.get('status') === 'not_assessed') filters.assessment = 'not_assessed';
+  if (params.get('attention') === 'true') filters.assessment = 'needs_attention';
+  return filters;
+}
+
+export const ATTENTION_REASON_LABEL: Record<VendorAttentionReason, string> = {
+  not_assessed: 'Not assessed',
+  criticality_not_set: 'Criticality not set',
+  review_overdue: 'Review overdue',
+  never_reviewed_in_scope: 'Never reviewed',
+  docs_expiring: 'Documents expiring',
 };
 
 export function matchesTpspFilters({
   vendor,
   filters,
 }: {
-  vendor: Pick<Vendor, 'criticality' | 'reviewStatus' | 'expiringDocumentsCount'>;
+  vendor: Pick<
+    Vendor,
+    'criticality' | 'reviewStatus' | 'expiringDocumentsCount' | 'status' | 'attentionReasons'
+  >;
   filters: VendorTpspFilters;
 }): boolean {
+  if (filters.assessment === 'not_assessed' && vendor.status !== 'not_assessed') return false;
+  if (filters.assessment === 'needs_attention' && !vendor.attentionReasons?.length) return false;
   if (filters.criticality !== 'all' && (vendor.criticality ?? 'unset') !== filters.criticality) {
     return false;
   }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { RiskTreatmentAction } from '@/hooks/use-risk-workspace';
 import { isAcceptanceRequired } from '@/hooks/use-risk-workspace';
-import { countActions, filterActions } from './action-filters';
+import { closesLastOpenAction, countActions, filterActions } from './action-filters';
 import { buildHeatmapCounts, formatHeatmapCell, parseHeatmapCell, riskInCell } from './heatmap-cells';
 import { registerGroup, sortByGroup } from './register-grouping';
 import { buildRiskActionsCsv } from './risk-actions-csv';
@@ -39,6 +39,21 @@ describe('action filters', () => {
     expect(filterActions({ actions, filter: 'open', ownerId: 'all' }).map((a) => a.id)).toEqual(['a', 'd']);
     expect(filterActions({ actions, filter: 'all', ownerId: 'none' }).map((a) => a.id)).toEqual(['c', 'd']);
     expect(filterActions({ actions, filter: 'all', ownerId: 'mem_1' }).map((a) => a.id)).toEqual(['a', 'b']);
+  });
+});
+
+describe('closesLastOpenAction', () => {
+  const risk = { id: 'rsk_1', title: 'R', status: 'open' as const };
+  const act = (id: string, status: RiskTreatmentAction['status'], riskId = 'rsk_1') =>
+    ({ id, status, risk: { ...risk, id: riskId } }) as RiskTreatmentAction;
+
+  it('is true only when no other action on the same risk is open', () => {
+    expect(closesLastOpenAction({ actions: [act('a', 'todo'), act('b', 'done')], actionId: 'a' })).toBe(true);
+    expect(closesLastOpenAction({ actions: [act('a', 'todo'), act('b', 'in_progress')], actionId: 'a' })).toBe(false);
+    expect(
+      closesLastOpenAction({ actions: [act('a', 'todo'), act('b', 'todo', 'rsk_2')], actionId: 'a' }),
+    ).toBe(true);
+    expect(closesLastOpenAction({ actions: [], actionId: 'a' })).toBe(false);
   });
 });
 

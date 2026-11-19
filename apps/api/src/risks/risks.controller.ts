@@ -225,6 +225,7 @@ export class RisksController {
       riskId,
       organizationId,
       updateRiskDto,
+      authContext.userId,
     );
 
     return {

@@ -2,7 +2,6 @@
 
 import { OnboardingLoadingAnimation } from '@/components/onboarding-loading-animation';
 import { RiskScoreBadge } from '@/components/risks/RiskScoreBadge';
-import { VendorStatus } from '@/components/vendor-status';
 import { usePermissions } from '@/hooks/use-permissions';
 import { useVendors, useVendorActions, type Vendor } from '@/hooks/use-vendors';
 import { getRiskScore } from '@/lib/risk-score';
@@ -25,6 +24,7 @@ import {
   AvatarFallback,
   AvatarImage,
   Badge,
+  Checkbox,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -49,12 +49,13 @@ import {
 } from '@trycompai/design-system';
 import { OverflowMenuVertical, Search, TrashCan } from '@trycompai/design-system/icons';
 import { ArrowDown, ArrowUp, ArrowUpDown, Loader2, UserIcon } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { useOnboardingStatus } from '../hooks/use-onboarding-status';
 import { VendorOnboardingProvider, useVendorOnboardingStatus } from './vendor-onboarding-context';
-import { DEFAULT_TPSP_FILTERS, matchesTpspFilters } from '../../lib/vendor-tpsp';
+import { filtersFromSearchParams, matchesTpspFilters } from '../../lib/vendor-tpsp';
+import { VendorBulkBar } from './VendorBulkBar';
 import { VendorCriticalityCell, VendorReviewCell, VendorTpspFilters } from './VendorTpspFilters';
 
 export type VendorRow = Vendor & {
@@ -165,38 +166,6 @@ function VendorNameCell({ vendor }: { vendor: VendorRow }) {
   );
 }
 
-function VendorStatusCell({ vendor }: { vendor: VendorRow }) {
-  const onboardingStatus = useVendorOnboardingStatus();
-  const status = onboardingStatus[vendor.id];
-  const isPending = vendor.isPending || status === 'pending' || status === 'processing';
-  const isAssessing = vendor.isAssessing || status === 'assessing';
-  const isResolved = vendor.status === 'assessed';
-
-  if (isPending && !isResolved) {
-    return (
-      <HStack gap="2" align="center">
-        <Spinner />
-        <Text variant="muted" size="sm">
-          Creating...
-        </Text>
-      </HStack>
-    );
-  }
-
-  if (isAssessing && !isResolved) {
-    return (
-      <HStack gap="2" align="center">
-        <Spinner />
-        <Text variant="muted" size="sm">
-          Assessing...
-        </Text>
-      </HStack>
-    );
-  }
-
-  return <VendorStatus status={vendor.status} />;
-}
-
 export function VendorsTable({
   vendors: initialVendors,
   assignees,
@@ -204,7 +173,10 @@ export function VendorsTable({
   orgId,
 }: VendorsTableProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { hasPermission } = usePermissions();
+  const canBulkEdit = hasPermission('vendor', 'update');
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const { deleteVendor } = useVendorActions();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [vendorToDelete, setVendorToDelete] = useState<VendorRow | null>(null);
@@ -212,7 +184,7 @@ export function VendorsTable({
 
   // Local state for search, sorting, and pagination
   const [searchQuery, setSearchQuery] = useState('');
-  const [tpspFilters, setTpspFilters] = useState(DEFAULT_TPSP_FILTERS);
+  const [tpspFilters, setTpspFilters] = useState(() => filtersFromSearchParams(searchParams));
   const [sort, setSort] = useState<{
     id: 'name' | 'updatedAt' | 'inherentRisk' | 'residualRisk';
     desc: boolean;
@@ -536,6 +508,14 @@ export function VendorsTable({
           <VendorTpspFilters filters={tpspFilters} onChange={setTpspFilters} />
         </div>
 
+        {canBulkEdit && (
+          <VendorBulkBar
+            selectedIds={selectedIds}
+            owners={assignees}
+            onClear={() => setSelectedIds([])}
+          />
+        )}
+
         {/* Onboarding Progress Banner */}
         {isActive && !allVendorsDoneAssessing && (
           <div className="flex items-center gap-3 rounded-xl border border-primary/20 bg-linear-to-r from-primary/10 via-primary/5 to-transparent px-4 py-3">
@@ -594,6 +574,27 @@ export function VendorsTable({
           >
             <TableHeader>
               <TableRow>
+                {canBulkEdit && (
+                  <TableHead>
+                    <Checkbox
+                      aria-label="Select all vendors on this page"
+                      checked={
+                        paginatedVendors.length > 0 &&
+                        paginatedVendors.every((v) => selectedIds.includes(v.id))
+                      }
+                      onCheckedChange={(checked) => {
+                        const pageIds = paginatedVendors
+                          .filter((v) => !isRowBlocked(v))
+                          .map((v) => v.id);
+                        setSelectedIds((ids) =>
+                          checked
+                            ? [...new Set([...ids, ...pageIds])]
+                            : ids.filter((id) => !pageIds.includes(id)),
+                        );
+                      }}
+                    />
+                  </TableHead>
+                )}
                 <TableHead>
                   <button
                     type="button"
@@ -604,7 +605,6 @@ export function VendorsTable({
                     {getSortIcon('name')}
                   </button>
                 </TableHead>
-                <TableHead>STATUS</TableHead>
                 <TableHead>
                   <button
                     type="button"
@@ -642,11 +642,25 @@ export function VendorsTable({
                     style={{ cursor: blocked ? 'default' : 'pointer' }}
                     data-state={blocked ? 'disabled' : undefined}
                   >
+                    {canBulkEdit && (
+                      <TableCell>
+                        {/* Stop the row click so ticking doesn't open the vendor */}
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            aria-label={`Select ${vendor.name}`}
+                            disabled={Boolean(blocked)}
+                            checked={selectedIds.includes(vendor.id)}
+                            onCheckedChange={(checked) =>
+                              setSelectedIds((ids) =>
+                                checked ? [...ids, vendor.id] : ids.filter((id) => id !== vendor.id),
+                              )
+                            }
+                          />
+                        </div>
+                      </TableCell>
+                    )}
                     <TableCell>
                       <VendorNameCell vendor={vendor} />
-                    </TableCell>
-                    <TableCell>
-                      <VendorStatusCell vendor={vendor} />
                     </TableCell>
                     <TableCell>
                       {vendor.status === 'not_assessed' ? (

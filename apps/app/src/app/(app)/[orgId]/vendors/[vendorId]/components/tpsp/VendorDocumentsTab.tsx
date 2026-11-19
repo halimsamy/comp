@@ -1,5 +1,7 @@
 'use client';
 
+import { usePermissions } from '@/hooks/use-permissions';
+import { useTaskItemActions } from '@/hooks/use-task-items';
 import { useVendorDocuments, type VendorDocument } from '@/hooks/use-vendor-tpsp';
 import {
   AlertDialog,
@@ -22,6 +24,7 @@ import {
   ChevronDown,
   ChevronUp,
   Download,
+  Launch,
   MagicWand,
   TrashCan,
   Upload,
@@ -46,12 +49,14 @@ function DocumentRow({
   onDownload,
   onSummarize,
   onDelete,
+  onCreateTask,
 }: {
   document: VendorDocument;
   canUpdate: boolean;
   onDownload: () => void;
   onSummarize: () => void;
   onDelete: () => void;
+  onCreateTask?: (title: string) => Promise<void>;
 }) {
   const [expanded, setExpanded] = useState(false);
   const expiry = expiryLabel({ expiresAt: document.expiresAt });
@@ -114,7 +119,7 @@ function DocumentRow({
         </div>
       </div>
       {expanded && document.aiSummary && (
-        <VendorDocumentSummaryPanel summary={document.aiSummary} />
+        <VendorDocumentSummaryPanel summary={document.aiSummary} onCreateTask={onCreateTask} />
       )}
     </li>
   );
@@ -124,10 +129,24 @@ function DocumentRow({
 export function VendorDocumentsTab({
   vendorId,
   canUpdate,
+  trustUrl,
 }: {
   vendorId: string;
   canUpdate: boolean;
+  /** The vendor's trust center, where SOC 2 / ISO / AOC reports are usually requested. */
+  trustUrl?: string | null;
 }) {
+  const { hasPermission } = usePermissions();
+  const { createTaskItem } = useTaskItemActions();
+  const handleCreateTask = async (title: string) => {
+    try {
+      await createTaskItem({ title: title.slice(0, 200), entityId: vendorId, entityType: 'vendor' });
+      toast.success('Action created');
+    } catch (caught) {
+      toast.error(caught instanceof Error ? caught.message : 'Failed to create the action');
+      throw caught;
+    }
+  };
   const {
     documents,
     error,
@@ -184,11 +203,23 @@ export function VendorDocumentsTab({
             days before a document expires.
           </span>
         </div>
-        {canUpdate && (
-          <Button iconLeft={<Upload size={16} />} onClick={() => setUploading(true)}>
-            Upload document
-          </Button>
-        )}
+        <div className="flex flex-wrap gap-2">
+          {trustUrl && (
+            <a
+              href={trustUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border px-3 text-sm hover:bg-muted"
+            >
+              <Launch size={14} /> Trust center
+            </a>
+          )}
+          {canUpdate && (
+            <Button iconLeft={<Upload size={16} />} onClick={() => setUploading(true)}>
+              Upload document
+            </Button>
+          )}
+        </div>
       </div>
 
       {error ? (
@@ -219,6 +250,7 @@ export function VendorDocumentsTab({
                 void handleAction(() => summarizeDocument(document.id), 'AI summary started')
               }
               onDelete={() => setToDelete(document)}
+              onCreateTask={hasPermission('task', 'create') ? handleCreateTask : undefined}
             />
           ))}
         </ul>

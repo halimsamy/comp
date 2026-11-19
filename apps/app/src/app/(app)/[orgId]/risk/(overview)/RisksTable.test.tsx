@@ -8,6 +8,8 @@ import {
 } from '@/test-utils/mocks/permissions';
 
 // Mock usePermissions
+vi.mock('@/hooks/use-mobile', () => ({ useIsMobile: () => false }));
+
 vi.mock('@/hooks/use-permissions', () => ({
   usePermissions: () => ({
     permissions: {},
@@ -235,7 +237,7 @@ describe('RisksTable permission gating', () => {
 
     expect(screen.getByText('RISK')).toBeInTheDocument();
     expect(screen.getByText('SEVERITY')).toBeInTheDocument();
-    expect(screen.getByText('RISK SCORE')).toBeInTheDocument();
+    expect(screen.getByText('CURRENT RISK')).toBeInTheDocument();
     expect(screen.getByText('STATUS')).toBeInTheDocument();
     expect(screen.getByText('OWNER')).toBeInTheDocument();
     expect(screen.getByText('UPDATED')).toBeInTheDocument();
@@ -253,7 +255,16 @@ describe('RisksTable permission gating', () => {
     // The severity filter dropdown also contains "Low" as an option, so
     // we expect at least one (row + dropdown option).
     expect(screen.getAllByText('Low').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('4/10')).toBeInTheDocument();
+    // Inherent and current columns both show 4/10 with no linked work.
+    expect(screen.getAllByText('4/10')).toHaveLength(2);
+  });
+
+  it('shows the risk reference above the title', () => {
+    setMockPermissions({});
+    render(
+      <RisksTable {...defaultProps} risks={[{ ...mockRisks[0], ref: 'R-007' }]} />,
+    );
+    expect(screen.getByText('R-007')).toBeInTheDocument();
   });
 
   it('renders search bar regardless of permissions', () => {

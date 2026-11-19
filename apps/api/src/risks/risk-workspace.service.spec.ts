@@ -1,7 +1,8 @@
 const mockDb = {
   risk: { findMany: jest.fn(), create: jest.fn() },
-  taskItem: { findMany: jest.fn() },
-  $transaction: jest.fn((ops: Array<Promise<unknown>>) => Promise.all(ops)),
+  taskItem: { findMany: jest.fn(), create: jest.fn() },
+  requirementMap: { findMany: jest.fn() },
+  $transaction: jest.fn((run: (tx: unknown) => Promise<unknown>) => run(mockDb)),
 };
 jest.mock('@db', () => ({ db: mockDb, Prisma: {} }));
 
@@ -12,7 +13,10 @@ const ORG = 'org_1';
 
 describe('RiskWorkspaceService', () => {
   const service = new RiskWorkspaceService();
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockDb.requirementMap.findMany.mockResolvedValue([]);
+  });
 
   it('flags library templates already in the register (case-insensitive)', async () => {
     const first = RISK_LIBRARY[0];
@@ -33,7 +37,7 @@ describe('RiskWorkspaceService', () => {
   it('bulk-creates new risks, skipping existing and repeated titles', async () => {
     mockDb.risk.findMany.mockResolvedValue([{ title: 'Existing risk' }]);
     mockDb.risk.create.mockImplementation(({ data }) =>
-      Promise.resolve({ id: `rsk_${data.title}`, title: data.title }),
+      Promise.resolve({ id: `rsk_${data.title}`, title: data.title, ref: 'R-001' }),
     );
     const draft = {
       description: 'd',
@@ -51,7 +55,9 @@ describe('RiskWorkspaceService', () => {
       ],
     });
 
-    expect(result.created).toEqual([{ id: 'rsk_New risk', title: 'New risk' }]);
+    expect(result.created).toEqual([
+      { id: 'rsk_New risk', title: 'New risk', ref: 'R-001', linkedTasks: 0 },
+    ]);
     expect(result.skipped).toEqual(['existing RISK', 'new risk']);
     expect(mockDb.risk.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -64,6 +70,78 @@ describe('RiskWorkspaceService', () => {
         }),
       }),
     );
+  });
+
+  it('links library references to org controls’ tasks, sets the owner and a treatment action', async () => {
+    mockDb.risk.findMany.mockResolvedValue([]);
+    mockDb.requirementMap.findMany.mockResolvedValue([
+      {
+        controlId: 'ctl_1',
+        requirement: { identifier: '6.4.3', framework: { name: 'PCI DSS Level 1' } },
+        control: { tasks: [{ id: 'tsk_1' }, { id: 'tsk_2' }] },
+      },
+      {
+        controlId: 'ctl_2',
+        requirement: { identifier: 'A.8.28', framework: { name: 'ISO 27001' } },
+        control: { tasks: [{ id: 'tsk_2' }] },
+      },
+    ]);
+    mockDb.risk.create.mockImplementation(({ data }) =>
+      Promise.resolve({ id: 'rsk_1', title: data.title, ref: 'R-007' }),
+    );
+
+    const result = await service.bulkCreate({
+      organizationId: ORG,
+      ownerMemberId: 'mem_1',
+      risks: [
+        {
+          title: 'Skimming',
+          description: 'd',
+          category: 'technology',
+          likelihood: 'possible',
+          impact: 'severe',
+          treatmentStrategyDescription: 'Inventory scripts',
+          references: ['PCI DSS 6.4.3', 'ISO A.8.28', 'Not a ref'],
+        },
+      ],
+    });
+
+    expect(mockDb.requirementMap.findMany.mock.calls[0][0].where).toMatchObject({
+      archivedAt: null,
+      frameworkInstance: { organizationId: ORG },
+    });
+    const { data } = mockDb.risk.create.mock.calls[0][0];
+    expect(data).toMatchObject({
+      assigneeId: 'mem_1',
+      frameworkRefs: ['PCI DSS 6.4.3', 'ISO A.8.28', 'Not a ref'],
+      tasks: { connect: [{ id: 'tsk_1' }, { id: 'tsk_2' }] },
+    });
+    const action = mockDb.taskItem.create.mock.calls[0][0].data;
+    expect(action).toMatchObject({
+      entityType: 'risk',
+      entityId: 'rsk_1',
+      organizationId: ORG,
+      assigneeId: 'mem_1',
+      createdById: 'mem_1',
+      description: 'Inventory scripts',
+    });
+    const days = (action.dueDate.getTime() - Date.now()) / 86_400_000;
+    expect(Math.round(days)).toBe(90);
+    expect(result.created[0]).toMatchObject({ ref: 'R-007', linkedTasks: 2 });
+  });
+
+  it('counts recommended controls per library template', async () => {
+    mockDb.risk.findMany.mockResolvedValue([]);
+    mockDb.requirementMap.findMany.mockResolvedValue([
+      {
+        controlId: 'ctl_1',
+        requirement: { identifier: '6.4.3', framework: { name: 'PCI DSS Level 1' } },
+        control: { tasks: [] },
+      },
+    ]);
+    const library = await service.getLibrary(ORG);
+    const skimming = library.find((t) => t.references.includes('PCI DSS 6.4.3'));
+    expect(skimming?.recommendedControls).toBe(1);
   });
 
   it('lists actions only for visible risks and flags overdue ones', async () => {

@@ -59,6 +59,7 @@ import {
 } from '@trycompai/design-system';
 import { OverflowMenuVertical, Search, TrashCan } from '@trycompai/design-system/icons';
 import { ArrowDown, ArrowUp, ArrowUpDown, Loader2 } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { useRouter } from 'next/navigation';
 import {
   parseAsString,
@@ -78,6 +79,9 @@ import { RisksLoadingAnimation } from './components/risks-loading-animation';
 import { useOnboardingStatus } from './hooks/use-onboarding-status';
 
 export type RiskRow = ApiRisk & { isPending?: boolean; isAssessing?: boolean };
+
+/** Keeps the row menu in view when the table scrolls sideways (#113). */
+const PINNED = { position: 'sticky', right: 0, background: 'var(--background)' } as const;
 
 const ACTIVE_STATUSES: Array<'pending' | 'processing' | 'created' | 'assessing'> = [
   'pending',
@@ -164,6 +168,8 @@ export const RisksTable = ({
 }) => {
   const router = useRouter();
   const { hasPermission } = usePermissions();
+  // #113: drop UPDATED on narrow screens so RISK and ACTIONS fit.
+  const showUpdated = !useIsMobile();
   const { deleteRisk } = useRiskActions();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [riskToDelete, setRiskToDelete] = useState<RiskRow | null>(null);
@@ -661,6 +667,7 @@ export const RisksTable = ({
                   <TableHead>CURRENT RISK</TableHead>
                   <TableHead>STATUS</TableHead>
                   <TableHead>OWNER</TableHead>
+                  {showUpdated && (
                   <TableHead>
                     <button
                       type="button"
@@ -671,7 +678,8 @@ export const RisksTable = ({
                       {getSortIcon('updatedAt')}
                     </button>
                   </TableHead>
-                  {hasPermission('risk', 'delete') && <TableHead>ACTIONS</TableHead>}
+                  )}
+                  {hasPermission('risk', 'delete') && <TableHead style={PINNED}>ACTIONS</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -693,7 +701,9 @@ export const RisksTable = ({
                     <Fragment key={risk.id}>
                     {startsGroup && (
                       <TableRow data-group-header>
-                        <TableCell colSpan={hasPermission('risk', 'delete') ? 8 : 7}>
+                        <TableCell
+                          colSpan={(hasPermission('risk', 'delete') ? 8 : 7) - (showUpdated ? 0 : 1)}
+                        >
                           <Text size="sm" weight="semibold">
                             {groupLabel}
                           </Text>
@@ -708,7 +718,15 @@ export const RisksTable = ({
                       <TableCell>
                         <HStack gap="2" align="center">
                           {blocked && <Spinner />}
-                          <Text>{risk.title}</Text>
+                          {/* #113: long titles wrap to two lines instead of stretching the table */}
+                          <div className="flex min-w-[180px] max-w-[360px] flex-col whitespace-normal">
+                            {risk.ref && (
+                              <span className="font-mono text-xs text-muted-foreground">{risk.ref}</span>
+                            )}
+                            <span className="line-clamp-2 text-sm" title={risk.title}>
+                              {risk.title}
+                            </span>
+                          </div>
                         </HStack>
                       </TableCell>
                       {(() => {
@@ -745,11 +763,13 @@ export const RisksTable = ({
                       <TableCell>
                         <Text>{risk.assignee?.user?.name || 'Unassigned'}</Text>
                       </TableCell>
-                      <TableCell>
-                        <Text>{formatDate(risk.updatedAt)}</Text>
-                      </TableCell>
-                      {hasPermission('risk', 'delete') && (
+                      {showUpdated && (
                         <TableCell>
+                          <Text>{formatDate(risk.updatedAt)}</Text>
+                        </TableCell>
+                      )}
+                      {hasPermission('risk', 'delete') && (
+                        <TableCell style={PINNED}>
                           <div className="flex justify-center">
                             <DropdownMenu>
                               <DropdownMenuTrigger

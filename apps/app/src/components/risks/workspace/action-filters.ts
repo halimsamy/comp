@@ -51,3 +51,21 @@ export function countActions(actions: RiskTreatmentAction[]): Record<ActionFilte
     all: actions.length,
   };
 }
+
+/**
+ * True when completing `actionId` leaves its risk with no open actions: the
+ * moment to re-rate residual risk (ISO 27001 6.1.3 / 8.3).
+ */
+export function closesLastOpenAction({
+  actions,
+  actionId,
+}: {
+  actions: RiskTreatmentAction[];
+  actionId: string;
+}): boolean {
+  const action = actions.find((candidate) => candidate.id === actionId);
+  if (!action?.risk) return false;
+  return !actions.some(
+    (other) => other.id !== actionId && other.risk?.id === action.risk?.id && !isClosed(other),
+  );
+}

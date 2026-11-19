@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { RiskAcceptancesController } from './risk-acceptances.controller';
 import { RiskAcceptancesService } from './risk-acceptances.service';
 import { RiskReviewsService } from './risk-reviews.service';
@@ -10,7 +11,7 @@ import { RisksController } from './risks.controller';
 import { RisksService } from './risks.service';
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, NotificationsModule],
   controllers: [RisksController, RiskAcceptancesController, RiskWorkspaceController],
   providers: [
     RisksService,

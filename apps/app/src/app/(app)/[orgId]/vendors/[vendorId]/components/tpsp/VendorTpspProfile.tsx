@@ -1,6 +1,7 @@
 'use client';
 
-import { useVendor, useVendorActions } from '@/hooks/use-vendors';
+import { useVendorDocuments, type VendorDocument } from '@/hooks/use-vendor-tpsp';
+import { useVendor, useVendorActions, type ResponsibilityMatrixRow } from '@/hooks/use-vendors';
 import { Badge, Button, Progress } from '@trycompai/design-system';
 import { CheckmarkFilled, CircleDash, Edit } from '@trycompai/design-system/icons';
 import { useState, type ReactNode } from 'react';
@@ -16,7 +17,7 @@ import {
 } from '../../../lib/vendor-tpsp';
 import { EditTpspProfileSheet } from './EditTpspProfileSheet';
 import { tpspChecklist } from './tpsp-checklist';
-import { VendorResponsibilityMatrix } from './VendorResponsibilityMatrix';
+import { PCI_REQUIREMENTS, VendorResponsibilityMatrix } from './VendorResponsibilityMatrix';
 
 function Fact({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -33,6 +34,18 @@ const Muted = ({ children }: { children: ReactNode }) => (
 
 const yesNo = (value: boolean | undefined) => (value ? 'Yes' : 'No');
 
+/** The 12.8.5 split the AI read from the newest AOC, as matrix rows. */
+export function matrixRowsFromAoc(documents: VendorDocument[]): ResponsibilityMatrixRow[] {
+  const aoc = documents
+    .filter((d) => d.type === 'pci_aoc' && d.aiSummary?.pciResponsibilities?.length)
+    .sort((a, b) => (b.periodEnd ?? b.createdAt).localeCompare(a.periodEnd ?? a.createdAt))[0];
+  return (aoc?.aiSummary?.pciResponsibilities ?? []).map(({ requirement, owner }) => ({
+    requirement:
+      PCI_REQUIREMENTS.find((label) => label.startsWith(`${requirement} `)) ?? requirement,
+    owner,
+  }));
+}
+
 /**
  * Vanta-style third-party profile: classification, contract, assurance and
  * PCI DSS 12.8 status at a glance, with a readiness checklist.
@@ -46,6 +59,7 @@ export function VendorTpspProfile({
 }) {
   const { vendor, mutate } = useVendor(vendorId);
   const { updateVendor } = useVendorActions();
+  const { documents } = useVendorDocuments(vendorId);
   const [editing, setEditing] = useState(false);
   if (!vendor) return null;
 
@@ -196,6 +210,7 @@ export function VendorTpspProfile({
       {inPciScope && (
         <VendorResponsibilityMatrix
           rows={vendor.responsibilityMatrix ?? []}
+          aocRows={matrixRowsFromAoc(documents)}
           canUpdate={canUpdate}
           onSave={(responsibilityMatrix) => handleSave({ responsibilityMatrix })}
         />

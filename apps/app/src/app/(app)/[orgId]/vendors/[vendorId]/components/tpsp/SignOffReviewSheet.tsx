@@ -1,6 +1,7 @@
 'use client';
 
-import type { SignOffVendorReviewInput } from '@/hooks/use-vendor-tpsp';
+import type { SignOffVendorReviewInput, VendorDocument } from '@/hooks/use-vendor-tpsp';
+import type { VendorPciStatus } from '@db';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Button,
@@ -9,6 +10,11 @@ import {
   Label,
   RadioGroup,
   RadioGroupItem,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Sheet,
   SheetBody,
   SheetContent,
@@ -18,48 +24,33 @@ import {
   SheetTitle,
   Textarea,
 } from '@trycompai/design-system';
-import { Controller, useForm } from 'react-hook-form';
-import { z } from 'zod';
-import { REVIEW_OUTCOME } from '../../../lib/vendor-tpsp';
+import { Add, TrashCan } from '@trycompai/design-system/icons';
+import { useEffect, useMemo } from 'react';
+import { Controller, useFieldArray, useForm } from 'react-hook-form';
+import { DOCUMENT_TYPE_LABEL, PCI_STATUS, REVIEW_OUTCOME } from '../../../lib/vendor-tpsp';
+import {
+  signOffDefaults,
+  signOffSchema,
+  toSignOffInput,
+  type SignOffValues,
+} from './sign-off-review-form';
 
 const CHECKLIST = [
   {
     name: 'assuranceReviewed',
     label: 'Reviewed the current SOC 2 / ISO certificate / AOC, its exceptions and our CUECs',
   },
-  {
-    name: 'pciStatusConfirmed',
-    label: 'Confirmed the vendor’s PCI DSS compliance status (12.8.4)',
-  },
+  { name: 'pciStatusConfirmed', label: 'Confirmed the vendor’s PCI DSS compliance status (12.8.4)' },
   { name: 'contractReviewed', label: 'Contract, security and confidentiality clauses still valid' },
   { name: 'riskReassessed', label: 'Inherent and residual risk re-assessed' },
 ] as const;
 
-const reviewSchema = z
-  .object({
-    outcome: z.enum(['approved', 'approved_with_conditions', 'rejected']),
-    assuranceReviewed: z.boolean(),
-    pciStatusConfirmed: z.boolean(),
-    contractReviewed: z.boolean(),
-    riskReassessed: z.boolean(),
-    notes: z.string().max(10_000),
-    nextReviewDue: z.string(),
-  })
-  .refine((v) => v.outcome === 'approved' || v.notes.trim().length > 0, {
-    message: 'Describe the conditions or the reason for rejection',
-    path: ['notes'],
-  });
-type ReviewValues = z.infer<typeof reviewSchema>;
-
-const DEFAULTS: ReviewValues = {
-  outcome: 'approved',
-  assuranceReviewed: false,
-  pciStatusConfirmed: false,
-  contractReviewed: false,
-  riskReassessed: false,
-  notes: '',
-  nextReviewDue: '',
-};
+const FieldError = ({ message }: { message?: string }) =>
+  message ? (
+    <span role="alert" className="text-xs text-destructive">
+      {message}
+    </span>
+  ) : null;
 
 /** Sign-off form for a periodic vendor review (ISO 27001 A.5.22, PCI DSS 12.8.4). */
 export function SignOffReviewSheet({
@@ -67,46 +58,48 @@ export function SignOffReviewSheet({
   onOpenChange,
   cadenceLabel,
   onSignOff,
+  inPciScope,
+  documents,
+  currentPciStatus,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   cadenceLabel: string;
   onSignOff: (input: SignOffVendorReviewInput) => Promise<void>;
+  inPciScope: boolean;
+  documents: VendorDocument[];
+  currentPciStatus?: VendorPciStatus | null;
 }) {
+  const defaults = useMemo(
+    () => signOffDefaults({ documents, currentPciStatus }),
+    [documents, currentPciStatus],
+  );
   const {
     control,
     handleSubmit,
     reset,
+    watch,
     formState: { isSubmitting, errors },
-  } = useForm<ReviewValues>({
-    resolver: zodResolver(reviewSchema),
-    defaultValues: DEFAULTS,
+  } = useForm<SignOffValues>({
+    resolver: zodResolver(signOffSchema({ inPciScope })),
+    defaultValues: defaults,
   });
+  const conditions = useFieldArray({ control, name: 'conditions' });
+  const outcome = watch('outcome');
+  const pciConfirmed = watch('pciStatusConfirmed');
 
-  const handleClose = (next: boolean) => {
-    if (!next) reset(DEFAULTS);
-    onOpenChange(next);
-  };
+  // Prefill from the latest documents each time the sheet opens.
+  useEffect(() => {
+    if (open) reset(defaults);
+  }, [open, defaults, reset]);
 
   const handleSignOff = handleSubmit(async (values) => {
-    await onSignOff({
-      outcome: values.outcome,
-      checklist: {
-        assuranceReviewed: values.assuranceReviewed,
-        pciStatusConfirmed: values.pciStatusConfirmed,
-        contractReviewed: values.contractReviewed,
-        riskReassessed: values.riskReassessed,
-      },
-      notes: values.notes.trim() || undefined,
-      nextReviewDue: values.nextReviewDue
-        ? new Date(values.nextReviewDue).toISOString()
-        : undefined,
-    });
-    handleClose(false);
+    await onSignOff(toSignOffInput(values));
+    onOpenChange(false);
   });
 
   return (
-    <Sheet open={open} onOpenChange={handleClose}>
+    <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent>
         <SheetHeader>
           <SheetTitle>Sign off vendor review</SheetTitle>
@@ -117,23 +110,89 @@ export function SignOffReviewSheet({
         <SheetBody>
           <form id="vendor-review-form" onSubmit={handleSignOff} className="flex flex-col gap-5">
             <fieldset className="flex flex-col gap-2">
+              <legend className="mb-1 text-sm font-medium">Documents reviewed</legend>
+              {documents.length === 0 && (
+                <span className="text-xs text-muted-foreground">
+                  No documents on file. Upload the vendor&apos;s SOC 2, ISO certificate or AOC first.
+                </span>
+              )}
+              <Controller
+                control={control}
+                name="reviewedDocumentIds"
+                render={({ field }) => (
+                  <>
+                    {documents.map((doc) => (
+                      <label key={doc.id} className="flex items-start gap-2 text-sm">
+                        <Checkbox
+                          checked={field.value.includes(doc.id)}
+                          onCheckedChange={(checked) =>
+                            field.onChange(
+                              checked
+                                ? [...field.value, doc.id]
+                                : field.value.filter((id) => id !== doc.id),
+                            )
+                          }
+                        />
+                        <span className="min-w-0">
+                          {doc.name}{' '}
+                          <span className="text-muted-foreground">
+                            ({DOCUMENT_TYPE_LABEL[doc.type]})
+                          </span>
+                        </span>
+                      </label>
+                    ))}
+                  </>
+                )}
+              />
+            </fieldset>
+            <fieldset className="flex flex-col gap-2">
               <legend className="mb-1 text-sm font-medium">What did you check?</legend>
-              {CHECKLIST.map((item) => (
-                <Controller
-                  key={item.name}
-                  control={control}
-                  name={item.name}
-                  render={({ field }) => (
-                    <label className="flex items-start gap-2 text-sm">
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={(checked) => field.onChange(Boolean(checked))}
-                      />
-                      <span>{item.label}</span>
-                    </label>
-                  )}
-                />
-              ))}
+              {CHECKLIST.filter((item) => inPciScope || item.name !== 'pciStatusConfirmed').map(
+                (item) => (
+                  <Controller
+                    key={item.name}
+                    control={control}
+                    name={item.name}
+                    render={({ field }) => (
+                      <label className="flex items-start gap-2 text-sm">
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={(checked) => field.onChange(Boolean(checked))}
+                        />
+                        <span>{item.label}</span>
+                      </label>
+                    )}
+                  />
+                ),
+              )}
+              {pciConfirmed && (
+                <div className="flex flex-col gap-1 pl-6">
+                  <Label htmlFor="vendor-review-pci">Confirmed PCI DSS status</Label>
+                  <Controller
+                    control={control}
+                    name="pciStatus"
+                    render={({ field }) => (
+                      <Select value={field.value} onValueChange={(v) => v && field.onChange(v)}>
+                        <SelectTrigger id="vendor-review-pci">
+                          <SelectValue placeholder="Choose a status">
+                            {field.value ? PCI_STATUS[field.value].label : undefined}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.entries(PCI_STATUS)
+                            .filter(([value]) => value !== 'unknown')
+                            .map(([value, { label }]) => (
+                              <SelectItem key={value} value={value}>
+                                {label}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                  <FieldError message={errors.pciStatus?.message} />
+                </div>
+              )}
             </fieldset>
             <fieldset className="flex flex-col gap-2">
               <legend className="mb-1 text-sm font-medium">Outcome</legend>
@@ -151,7 +210,52 @@ export function SignOffReviewSheet({
                   </RadioGroup>
                 )}
               />
+              <FieldError message={errors.outcome?.message} />
             </fieldset>
+            {outcome === 'approved_with_conditions' && (
+              <fieldset className="flex flex-col gap-2">
+                <legend className="mb-1 text-sm font-medium">Conditions</legend>
+                <span className="text-xs text-muted-foreground">
+                  Each condition becomes an action on this vendor, due in 90 days.
+                </span>
+                {conditions.fields.map((field, index) => (
+                  <div key={field.id} className="flex items-center gap-2">
+                    <Controller
+                      control={control}
+                      name={`conditions.${index}.text`}
+                      render={({ field: { ref: _ref, ...f } }) => (
+                        <Input
+                          {...f}
+                          aria-label={`Condition ${index + 1}`}
+                          placeholder="e.g. Provide the 2026 SOC 2 bridge letter"
+                        />
+                      )}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Remove condition"
+                      onClick={() => conditions.remove(index)}
+                    >
+                      <TrashCan size={16} />
+                    </Button>
+                  </div>
+                ))}
+                <div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    iconLeft={<Add size={14} />}
+                    onClick={() => conditions.append({ text: '' })}
+                  >
+                    Add condition
+                  </Button>
+                </div>
+                <FieldError message={errors.conditions?.message ?? errors.conditions?.root?.message} />
+              </fieldset>
+            )}
             <div className="flex flex-col gap-2">
               <Label htmlFor="vendor-review-notes">Notes</Label>
               <Controller
@@ -162,15 +266,11 @@ export function SignOffReviewSheet({
                     {...field}
                     id="vendor-review-notes"
                     rows={4}
-                    placeholder="Conditions, follow-ups, CUECs mapped to our controls…"
+                    placeholder="Findings, CUECs mapped to our controls, reason for rejection…"
                   />
                 )}
               />
-              {errors.notes && (
-                <span role="alert" className="text-xs text-destructive">
-                  {errors.notes.message}
-                </span>
-              )}
+              <FieldError message={errors.notes?.message} />
             </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="vendor-review-next">Next review (optional)</Label>
@@ -191,7 +291,7 @@ export function SignOffReviewSheet({
           <Button
             type="button"
             variant="secondary"
-            onClick={() => handleClose(false)}
+            onClick={() => onOpenChange(false)}
             disabled={isSubmitting}
           >
             Cancel

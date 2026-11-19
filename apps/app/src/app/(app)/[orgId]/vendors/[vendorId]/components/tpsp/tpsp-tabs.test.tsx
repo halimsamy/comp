@@ -51,6 +51,13 @@ vi.mock('@/hooks/use-vendor-tpsp', () => ({
   useVendorReviews: () => reviewsState,
 }));
 
+vi.mock('@/hooks/use-permissions', () => ({
+  usePermissions: () => ({ hasPermission: () => true }),
+}));
+vi.mock('@/hooks/use-task-items', () => ({
+  useTaskItemActions: () => ({ createTaskItem: vi.fn() }),
+}));
+
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 beforeEach(() => {

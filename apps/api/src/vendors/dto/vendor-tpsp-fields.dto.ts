@@ -53,6 +53,14 @@ export class ResponsibilityMatrixRowDto {
   @IsString()
   @MaxLength(1000)
   notes?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'The split was confirmed against the TPSP (AOC or written agreement). A matrix counts as done only when every row is confirmed and each shared row has a note.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  confirmed?: boolean;
 }
 
 /**

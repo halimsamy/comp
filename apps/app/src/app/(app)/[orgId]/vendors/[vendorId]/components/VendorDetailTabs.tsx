@@ -18,8 +18,8 @@ import { VendorResearchBadges, VendorResearchLinks } from './VendorResearchSecti
 import { VendorResearchFeed } from './VendorResearchFeed';
 import { VendorInherentRiskChart } from './VendorInherentRiskChart';
 import { VendorResidualRiskChart } from './VendorResidualRiskChart';
-import { VendorDocumentsTab } from './tpsp/VendorDocumentsTab';
-import { VendorReviewsTab } from './tpsp/VendorReviewsTab';
+import { VendorSecurityReviewTab } from './tpsp/VendorSecurityReviewTab';
+import { ArchiveVendorSetting, VendorArchivedBanner } from './VendorArchiveControls';
 import { VendorTpspProfile } from './tpsp/VendorTpspProfile';
 import { ResidualAcceptanceCard } from '@/components/risks/acceptance/ResidualAcceptanceCard';
 import { TreatmentPlanTab } from '@/components/risks/treatment-plan/TreatmentPlanTab';
@@ -43,6 +43,15 @@ import { useSearchParams } from 'next/navigation';
 import { useQueryState } from 'nuqs';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+
+const LEGACY_TABS: Record<string, string> = {
+  documents: 'security-review',
+  reviews: 'security-review',
+  'treatment-plan': 'risk',
+  'risk-matrix': 'risk',
+  'risk-assessment': 'risk',
+  tasks: 'actions',
+};
 
 type VendorWithRiskAssessment = Vendor & {
   assignee: { user: User | null } | null;
@@ -112,9 +121,11 @@ export function VendorDetailTabs({
   // the active panel, sidestepping base-ui's transition window where the
   // outgoing panel stays at full opacity during the incoming fade-in
   // (visible "both panels stacked" flash on tab switch).
-  const [activeTab, setActiveTab] = useQueryState('tab', {
+  const [tabParam, setActiveTab] = useQueryState('tab', {
     defaultValue: 'overview',
   });
+  // Old bookmarks and reminder links point at the tabs merged in round 2.
+  const activeTab = LEGACY_TABS[tabParam] ?? tabParam;
 
   const { data: taskItemsData, mutate: refreshTaskItems } = useTaskItems(
     vendorId, 'vendor', 1, 50, 'createdAt', 'desc', {},
@@ -348,7 +359,7 @@ export function VendorDetailTabs({
       toast.success('Assessment regeneration triggered.');
       if (result.runId) {
         setIsRegenerating(true);
-        void setActiveTab('risk-assessment');
+        void setActiveTab('risk');
         handleAssessmentTriggered(result.runId);
       }
       refreshVendor();
@@ -394,7 +405,7 @@ export function VendorDetailTabs({
             ? [
                 { label: 'Vendors', href: `/${orgId}/vendors`, props: { render: <Link href={`/${orgId}/vendors`} /> } },
                 { label: resolvedVendor.name, href: `/${orgId}/vendors/${vendorId}`, props: { render: <Link href={`/${orgId}/vendors/${vendorId}`} /> } },
-                { label: 'Tasks', href: `/${orgId}/vendors/${vendorId}?tab=tasks`, props: { render: <Link href={`/${orgId}/vendors/${vendorId}?tab=tasks`} /> } },
+                { label: 'Actions', href: `/${orgId}/vendors/${vendorId}?tab=actions`, props: { render: <Link href={`/${orgId}/vendors/${vendorId}?tab=actions`} /> } },
                 { label: selectedTaskTitle || 'Task', isCurrent: true },
               ]
             : [
@@ -479,21 +490,28 @@ export function VendorDetailTabs({
         )}
       </Stack>
 
+      {!isViewingTask && swrVendor?.archivedAt && (
+        <VendorArchivedBanner
+          vendorId={vendorId}
+          archivedAt={swrVendor.archivedAt}
+          archiveReason={swrVendor.archiveReason}
+          canUpdate={canUpdate}
+          onChange={() => void refreshVendor()}
+        />
+      )}
+
       {isViewingTask ? (
         <TaskItems entityId={vendorId} entityType="vendor" />
       ) : (
         <Tabs value={activeTab} onValueChange={(next) => void setActiveTab(String(next))}>
           <Stack gap="lg">
-            {/* 10 tabs: scroll horizontally on phones instead of overflowing the page */}
+            {/* Scroll horizontally on phones instead of overflowing the page */}
             <div className="max-w-full overflow-x-auto">
               <TabsList variant="underline">
                 <TabsTrigger value="overview">Overview</TabsTrigger>
-                <TabsTrigger value="documents">Documents</TabsTrigger>
-                <TabsTrigger value="reviews">Reviews</TabsTrigger>
-                <TabsTrigger value="treatment-plan">Treatment Plan</TabsTrigger>
-                <TabsTrigger value="risk-matrix">Risk Matrix</TabsTrigger>
-                <TabsTrigger value="risk-assessment">Risk Assessment</TabsTrigger>
-                <TabsTrigger value="tasks">Tasks</TabsTrigger>
+                <TabsTrigger value="security-review">Security review</TabsTrigger>
+                <TabsTrigger value="risk">Risk</TabsTrigger>
+                <TabsTrigger value="actions">Actions</TabsTrigger>
                 <TabsTrigger value="comments">Comments</TabsTrigger>
                 <TabsTrigger value="activity">Activity</TabsTrigger>
                 <TabsTrigger value="settings">Settings</TabsTrigger>
@@ -509,20 +527,15 @@ export function VendorDetailTabs({
               </TabsContent>
             )}
 
-            {activeTab === 'documents' && (
-              <TabsContent value="documents">
-                <VendorDocumentsTab vendorId={vendorId} canUpdate={canUpdate} />
+            {activeTab === 'security-review' && (
+              <TabsContent value="security-review">
+                <VendorSecurityReviewTab vendorId={vendorId} canUpdate={canUpdate} />
               </TabsContent>
             )}
 
-            {activeTab === 'reviews' && (
-              <TabsContent value="reviews">
-                <VendorReviewsTab vendorId={vendorId} canUpdate={canUpdate} />
-              </TabsContent>
-            )}
-
-            {activeTab === 'treatment-plan' && (
-            <TabsContent value="treatment-plan">
+            {activeTab === 'risk' && (
+            <TabsContent value="risk">
+              <Stack gap="xl">
               <TreatmentPlanTab
                 orgId={orgId}
                 entity={{
@@ -571,20 +584,10 @@ export function VendorDetailTabs({
                   canUpdate={canUpdate}
                 />
               </div>
-            </TabsContent>
-            )}
-
-            {activeTab === 'risk-matrix' && (
-            <TabsContent value="risk-matrix">
               <Stack gap="lg">
                 <VendorInherentRiskChart vendor={resolvedVendor} />
                 <VendorResidualRiskChart vendor={resolvedVendor} />
               </Stack>
-            </TabsContent>
-            )}
-
-            {activeTab === 'risk-assessment' && (
-            <TabsContent value="risk-assessment">
               <Stack gap="md">
                 <AnimatePresence mode="wait">
                   {showResearchFeed ? (
@@ -630,11 +633,12 @@ export function VendorDetailTabs({
                   )}
                 </AnimatePresence>
               </Stack>
+              </Stack>
             </TabsContent>
             )}
 
-            {activeTab === 'tasks' && (
-              <TabsContent value="tasks">
+            {activeTab === 'actions' && (
+              <TabsContent value="actions">
                 <TaskItems entityId={vendorId} entityType="vendor" />
               </TabsContent>
             )}
@@ -672,6 +676,13 @@ export function VendorDetailTabs({
                       Regenerate Assessment
                     </Button>
                   </HStack>
+                )}
+                {canUpdate && !swrVendor?.archivedAt && (
+                  <ArchiveVendorSetting
+                    vendorId={vendorId}
+                    vendorName={resolvedVendor.name}
+                    onChange={() => void refreshVendor()}
+                  />
                 )}
               </Stack>
             </TabsContent>

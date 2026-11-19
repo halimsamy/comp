@@ -26,17 +26,12 @@ export const vendorReviewRemindersSchedule = schedules.task({
 
     const vendors = await db.vendor.findMany({
       where: {
+        archivedAt: null,
         OR: [
           { nextReviewDue: { lte: reviewHorizon } },
-          {
-            lastReviewedAt: null,
-            nextReviewDue: null,
-            OR: [
-              { handlesCardholderData: true },
-              { affectsCdeSecurity: true },
-              { criticality: { in: ['critical', 'high'] } },
-            ],
-          },
+          // Never reviewed: the planner decides whether it is in scope
+          // (criticality, PCI scope or high inherent risk).
+          { lastReviewedAt: null, nextReviewDue: null },
           { documents: { some: { expiresAt: { lte: expiryHorizon } } } },
           { contractEndDate: { lte: expiryHorizon } },
         ],
@@ -48,6 +43,9 @@ export const vendorReviewRemindersSchedule = schedules.task({
         criticality: true,
         handlesCardholderData: true,
         affectsCdeSecurity: true,
+        inherentProbability: true,
+        inherentImpact: true,
+        archivedAt: true,
         lastReviewedAt: true,
         nextReviewDue: true,
         contractEndDate: true,

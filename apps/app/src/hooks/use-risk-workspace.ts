@@ -19,6 +19,8 @@ export interface RiskLibraryTemplate {
   treatment: string;
   references: string[];
   added: boolean;
+  /** Controls in the org's frameworks matching `references`; linked on add. */
+  recommendedControls?: number;
 }
 
 export interface RiskDraft {
@@ -28,6 +30,8 @@ export interface RiskDraft {
   likelihood: Likelihood;
   impact: Impact;
   treatmentStrategyDescription?: string;
+  /** Framework references (e.g. "PCI DSS 8.4.2") whose controls are linked. */
+  references?: string[];
 }
 
 export interface RiskSuggestion extends RiskDraft {
@@ -56,6 +60,22 @@ export interface RiskTreatmentAction {
 export interface RiskMethodologySettings {
   acceptanceRequiredFromLevel: RiskLevel;
   reviewIntervalMonths: number;
+  /** Five entries, lowest (very unlikely / insignificant) first. */
+  likelihoodDescriptions?: string[];
+  impactDescriptions?: string[];
+}
+
+/** An evidence task linked to a risk: the controls side of the treatment plan. */
+export interface RiskLinkedTaskRow {
+  risk: { id: string; ref: string | null; title: string };
+  task: {
+    id: string;
+    title: string;
+    status: string;
+    dueDate: string | null;
+    assignee: { id: string; user: { name: string | null; email: string } } | null;
+    controls: { id: string; name: string }[];
+  };
 }
 
 export interface RiskReviewTotals {
@@ -151,6 +171,12 @@ export function useRiskTreatmentActions() {
   return { ...swr, actions: Array.isArray(data) ? data : [] };
 }
 
+export function useRiskLinkedTasks() {
+  const swr = useApiSWR<{ data: RiskLinkedTaskRow[] }>(`${BASE}/linked-tasks`);
+  const data = swr.data?.data?.data;
+  return { ...swr, rows: Array.isArray(data) ? data : [] };
+}
+
 export function useRiskReviews() {
   const swr = useApiSWR<RiskReviewsResponse>(`${BASE}/reviews`);
   const body = swr.data?.data;
@@ -172,7 +198,10 @@ export function useRiskWorkspaceMutations() {
 
   const addRisks = useCallback(
     async (risks: RiskDraft[]) => {
-      const response = await api.post<{ created: { id: string; title: string }[]; skipped: string[] }>(
+      const response = await api.post<{
+        created: { id: string; title: string; ref: string | null; linkedTasks: number }[];
+        skipped: string[];
+      }>(
         `${BASE}/risks/bulk`,
         { risks },
       );

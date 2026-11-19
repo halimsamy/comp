@@ -67,10 +67,26 @@ describe('RiskLibrary', () => {
         expect.objectContaining({
           title: 'Cardholder data exposed outside the CDE',
           treatmentStrategyDescription: 'Mask PAN in logs',
+          references: ['PCI DSS 3.4.1'],
         }),
       ]),
     );
     expect(mockRefresh).toHaveBeenCalled();
+  });
+
+  it('asks before linking recommended controls', async () => {
+    setMockPermissions(ADMIN_PERMISSIONS);
+    mockTemplates = [template({ recommendedControls: 2 })];
+    mockAddRisks.mockResolvedValue({
+      created: [{ id: 'rsk_1', title: 'x', ref: 'R-007', linkedTasks: 3 }],
+      skipped: [],
+    });
+    render(<RiskLibrary />);
+    fireEvent.click(screen.getByRole('button', { name: 'Add to register' }));
+    expect(mockAddRisks).not.toHaveBeenCalled();
+    expect(await screen.findByText('Link 2 recommended controls?')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Add and link' }));
+    await waitFor(() => expect(mockAddRisks).toHaveBeenCalledTimes(1));
   });
 
   it('adds picked AI suggestions without their source label', async () => {

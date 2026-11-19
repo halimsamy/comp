@@ -12,6 +12,7 @@ export function responsibilityMatrixUpdate(
       requirement: row.requirement,
       owner: row.owner,
       notes: row.notes ?? null,
+      confirmed: row.confirmed ?? false,
     })),
   };
 }

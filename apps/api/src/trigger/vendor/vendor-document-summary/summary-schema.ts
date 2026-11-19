@@ -44,6 +44,18 @@ export const vendorDocumentSummarySchema = z.object({
   subserviceOrganizations: z
     .array(z.string())
     .describe('Carved-out or inclusive subservice orgs'),
+  pciResponsibilities: z
+    .array(
+      z.object({
+        requirement: z
+          .string()
+          .describe('PCI DSS principal requirement number, "1" to "12"'),
+        owner: z.enum(['tpsp', 'entity', 'shared']),
+      }),
+    )
+    .describe(
+      'PCI DSS AOC only: who manages each principal requirement for the assessed service (tpsp = the vendor, entity = the customer, shared = both). Empty for other reports or when the AOC does not say.',
+    ),
   keyRisks: z
     .array(z.string())
     .describe('Points a reviewer should follow up on, max 5'),

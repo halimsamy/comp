@@ -1,5 +1,6 @@
 'use client';
 
+import { useRiskSettings } from '@/hooks/use-risk-workspace';
 import { IMPACT_SCORES, LIKELIHOOD_SCORES, getRiskLevel } from '@/lib/risk-score';
 import { Impact, Likelihood } from '@db';
 import { AxisTooltip } from './AxisTooltip';
@@ -108,6 +109,14 @@ export function MatrixBody({
   suggestedLikelihood,
   suggestedImpact,
 }: MatrixBodyProps) {
+  // #155: the org's own scale wording (methodology settings), lowest first.
+  const { settings } = useRiskSettings();
+  const likelihoodText = (rowIdx: number) =>
+    settings?.likelihoodDescriptions?.[4 - rowIdx] ??
+    LIKELIHOOD_DEFINITIONS[probabilityLevels[rowIdx]] ??
+    '';
+  const impactText = (colIdx: number) =>
+    settings?.impactDescriptions?.[colIdx] ?? IMPACT_DEFINITIONS[impactLevels[colIdx]] ?? '';
   return (
     <div className="flex gap-0">
       <div className="flex-1">
@@ -121,7 +130,7 @@ export function MatrixBody({
                 <span className="text-xs text-muted-foreground">
                   <AxisTooltip
                     label={probabilityNumbers[rowIdx]}
-                    definition={`${probabilityLevels[rowIdx]}: ${LIKELIHOOD_DEFINITIONS[probabilityLevels[rowIdx]] ?? ''}`}
+                    definition={`${probabilityLevels[rowIdx]}: ${likelihoodText(rowIdx)}`}
                   />
                 </span>
               </div>
@@ -168,10 +177,10 @@ export function MatrixBody({
         </div>
         <div className="grid mt-2" style={{ gridTemplateColumns: '2rem repeat(5, 1fr)' }}>
           <div />
-          {impactLevels.map((impact) => (
+          {impactLevels.map((impact, colIdx) => (
             <div key={impact} className="flex justify-center">
               <span className="text-center text-xs text-muted-foreground leading-tight">
-                <AxisTooltip label={impact} definition={IMPACT_DEFINITIONS[impact] ?? ''} />
+                <AxisTooltip label={impact} definition={`${impact}: ${impactText(colIdx)}`} />
               </span>
             </div>
           ))}

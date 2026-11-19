@@ -31,6 +31,7 @@ import type {
 } from '../auth/types';
 import { CreateVendorDto } from './dto/create-vendor.dto';
 import { UpdateVendorDto } from './dto/update-vendor.dto';
+import { ListVendorsQueryDto } from './dto/list-vendors-query.dto';
 import { VendorsService } from './vendors.service';
 import { VENDOR_OPERATIONS } from './schemas/vendor-operations';
 import { VENDOR_PARAMS } from './schemas/vendor-params';
@@ -71,11 +72,14 @@ export class VendorsController {
   @ApiResponse(GET_ALL_VENDORS_RESPONSES[404])
   @ApiResponse(GET_ALL_VENDORS_RESPONSES[500])
   async getAllVendors(
+    @Query() query: ListVendorsQueryDto,
     @OrganizationId() organizationId: string,
     @AuthContext() authContext: AuthContextType,
   ) {
-    const vendors =
-      await this.vendorsService.findAllByOrganization(organizationId);
+    const vendors = await this.vendorsService.findAllByOrganization(
+      organizationId,
+      query,
+    );
 
     return {
       data: vendors,
@@ -186,6 +190,7 @@ export class VendorsController {
       vendorId,
       organizationId,
       updateVendorDto,
+      authContext.userId,
     );
 
     return {

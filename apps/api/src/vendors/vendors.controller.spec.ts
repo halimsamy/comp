@@ -143,7 +143,11 @@ describe('VendorsController', () => {
       ];
       mockVendorsService.findAllByOrganization.mockResolvedValue(mockVendors);
 
-      const result = await controller.getAllVendors('org_123', mockAuthContext);
+      const result = await controller.getAllVendors(
+        { criticality: 'unset' },
+        'org_123',
+        mockAuthContext,
+      );
 
       expect(result.data).toEqual(mockVendors);
       expect(result.count).toBe(2);
@@ -154,6 +158,7 @@ describe('VendorsController', () => {
       });
       expect(vendorsService.findAllByOrganization).toHaveBeenCalledWith(
         'org_123',
+        { criticality: 'unset' },
       );
     });
 
@@ -161,6 +166,7 @@ describe('VendorsController', () => {
       mockVendorsService.findAllByOrganization.mockResolvedValue([]);
 
       const result = await controller.getAllVendors(
+        {},
         'org_123',
         apiKeyAuthContext,
       );
@@ -304,6 +310,7 @@ describe('VendorsController', () => {
         'vnd_1',
         'org_123',
         dto,
+        'usr_123',
       );
     });
 

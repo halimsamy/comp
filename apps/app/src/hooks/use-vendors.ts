@@ -56,9 +56,23 @@ export interface Vendor extends Partial<VendorTpspFields>, Partial<VendorComplia
   treatmentStrategy: RiskTreatmentType;
   treatmentStrategyDescription: string | null;
   tasks?: VendorLinkedTask[];
+  /** Set when the relationship ended; archived vendors leave the current register. */
+  archivedAt?: string | null;
+  archiveReason?: string | null;
+  /** Why the vendor needs attention (empty = OK); see the API vendorNeedsAttention. */
+  attentionReasons?: VendorAttentionReason[];
+  /** Trust portal badges, e.g. [{ type: 'pci_dss', verified: false }]. */
+  complianceBadges?: { type: string; verified?: boolean }[] | null;
   createdAt: string;
   updatedAt: string;
 }
+
+export type VendorAttentionReason =
+  | 'not_assessed'
+  | 'criticality_not_set'
+  | 'review_overdue'
+  | 'never_reviewed_in_scope'
+  | 'docs_expiring';
 
 export type VendorReviewStatus = 'never_reviewed' | 'overdue' | 'due_soon' | 'current';
 
@@ -66,6 +80,8 @@ export interface ResponsibilityMatrixRow {
   requirement: string;
   owner: 'tpsp' | 'entity' | 'shared';
   notes?: string | null;
+  /** Split confirmed against the TPSP's AOC or agreement (12.8.5). */
+  confirmed?: boolean;
 }
 
 /** Third-party service provider profile (ISO 27001 A.5.19-A.5.22, PCI DSS 12.8). */
