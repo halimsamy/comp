@@ -38,3 +38,10 @@
   border-bottom-left-radius: var(--dialog-radius, 0.75rem);
   border-bottom-right-radius: var(--dialog-radius, 0.75rem);
 }
+
+/* The DS Table drops the right padding of any cell holding a checkbox (pr-0), so
+   in bordered tables the selection checkbox sat flush against the column divider. */
+[data-slot='table-head']:has([data-slot='checkbox']),
+[data-slot='table-cell']:has([data-slot='checkbox']) {
+  padding-right: 0.75rem;
+}
