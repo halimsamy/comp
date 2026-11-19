@@ -38,6 +38,7 @@ interface UseTasksReturn {
   bulkUpdateStatus: (taskIds: string[], status: TaskStatus, notRelevantJustification?: string) => Promise<{ updatedCount: number }>;
   bulkUpdateAssignee: (taskIds: string[], assigneeId: string | null) => Promise<{ updatedCount: number }>;
   bulkSubmitForReview: (taskIds: string[], approverId: string) => Promise<{ submittedCount: number }>;
+  bulkUpdateDueDate: (params: { taskIds: string[]; dueDate: string | null }) => Promise<{ updatedCount: number }>;
   createTask: (data: CreateTaskPayload) => Promise<void>;
   reorderTasks: (updates: ReorderUpdate[]) => Promise<void>;
 }
@@ -141,6 +142,23 @@ export function useTasks({ initialData }: UseTasksOptions = {}): UseTasksReturn 
     return response.data ?? { submittedCount: 0 };
   };
 
+  /** dueDate is YYYY-MM-DD, or null to clear it. */
+  const bulkUpdateDueDate = async ({
+    taskIds,
+    dueDate,
+  }: {
+    taskIds: string[];
+    dueDate: string | null;
+  }): Promise<{ updatedCount: number }> => {
+    const response = await apiClient.patch<{ updatedCount: number }>('/v1/tasks/bulk/due-date', {
+      taskIds,
+      dueDate,
+    });
+    if (response.error) throw new Error(response.error);
+    await mutate();
+    return { updatedCount: response.data?.updatedCount ?? taskIds.length };
+  };
+
   const createTask = async (payload: CreateTaskPayload): Promise<void> => {
     const response = await apiClient.post('/v1/tasks', payload);
     if (response.error) throw new Error(response.error);
@@ -162,6 +180,7 @@ export function useTasks({ initialData }: UseTasksOptions = {}): UseTasksReturn 
     bulkUpdateStatus,
     bulkUpdateAssignee,
     bulkSubmitForReview,
+    bulkUpdateDueDate,
     createTask,
     reorderTasks,
   };

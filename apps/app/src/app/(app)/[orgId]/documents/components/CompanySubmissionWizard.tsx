@@ -13,6 +13,7 @@ import {
 import type { EvidenceFormAnalysisResult } from '@/app/api/evidence-forms/analyze/route';
 import { FileUploader } from '@/components/file-uploader';
 import { api } from '@/lib/api-client';
+import { usePermissions } from '@/hooks/use-permissions';
 import { meetingFields } from '@trycompai/company';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -40,9 +41,10 @@ import {
   Text,
   Textarea,
 } from '@trycompai/design-system';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
+import { MatrixCsvImportButton } from './MatrixCsvImportButton';
 import { toast } from 'sonner';
 import {
   isMatrixField,
@@ -119,6 +121,10 @@ export function CompanySubmissionWizard({
   formType: EvidenceFormType;
 }) {
   const router = useRouter();
+  // Opened from a task's "Structured evidence" card (#173).
+  const taskId = useSearchParams()?.get('taskId') ?? null;
+  const { hasPermission } = usePermissions();
+  const [importedFromCsv, setImportedFromCsv] = useState(false);
   const [step, setStep] = useState<Step>(1);
   const [uploadingField, setUploadingField] = useState<string | null>(null);
 
@@ -283,6 +289,11 @@ export function CompanySubmissionWizard({
       shouldDirty: true,
       shouldValidate: true,
     });
+  };
+
+  const importMatrixRows = (field: { key: string }, rows: MatrixRowValue[]) => {
+    setValue(field.key as never, rows as never, { shouldDirty: true, shouldValidate: true });
+    setImportedFromCsv(true);
   };
 
   const removeMatrixRow = (
@@ -490,6 +501,17 @@ export function CompanySubmissionWizard({
     }
 
     toast.success('Submission saved');
+    if (taskId) {
+      // The imported register supersedes the files uploaded to the task until now.
+      if (importedFromCsv && hasPermission('evidence', 'update')) {
+        const today = new Date().toISOString().slice(0, 10);
+        const res = await api.patch(`/v1/tasks/${taskId}/attachments/validity`, { validUntil: today });
+        if (!res.error) toast.info('Earlier files on the task now end today, superseded by this register.');
+      }
+      router.push(`/${organizationId}/tasks/${taskId}`);
+      router.refresh();
+      return;
+    }
     router.push(`/${organizationId}/documents/${formType}`);
     router.refresh();
   };
@@ -865,13 +887,19 @@ export function CompanySubmissionWizard({
                             </div>
                           </div>
                         ))}
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          onClick={() => addMatrixRow(field)}
-                        >
-                          {field.addRowLabel ?? 'Add row'}
-                        </Button>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => addMatrixRow(field)}
+                          >
+                            {field.addRowLabel ?? 'Add row'}
+                          </Button>
+                          <MatrixCsvImportButton
+                            columns={field.columns}
+                            onImport={(rows) => importMatrixRows(field, rows)}
+                          />
+                        </div>
                       </div>
                       <FieldError errors={[matrixError as never]} />
                     </Field>
@@ -1026,10 +1054,14 @@ export function CompanySubmissionWizard({
                       </div>
                     ))}
 
-                    <div>
+                    <div className="flex flex-wrap gap-2">
                       <Button type="button" variant="secondary" onClick={() => addMatrixRow(field)}>
                         {field.addRowLabel ?? 'Add row'}
                       </Button>
+                      <MatrixCsvImportButton
+                        columns={field.columns}
+                        onImport={(rows) => importMatrixRows(field, rows)}
+                      />
                     </div>
                   </div>
                   <FieldError errors={[matrixError as never]} />

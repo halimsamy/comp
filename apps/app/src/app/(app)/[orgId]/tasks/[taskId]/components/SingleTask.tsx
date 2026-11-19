@@ -40,8 +40,7 @@ import {
   TabsTrigger,
   Text,
 } from '@trycompai/design-system';
-import { SubtractAlt } from '@trycompai/design-system/icons';
-import { CheckCircle2, Clock, Download, RefreshCw, SendHorizontal, Trash2, XCircle } from 'lucide-react';
+import { Download, RefreshCw, SendHorizontal, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
@@ -51,7 +50,7 @@ import { useTask } from '../hooks/use-task';
 import { useTaskAutomations } from '../hooks/use-task-automations';
 import { BrowserAutomations } from './BrowserAutomations';
 import { TaskAutomations } from './TaskAutomations';
-import { TaskAutomationStatusBadge } from './TaskAutomationStatusBadge';
+import { TaskEvidenceSourceBadge } from './TaskEvidenceSourceBadge';
 import { TaskDeleteDialog } from './TaskDeleteDialog';
 import { TaskIntegrationChecks } from './TaskIntegrationChecks';
 import { TaskMainContent } from './TaskMainContent';
@@ -60,6 +59,10 @@ import { RelatedControls } from '@/components/related-controls/RelatedControls';
 import { AutomationReviewBanner } from './AutomationReviewBanner';
 import { TaskPropertiesSidebar } from './TaskPropertiesSidebar';
 import { TaskNativeEvidence } from './TaskNativeEvidence';
+import { ApprovalBanner, NotRelevantBanner } from './TaskReviewBanners';
+import { TaskStructuredEvidence } from './TaskStructuredEvidence';
+import { taskNativeEvidenceKey } from '../hooks/use-task-native-evidence';
+import { useSWRConfig } from 'swr';
 
 type AutomationWithRuns = EvidenceAutomation & {
   runs: EvidenceAutomationRun[];
@@ -97,6 +100,7 @@ export function SingleTask({
     submitForReview,
     approveTask: approveTaskFn,
     rejectTask: rejectTaskFn,
+    withdrawReview,
   } = useTask({
     initialData: initialTask,
   });
@@ -104,6 +108,12 @@ export function SingleTask({
     initialData: initialAutomations,
   });
   const { mutate: mutateActivity } = useAuditLogs({ entityType: 'task', entityId: taskId });
+  const { mutate: globalMutate } = useSWRConfig();
+  // A status change can make auto-evidence submittable (or not) again.
+  const refreshAfterStatusChange = () => {
+    mutateActivity();
+    void globalMutate(taskNativeEvidenceKey(taskId));
+  };
 
   const { data: activeMember } = useActiveMember();
   const { members } = useOrganizationMembers({
@@ -199,7 +209,7 @@ export function SingleTask({
         notRelevantJustification: updates.notRelevantJustification,
       });
       toast.success('Task updated');
-      mutateActivity();
+      refreshAfterStatusChange();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to update task');
     }
@@ -209,7 +219,7 @@ export function SingleTask({
     try {
       await approveTaskFn();
       toast.success('Task approved');
-      mutateActivity();
+      refreshAfterStatusChange();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to approve task');
     }
@@ -219,9 +229,19 @@ export function SingleTask({
     try {
       await rejectTaskFn();
       toast.success('Task rejected');
-      mutateActivity();
+      refreshAfterStatusChange();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to reject task');
+    }
+  };
+
+  const handleWithdrawReview = async () => {
+    try {
+      await withdrawReview();
+      toast.success('Review request withdrawn');
+      refreshAfterStatusChange();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to withdraw the review request');
     }
   };
 
@@ -239,21 +259,20 @@ export function SingleTask({
       await submitForReview(selectedApproverId);
       toast.success('Task submitted for review');
       setRequestApprovalDialogOpen(false);
-      mutateActivity();
+      refreshAfterStatusChange();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to submit for review');
     }
   };
 
-  const isAuditor = activeMember?.role?.includes('auditor') ?? false;
-  const isAdminOrOwner =
-    activeMember?.role?.includes('admin') || activeMember?.role?.includes('owner') || false;
   const isInReview = task.status === 'in_review';
   const isCurrentUserApprover =
     activeMember?.id && task.approverId && activeMember.id === task.approverId;
   const canApprove = evidenceApprovalEnabled && isInReview && isCurrentUserApprover;
-  const canCancel =
-    evidenceApprovalEnabled && isInReview && isAdminOrOwner && !isCurrentUserApprover;
+  // Withdrawing needs task:update, the same permission the API checks (#44).
+  const canWithdraw = evidenceApprovalEnabled && isInReview && canUpdateTask && !isCurrentUserApprover;
+  // Comp AI sent platform-records evidence for this review (#42).
+  const isAutoEvidenceReview = isInReview && !!task.nativeEvidenceSubmittedAt;
   const approverMember =
     !task.approverId || !members ? null : members.find((m) => m.id === task.approverId);
 
@@ -293,7 +312,7 @@ export function SingleTask({
               >
                 {task.title}
               </h1>
-              <TaskAutomationStatusBadge status={task.automationStatus} />
+              <TaskEvidenceSourceBadge taskId={task.id} orgId={orgId} automations={automations ?? []} />
             </HStack>
           )}
         </HStack>
@@ -334,16 +353,18 @@ export function SingleTask({
       )}
 
       {/* Automation moved a task with manual parts to review */}
-      {isInReview && !task.approverId && <AutomationReviewBanner />}
+      {isInReview && !task.approverId && <AutomationReviewBanner isAutoEvidence={isAutoEvidenceReview} />}
 
       {/* Approval Banner */}
       {evidenceApprovalEnabled && isInReview && task.approverId && (
         <ApprovalBanner
           canApprove={!!canApprove}
-          canCancel={canCancel}
+          canWithdraw={canWithdraw}
           approverMember={approverMember}
+          isAutoEvidence={isAutoEvidenceReview}
           onApprove={handleApproveTask}
           onReject={handleRejectTask}
+          onWithdraw={handleWithdrawReview}
         />
       )}
 
@@ -369,6 +390,7 @@ export function SingleTask({
                 onRequestApproval={handleRequestApproval}
               />
               <TaskNativeEvidence taskId={task.id} onTaskUpdated={() => mutateTask()} />
+              <TaskStructuredEvidence taskId={task.id} />
               <Stack gap="sm">
                 <Label>Comments</Label>
                 <Comments
@@ -568,82 +590,4 @@ export function SingleTask({
 function TaskActivitySection({ taskId }: { taskId: string }) {
   const { logs } = useAuditLogs({ entityType: 'task', entityId: taskId });
   return <RecentAuditLogs logs={logs} />;
-}
-
-function NotRelevantBanner({ justification }: { justification: string }) {
-  return (
-    <div className="rounded-lg border border-l-4 border-border border-l-muted-foreground/50 bg-muted/30 p-4">
-      <HStack gap="sm" align="start">
-        <SubtractAlt size={20} className="text-muted-foreground mt-0.5 shrink-0" />
-        <Stack gap="xs">
-          <Text size="sm" weight="medium">Marked as Not Relevant</Text>
-          <Text size="sm" variant="muted">{justification}</Text>
-        </Stack>
-      </HStack>
-    </div>
-  );
-}
-
-function ApprovalBanner({
-  canApprove,
-  canCancel,
-  approverMember,
-  onApprove,
-  onReject,
-}: {
-  canApprove: boolean;
-  canCancel: boolean;
-  approverMember: { user: { name: string | null; email: string } } | null | undefined;
-  onApprove: () => void;
-  onReject: () => void;
-}) {
-  if (canApprove) {
-    return (
-      <div className="rounded-lg border border-l-4 border-border border-l-orange-400 bg-orange-50 dark:bg-orange-950/20 p-4">
-        <HStack justify="between" align="center">
-          <HStack gap="sm" align="start">
-            <CheckCircle2 className="h-5 w-5 text-orange-500 mt-0.5 shrink-0" />
-            <Stack gap="none">
-              <Text size="sm" weight="medium">Your approval is required</Text>
-              <Text size="xs" variant="muted">Review the evidence and approve or reject.</Text>
-            </Stack>
-          </HStack>
-          <HStack gap="sm">
-            <Button variant="outline" size="sm" onClick={onReject}>
-              <XCircle className="h-4 w-4 mr-2" />
-              Reject
-            </Button>
-            <Button size="sm" onClick={onApprove}>
-              <CheckCircle2 className="h-4 w-4 mr-2" />
-              Approve
-            </Button>
-          </HStack>
-        </HStack>
-      </div>
-    );
-  }
-
-  const approverName = approverMember
-    ? approverMember.user.name || approverMember.user.email
-    : 'the approver';
-
-  return (
-    <div className="rounded-lg border border-l-4 border-border border-l-muted-foreground/50 bg-background p-4">
-      <HStack justify="between" align="center">
-        <HStack gap="sm" align="start">
-          <Clock className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
-          <Stack gap="none">
-            <Text size="sm" weight="medium">Pending approval</Text>
-            <Text size="xs" variant="muted">Waiting for {approverName} to review.</Text>
-          </Stack>
-        </HStack>
-        {canCancel && (
-          <Button variant="outline" size="sm" onClick={onReject}>
-            <XCircle className="h-4 w-4 mr-2" />
-            Cancel
-          </Button>
-        )}
-      </HStack>
-    </div>
-  );
 }

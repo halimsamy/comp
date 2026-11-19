@@ -1,5 +1,10 @@
 import { db, type EvidenceFormType } from '@db';
-import { isEvidenceFormFresh, toExternalEvidenceFormType } from '@trycompai/company';
+import {
+  evidenceFormDefinitionList,
+  isEvidenceFormFresh,
+  toDbEvidenceFormType,
+  toExternalEvidenceFormType,
+} from '@trycompai/company';
 import {
   scoreFramework,
   type ApplicabilityStatus,
@@ -16,15 +21,15 @@ export async function loadEvidenceFormContext({
   organizationId: string;
   now?: Date;
 }): Promise<ScoringContext & { notRelevantForms: Set<string> }> {
-  const [latest, notRelevant] = await Promise.all([
+  const [latest, settings] = await Promise.all([
     db.evidenceSubmission.groupBy({
       by: ['formType'],
       where: { organizationId, status: { not: 'rejected' } },
       _max: { submittedAt: true },
     }),
     db.evidenceFormSetting.findMany({
-      where: { organizationId, isNotRelevant: true },
-      select: { formType: true },
+      where: { organizationId },
+      select: { formType: true, isNotRelevant: true, cadenceMonthsOverride: true },
     }),
   ]);
   const freshForms = new Set<string>();
@@ -33,14 +38,19 @@ export async function loadEvidenceFormContext({
     const external = toExternalEvidenceFormType(row.formType);
     if (!row._max.submittedAt || !external) continue;
     submittedForms.add(row.formType);
-    if (isEvidenceFormFresh({ formType: external, lastSubmittedAt: row._max.submittedAt, now })) {
+    const cadenceMonths = settings.find((s) => s.formType === row.formType)?.cadenceMonthsOverride;
+    if (isEvidenceFormFresh({ formType: external, lastSubmittedAt: row._max.submittedAt, cadenceMonths, now })) {
       freshForms.add(row.formType);
     }
   }
   return {
     freshForms,
     submittedForms,
-    notRelevantForms: new Set(notRelevant.map((s) => s.formType)),
+    notRelevantForms: new Set<string>([
+      ...settings.filter((s) => s.isNotRelevant).map((s) => s.formType),
+      // Retired forms (#130): a module and its native-evidence task carry the requirement now.
+      ...evidenceFormDefinitionList.filter((f) => f.retiredTo).map((f) => toDbEvidenceFormType(f.type)),
+    ]),
   };
 }
 

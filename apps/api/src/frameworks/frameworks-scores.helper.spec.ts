@@ -75,10 +75,11 @@ describe('frameworks-scores.helper', () => {
 
     const scores = await getOverviewScores('org_1');
 
+    // Retired forms (#130) and the not-relevant pentest form don't count.
     expect(scores.documents).toEqual({
-      totalDocuments: 6,
+      totalDocuments: 1,
       completedDocuments: 0,
-      outstandingDocuments: 6,
+      outstandingDocuments: 1,
     });
   });
 
@@ -93,7 +94,7 @@ describe('frameworks-scores.helper', () => {
     const sevenMonthsAgo = new Date();
     sevenMonthsAgo.setMonth(sevenMonthsAgo.getMonth() - 7);
     (mockDb.evidenceSubmission.groupBy as jest.Mock).mockResolvedValue([
-      // 12-month pentest cadence: still current. 6-month RBAC cadence: stale.
+      // 12-month pentest cadence: still current. Retired RBAC matrix: not counted.
       { formType: 'penetration_test', _max: { submittedAt: sevenMonthsAgo } },
       { formType: 'rbac_matrix', _max: { submittedAt: sevenMonthsAgo } },
     ]);

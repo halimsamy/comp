@@ -30,6 +30,8 @@ import { useQueryState } from 'nuqs';
 import { useEffect, useMemo, useState } from 'react';
 import type { FrameworkInstanceForTasks } from '../types';
 import { ModernTaskList } from './ModernTaskList';
+import { TaskDueSummary } from './TaskDue';
+import { isTaskDueFilter, taskDueState } from './task-due';
 import { TasksByCategory } from './TasksByCategory';
 
 const statuses = [
@@ -81,6 +83,9 @@ export function TaskList({
   const [frameworkFilter, setFrameworkFilter] = useQueryState('framework');
   const [automationStatusFilter, setAutomationStatusFilter] =
     useQueryState('automationStatus');
+  const [dueParam, setDueParam] = useQueryState('due');
+  const [sortParam, setSortParam] = useQueryState('sort');
+  const dueFilter = isTaskDueFilter(dueParam) ? dueParam : null;
   const [currentTab, setCurrentTab] = useState<'categories' | 'list'>(activeTab);
 
   // Sync activeTab prop with state when it changes
@@ -151,13 +156,15 @@ export function TaskList({
 
     const matchesAutomationStatus =
       !automationStatusFilter || task.automationStatus === automationStatusFilter;
+    const matchesDue = !dueFilter || taskDueState({ task }) === dueFilter;
 
     return (
       matchesSearch &&
       matchesStatus &&
       matchesAssignee &&
       matchesFramework &&
-      matchesAutomationStatus
+      matchesAutomationStatus &&
+      matchesDue
     );
   });
 
@@ -579,6 +586,17 @@ export function TaskList({
       {showFiltersAndList && (
       <Tabs value={currentTab} onValueChange={handleTabChange}>
         <Stack gap="lg">
+          <TaskDueSummary
+            tasks={initialTasks}
+            dueFilter={dueFilter}
+            onDueFilterChange={(value) => setDueParam(value)}
+            sortByDue={sortParam === 'due'}
+            onSortByDueChange={(value) => {
+              setSortParam(value ? 'due' : null);
+              // Sorting by due date applies to the list view.
+              if (value) handleTabChange('list');
+            }}
+          />
           <div className="flex w-full flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
             {/* Filters */}
             <div className="flex w-full flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-center lg:gap-2 lg:flex-1">
@@ -763,7 +781,7 @@ export function TaskList({
                 </Select>
               </div>
               {/* Result Count */}
-              {(searchQuery || statusFilter || assigneeFilter || frameworkFilter || automationStatusFilter) && (
+              {(searchQuery || statusFilter || assigneeFilter || frameworkFilter || automationStatusFilter || dueFilter) && (
                 <div className="text-muted-foreground text-xs tabular-nums whitespace-nowrap lg:ml-auto">
                   {filteredTasks.length} {filteredTasks.length === 1 ? 'result' : 'results'}
                 </div>
@@ -793,7 +811,7 @@ export function TaskList({
               />
             </TabsContent>
             <TabsContent value="list">
-              <ModernTaskList tasks={filteredTasks} members={members} statusFilter={statusFilter} evidenceApprovalEnabled={evidenceApprovalEnabled} />
+              <ModernTaskList tasks={filteredTasks} members={members} statusFilter={statusFilter} evidenceApprovalEnabled={evidenceApprovalEnabled} sortByDue={sortParam === 'due'} />
             </TabsContent>
           </div>
         </Stack>

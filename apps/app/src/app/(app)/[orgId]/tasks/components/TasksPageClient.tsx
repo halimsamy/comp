@@ -1,31 +1,15 @@
 'use client';
 
 import { UpdateOrganizationEvidenceApproval } from '@/components/forms/organization/update-organization-evidence-approval';
-import { triggerBulkEvidenceExport } from '@/lib/evidence-download';
 import type { Member, Task, User } from '@db';
-import {
-  Button,
-  PageHeader,
-  PageLayout,
-  Popover,
-  PopoverContent,
-  PopoverDescription,
-  PopoverHeader,
-  PopoverTitle,
-  PopoverTrigger,
-  Switch,
-  Tabs,
-  TabsList,
-  TabsTrigger,
-} from '@trycompai/design-system';
-import { Add, ArrowDown } from '@trycompai/design-system/icons';
-import { useEffect, useState } from 'react';
-import { toast } from 'sonner';
+import { Button, PageHeader, PageLayout, Tabs, TabsList, TabsTrigger } from '@trycompai/design-system';
+import { Add } from '@trycompai/design-system/icons';
+import { useState } from 'react';
 import { useTasks } from '../hooks/useTasks';
-import { useJobRun } from '@/hooks/use-job-run';
 import { usePermissions } from '@/hooks/use-permissions';
 import type { FrameworkInstanceForTasks } from '../types';
 import { CreateTaskSheet } from './CreateTaskSheet';
+import { EvidenceExportButton } from './EvidenceExportButton';
 import { TaskList } from './TaskList';
 
 interface TasksPageClientProps {
@@ -61,81 +45,13 @@ export function TasksPageClient({
   controls,
   frameworkInstances,
   activeTab,
-  orgId,
-  organizationName,
   hasEvidenceExportAccess,
   evidenceApprovalEnabled,
 }: TasksPageClientProps) {
-  const { tasks, createTask, mutate: mutateTasks } = useTasks({ initialData: initialTasks });
+  const { tasks, createTask } = useTasks({ initialData: initialTasks });
   const { hasPermission } = usePermissions();
   const [isCreateSheetOpen, setIsCreateSheetOpen] = useState(false);
-  const [includeRawJson, setIncludeRawJson] = useState(false);
-  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const [mainTab, setMainTab] = useState('evidence-list');
-  const [exportRunId, setExportRunId] = useState<string | null>(null);
-  const [isTriggering, setIsTriggering] = useState(false);
-
-  // Poll for the onComplete side effect (download / error toast); the
-  // returned run isn't rendered here.
-  const { error: exportRunError } = useJobRun<{ downloadUrl?: string }>(exportRunId, {
-    enabled: !!exportRunId,
-    onComplete: (run) => {
-      // useJobRun fires onComplete on any terminal state, so treat anything
-      // that isn't a clean COMPLETED run as a failure.
-      if (run.status !== 'COMPLETED') {
-        toast.error('Evidence export failed. Please try again.');
-        setExportRunId(null);
-        return;
-      }
-      const downloadUrl =
-        run.output?.downloadUrl ??
-        (run.metadata?.downloadUrl as string | undefined);
-      if (downloadUrl) {
-        const link = document.createElement('a');
-        link.href = downloadUrl;
-        link.download = `${organizationName || 'evidence'}-export.zip`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        toast.success('Evidence package downloaded successfully');
-      } else {
-        toast.error('Export completed but download link was not available.');
-      }
-      setExportRunId(null);
-      setIsPopoverOpen(false);
-    },
-  });
-
-  // The run can no longer be read (e.g. 404): stop showing progress.
-  useEffect(() => {
-    if (!exportRunError || !exportRunId) return;
-    toast.error('Evidence export failed. Please try again.');
-    setExportRunId(null);
-  }, [exportRunError, exportRunId]);
-
-  const isDownloadingAll = isTriggering || !!exportRunId;
-
-  const handleDownloadAllEvidence = async () => {
-    setIsTriggering(true);
-    try {
-      const result = await triggerBulkEvidenceExport({
-        includeJson: includeRawJson,
-      });
-      setExportRunId(result.runId);
-      toast.info('Evidence export started. You\'ll be notified when it\'s ready.');
-    } catch (err) {
-      const noEvidence =
-        err instanceof Error && err.message?.includes('No tasks with evidence found');
-      if (noEvidence) {
-        toast.info('No tasks with evidence found to export.');
-      } else {
-        toast.error('Failed to start evidence export. Please try again.');
-      }
-      console.error('Evidence export error:', err);
-    } finally {
-      setIsTriggering(false);
-    }
-  };
 
   return (
     <Tabs defaultValue="evidence-list" onValueChange={setMainTab}>
@@ -145,34 +61,7 @@ export function TasksPageClient({
             title="Evidence"
             actions={
               <div className="flex items-center gap-2">
-                {hasEvidenceExportAccess && (
-                  <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
-                    <PopoverTrigger className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-7 px-2 cursor-pointer">
-                      Export All Evidence
-                    </PopoverTrigger>
-                    <PopoverContent align="end" side="bottom" sideOffset={8}>
-                      <PopoverHeader>
-                        <PopoverTitle>Export Options</PopoverTitle>
-                        <PopoverDescription>Download all task evidence as ZIP</PopoverDescription>
-                      </PopoverHeader>
-                      <div className="flex items-center justify-between gap-3 py-1">
-                        <span className="text-sm">Include raw JSON files</span>
-                        <Switch
-                          checked={includeRawJson}
-                          onCheckedChange={(checked) => setIncludeRawJson(checked)}
-                        />
-                      </div>
-                      <Button
-                        iconLeft={<ArrowDown />}
-                        onClick={handleDownloadAllEvidence}
-                        disabled={isDownloadingAll}
-                        width="full"
-                      >
-                        {isDownloadingAll ? 'Preparing...' : 'Export'}
-                      </Button>
-                    </PopoverContent>
-                  </Popover>
-                )}
+                {hasEvidenceExportAccess && <EvidenceExportButton frameworkInstances={frameworkInstances} />}
                 {hasPermission('task', 'create') && (
                   <Button iconLeft={<Add />} onClick={() => setIsCreateSheetOpen(true)}>
                     Create Evidence

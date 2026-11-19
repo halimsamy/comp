@@ -50,6 +50,8 @@ jest.mock('@db', () => {
         upsert: jest.fn(),
       },
       organization: { findUnique: jest.fn() },
+      controlDocumentType: { findMany: jest.fn().mockResolvedValue([]) },
+      frameworkControlDocumentTypeLink: { findMany: jest.fn().mockResolvedValue([]) },
     },
   };
 });
@@ -131,7 +133,7 @@ describe('EvidenceFormsService', () => {
 
       expect(mockedDb.evidenceFormSetting.findMany).toHaveBeenCalledWith({
         where: { organizationId: 'org_123' },
-        select: { formType: true, isNotRelevant: true },
+        select: { formType: true, isNotRelevant: true, ownerMemberId: true, cadenceMonthsOverride: true },
       });
       expect(mockedDb.evidenceSubmission.groupBy).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -145,12 +147,15 @@ describe('EvidenceFormsService', () => {
         nextDueAt: '2026-07-01T00:00:00.000Z',
         isFresh: false,
       });
-      expect(result['access-request']).toEqual({
+      expect(result['access-request']).toMatchObject({
         lastSubmittedAt: null,
         isNotRelevant: false,
         cadenceMonths: 12,
         nextDueAt: null,
         isFresh: false,
+        status: 'never_submitted',
+        ownerMemberId: null,
+        frameworks: [],
       });
     });
   });
@@ -210,10 +215,12 @@ describe('EvidenceFormsService', () => {
         select: {
           formType: true,
           isNotRelevant: true,
+          ownerMemberId: true,
+          cadenceMonthsOverride: true,
           updatedAt: true,
         },
       });
-      expect(result).toEqual({
+      expect(result).toMatchObject({
         formType: 'meeting',
         isNotRelevant: true,
         updatedAt: '2026-01-03T00:00:00.000Z',

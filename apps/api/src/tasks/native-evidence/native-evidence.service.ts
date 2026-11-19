@@ -1,6 +1,8 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { db, type TaskStatus } from '@db';
 import { AttachmentsService } from '../../attachments/attachments.service';
+import { TaskNotifierService } from '../task-notifier.service';
+import { pickNativeApprover } from './native-evidence-approver';
 import { renderNativeEvidencePdf } from './native-evidence-pdf';
 import { NATIVE_EVIDENCE_RULES, ruleForTemplate } from './native-evidence-rules';
 
@@ -14,6 +16,7 @@ const TASK_SELECT = {
   frequency: true,
   taskTemplateId: true,
   lastCompletedAt: true,
+  approverId: true,
   nativeEvidenceFingerprint: true,
   nativeEvidenceSubmittedAt: true,
   nativeEvidenceAttachmentId: true,
@@ -44,7 +47,10 @@ export type SubmitOutcome = 'submitted' | 'not_met' | 'not_open' | 'unchanged';
 export class NativeEvidenceService {
   private readonly logger = new Logger(NativeEvidenceService.name);
 
-  constructor(private readonly attachments: AttachmentsService) {}
+  constructor(
+    private readonly attachments: AttachmentsService,
+    private readonly notifier: TaskNotifierService,
+  ) {}
 
   private async loadTask({ organizationId, taskId }: { organizationId: string; taskId: string }) {
     const task = await db.task.findFirst({
@@ -118,14 +124,25 @@ export class NativeEvidenceService {
 
     const org = await db.organization.findUnique({
       where: { id: organizationId },
-      select: { name: true, primaryColor: true },
+      select: { name: true, primaryColor: true, evidenceApprovalEnabled: true },
     });
+    // With evidence approval on, route the review to a person (#42).
+    const approverId = org?.evidenceApprovalEnabled
+      ? await pickNativeApprover({ organizationId, taskId: task.id, lastApproverId: task.approverId })
+      : null;
+    const reviewer = approverId
+      ? await db.member.findFirst({
+          where: { id: approverId, organizationId },
+          select: { user: { select: { name: true, email: true } } },
+        })
+      : null;
     const { buffer, filename } = renderNativeEvidencePdf({
       rule,
       result,
       taskTitle: task.title,
       organizationName: org?.name ?? null,
       primaryColor: org?.primaryColor ?? null,
+      reviewerName: reviewer ? reviewer.user.name || reviewer.user.email : null,
       now,
     });
     const attachment = await this.attachments.uploadAttachment(
@@ -141,17 +158,64 @@ export class NativeEvidenceService {
       userId,
     );
     // Conditional update: a person may have changed the status meanwhile.
-    await db.task.updateMany({
+    const { count } = await db.task.updateMany({
       where: { id: task.id, organizationId, status: { in: SUBMITTABLE } },
       data: {
         status: 'in_review',
         previousStatus: task.status,
+        ...(approverId && { approverId }),
         nativeEvidenceFingerprint: result.fingerprint,
         nativeEvidenceSubmittedAt: now,
         nativeEvidenceAttachmentId: attachment.id,
       },
     });
+    if (count > 0) {
+      await this.recordSubmission({ organizationId, task, rule, userId, approverId });
+    }
     return { outcome: 'submitted', attachmentId: attachment.id };
+  }
+
+  /** One audit entry (manual sends) and the approver's review-request email. */
+  private async recordSubmission({
+    organizationId,
+    task,
+    rule,
+    userId,
+    approverId,
+  }: {
+    organizationId: string;
+    task: { id: string; title: string; status: TaskStatus };
+    rule: { module: string };
+    userId?: string;
+    approverId: string | null;
+  }) {
+    if (userId) {
+      const member = await db.member.findFirst({
+        where: { userId, organizationId, deactivated: false },
+        select: { id: true },
+      });
+      await db.auditLog.create({
+        data: {
+          organizationId,
+          userId,
+          memberId: member?.id ?? null,
+          entityType: 'task',
+          entityId: task.id,
+          description: `sent auto-evidence from ${rule.module} for review`,
+          data: { action: 'review', source: 'auto_evidence', taskTitle: task.title, approverId, previousStatus: task.status },
+        },
+      });
+    }
+    if (!approverId) return;
+    await this.notifier
+      .notifyEvidenceReviewRequested({
+        organizationId,
+        taskId: task.id,
+        taskTitle: task.title,
+        submittedByUserId: userId ?? '',
+        approverMemberId: approverId,
+      })
+      .catch((error: unknown) => this.logger.warn(`Review request email failed for task ${task.id}: ${String(error)}`));
   }
 
   /** Scheduled pass over every open task that has a rule (run by task-schedule). */

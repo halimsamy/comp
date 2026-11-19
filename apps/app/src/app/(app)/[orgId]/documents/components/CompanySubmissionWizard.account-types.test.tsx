@@ -3,7 +3,9 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
 }));
+vi.mock('@/hooks/use-permissions', () => ({ usePermissions: () => ({ hasPermission: () => true }) }));
 vi.mock('@/lib/api-client', () => ({ api: { post: vi.fn() } }));
 vi.mock('@/components/file-uploader', () => ({ FileUploader: () => <div /> }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));

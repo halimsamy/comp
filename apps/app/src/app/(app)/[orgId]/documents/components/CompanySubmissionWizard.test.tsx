@@ -6,7 +6,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mockPush = vi.fn();
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush, refresh: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
 }));
+vi.mock('@/hooks/use-permissions', () => ({ usePermissions: () => ({ hasPermission: () => true }) }));
 
 // next/link is only referenced by the pre-fix Cancel control; keep it inert.
 vi.mock('next/link', () => ({

@@ -1,11 +1,9 @@
 import { db } from '@db';
-import { z } from 'zod';
 import {
   daysBefore,
   fingerprintOf,
   formatDate,
   listIssue,
-  monthsBefore,
   personLabel,
   type NativeEvidenceRule,
 } from '../native-evidence.types';
@@ -96,60 +94,3 @@ function deviceRule({ requireCompliant }: { requireCompliant: boolean }): Native
 
 export const deviceListRule = deviceRule({ requireCompliant: false });
 export const secureDevicesRule = deviceRule({ requireCompliant: true });
-
-const chartNodes = z.array(
-  z.object({ data: z.object({ name: z.string().optional(), title: z.string().nullish() }).passthrough() }).passthrough(),
-);
-
-/** ISO 27001 5.3, A.5.2: a dated org chart snapshot within 12 months. */
-export const orgChartRule: NativeEvidenceRule = {
-  key: 'people_org_chart',
-  module: 'People',
-  title: 'An org chart snapshot was saved in the last 12 months',
-  reference: 'ISO/IEC 27001:2022 5.3, A.5.2',
-  path: '/people?tab=chart',
-  async evaluate({ organizationId, now }) {
-    const snapshot = await db.organizationChartSnapshot.findFirst({
-      where: { organizationId },
-      orderBy: { createdAt: 'desc' },
-    });
-    const holds = !!snapshot && snapshot.createdAt >= monthsBefore({ date: now, months: 12 });
-    const parsed = chartNodes.safeParse(snapshot?.nodes ?? []);
-    const nodes = parsed.success ? parsed.data : [];
-
-    return {
-      holds,
-      summary: snapshot
-        ? `“${snapshot.name}” saved ${formatDate(snapshot.createdAt)}`
-        : 'No org chart snapshot saved',
-      issues: holds
-        ? []
-        : [
-            snapshot
-              ? 'The latest snapshot is older than 12 months. Update the chart and save a new snapshot.'
-              : 'Build the chart in People > Chart and click “Save snapshot”.',
-          ],
-      fingerprint: fingerprintOf(['chart', snapshot?.id ?? null]),
-      sections: [
-        {
-          heading: 'Organisation chart',
-          keyValues: [
-            { label: 'Snapshot', value: snapshot?.name ?? '—' },
-            { label: 'Saved on', value: formatDate(snapshot?.createdAt) },
-            { label: 'People on chart', value: String(nodes.length) },
-          ],
-        },
-        {
-          heading: 'Roles',
-          emptyText: 'The snapshot has no people.',
-          ...(nodes.length > 0 && {
-            table: {
-              headers: ['Name', 'Title'],
-              rows: nodes.map((n) => [n.data.name ?? '—', n.data.title ?? '—']),
-            },
-          }),
-        },
-      ],
-    };
-  },
-};

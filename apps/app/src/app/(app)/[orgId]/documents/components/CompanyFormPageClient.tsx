@@ -77,6 +77,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import useSWR, { useSWRConfig } from 'swr';
+import { FormModuleBanner } from './FormModuleBanner';
+import { FormOwnerSettings } from './FormOwnerSettings';
 import { StatusBadge, formatSubmissionDate } from './submission-utils';
 
 // ─── Types ───────────────────────────────────────────────────
@@ -415,6 +417,8 @@ export function CompanyFormPageClient({
           {conciseFormDescriptions[formType] ?? formDefinition.description}
         </Text>
       </div>
+      <FormModuleBanner organizationId={organizationId} formType={formType} />
+      <FormOwnerSettings organizationId={organizationId} formType={formType} />
 
       <Tabs defaultValue={defaultTab}>
         <Stack gap="lg">

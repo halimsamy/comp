@@ -2,10 +2,10 @@
 
 import { conciseFormDescriptions } from '@/app/(app)/[orgId]/documents/form-descriptions';
 import { useOrganizationFindings } from '@/hooks/use-findings-api';
-import { apiClient } from '@/lib/api-client';
 import { FindingStatus } from '@db';
 import {
   Badge,
+  Button,
   Card,
   CardContent,
   CardDescription,
@@ -15,19 +15,11 @@ import {
   Text,
 } from '@trycompai/design-system';
 import Link from 'next/link';
+import { useQueryState } from 'nuqs';
 import { useMemo } from 'react';
-import useSWR from 'swr';
 import { evidenceFormDefinitionList, meetingSubTypeValues } from '../forms';
-
-type FormStatus = {
-  lastSubmittedAt: string | null;
-  isNotRelevant?: boolean;
-  // Per-form cadence, computed by the API (one scoring source).
-  cadenceMonths?: number;
-  nextDueAt?: string | null;
-  isFresh?: boolean;
-};
-type FormStatuses = Record<string, FormStatus>;
+import { CompanyFormsTable } from './CompanyFormsTable';
+import { useFormStatuses, type FormStatus, type FormStatuses } from './use-form-settings';
 
 const MEETING_SUB_TYPES = meetingSubTypeValues;
 const MEETING_ALL_TYPES = new Set<string>([...MEETING_SUB_TYPES, 'meeting']);
@@ -124,18 +116,8 @@ function StatusBadge({
 }
 
 export function CompanyOverviewCards({ organizationId }: { organizationId: string }) {
-  const swrKey: readonly [string, string] = ['/v1/evidence-forms/statuses', organizationId];
-
-  const { data: statuses } = useSWR<FormStatuses>(
-    swrKey,
-    async ([endpoint, orgId]: readonly [string, string]) => {
-      const response = await apiClient.get<FormStatuses>(endpoint, orgId);
-      if (response.error || !response.data) {
-        throw new Error(response.error ?? 'Failed to load form statuses');
-      }
-      return response.data;
-    },
-  );
+  const { statuses, bulkSetOwner } = useFormStatuses(organizationId);
+  const [view, setView] = useQueryState('view');
 
   const { data: findingsResponse } = useOrganizationFindings();
 
@@ -159,7 +141,13 @@ export function CompanyOverviewCards({ organizationId }: { organizationId: strin
     return counts;
   }, [findingsResponse]);
 
-  const visibleForms = useMemo(() => evidenceFormDefinitionList.filter((form) => !form.hidden), []);
+  // Meeting minutes stay as a card that points to the ISMS management review (#176).
+  const visibleForms = useMemo(
+    () => evidenceFormDefinitionList.filter((form) => !form.hidden || form.type === 'meeting'),
+    [],
+  );
+  const formHref = (form: (typeof evidenceFormDefinitionList)[number]) =>
+    form.retiredTo ? `/${organizationId}${form.retiredTo.path}` : `/${organizationId}/documents/${form.type}`;
 
   const categories = useMemo(() => {
     const map = new Map<string, typeof evidenceFormDefinitionList>();
@@ -173,8 +161,34 @@ export function CompanyOverviewCards({ organizationId }: { organizationId: strin
     return map;
   }, [visibleForms]);
 
+  const viewToggle = (
+    <div className="flex gap-2">
+      <Button size="sm" variant={view === 'table' ? 'outline' : 'secondary'} onClick={() => setView(null)}>
+        Cards
+      </Button>
+      <Button size="sm" variant={view === 'table' ? 'secondary' : 'outline'} onClick={() => setView('table')}>
+        Table
+      </Button>
+    </div>
+  );
+
+  if (view === 'table') {
+    return (
+      <Stack gap="4">
+        {viewToggle}
+        <CompanyFormsTable
+          organizationId={organizationId}
+          forms={visibleForms.filter((form) => !form.retiredTo)}
+          statuses={statuses}
+          onBulkSetOwner={bulkSetOwner}
+        />
+      </Stack>
+    );
+  }
+
   return (
     <Stack gap="6">
+      {viewToggle}
       {Array.from(categories.entries()).map(([category, forms]) => (
         <div key={category} className="space-y-3">
           <div className="flex items-center gap-2">
@@ -185,7 +199,7 @@ export function CompanyOverviewCards({ organizationId }: { organizationId: strin
           </div>
           <div className="grid gap-4 lg:grid-cols-2">
             {forms.map((form) => (
-              <Link key={form.type} href={`/${organizationId}/documents/${form.type}`}>
+              <Link key={form.type} href={formHref(form)}>
                 <Card>
                   <CardHeader>
                     <CardTitle>{form.title}</CardTitle>
@@ -196,11 +210,17 @@ export function CompanyOverviewCards({ organizationId }: { organizationId: strin
                     </div>
                   </CardHeader>
                   <CardContent>
+                    {form.retiredTo ? (
+                      <Text size="xs" variant="muted">
+                        Now recorded in {form.retiredTo.label}
+                      </Text>
+                    ) : (
                     <StatusBadge
                       statuses={statuses}
                       form={form}
                       activeIssues={activeIssueCounts[form.type] ?? 0}
                     />
+                    )}
                   </CardContent>
                 </Card>
               </Link>

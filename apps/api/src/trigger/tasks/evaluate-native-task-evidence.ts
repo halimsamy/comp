@@ -2,6 +2,8 @@ import { logger, task } from '@trycompai/jobs';
 import { AttachmentsService } from '@/attachments/attachments.service';
 import { NativeEvidenceService } from '@/tasks/native-evidence/native-evidence.service';
 import { UploadsService } from '@/uploads/uploads.service';
+import { NovuService } from '@/notifications/novu.service';
+import { TaskNotifierService } from '@/tasks/task-notifier.service';
 
 export const EVALUATE_NATIVE_TASK_EVIDENCE = 'evaluate-native-task-evidence';
 
@@ -15,7 +17,10 @@ export const evaluateNativeTaskEvidence = task({
   maxDuration: 30 * 60,
   run: async () => {
     // The job runs outside Nest's DI container, so wire the service by hand.
-    const service = new NativeEvidenceService(new AttachmentsService(new UploadsService()));
+    const service = new NativeEvidenceService(
+      new AttachmentsService(new UploadsService()),
+      new TaskNotifierService(new NovuService()),
+    );
     const result = await service.evaluateAll();
     logger.info('Evaluated native task evidence', result);
     return result;

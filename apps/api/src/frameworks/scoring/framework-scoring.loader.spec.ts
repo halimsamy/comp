@@ -27,12 +27,12 @@ beforeEach(() => {
   ]);
   mockDb.frameworkControlTaskLink.findMany.mockResolvedValue([]);
   mockDb.frameworkControlDocumentTypeLink.findMany.mockResolvedValue([
-    { frameworkInstanceId: 'fi1', controlId: 'c2', formType: 'rbac_matrix' },
+    { frameworkInstanceId: 'fi1', controlId: 'c2', formType: 'tabletop_exercise' },
   ]);
   mockDb.requirementApplicability.findMany.mockResolvedValue([]);
   mockDb.evidenceSubmission.groupBy.mockResolvedValue([
-    // 7 months old: stale for the 6-month RBAC cadence (PCI 7.2.4).
-    { formType: 'rbac_matrix', _max: { submittedAt: new Date('2026-04-18T00:00:00.000Z') } },
+    // 19 months old: stale for the 12-month tabletop cadence (PCI 12.10.2).
+    { formType: 'tabletop_exercise', _max: { submittedAt: new Date('2025-04-18T00:00:00.000Z') } },
     { formType: 'penetration_test', _max: { submittedAt: new Date('2026-04-18T00:00:00.000Z') } },
   ]);
   mockDb.evidenceFormSetting.findMany.mockResolvedValue([]);
@@ -50,7 +50,18 @@ describe('loadEvidenceFormContext', () => {
       }),
     );
     expect([...result.freshForms]).toEqual(['penetration_test']);
-    expect([...result.submittedForms]).toEqual(['rbac_matrix', 'penetration_test']);
+    expect([...result.submittedForms]).toEqual(['tabletop_exercise', 'penetration_test']);
+  });
+
+  it('treats retired forms as not relevant and honours the org cadence override (#130, #50)', async () => {
+    mockDb.evidenceFormSetting.findMany.mockResolvedValueOnce([
+      { formType: 'tabletop_exercise', isNotRelevant: false, cadenceMonthsOverride: 24 },
+    ]);
+    const result = await loadEvidenceFormContext({ organizationId: ORG, now });
+    expect(result.notRelevantForms.has('rbac_matrix')).toBe(true);
+    expect(result.notRelevantForms.has('infrastructure_inventory')).toBe(true);
+    expect(result.notRelevantForms.has('penetration_test')).toBe(false);
+    expect([...result.freshForms]).toEqual(['tabletop_exercise', 'penetration_test']);
   });
 });
 
@@ -78,7 +89,7 @@ describe('loadFrameworkScores', () => {
     });
 
     const score = scores.get('fi1')!;
-    // c1: published policy + draft ISMS doc; c2: stale RBAC matrix.
+    // c1: published policy + draft ISMS doc; c2: stale tabletop exercise.
     expect(score.controls.c1).toMatchObject({ status: 'in_progress', percent: 50 });
     expect(score.controls.c2.status).toBe('in_progress');
     expect(score).toMatchObject({

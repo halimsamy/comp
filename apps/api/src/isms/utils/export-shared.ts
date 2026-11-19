@@ -33,6 +33,8 @@ export interface IsmsExportMetadata {
   issueDate: Date | string | null;
   organizationName: string | null;
   primaryColor: string | null;
+  /** Replaces the document metadata table (e.g. auto-evidence snapshots have no version or review). */
+  rows?: IsmsKeyValue[];
 }
 
 export interface IsmsExportResult {
@@ -149,6 +151,7 @@ export function approvalLine(metadata: IsmsExportMetadata): string {
 
 /** The key/value rows of the cover metadata table (shared by PDF + DOCX). */
 export function metadataRows(metadata: IsmsExportMetadata): IsmsKeyValue[] {
+  if (metadata.rows) return metadata.rows;
   return [
     { label: 'Document ID', value: metadata.documentCode },
     { label: 'Document title', value: metadata.title },

@@ -3,8 +3,13 @@ import { NotFoundException } from '@nestjs/common';
 const mockDb = {
   task: { findFirst: jest.fn(), findMany: jest.fn(), updateMany: jest.fn() },
   organization: { findUnique: jest.fn() },
+  member: { findFirst: jest.fn() },
+  auditLog: { create: jest.fn() },
 };
 jest.mock('@db', () => ({ db: mockDb }));
+const mockPickApprover = jest.fn();
+jest.mock('./native-evidence-approver', () => ({ pickNativeApprover: (...a: unknown[]) => mockPickApprover(...a) }));
+jest.mock('../task-notifier.service', () => ({ TaskNotifierService: class {} }));
 jest.mock('../../attachments/attachments.service', () => ({ AttachmentsService: class {} }));
 jest.mock('../../auth/auth.server', () => ({ auth: { api: { getSession: jest.fn() } } }));
 jest.mock('@trycompai/auth', () => ({ statement: {}, BUILT_IN_ROLE_PERMISSIONS: {} }));
@@ -25,6 +30,7 @@ import { PERMISSIONS_KEY } from '../../auth/permission.guard';
 import { NativeEvidenceController } from './native-evidence.controller';
 import { alreadySubmitted, NativeEvidenceService } from './native-evidence.service';
 import type { AttachmentsService } from '../../attachments/attachments.service';
+import type { TaskNotifierService } from '../task-notifier.service';
 
 const NOW = new Date('2026-11-18T00:00:00Z');
 const HOLDS = { holds: true, summary: 'v2 published', issues: [], fingerprint: 'fp1', sections: [] };
@@ -37,6 +43,7 @@ function openTask(overrides: Record<string, unknown> = {}) {
     frequency: 'yearly',
     taskTemplateId: 'tpl_rtp',
     lastCompletedAt: null,
+    approverId: null,
     nativeEvidenceFingerprint: null,
     nativeEvidenceSubmittedAt: null,
     nativeEvidenceAttachmentId: null,
@@ -46,12 +53,44 @@ function openTask(overrides: Record<string, unknown> = {}) {
 
 describe('NativeEvidenceService', () => {
   const uploadAttachment = jest.fn().mockResolvedValue({ id: 'att_1' });
-  const service = new NativeEvidenceService({ uploadAttachment } as unknown as AttachmentsService);
+  const notifyEvidenceReviewRequested = jest.fn().mockResolvedValue(undefined);
+  const service = new NativeEvidenceService(
+    { uploadAttachment } as unknown as AttachmentsService,
+    { notifyEvidenceReviewRequested } as unknown as TaskNotifierService,
+  );
 
   beforeEach(() => {
     jest.clearAllMocks();
     mockDb.organization.findUnique.mockResolvedValue({ name: 'Acme', primaryColor: null });
     evaluate.mockResolvedValue(HOLDS);
+    mockDb.task.updateMany.mockResolvedValue({ count: 1 });
+  });
+
+  it('routes the review to an approver and notifies them when approval is on (#42)', async () => {
+    mockDb.organization.findUnique.mockResolvedValue({ name: 'Acme', primaryColor: null, evidenceApprovalEnabled: true });
+    mockDb.task.findFirst.mockResolvedValue(openTask({ approverId: 'mem_last' }));
+    mockPickApprover.mockResolvedValue('mem_last');
+    mockDb.member.findFirst.mockResolvedValue({ id: 'mem_me', user: { name: 'Ann', email: 'a@x.io' } });
+    await service.submit({ organizationId: 'org_1', taskId: 'tsk_1', userId: 'usr_1', now: NOW });
+
+    expect(mockPickApprover).toHaveBeenCalledWith({ organizationId: 'org_1', taskId: 'tsk_1', lastApproverId: 'mem_last' });
+    expect(mockDb.task.updateMany.mock.calls[0][0].data).toMatchObject({ status: 'in_review', approverId: 'mem_last' });
+    expect(mockDb.auditLog.create.mock.calls[0][0].data).toMatchObject({
+      organizationId: 'org_1',
+      description: 'sent auto-evidence from ISMS for review',
+      data: expect.objectContaining({ source: 'auto_evidence' }),
+    });
+    expect(notifyEvidenceReviewRequested).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: 'org_1', taskId: 'tsk_1', approverMemberId: 'mem_last' }),
+    );
+  });
+
+  it('leaves the approver unset when evidence approval is off', async () => {
+    mockDb.task.findFirst.mockResolvedValue(openTask());
+    await service.submit({ organizationId: 'org_1', taskId: 'tsk_1', now: NOW });
+    expect(mockPickApprover).not.toHaveBeenCalled();
+    expect(mockDb.task.updateMany.mock.calls[0][0].data.approverId).toBeUndefined();
+    expect(notifyEvidenceReviewRequested).not.toHaveBeenCalled();
   });
 
   it('scopes the task lookup to the organization', async () => {

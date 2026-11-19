@@ -27,6 +27,9 @@ model EvidenceFormSetting {
   organizationId String
   formType       EvidenceFormType
   isNotRelevant  Boolean          @default(false)
+  // Accountable member (plain id, like IsmsObjective.ownerMemberId) and a per-org cadence.
+  ownerMemberId         String?
+  cadenceMonthsOverride Int?
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 

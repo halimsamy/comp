@@ -133,13 +133,15 @@ async function reopenOverdueTasks() {
     }
 
     try {
+      // Reopened work is due again in 30 days (same as API openTaskDueDate).
+      const reopenDue = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
       // Update tasks to "todo" status (no automations configured)
       const todoTaskIds = tasksToTodo.map((task) => task.id);
       let todoUpdateCount = 0;
       if (todoTaskIds.length > 0) {
         const todoResult = await db.task.updateMany({
           where: { id: { in: todoTaskIds } },
-          data: { status: 'todo' },
+          data: { status: 'todo', reviewDate: reopenDue },
         });
         todoUpdateCount = todoResult.count;
       }
@@ -150,7 +152,7 @@ async function reopenOverdueTasks() {
       if (failedTaskIds.length > 0) {
         const failedResult = await db.task.updateMany({
           where: { id: { in: failedTaskIds } },
-          data: { status: 'failed' },
+          data: { status: 'failed', reviewDate: reopenDue },
         });
         failedUpdateCount = failedResult.count;
       }

@@ -3,12 +3,13 @@ import { AttachmentsModule } from '@/attachments/attachments.module';
 import { AuthModule } from '@/auth/auth.module';
 import { TimelinesModule } from '../timelines/timelines.module';
 import { EvidenceFormsController } from './evidence-forms.controller';
+import { EvidenceFormsSettingsController } from './evidence-forms-settings.controller';
 import { EvidenceFormsNotifierService } from './evidence-forms-notifier.service';
 import { EvidenceFormsService } from './evidence-forms.service';
 
 @Module({
   imports: [AuthModule, AttachmentsModule, TimelinesModule],
-  controllers: [EvidenceFormsController],
+  controllers: [EvidenceFormsSettingsController, EvidenceFormsController],
   providers: [EvidenceFormsService, EvidenceFormsNotifierService],
   exports: [EvidenceFormsService],
 })

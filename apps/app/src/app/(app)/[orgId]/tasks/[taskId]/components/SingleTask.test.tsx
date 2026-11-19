@@ -149,8 +149,12 @@ vi.mock('./TaskAutomations', () => ({
   TaskAutomations: () => <div data-testid="task-automations" />,
 }));
 
-vi.mock('./TaskAutomationStatusBadge', () => ({
-  TaskAutomationStatusBadge: () => <span data-testid="automation-status-badge" />,
+vi.mock('./TaskStructuredEvidence', () => ({
+  TaskStructuredEvidence: () => null,
+}));
+
+vi.mock('./TaskEvidenceSourceBadge', () => ({
+  TaskEvidenceSourceBadge: () => <span data-testid="automation-status-badge" />,
 }));
 
 vi.mock('./TaskDeleteDialog', () => ({

@@ -3,9 +3,10 @@ import { CheckmarkOutline } from '@trycompai/design-system/icons';
 
 /**
  * Shown when an automation moved a task to review (checks passed, no approver):
- * the task has a manual part only a person can finish.
+ * the task has a manual part only a person can finish. The auto-evidence
+ * variant (#42) is a snapshot from platform records waiting for a person.
  */
-export function AutomationReviewBanner() {
+export function AutomationReviewBanner({ isAutoEvidence = false }: { isAutoEvidence?: boolean }) {
   return (
     <div
       role="status"
@@ -17,11 +18,14 @@ export function AutomationReviewBanner() {
         </div>
         <Stack gap="none">
           <Text size="sm" weight="medium">
-            Automated checks passed — manual review needed
+            {isAutoEvidence
+              ? 'Auto-evidence attached — review needed'
+              : 'Automated checks passed — manual review needed'}
           </Text>
           <Text size="xs" variant="muted">
-            The latest results are attached below. Add the manual evidence this task asks for,
-            then mark it done.
+            {isAutoEvidence
+              ? 'Comp AI attached a dated snapshot from platform records. Check it, then mark the task done.'
+              : 'The latest results are attached below. Add the manual evidence this task asks for, then mark it done.'}
           </Text>
         </Stack>
       </HStack>

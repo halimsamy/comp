@@ -5,6 +5,7 @@ import { Check, Circle, Eye, Loader2, XCircle } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useMemo } from 'react';
 import { ModernSingleStatusTaskList } from './ModernSingleStatusTaskList';
+import { compareTasksByDue } from './task-due';
 
 interface ModernTaskListProps {
   tasks: (Task & {
@@ -26,6 +27,7 @@ interface ModernTaskListProps {
   members: (Member & { user: User })[];
   statusFilter?: string | null;
   evidenceApprovalEnabled?: boolean;
+  sortByDue?: boolean;
 }
 
 const statusConfig = {
@@ -37,7 +39,13 @@ const statusConfig = {
   not_relevant: { icon: Circle, label: 'Not Relevant', color: 'text-slate-500' },
 } as const;
 
-export function ModernTaskList({ tasks, members, statusFilter, evidenceApprovalEnabled = false }: ModernTaskListProps) {
+export function ModernTaskList({
+  tasks,
+  members,
+  statusFilter,
+  evidenceApprovalEnabled = false,
+  sortByDue = false,
+}: ModernTaskListProps) {
   const router = useRouter();
   const pathname = usePathname();
 
@@ -58,13 +66,13 @@ export function ModernTaskList({ tasks, members, statusFilter, evidenceApprovalE
       }
     }
 
-    // Sort each group by title
+    // Sort each group by title, or by due date when asked
     Object.keys(grouped).forEach((status) => {
-      grouped[status].sort((a, b) => a.title.localeCompare(b.title));
+      grouped[status].sort(sortByDue ? compareTasksByDue : (a, b) => a.title.localeCompare(b.title));
     });
 
     return grouped;
-  }, [tasks]);
+  }, [tasks, sortByDue]);
 
   const handleTaskClick = (taskId: string) => {
     router.push(`${pathname}/${taskId}`);

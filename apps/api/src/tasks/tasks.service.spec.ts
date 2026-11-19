@@ -286,14 +286,31 @@ describe('TasksService approval gating', () => {
       expect(monthsAhead(yearly.data.reviewDate)).toBe(12);
     });
 
-    it('bulk non-done status does not touch due dates', async () => {
+    it('bulk open status leaves open tasks\' due dates alone', async () => {
       orgFindUnique.mockResolvedValue({ evidenceApprovalEnabled: false });
       taskUpdateMany.mockResolvedValue({ count: 1 });
+      taskFindMany.mockResolvedValue([]);
 
       await service.updateTasksStatus(ORG_ID, [TASK_ID], TaskStatus.todo, undefined, USER_ID);
 
-      expect(taskFindMany).not.toHaveBeenCalled();
       expect(taskUpdateMany).toHaveBeenCalledTimes(1);
+    });
+
+    it('bulk reopening done work makes it due again in 30 days (#4)', async () => {
+      orgFindUnique.mockResolvedValue({ evidenceApprovalEnabled: false });
+      taskUpdateMany.mockResolvedValue({ count: 1 });
+      taskFindMany.mockResolvedValue([{ id: TASK_ID }]);
+
+      await service.updateTasksStatus(ORG_ID, [TASK_ID], TaskStatus.todo, undefined, USER_ID);
+
+      expect(taskFindMany.mock.calls[0][0].where).toMatchObject({
+        organizationId: ORG_ID,
+        status: { in: [TaskStatus.done, TaskStatus.not_relevant] },
+      });
+      const reopen = taskUpdateMany.mock.calls[1][0];
+      expect(reopen.where).toEqual({ id: { in: [TASK_ID] }, organizationId: ORG_ID });
+      const days = (reopen.data.reviewDate.getTime() - Date.now()) / 86_400_000;
+      expect(Math.round(days)).toBe(30);
     });
   });
 

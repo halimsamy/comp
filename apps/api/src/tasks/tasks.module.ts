@@ -5,13 +5,14 @@ import { AutomationsModule } from './automations/automations.module';
 import { NativeEvidenceModule } from './native-evidence/native-evidence.module';
 import { TimelinesModule } from '../timelines/timelines.module';
 import { NovuService } from '../notifications/novu.service';
+import { TaskReviewActionsController } from './task-review-actions.controller';
 import { TasksController } from './tasks.controller';
 import { TasksService } from './tasks.service';
 import { TaskNotifierService } from './task-notifier.service';
 
 @Module({
   imports: [AuthModule, AttachmentsModule, forwardRef(() => AutomationsModule), TimelinesModule, NativeEvidenceModule],
-  controllers: [TasksController],
+  controllers: [TaskReviewActionsController, TasksController],
   providers: [TasksService, TaskNotifierService, NovuService],
   exports: [TasksService, TaskNotifierService],
 })

@@ -92,7 +92,7 @@
   {
     "id": "frk_tt_68406903839203801ac8041a",
     "name": "Device List",
-    "description": "If the CompAI device agent or MDM covers every member, attach the People > Devices CSV export. Otherwise keep the manual laptop and phone list. Servers and cloud assets go in the Infrastructure Inventory form.",
+    "description": "Keep every laptop and phone in Assets: devices synced by the CompAI device agent or MDM appear there automatically, and you add the rest by hand. Each device needs an owner and an assessed scope, and the asset register must be reviewed at least every 12 months. When it is, Comp AI attaches a dated snapshot of the register for review.",
     "frequency": "yearly",
     "department": "admin",
     "createdAt": "2025-06-04 15:40:51.392",
@@ -412,7 +412,7 @@
   {
     "id": "frk_tt_68406cd9dde2d8cd4c463fe0",
     "name": "2FA",
-    "description": "Always enable 2FA/MFA (Two-Factor Authentication/Multi-Factor Authentication) on Google Workspace, the apps you use, and wherever else it's an option. \n\nUpload a screenshot showing this setting enabled at the org/admin level, in addition to a screenshot of an end user being prompted for 2FA\n\nFor PCI: Enable MFA for all administrative access into CDE systems, and all remote access (internal or external). Collect evidence of configurations showing MFA enforcement.\n\nAlso upload identity provider / cloud console screenshots of the authentication settings: password length and complexity, password history, account lockout, session idle timeout, and MFA enforcement with no bypass (or an approved exception list).\n\nFor ISO 27001: show these settings are enforced as described in the access control policy.\n\nFor PCI: settings must show minimum length 12 (alphanumeric), history of at least 4, lockout after no more than 10 failed attempts for at least 30 minutes, unique first-use and reset passwords, 90-day change or MFA/dynamic posture analysis, idle timeout of 15 minutes or less, and MFA factors that resist replay.",
+    "description": "Turn on MFA for every human account on in-scope systems and record it in People > Access: PCI DSS requires MFA for all administrative access into the CDE and all remote access (8.4). Set the Comp AI session idle timeout to 15 minutes or less in Settings > Security (PCI DSS 8.2.8). When both hold, Comp AI attaches a snapshot that lists any exceptions.\n\nAlso attach identity-provider screenshots of password length and complexity, password history and account lockout settings.",
     "frequency": "yearly",
     "department": "itsm",
     "createdAt": "2025-06-04 15:57:13.287",
@@ -482,7 +482,7 @@
   {
     "id": "frk_tt_69033a6bfeb4759be36257bc",
     "name": "Infrastructure Inventory",
-    "description": "Maintain an up-to-date inventory of all infrastructure assets, including cloud accounts, compute resources, databases, storage, and networks. SOC 2 requires that you identify and track all assets in your environment to ensure they are protected and ownership is assigned.\n\nUpload an export or screenshot from your cloud provider (e.g., AWS, GCP, Azure) or CMDB listing these assets. Ensure the evidence clearly shows asset names, tags, owners, and a last-updated date.\n\nTemplate here: https://docs.google.com/spreadsheets/d/170csMBWNcmKIkyC6TE0H3lqwv3C1e5dc/edit?usp=drive_link&ouid=105483817633840137498&rtpof=true&sd=true",
+    "description": "Keep every cloud account, compute resource, database, storage bucket and network in Assets (import them from your cloud provider or a CSV). Each asset needs an owner and an assessed PCI scope, and the inventory must be reviewed at least every 12 months (PCI DSS 12.5.1, ISO 27001 A.5.9). When it is, Comp AI attaches a dated snapshot of the asset register for review.",
     "frequency": "yearly",
     "department": "itsm",
     "createdAt": "2025-10-30 10:14:03.155",
@@ -502,7 +502,7 @@
   {
     "id": "frk_tt_68e52b274a7c38c62db08e80",
     "name": "Organisation Chart",
-    "description": "Attach a dated screenshot of People > Org chart showing name and job title for each role. Confirm the security role owners match ISMS 5.3 Roles.",
+    "description": "Keep People > Org chart current: at least 90% of active members, and every ISMS 5.3 role holder, appear with their job title. Comp AI lists anyone missing and attaches a dated snapshot of the chart for review once it is complete.",
     "frequency": "yearly",
     "department": "hr",
     "createdAt": "2025-10-07 15:00:54.563",
@@ -712,7 +712,7 @@
   {
     "id": "frk_tt_69dd3f8f62639b078e7cc061",
     "name": "Executive PCI accountability assignment",
-    "description": "Confirm the PCI DSS Scope & Compliance Program policy, which names the accountable executive, is approved and current, and that a board-meeting record minutes the assignment. Submit the board-meeting form from the PCI DSS program management control's Documents tab.",
+    "description": "Assign the PCI executive owner in ISMS 5.3 Roles and have them acknowledge the role, and give every PCI DSS control an owner (PCI DSS 12.4.1, 12.4.2). Comp AI attaches a snapshot for review when both hold. Record the board's approval of the assignment in the ISMS management review.",
     "frequency": "yearly",
     "department": "admin",
     "createdAt": "2026-04-13 19:10:07.078",
@@ -742,7 +742,7 @@
   {
     "id": "frk_tt_69dd3f6094fc732d635210ae",
     "name": "Scope confirmation & CDE inventory pack",
-    "description": "Sign the PCI scope confirmation (12.5.2 / 12.5.2.1), citing the current Diagramming attachments and Infrastructure Inventory submission. Until the inventory form has function and CDE-scope columns, attach the in-scope system list (owner, function, location, CDE / connected / out) here.\n\nFor each in-scope system, also record its security level and how it is isolated or segmented from systems with a lower security level.",
+    "description": "Assess the PCI scope of every asset in Assets (in the CDE, connected, or out of scope) and confirm the scope at least every 12 months and after any significant change (PCI DSS 12.5.2, 12.5.2.1). For each in-scope system, record its owner, function, security level and how it is segmented from systems with a lower security level, and cite the current Diagramming attachments. Comp AI attaches a snapshot of the scoped asset register for review.",
     "frequency": "semiannually",
     "department": "admin",
     "createdAt": "2026-04-13 19:09:20.365",

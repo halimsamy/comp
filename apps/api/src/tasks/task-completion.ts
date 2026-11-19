@@ -28,6 +28,20 @@ export function computeNextTaskReviewDate(
   return new Date(y, m + months, Math.min(d, lastDay));
 }
 
+/** Days an open task has before it is due: on create and on reopen (#4). */
+export const OPEN_TASK_DUE_DAYS = 30;
+
+/** Due date for a task that is created or reopened at `from`. */
+export function openTaskDueDate(from: Date = new Date()): Date {
+  return new Date(from.getTime() + OPEN_TASK_DUE_DAYS * 24 * 60 * 60 * 1000);
+}
+
+/** A done or not-relevant task moving back to open work gets a fresh due date. */
+export function isReopen({ from, to }: { from: TaskStatus; to: TaskStatus }): boolean {
+  const closed = (s: TaskStatus) => s === 'done' || s === 'not_relevant';
+  return closed(from) && !closed(to);
+}
+
 /** Fields to write when a task is completed (by a person or an automation). */
 export function completedTaskData(
   frequency: TaskFrequency | null | undefined,

@@ -15,6 +15,7 @@ import type React from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { AttachmentValidity } from './AttachmentValidity';
+import { TaskFilesValidity } from './TaskFilesValidity';
 
 interface TaskBodyProps {
   taskId: string;
@@ -296,6 +297,7 @@ export function TaskBody({
           <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
             Attachments
           </h3>
+          <TaskFilesValidity taskId={taskId} fileCount={attachments.length} onChanged={refreshAttachments} />
         </div>
 
         {/* Show error state if attachments failed to load */}

@@ -16,10 +16,16 @@ const VERDICT_LABEL: Record<string, string> = {
 export const riskTreatmentPlanRule: NativeEvidenceRule = {
   key: 'isms_risk_treatment_plan',
   module: 'ISMS',
-  title: 'Risk treatment plan (6.1.3) published within the last 12 months',
+  title: 'Risk treatment plan (6.1.3) published within the last 12 months and the Statement of Applicability approved',
   reference: 'ISO/IEC 27001:2022 6.1.3, 8.3',
   path: '/documents/isms/risk-treatment-plan',
   async evaluate({ organizationId, now }) {
+    // 6.1.3 d): the SoA is an output of risk treatment; it must be approved too.
+    const soa = await db.sOADocument.findFirst({
+      where: { organizationId, approvedAt: { not: null } },
+      orderBy: { approvedAt: 'desc' },
+      select: { id: true, approvedAt: true },
+    });
     const docs = await db.ismsDocument.findMany({
       where: { organizationId, type: 'risk_treatment_plan' },
       select: {
@@ -43,21 +49,25 @@ export const riskTreatmentPlanRule: NativeEvidenceRule = {
       )
       .sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime())[0];
     const publishedAt = latest?.publishedAt ?? null;
-    const holds = !!publishedAt && publishedAt >= monthsBefore({ date: now, months: 12 });
+    const rtpOk = !!publishedAt && publishedAt >= monthsBefore({ date: now, months: 12 });
+    const holds = rtpOk && !!soa;
     const publisher = latest?.version.publishedBy?.user;
     return {
       holds,
       summary: latest
         ? `Version ${latest.version.version} published ${formatDate(latest.publishedAt)}`
         : 'No published risk treatment plan',
-      issues: holds
-        ? []
-        : [
-            publishedAt
-              ? 'The published plan is older than 12 months. Review and publish a new version.'
-              : 'Generate and publish the risk treatment plan in ISMS.',
-          ],
-      fingerprint: fingerprintOf(['rtp', latest?.version.id ?? null]),
+      issues: [
+        ...(rtpOk
+          ? []
+          : [
+              publishedAt
+                ? 'The published plan is older than 12 months. Review and publish a new version.'
+                : 'Generate and publish the risk treatment plan in ISMS.',
+            ]),
+        ...(soa ? [] : ['Submit the Statement of Applicability for approval in Documents.']),
+      ],
+      fingerprint: fingerprintOf(['rtp', latest?.version.id ?? null, soa?.id ?? null, soa?.approvedAt ?? null]),
       sections: [
         {
           heading: 'Risk treatment plan',
@@ -67,6 +77,7 @@ export const riskTreatmentPlanRule: NativeEvidenceRule = {
             { label: 'Published on', value: formatDate(publishedAt) },
             { label: 'Approved by', value: publisher ? publisher.name || publisher.email : '—' },
             { label: 'Change note', value: latest?.version.changelog || '—' },
+            { label: 'Statement of Applicability approved', value: formatDate(soa?.approvedAt) },
           ],
         },
       ],

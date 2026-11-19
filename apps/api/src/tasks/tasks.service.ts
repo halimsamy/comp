@@ -17,6 +17,8 @@ import { isMemberOrgParticipant } from '../utils/org-participation';
 import {
   completedTaskData,
   computeNextTaskReviewDate,
+  isReopen,
+  openTaskDueDate,
 } from './task-completion';
 
 @Injectable()
@@ -402,6 +404,16 @@ export class TasksService {
             })
           : [];
 
+      // Reopening done / not-relevant work: due again in 30 days (#4).
+      const reopening =
+        reviewDate === undefined &&
+        isReopen({ from: TaskStatus.done, to: status })
+          ? await db.task.findMany({
+              where: { ...where, status: { in: [TaskStatus.done, TaskStatus.not_relevant] } },
+              select: { id: true },
+            })
+          : [];
+
       const result = await db.task.updateMany({
         where,
         data: {
@@ -413,6 +425,12 @@ export class TasksService {
       });
 
       const now = new Date();
+      if (reopening.length > 0) {
+        await db.task.updateMany({
+          where: { id: { in: reopening.map((t) => t.id) }, organizationId },
+          data: { reviewDate: openTaskDueDate(now) },
+        });
+      }
       for (const frequency of new Set(completing.map((t) => t.frequency))) {
         const { reviewDate: nextDue, lastCompletedAt } = completedTaskData(
           frequency,
@@ -764,6 +782,14 @@ export class TasksService {
         dataToUpdate.lastCompletedAt = lastCompletedAt;
         if (!updateData.reviewDate) dataToUpdate.reviewDate = reviewDate;
       }
+      // Reopening done / not-relevant work: due again in 30 days (#4).
+      if (
+        updateData.status !== undefined &&
+        isReopen({ from: existingTask.status, to: updateData.status }) &&
+        !updateData.reviewDate
+      ) {
+        dataToUpdate.reviewDate = openTaskDueDate();
+      }
 
       // Get the current member for audit logging
       const currentMember = await db.member.findFirst({
@@ -956,6 +982,7 @@ export class TasksService {
           status: 'todo',
           order: 0,
           frequency: (createData.frequency as TaskFrequency) || null,
+          reviewDate: openTaskDueDate(),
           department: createData.department || null,
           automationStatus,
           taskTemplateId: createData.taskTemplateId || null,

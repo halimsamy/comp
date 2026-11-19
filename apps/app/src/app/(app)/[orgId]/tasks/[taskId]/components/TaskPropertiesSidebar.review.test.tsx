@@ -54,7 +54,7 @@ describe('TaskPropertiesSidebar — review lock and due dates', () => {
 
   it('shows the next due date and the last completion date', () => {
     render(<TaskPropertiesSidebar handleUpdateTask={vi.fn()} />);
-    expect(screen.getByLabelText('Next Due Date')).toHaveValue('5/18/2027');
+    expect(screen.getByLabelText('Due')).toHaveValue('5/18/2027');
     expect(screen.getByLabelText('Last Completed')).toHaveValue('11/18/2026');
   });
 });

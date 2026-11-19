@@ -39,4 +39,9 @@ export type EvidenceFormDefinition = {
   fields: ReadonlyArray<EvidenceFormFieldDefinition>;
   optional?: boolean;
   hidden?: boolean;
+  /**
+   * The module that replaced this form (#130). The form stays readable for past
+   * submissions and historic exports; new evidence lives in the module.
+   */
+  retiredTo?: { label: string; path: string };
 };

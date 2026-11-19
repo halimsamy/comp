@@ -26,6 +26,7 @@ vi.mock('swr', () => ({
     error: null,
     mutate: vi.fn(),
   })),
+  useSWRConfig: () => ({ mutate: vi.fn() }),
 }));
 
 // ─── Mock api client ─────────────────────────────────────────
@@ -72,9 +73,13 @@ vi.mock('@trycompai/design-system/icons', () => ({
   Catalog: () => <span data-testid="catalog-icon" />,
   Download: () => <span data-testid="download-icon" />,
   Search: () => <span data-testid="search-icon" />,
+  Upload: () => <span data-testid="upload-icon" />,
 }));
 
 // ─── Mock submission-utils ───────────────────────────────────
+
+vi.mock('./FormModuleBanner', () => ({ FormModuleBanner: () => null }));
+vi.mock('./FormOwnerSettings', () => ({ FormOwnerSettings: () => null }));
 
 vi.mock('./submission-utils', () => ({
   StatusBadge: ({ status }: { status: string }) => (

@@ -1,5 +1,5 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   setMockPermissions,
   mockHasPermission,
@@ -35,30 +35,8 @@ vi.mock('./TaskList', () => ({
   TaskList: () => <div data-testid="task-list" />,
 }));
 
-// Mock evidence download (bulk export is triggered as a background job)
-const mockTriggerBulkEvidenceExport = vi.fn();
-vi.mock('@/lib/evidence-download', () => ({
-  triggerBulkEvidenceExport: (args: { includeJson?: boolean }) =>
-    mockTriggerBulkEvidenceExport(args),
-}));
-
-// Capture useJobRun's onComplete so tests can simulate a finished run.
-const mockRealtime: {
-  onComplete?: (run: {
-    status?: string;
-    output?: { downloadUrl?: string } | null;
-    metadata?: Record<string, unknown>;
-  }) => void;
-} = {};
-vi.mock('@/hooks/use-job-run', () => ({
-  useJobRun: (
-    _runId: string | null,
-    options: { onComplete?: typeof mockRealtime.onComplete },
-  ) => {
-    mockRealtime.onComplete = options.onComplete;
-    return { run: undefined, error: undefined, isLoading: false };
-  },
-  isJobRunFinished: () => false,
+vi.mock('./EvidenceExportButton', () => ({
+  EvidenceExportButton: () => <button>Export evidence</button>,
 }));
 
 const mockToastSuccess = vi.fn();
@@ -197,70 +175,20 @@ describe('TasksPageClient permission gating', () => {
   });
 });
 
-describe('TasksPageClient evidence export', () => {
-  const exportProps = { ...defaultProps, hasEvidenceExportAccess: true };
-
+describe('TasksPageClient evidence export (#192)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockRealtime.onComplete = undefined;
-    setMockPermissions({});
-    mockTriggerBulkEvidenceExport.mockResolvedValue({ runId: 'jrun_1' });
-    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    setMockPermissions(ADMIN_PERMISSIONS);
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
+  it('shows the framework export dialog button when the org can export', () => {
+    render(<TasksPageClient {...defaultProps} hasEvidenceExportAccess />);
+    expect(screen.getByRole('button', { name: 'Export evidence' })).toBeInTheDocument();
+    expect(screen.queryByText('Export All Evidence')).not.toBeInTheDocument();
   });
 
-  async function startExport() {
-    fireEvent.click(screen.getByRole('button', { name: 'Export' }));
-    await waitFor(() => expect(mockToastInfo).toHaveBeenCalled());
-  }
-
-  it('downloads and toasts success when the run completes with a URL', async () => {
-    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click');
-    render(<TasksPageClient {...exportProps} />);
-    await startExport();
-
-    act(() => {
-      mockRealtime.onComplete?.({
-        status: 'COMPLETED',
-        output: { downloadUrl: 'https://example.com/e.zip' },
-      });
-    });
-
-    expect(clickSpy).toHaveBeenCalledTimes(1);
-    expect(mockToastSuccess).toHaveBeenCalledWith(
-      'Evidence package downloaded successfully',
-    );
-    expect(mockToastError).not.toHaveBeenCalled();
-  });
-
-  it('toasts an error when the run completes without a download URL', async () => {
-    render(<TasksPageClient {...exportProps} />);
-    await startExport();
-
-    act(() => {
-      mockRealtime.onComplete?.({ status: 'COMPLETED', output: null, metadata: {} });
-    });
-
-    expect(mockToastError).toHaveBeenCalledWith(
-      'Export completed but download link was not available.',
-    );
-    expect(mockToastSuccess).not.toHaveBeenCalled();
-  });
-
-  it('toasts a failure error when the run does not complete cleanly', async () => {
-    render(<TasksPageClient {...exportProps} />);
-    await startExport();
-
-    act(() => {
-      mockRealtime.onComplete?.({ status: 'FAILED' });
-    });
-
-    expect(mockToastError).toHaveBeenCalledWith(
-      'Evidence export failed. Please try again.',
-    );
-    expect(mockToastSuccess).not.toHaveBeenCalled();
+  it('hides it without export access', () => {
+    render(<TasksPageClient {...defaultProps} hasEvidenceExportAccess={false} />);
+    expect(screen.queryByRole('button', { name: 'Export evidence' })).not.toBeInTheDocument();
   });
 });

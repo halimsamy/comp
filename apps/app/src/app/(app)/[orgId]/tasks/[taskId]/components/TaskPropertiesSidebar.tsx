@@ -151,7 +151,7 @@ export function TaskPropertiesSidebar({
             />
           </Stack>
 
-          <ReadOnlyDate label="Next Due Date" value={task.reviewDate} />
+          <ReadOnlyDate label="Due" value={task.reviewDate} />
           <ReadOnlyDate label="Last Completed" value={task.lastCompletedAt} />
 
           {/* Approver */}

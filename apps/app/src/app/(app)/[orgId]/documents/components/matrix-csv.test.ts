@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildMatrixCsv, matrixCsvFilename } from './matrix-csv';
+import { buildMatrixCsv, matrixCsvFilename, parseMatrixCsv } from './matrix-csv';
 
 const columns = [
   { key: 'system', label: 'System' },
@@ -48,5 +48,38 @@ describe('matrixCsvFilename', () => {
     expect(
       matrixCsvFilename({ formType: 'rbac-matrix', submittedOn: '2026-11-11T10:00:00.000Z' }),
     ).toBe('rbac-matrix-2026-11-11.csv');
+  });
+});
+
+describe('parseMatrixCsv', () => {
+  const columns = [
+    { key: 'system', label: 'System' },
+    { key: 'role', label: 'Role' },
+    {
+      key: 'mfa',
+      label: 'MFA',
+      type: 'select' as const,
+      options: [
+        { label: 'Yes', value: 'yes' },
+        { label: 'No', value: 'no' },
+      ],
+    },
+  ];
+
+  it('maps columns by label or key in any order and reads quoted cells', () => {
+    const csv = '﻿role,SYSTEM,mfa,Notes\r\n"Admin, full",AWS,Yes,x\r\n\r\nviewer,"Bitbucket ""cloud""",no,\r\n';
+    expect(parseMatrixCsv({ csv, columns })).toEqual([
+      { system: 'AWS', role: 'Admin, full', mfa: 'yes' },
+      { system: 'Bitbucket "cloud"', role: 'viewer', mfa: 'no' },
+    ]);
+  });
+
+  it('round-trips an exported matrix, including the formula guard', () => {
+    const rows = [{ system: '=SUM(A1)', role: 'Admin', mfa: 'yes' }];
+    expect(parseMatrixCsv({ csv: buildMatrixCsv({ columns, rows }), columns })).toEqual(rows);
+  });
+
+  it('rejects a CSV whose header names none of the columns', () => {
+    expect(() => parseMatrixCsv({ csv: 'a,b\n1,2', columns })).toThrow(/System, Role, MFA/);
   });
 });

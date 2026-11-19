@@ -6,6 +6,7 @@ import type { Member, Task, User } from '@db';
 import { Checkbox } from '@trycompai/ui/checkbox';
 import Image from 'next/image';
 import { AutomationIndicator } from './AutomationIndicator';
+import { TaskDueChip } from './TaskDue';
 import { TaskStatusSelector } from './TaskStatusSelector';
 
 interface ModernTaskListItemProps {
@@ -111,6 +112,7 @@ export function ModernTaskListItem({
             </div>
           )}
         </div>
+        <TaskDueChip task={task} />
         {member && (
           <div className="flex shrink-0 items-center">
             <div className="bg-muted flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-border">

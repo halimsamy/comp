@@ -66,6 +66,14 @@ vi.mock('./BulkTaskAssigneeChangeModal', () => ({
   ),
 }));
 
+vi.mock('./BulkTaskDueDateModal', () => ({
+  BulkTaskDueDateModal: () => <div data-testid="bulk-due-modal" />,
+}));
+
+vi.mock('@trycompai/design-system/icons', () => ({
+  Calendar: () => <span data-testid="calendar-icon" />,
+}));
+
 vi.mock('./BulkTaskDeleteModal', () => ({
   BulkTaskDeleteModal: () => <div data-testid="bulk-delete-modal" />,
 }));
@@ -225,6 +233,7 @@ describe('ModernSingleStatusTaskList permission gating', () => {
 
     expect(screen.getByText('Status')).toBeInTheDocument();
     expect(screen.getByText('Assignee')).toBeInTheDocument();
+    expect(screen.getByText('Due date')).toBeInTheDocument();
   });
 
   it('shows bulk Delete button for admin when in edit mode', async () => {
@@ -248,6 +257,7 @@ describe('ModernSingleStatusTaskList permission gating', () => {
 
     expect(screen.queryByText('Status')).not.toBeInTheDocument();
     expect(screen.queryByText('Assignee')).not.toBeInTheDocument();
+    expect(screen.queryByText('Due date')).not.toBeInTheDocument();
   });
 
   it('hides bulk Delete button for auditor when in edit mode', async () => {

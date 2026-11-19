@@ -16,14 +16,17 @@ function toDate(value: Date | string | null | undefined): Date | null {
 export function evidenceFormNextDueAt({
   formType,
   lastSubmittedAt,
+  cadenceMonths,
 }: {
   formType: EvidenceFormType;
   lastSubmittedAt: Date | string | null | undefined;
+  /** The organization's override of the form's cadence. */
+  cadenceMonths?: number | null;
 }): Date | null {
   const last = toDate(lastSubmittedAt);
   if (!last) return null;
   const due = new Date(last);
-  due.setUTCMonth(due.getUTCMonth() + evidenceFormCadenceMonths(formType));
+  due.setUTCMonth(due.getUTCMonth() + (cadenceMonths ?? evidenceFormCadenceMonths(formType)));
   return due;
 }
 
@@ -31,12 +34,14 @@ export function evidenceFormNextDueAt({
 export function isEvidenceFormFresh({
   formType,
   lastSubmittedAt,
+  cadenceMonths,
   now = new Date(),
 }: {
   formType: EvidenceFormType;
   lastSubmittedAt: Date | string | null | undefined;
+  cadenceMonths?: number | null;
   now?: Date;
 }): boolean {
-  const due = evidenceFormNextDueAt({ formType, lastSubmittedAt });
+  const due = evidenceFormNextDueAt({ formType, lastSubmittedAt, cadenceMonths });
   return due !== null && due.getTime() > now.getTime();
 }

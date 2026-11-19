@@ -1,5 +1,5 @@
 import { db, type TaskFrequency } from '@db';
-import { reviewStatus } from '../../../vendors/tpsp/vendor-review-status';
+import { isVendorInReviewScope, reviewStatus } from '../../../vendors/tpsp/vendor-review-status';
 import {
   fingerprintOf,
   formatDate,
@@ -167,6 +167,75 @@ export const supplierEvaluationRule: NativeEvidenceRule = {
                 vendor.reviews[0]?.reviewedByName ?? '—',
                 formatDate(vendor.nextReviewDue),
                 status.replace(/_/g, ' '),
+              ]),
+            },
+          }),
+        },
+      ],
+    };
+  },
+};
+
+/** ISO 27001 A.5.20; PCI DSS 12.8.2, 12.8.5: every in-scope supplier has a reviewed contract. */
+export const supplierContractRule: NativeEvidenceRule = {
+  key: 'vendor_contract_review',
+  module: 'Vendors',
+  title: 'Every in-scope supplier has contract dates and security clauses, and every PCI service provider acknowledged its responsibilities',
+  reference: 'ISO/IEC 27001:2022 A.5.20; PCI DSS v4.0.1 12.8.2, 12.8.5',
+  path: '/vendors',
+  async evaluate({ organizationId }) {
+    const vendors = await db.vendor.findMany({
+      where: { organizationId, archivedAt: null },
+      select: {
+        id: true,
+        name: true,
+        criticality: true,
+        handlesCardholderData: true,
+        affectsCdeSecurity: true,
+        inherentProbability: true,
+        inherentImpact: true,
+        contractStartDate: true,
+        contractEndDate: true,
+        securityClausesConfirmed: true,
+        confidentialityClausesConfirmed: true,
+        tpspAcknowledgementDate: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+    const inScope = vendors.filter((v) => isVendorInReviewScope(v));
+    const isTpsp = (v: (typeof inScope)[number]) => v.handlesCardholderData || v.affectsCdeSecurity;
+    const gaps = inScope.flatMap((v) => {
+      const missing = [
+        ...(v.contractStartDate ? [] : ['contract dates']),
+        ...(v.securityClausesConfirmed && v.confidentialityClausesConfirmed ? [] : ['security clauses']),
+        ...(isTpsp(v) && !v.tpspAcknowledgementDate ? ['12.8.2 acknowledgement'] : []),
+      ];
+      return missing.length ? [`${v.name} (${missing.join(', ')})`] : [];
+    });
+    return {
+      holds: inScope.length > 0 && gaps.length === 0,
+      summary: `${inScope.length - gaps.length} of ${inScope.length} in-scope suppliers have a complete contract record`,
+      issues: [
+        ...(inScope.length ? [] : ['Classify your vendors so the in-scope suppliers can be tracked.']),
+        ...listIssue({ label: 'Missing', names: gaps }),
+      ],
+      fingerprint: fingerprintOf(
+        inScope.map((v) => [v.id, v.contractStartDate, v.securityClausesConfirmed, v.confidentialityClausesConfirmed, v.tpspAcknowledgementDate]),
+      ),
+      sections: [
+        {
+          heading: 'Supplier contracts',
+          intro: 'Suppliers rated critical or high, with a high inherent risk, or that handle account data or can affect the CDE.',
+          emptyText: 'No in-scope suppliers.',
+          ...(inScope.length > 0 && {
+            table: {
+              headers: ['Supplier', 'PCI TPSP', 'Contract', 'Security clauses', '12.8.2 acknowledgement'],
+              rows: inScope.map((v) => [
+                v.name,
+                isTpsp(v) ? 'Yes' : 'No',
+                `${formatDate(v.contractStartDate)} to ${formatDate(v.contractEndDate)}`,
+                v.securityClausesConfirmed && v.confidentialityClausesConfirmed ? 'Confirmed' : 'Missing',
+                isTpsp(v) ? formatDate(v.tpspAcknowledgementDate) : 'n/a',
               ]),
             },
           }),

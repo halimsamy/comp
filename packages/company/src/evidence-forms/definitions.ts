@@ -24,6 +24,9 @@ export const evidenceFormDefinitions: Record<EvidenceFormType, EvidenceFormDefin
     // Freshness of the latest minutes: board and risk committee meet twice a year.
     cadenceMonths: 6,
     portalAccessible: false,
+    hidden: true,
+    optional: true,
+    retiredTo: { label: 'ISMS management review', path: '/documents/isms/management-review' },
     fields: meetingFields(boardMeetingMinutesPlaceholder),
   },
   'board-meeting': {
@@ -37,6 +40,8 @@ export const evidenceFormDefinitions: Record<EvidenceFormType, EvidenceFormDefin
     cadenceMonths: 6,
     portalAccessible: false,
     hidden: true,
+    optional: true,
+    retiredTo: { label: 'ISMS management review', path: '/documents/isms/management-review' },
     fields: meetingFields(boardMeetingMinutesPlaceholder),
   },
   'it-leadership-meeting': {
@@ -50,6 +55,8 @@ export const evidenceFormDefinitions: Record<EvidenceFormType, EvidenceFormDefin
     cadenceMonths: 3,
     portalAccessible: false,
     hidden: true,
+    optional: true,
+    retiredTo: { label: 'ISMS management review', path: '/documents/isms/management-review' },
     fields: meetingFields(itLeadershipMinutesPlaceholder),
   },
   'risk-committee-meeting': {
@@ -63,6 +70,8 @@ export const evidenceFormDefinitions: Record<EvidenceFormType, EvidenceFormDefin
     cadenceMonths: 6,
     portalAccessible: false,
     hidden: true,
+    optional: true,
+    retiredTo: { label: 'ISMS management review', path: '/documents/isms/management-review' },
     fields: meetingFields(riskCommitteeMinutesPlaceholder),
   },
   'access-request': {
@@ -242,6 +251,9 @@ Remediation: Status of fixes (e.g. 3 of 5 critical findings remediated; 2 in pro
     // PCI DSS 7.2.4: accounts and access reviewed at least once every six months.
     cadenceMonths: 6,
     portalAccessible: false,
+    hidden: true,
+    optional: true,
+    retiredTo: { label: 'People > Access', path: '/people?tab=access' },
     fields: [
       {
         key: 'matrixRows',
@@ -304,6 +316,9 @@ Remediation: Status of fixes (e.g. 3 of 5 critical findings remediated; 2 in pro
     // PCI DSS 12.5.1 / ISO A.5.9: inventory confirmed at least every 12 months.
     cadenceMonths: 12,
     portalAccessible: false,
+    hidden: true,
+    optional: true,
+    retiredTo: { label: 'Assets', path: '/assets' },
     fields: [
       {
         key: 'inventoryRows',
@@ -361,6 +376,7 @@ Remediation: Status of fixes (e.g. 3 of 5 critical findings remediated; 2 in pro
     // Annual performance review cycle.
     cadenceMonths: 12,
     portalAccessible: false,
+    optional: true,
     fields: [
       {
         key: 'employeeName',
@@ -429,6 +445,9 @@ Remediation: Status of fixes (e.g. 3 of 5 critical findings remediated; 2 in pro
     // PCI DSS 1.2.3 / 1.2.4: diagrams kept current; confirmed with the 12.5.2 scope review.
     cadenceMonths: 12,
     portalAccessible: false,
+    hidden: true,
+    optional: true,
+    retiredTo: { label: 'the Diagramming evidence task', path: '/tasks' },
     fields: [
       {
         key: 'diagramUrl',
@@ -633,6 +652,7 @@ Injects: At 10:30, media contacts the company about the incident.`,
     // the linked types, not these flags).
     hidden: true,
     optional: true,
+    retiredTo: { label: 'People > Access', path: '/people?tab=access' },
     fields: [
       {
         key: 'accountTypeRows',

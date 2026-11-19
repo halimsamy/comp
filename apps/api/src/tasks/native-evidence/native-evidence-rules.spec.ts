@@ -10,16 +10,20 @@ const mockDb = {
   accessReview: { findFirst: jest.fn() },
   offboardingChecklistTemplate: { count: jest.fn() },
   vendor: { findMany: jest.fn() },
+  sOADocument: { findFirst: jest.fn() },
 };
 jest.mock('@db', () => ({ db: mockDb }));
 jest.mock('../../utils/compliance-filters', () => ({
   filterComplianceMembers: async <T>(members: T[]) => members,
 }));
 jest.mock('@trycompai/company', () => ({ GENERAL_TRAINING_VIDEO_IDS: ['sat-1', 'sat-2'] }));
+jest.mock('../../access-reviews/access-accounts.service', () => ({ createAccessAccountsService: jest.fn() }));
+jest.mock('../../isms/isms-nonconformity.service', () => ({ IsmsNonconformityService: jest.fn() }));
+jest.mock('../../controls/controls-owner-suggestions', () => ({ loadRoleHolders: jest.fn() }));
 
 import { NATIVE_EVIDENCE_RULES } from './native-evidence-rules';
 import { accessReviewPeriodMonths, accessReviewRule, supplierEvaluationRule } from './rules/access-vendor-rules';
-import { deviceListRule, orgChartRule, secureDevicesRule } from './rules/device-chart-rules';
+import { deviceListRule, secureDevicesRule } from './rules/device-chart-rules';
 import { internalAuditRule, riskTreatmentPlanRule } from './rules/isms-rules';
 import { employeeVerificationRule, securityTrainingRule } from './rules/people-rules';
 
@@ -39,12 +43,17 @@ const member = (id: string, extra: Record<string, unknown> = {}) => ({
 
 beforeEach(() => jest.clearAllMocks());
 
-it('maps the eight task templates (nine with both device tasks)', () => {
-  expect(Object.keys(NATIVE_EVIDENCE_RULES)).toHaveLength(9);
+it('maps every task template that platform records can prove', () => {
+  expect(Object.keys(NATIVE_EVIDENCE_RULES)).toHaveLength(21);
+  // Assets is the single inventory: Device List and Infrastructure Inventory share one rule.
+  expect(NATIVE_EVIDENCE_RULES.frk_tt_68406903839203801ac8041a).toBe(
+    NATIVE_EVIDENCE_RULES.frk_tt_69033a6bfeb4759be36257bc,
+  );
 });
 
 describe('ISMS rules', () => {
-  it('RTP holds only for a version published in the last 12 months', async () => {
+  it('RTP holds only for a version published in the last 12 months and an approved SoA', async () => {
+    mockDb.sOADocument.findFirst.mockResolvedValue({ id: 'soa', approvedAt: daysAgo(10) });
     const doc = (publishedAt: Date) => ({
       title: 'RTP',
       currentVersion: { id: 'v1', version: 2, publishedAt, changelog: null, publishedBy: null },
@@ -57,6 +66,12 @@ describe('ISMS rules', () => {
     });
     mockDb.ismsDocument.findMany.mockResolvedValue([doc(daysAgo(400))]);
     expect((await riskTreatmentPlanRule.evaluate(ctx)).holds).toBe(false);
+    mockDb.ismsDocument.findMany.mockResolvedValue([doc(daysAgo(100))]);
+    mockDb.sOADocument.findFirst.mockResolvedValue(null);
+    const noSoa = await riskTreatmentPlanRule.evaluate(ctx);
+    expect(noSoa.holds).toBe(false);
+    expect(noSoa.issues).toEqual(['Submit the Statement of Applicability for approval in Documents.']);
+    expect(mockDb.sOADocument.findFirst.mock.calls[0][0].where).toMatchObject({ organizationId: 'org_1' });
   });
 
   it('internal audit needs completion plus auditor and top-management sign-off', async () => {
@@ -124,17 +139,6 @@ describe('People rules', () => {
     expect((await secureDevicesRule.evaluate(ctx)).holds).toBe(false);
     mockDb.device.findMany.mockResolvedValue([{ ...device, lastCheckIn: daysAgo(60) }]);
     expect((await deviceListRule.evaluate(ctx)).holds).toBe(false);
-  });
-
-  it('org chart needs a snapshot from the last 12 months', async () => {
-    mockDb.organizationChartSnapshot.findFirst.mockResolvedValue({
-      id: 'ocs', name: 'Q4', createdAt: daysAgo(20), nodes: [{ data: { name: 'Ann', title: 'CEO' } }],
-    });
-    const result = await orgChartRule.evaluate(ctx);
-    expect(result.holds).toBe(true);
-    expect(result.sections[1].table?.rows).toEqual([['Ann', 'CEO']]);
-    mockDb.organizationChartSnapshot.findFirst.mockResolvedValue(null);
-    expect((await orgChartRule.evaluate(ctx)).holds).toBe(false);
   });
 });
 

@@ -1,12 +1,14 @@
 // Enums only — avoid instantiating the DB client.
 jest.mock('@db', () => jest.requireActual('@prisma/client'));
 
-import { TaskAutomationStatus, TaskFrequency } from '@db';
+import { TaskAutomationStatus, TaskFrequency, TaskStatus } from '@db';
 import {
   autoCompleteTaskData,
   canAutoComplete,
   completedTaskData,
   computeNextTaskReviewDate,
+  isReopen,
+  openTaskDueDate,
 } from './task-completion';
 
 const day = (y: number, m: number, d: number) => new Date(y, m - 1, d);
@@ -79,5 +81,19 @@ describe('canAutoComplete', () => {
     expect(canAutoComplete({ status: 'done', reviewDate: day(2026, 4, 1) }, now)).toBe(false);
     expect(canAutoComplete({ status: 'done', reviewDate: day(2026, 3, 1) }, now)).toBe(true);
     expect(canAutoComplete({ status: 'done', reviewDate: null }, now)).toBe(true);
+  });
+});
+
+describe('open task due dates (#4, #41)', () => {
+  it('is due 30 days after create or reopen', () => {
+    const from = new Date('2026-11-19T10:00:00.000Z');
+    expect(openTaskDueDate(from).toISOString()).toBe('2026-12-19T10:00:00.000Z');
+  });
+
+  it('treats only done / not-relevant → open as a reopen', () => {
+    expect(isReopen({ from: TaskStatus.done, to: TaskStatus.todo })).toBe(true);
+    expect(isReopen({ from: TaskStatus.not_relevant, to: TaskStatus.in_progress })).toBe(true);
+    expect(isReopen({ from: TaskStatus.todo, to: TaskStatus.in_progress })).toBe(false);
+    expect(isReopen({ from: TaskStatus.done, to: TaskStatus.not_relevant })).toBe(false);
   });
 });

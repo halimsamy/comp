@@ -7,7 +7,9 @@ import { Checkbox } from '@trycompai/ui/checkbox';
 import { Member, Task, User } from '@db';
 import { RefreshCw, Trash2, User as UserIcon } from 'lucide-react';
 import { usePermissions } from '@/hooks/use-permissions';
+import { Calendar } from '@trycompai/design-system/icons';
 import { BulkTaskAssigneeChangeModal } from './BulkTaskAssigneeChangeModal';
+import { BulkTaskDueDateModal } from './BulkTaskDueDateModal';
 import { BulkTaskDeleteModal } from './BulkTaskDeleteModal';
 import { BulkTaskStatusChangeModal } from './BulkTaskStatusChangeModal';
 import { ModernTaskListItem } from './ModernTaskListItem';
@@ -53,6 +55,7 @@ export function ModernSingleStatusTaskList({
   const [openBulkStatus, setOpenBulkStatus] = useState(false);
   const [openBulkAssignee, setOpenBulkAssignee] = useState(false);
   const [openBulkDelete, setOpenBulkDelete] = useState(false);
+  const [openBulkDue, setOpenBulkDue] = useState(false);
   const StatusIcon = config.icon;
 
   useEffect(() => {
@@ -120,14 +123,14 @@ export function ModernSingleStatusTaskList({
       </div>
       <div className="divide-y divide-border/50 overflow-hidden rounded-lg border border-border/60 bg-card">
         {selectable ? (
-          <div className="flex items-center gap-4 p-4">
+          <div className="flex flex-wrap items-center gap-4 p-4">
             <Checkbox
               checked={selectAllChecked}
               onCheckedChange={handleSelectAllChange}
               aria-label="Select all tasks"
             />
             <span className="text-sm text-muted-foreground">Select all</span>
-            <div className="ml-auto flex items-center gap-2">
+            <div className="ml-auto flex flex-wrap items-center gap-2">
               {hasPermission('task', 'update') && (
                 <Button
                   variant="outline"
@@ -150,6 +153,18 @@ export function ModernSingleStatusTaskList({
                 >
                   <UserIcon className="h-3.5 w-3.5" />
                   <span>Assignee</span>
+                </Button>
+              )}
+              {hasPermission('task', 'update') && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setOpenBulkDue(true)}
+                  disabled={selectedTaskIds.length === 0}
+                  className={buttonClassName}
+                >
+                  <Calendar size={14} />
+                  <span>Due date</span>
                 </Button>
               )}
               {hasPermission('task', 'delete') && (
@@ -178,6 +193,12 @@ export function ModernSingleStatusTaskList({
               members={members}
               open={openBulkAssignee}
               onOpenChange={setOpenBulkAssignee}
+              onSuccess={handleBulkActionSuccess}
+            />
+            <BulkTaskDueDateModal
+              selectedTaskIds={selectedTaskIds}
+              open={openBulkDue}
+              onOpenChange={setOpenBulkDue}
               onSuccess={handleBulkActionSuccess}
             />
             <BulkTaskDeleteModal

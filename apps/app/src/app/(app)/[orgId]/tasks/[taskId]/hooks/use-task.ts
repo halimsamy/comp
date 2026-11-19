@@ -33,6 +33,7 @@ interface UseTaskReturn {
   submitForReview: (approverId: string) => Promise<void>;
   approveTask: () => Promise<void>;
   rejectTask: () => Promise<void>;
+  withdrawReview: () => Promise<void>;
 }
 
 interface UseTaskOptions {
@@ -112,6 +113,14 @@ export function useTask({ initialData }: UseTaskOptions = {}): UseTaskReturn {
     await mutate();
   };
 
+  /** The requester withdraws the open review request (#44); the approver is kept. */
+  const withdrawReview = async (): Promise<void> => {
+    if (!taskId) throw new Error('Task ID is required');
+    const response = await apiClient.post(`/v1/tasks/${taskId}/withdraw-review`, {});
+    if (response.error) throw new Error(response.error);
+    await mutate();
+  };
+
   return {
     task: data,
     isLoading,
@@ -124,5 +133,6 @@ export function useTask({ initialData }: UseTaskOptions = {}): UseTaskReturn {
     submitForReview,
     approveTask,
     rejectTask,
+    withdrawReview,
   };
 }
