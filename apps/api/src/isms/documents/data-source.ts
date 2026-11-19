@@ -1,7 +1,9 @@
-import { createHash } from 'node:crypto';
 import { db } from '@db';
 import type { Prisma } from '@db';
+import { isFormerMember } from '../../people-lifecycle/checklist-progress';
+import { filterComplianceMembers } from '../../utils/compliance-filters';
 import { parseStoredAnswers } from '../wizard/wizard-schema';
+import { fingerprintParties, fingerprintRiskTreatment } from './platform-fingerprints';
 import type { IsmsPlatformData } from './types';
 
 const CLOUD_CATEGORIES = ['cloud', 'infrastructure', 'software_as_a_service'];
@@ -33,9 +35,8 @@ export async function collectPlatformData({
   const [
     organization,
     frameworkInstances,
-    vendors,
-    memberCount,
-    membersGrouped,
+    allVendors,
+    members,
     deviceCount,
     risks,
     trainingCompletionCount,
@@ -43,6 +44,7 @@ export async function collectPlatformData({
     profile,
     partiesRows,
     acceptanceRows,
+    deputyHolder,
   ] = await Promise.all([
     dbc.organization.findUnique({
       where: { id: organizationId },
@@ -59,6 +61,7 @@ export async function collectPlatformData({
         name: true,
         category: true,
         isSubProcessor: true,
+        archivedAt: true,
         // Risk fields feed the Risk Treatment Plan fingerprint (6.1.3).
         status: true,
         inherentProbability: true,
@@ -71,11 +74,16 @@ export async function collectPlatformData({
         assignee: { select: { user: { select: { name: true, email: true } } } },
       },
     }),
-    dbc.member.count({ where: { organizationId, deactivated: false } }),
-    dbc.member.groupBy({
-      by: ['department'],
+    // Same population People/Training count: current members with the compliance obligation.
+    dbc.member.findMany({
       where: { organizationId, deactivated: false },
-      _count: { _all: true },
+      select: {
+        role: true,
+        department: true,
+        deactivated: true,
+        offboardDate: true,
+        user: { select: { role: true } },
+      },
     }),
     dbc.device.count({ where: { organizationId } }),
     dbc.risk.findMany({
@@ -121,6 +129,17 @@ export async function collectPlatformData({
       where: { organizationId },
       select: { id: true, riskId: true, vendorId: true },
     }),
+    // 5.3 Roles holds the Deputy SPO; the wizard answer is only a legacy fallback.
+    dbc.ismsRoleAssignment.findFirst({
+      where: {
+        role: {
+          roleKey: 'deputy_spo',
+          document: { organizationId, frameworkId, type: 'roles_and_responsibilities' },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+      select: { memberId: true },
+    }),
   ]);
 
   const frameworkNames = new Set<string>();
@@ -132,6 +151,8 @@ export async function collectPlatformData({
   const vendorsByCategory: Record<string, number> = {};
   const subProcessorNames: string[] = [];
   const infraVendorNames: string[] = [];
+  // Vendors register and Overview count non-archived vendors only.
+  const vendors = allVendors.filter((vendor) => !vendor.archivedAt);
   for (const vendor of vendors) {
     vendorsByCategory[vendor.category] =
       (vendorsByCategory[vendor.category] ?? 0) + 1;
@@ -141,10 +162,17 @@ export async function collectPlatformData({
     }
   }
 
+  const now = new Date();
+  const currentMembers = await filterComplianceMembers(
+    members.filter((member) => !isFormerMember(member, now)),
+    organizationId,
+  );
   const membersByDepartment: Record<string, number> = {};
-  for (const row of membersGrouped) {
-    membersByDepartment[row.department] = row._count._all;
+  for (const { department } of currentMembers) {
+    membersByDepartment[department] = (membersByDepartment[department] ?? 0) + 1;
   }
+  const wizardAnswers = parseStoredAnswers(profile?.answers);
+  if (deputyHolder) wizardAnswers.deputySpo = { memberId: deputyHolder.memberId };
 
   const highRiskCount = risks.filter(
     (risk) =>
@@ -160,148 +188,19 @@ export async function collectPlatformData({
     vendorsByCategory,
     subProcessorNames: subProcessorNames.sort(),
     infraVendorNames: infraVendorNames.sort(),
-    memberCount,
+    memberCount: currentMembers.length,
     membersByDepartment,
     deviceCount,
     riskCount: risks.length,
     highRiskCount,
     hasTrainingProgram: trainingCompletionCount > 0,
-    wizardAnswers: parseStoredAnswers(profile?.answers),
+    wizardAnswers,
     partiesFingerprint: fingerprintParties(partiesRows),
     riskTreatmentFingerprint: fingerprintRiskTreatment({
       risks,
-      vendors,
+      // The 6.1.3 plan renders archived vendors too, so its fingerprint keeps them.
+      vendors: allVendors,
       acceptances: acceptanceRows,
     }),
   };
-}
-
-/**
- * Stable, order-insensitive SHA-256 of the parties register rows. The
- * Requirements document derives one row per party, so a manual party edit (name
- * or category) — otherwise invisible to the platform snapshot — must change this
- * fingerprint and flag requirements drift. Each row is JSON-encoded (so field
- * boundaries can never collide) and the encoded rows are sorted, making the
- * result independent of row order.
- */
-function fingerprintParties(
-  rows: Array<{ id: string; name: string; category: string }>,
-): string {
-  if (rows.length === 0) return '';
-  const canonical = rows
-    .map((row) => JSON.stringify([row.id, row.name, row.category]))
-    .sort()
-    .join('');
-  return createHash('sha256').update(canonical).digest('hex');
-}
-
-/**
- * Stable, order-insensitive SHA-256 over everything the Risk Treatment Plan
- * (6.1.3) renders: non-archived Risk Register rows, vendor risk fields, and
- * acceptance events (append-only, so their ids alone capture "a new acceptance
- * was recorded"). Same canonicalization as fingerprintParties: JSON-encoded
- * rows, sorted, so field boundaries can't collide and row order is irrelevant.
- * Two subtleties: (1) archived risks leave the plan, so archiving changes the
- * row set (= drift) while later edits to an archived risk stay invisible —
- * acceptance rows are filtered to the RENDERED subjects for the same reason;
- * (2) the fingerprint carries the rendered owner DISPLAY value (not the id),
- * so a member rename that changes the exported owner cell also drifts.
- */
-function fingerprintRiskTreatment({
-  risks,
-  vendors,
-  acceptances,
-}: {
-  risks: Array<{
-    id: string;
-    title: string;
-    category: string;
-    status: string;
-    likelihood: string;
-    impact: string;
-    residualLikelihood: string;
-    residualImpact: string;
-    treatmentStrategy: string;
-    treatmentStrategyDescription: string | null;
-    assigneeId: string | null;
-    assignee: { user: { name: string | null; email: string } } | null;
-  }>;
-  vendors: Array<{
-    id: string;
-    name: string;
-    category: string;
-    status: string;
-    inherentProbability: string;
-    inherentImpact: string;
-    residualProbability: string;
-    residualImpact: string;
-    treatmentStrategy: string;
-    treatmentStrategyDescription: string | null;
-    assigneeId: string | null;
-    assignee: { user: { name: string | null; email: string } } | null;
-  }>;
-  acceptances: Array<{
-    id: string;
-    riskId: string | null;
-    vendorId: string | null;
-  }>;
-}): string {
-  const ownerDisplay = (
-    assignee: { user: { name: string | null; email: string } } | null,
-  ): string => (assignee ? assignee.user.name?.trim() || assignee.user.email : '');
-  const renderedRisks = risks.filter((risk) => risk.status !== 'archived');
-  const renderedSubjectIds = new Set([
-    ...renderedRisks.map((risk) => risk.id),
-    ...vendors.map((vendor) => vendor.id),
-  ]);
-  const rows = [
-    ...renderedRisks.map((risk) =>
-      JSON.stringify([
-        'risk',
-        risk.id,
-        risk.title,
-        risk.category,
-        risk.status,
-        risk.likelihood,
-        risk.impact,
-        risk.residualLikelihood,
-        risk.residualImpact,
-        risk.treatmentStrategy,
-        risk.treatmentStrategyDescription ?? '',
-        risk.assigneeId ?? '',
-        ownerDisplay(risk.assignee),
-      ]),
-    ),
-    ...vendors.map((vendor) =>
-      JSON.stringify([
-        'vendor',
-        vendor.id,
-        vendor.name,
-        vendor.category,
-        vendor.status,
-        vendor.inherentProbability,
-        vendor.inherentImpact,
-        vendor.residualProbability,
-        vendor.residualImpact,
-        vendor.treatmentStrategy,
-        vendor.treatmentStrategyDescription ?? '',
-        vendor.assigneeId ?? '',
-        ownerDisplay(vendor.assignee),
-      ]),
-    ),
-    ...acceptances
-      .filter((acceptance) =>
-        renderedSubjectIds.has(acceptance.riskId ?? acceptance.vendorId ?? ''),
-      )
-      .map((acceptance) =>
-        JSON.stringify([
-          'acceptance',
-          acceptance.id,
-          acceptance.riskId ?? '',
-          acceptance.vendorId ?? '',
-        ]),
-      ),
-  ];
-  if (rows.length === 0) return '';
-  return createHash('sha256').update(rows.sort().join('')).digest('hex');
 }

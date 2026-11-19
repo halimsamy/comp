@@ -16,6 +16,7 @@ jest.mock('@db', () => ({
     },
     ismsDocument: { findMany: jest.fn() },
     member: { findMany: jest.fn() },
+    ismsObjective: { count: jest.fn() },
   },
 }));
 jest.mock('./wizard-defaults', () => ({
@@ -30,8 +31,6 @@ const mockDefaults = jest.mocked(computeWizardDefaults);
 const mockCollect = jest.mocked(collectPlatformData);
 
 const fullAnswers = {
-  deputySpo: { memberId: 'mem_1', toBeNamed: false },
-  internalAuditApproach: 'in_house' as const,
   certificationBody: 'BSI',
   insurance: { has: true, insurerName: 'Acme Cyber' },
   sectorRegulators: ['FINMA'],
@@ -92,6 +91,7 @@ describe('IsmsProfileService', () => {
     });
     mockDefaults.mockResolvedValue(defaultsFixture);
     (mockDb.member.findMany as jest.Mock).mockResolvedValue([]);
+    (mockDb.ismsObjective.count as jest.Mock).mockResolvedValue(0);
     mockCollect.mockResolvedValue(platformData);
   });
 
@@ -124,6 +124,19 @@ describe('IsmsProfileService', () => {
       expect(result.answers).toBeNull();
       expect(result.defaults).toEqual(defaultsFixture);
       expect(result.members).toEqual([]);
+      expect(result.objectiveRowCount).toBe(0);
+    });
+
+    it('reports the 6.2 register size so the wizard objectives turn read-only', async () => {
+      (mockDb.ismsProfile.upsert as jest.Mock).mockResolvedValue({ id: 'pf_1', answers: {} });
+      (mockDb.ismsObjective.count as jest.Mock).mockResolvedValue(4);
+
+      const result = await service.getProfile(args);
+
+      expect(result.objectiveRowCount).toBe(4);
+      expect(mockDb.ismsObjective.count).toHaveBeenCalledWith({
+        where: { document: { organizationId: 'org_1', frameworkId: 'fw_1', type: 'objectives_plan' } },
+      });
     });
 
     it('returns saved answers when the profile has them', async () => {

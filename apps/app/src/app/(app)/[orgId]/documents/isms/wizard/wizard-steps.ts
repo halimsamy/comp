@@ -1,6 +1,7 @@
 /**
- * Step definitions for the ISMS setup wizard (CS-438). The 12 wizard questions
- * are grouped into 6 ordered steps. Each step declares the form fields it owns so
+ * Step definitions for the ISMS setup wizard (CS-438). The wizard questions are
+ * grouped into ordered steps. The Deputy SPO and internal audit route are not
+ * asked here: ISMS 5.3 Roles holds them. Each step declares the form fields it owns so
  * the orchestrator can validate just that slice on Next and POST only the changed
  * answers for that step.
  */
@@ -17,11 +18,6 @@ export interface WizardStepDef {
 }
 
 export const WIZARD_STEPS: WizardStepDef[] = [
-  {
-    id: 'leadership',
-    title: 'Leadership & accountability',
-    fields: ['deputySpo', 'internalAuditApproach'],
-  },
   {
     id: 'commitments',
     title: 'External commitments',

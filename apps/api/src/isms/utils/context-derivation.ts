@@ -11,13 +11,13 @@ import type { IsmsContextIssueKind, IsmsContextSource } from '@db';
 export interface ContextDerivationInput {
   /** Names of the frameworks the organization is actively pursuing. */
   frameworkNames: string[];
-  /** Total third-party vendors tracked in the org. */
+  /** Non-archived vendors, as the Vendors register counts them. */
   vendorCount: number;
   /** Vendors flagged as sub-processors. */
   subProcessorCount: number;
   /** Vendor counts keyed by category (e.g. cloud, software_as_a_service). */
   vendorsByCategory: Record<string, number>;
-  /** Total active (non-deactivated) workforce members. */
+  /** Current members with the compliance obligation, as People counts them. */
   memberCount: number;
   /** Member counts keyed by department (e.g. it, hr, gov). */
   membersByDepartment: Record<string, number>;

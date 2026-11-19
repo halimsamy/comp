@@ -80,19 +80,33 @@ describe('seedPciRoleIfMissing', () => {
   });
 });
 
+function makeTx({
+  roles,
+  answers = {},
+}: {
+  roles: Array<{ id: string; roleKey: string; _count: { assignments: number } }>;
+  answers?: unknown;
+}) {
+  return {
+    ismsRole: { findMany: jest.fn().mockResolvedValue(roles) },
+    member: { findMany: jest.fn().mockResolvedValue(spare) },
+    ismsDocument: { findFirst: jest.fn().mockResolvedValue({ frameworkId: 'fw_1' }) },
+    ismsProfile: { findUnique: jest.fn().mockResolvedValue({ answers }) },
+    ismsRoleAssignment: { createMany: jest.fn() },
+  };
+}
+
+const emptyDeputy = [{ id: 'r_dep', roleKey: 'deputy_spo', _count: { assignments: 0 } }];
+
 describe('assignSuggestedHolders', () => {
   it('fills only roles that have no holder yet', async () => {
-    const tx = {
-      ismsRole: {
-        findMany: jest.fn().mockResolvedValue([
-          { id: 'r_top', roleKey: 'top_management', _count: { assignments: 0 } },
-          { id: 'r_spo', roleKey: 'spo', _count: { assignments: 1 } },
-          { id: 'r_ia', roleKey: 'internal_auditor', _count: { assignments: 0 } },
-        ]),
-      },
-      member: { findMany: jest.fn().mockResolvedValue(spare) },
-      ismsRoleAssignment: { createMany: jest.fn() },
-    };
+    const tx = makeTx({
+      roles: [
+        { id: 'r_top', roleKey: 'top_management', _count: { assignments: 0 } },
+        { id: 'r_spo', roleKey: 'spo', _count: { assignments: 1 } },
+        { id: 'r_ia', roleKey: 'internal_auditor', _count: { assignments: 0 } },
+      ],
+    });
     await assignSuggestedHolders({
       tx: tx as unknown as Prisma.TransactionClient,
       documentId: 'doc_1',
@@ -103,6 +117,43 @@ describe('assignSuggestedHolders', () => {
     );
     expect(tx.ismsRoleAssignment.createMany).toHaveBeenCalledWith({
       data: [{ roleId: 'r_top', documentId: 'doc_1', memberId: 'ceo' }],
+      skipDuplicates: true,
+    });
+  });
+
+  it('suggests the legacy wizard Deputy SPO for an empty 5.3 deputy role', async () => {
+    const tx = makeTx({
+      roles: emptyDeputy,
+      answers: { deputySpo: { memberId: 'eng', toBeNamed: false } },
+    });
+    await assignSuggestedHolders({
+      tx: tx as unknown as Prisma.TransactionClient,
+      documentId: 'doc_1',
+      organizationId: 'org_1',
+    });
+    expect(tx.ismsDocument.findFirst).toHaveBeenCalledWith({
+      where: { id: 'doc_1', organizationId: 'org_1' },
+      select: { frameworkId: true },
+    });
+    expect(tx.ismsRoleAssignment.createMany).toHaveBeenCalledWith({
+      data: [{ roleId: 'r_dep', documentId: 'doc_1', memberId: 'eng' }],
+      skipDuplicates: true,
+    });
+  });
+
+  it('ignores a legacy wizard deputy who is no longer an active member', async () => {
+    const tx = makeTx({
+      roles: emptyDeputy,
+      answers: { deputySpo: { memberId: 'gone', toBeNamed: false } },
+    });
+    await assignSuggestedHolders({
+      tx: tx as unknown as Prisma.TransactionClient,
+      documentId: 'doc_1',
+      organizationId: 'org_1',
+    });
+    // Falls back to the job-title suggestion (the CTO).
+    expect(tx.ismsRoleAssignment.createMany).toHaveBeenCalledWith({
+      data: [{ roleId: 'r_dep', documentId: 'doc_1', memberId: 'cto' }],
       skipDuplicates: true,
     });
   });

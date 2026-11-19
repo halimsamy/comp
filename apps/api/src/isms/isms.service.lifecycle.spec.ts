@@ -9,6 +9,7 @@ import type { IsmsVersionService } from './isms-version.service';
 
 // approve() (the CS-701 freeze/version flow) is covered in
 // isms.service.approve.spec.ts.
+jest.mock('../utils/compliance-filters', () => ({ filterComplianceMembers: jest.fn() }));
 jest.mock('@db', () => {
   const db = {
     ismsDocument: {

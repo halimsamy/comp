@@ -1,4 +1,5 @@
 import type { Prisma } from '@db';
+import { parseStoredAnswers } from '../wizard/wizard-schema';
 import type { SeedRoleDefinition } from './types';
 
 type Tx = Prisma.TransactionClient;
@@ -132,6 +133,33 @@ export function suggestRoleHolders({
 }
 
 /**
+ * The Deputy SPO an org named in the old wizard question. 5.3 is now the only
+ * place to set it; this answer only pre-fills an empty 5.3 deputy role.
+ */
+async function legacyWizardDeputy({
+  tx,
+  documentId,
+  organizationId,
+}: {
+  tx: Tx;
+  documentId: string;
+  organizationId: string;
+}): Promise<string | null> {
+  const document = await tx.ismsDocument.findFirst({
+    where: { id: documentId, organizationId },
+    select: { frameworkId: true },
+  });
+  if (!document) return null;
+  const profile = await tx.ismsProfile.findUnique({
+    where: {
+      organizationId_frameworkId: { organizationId, frameworkId: document.frameworkId },
+    },
+    select: { answers: true },
+  });
+  return parseStoredAnswers(profile?.answers).deputySpo?.memberId ?? null;
+}
+
+/**
  * Pre-fill seeded roles that have no holder yet with the suggested member.
  * Roles that already have any assignment are left alone, so a regenerate
  * never overrides the customer's choice.
@@ -145,7 +173,7 @@ export async function assignSuggestedHolders({
   documentId: string;
   organizationId: string;
 }): Promise<void> {
-  const [roles, candidates] = await Promise.all([
+  const [roles, candidates, legacyDeputy] = await Promise.all([
     tx.ismsRole.findMany({
       where: { documentId, roleKey: { not: null } },
       select: { id: true, roleKey: true, _count: { select: { assignments: true } } },
@@ -155,8 +183,13 @@ export async function assignSuggestedHolders({
       select: { id: true, role: true, jobTitle: true },
       orderBy: { createdAt: 'asc' },
     }),
+    legacyWizardDeputy({ tx, documentId, organizationId }),
   ]);
   const suggestions = suggestRoleHolders({ candidates });
+  // A person's earlier wizard choice beats the job-title guess, if still a member.
+  if (legacyDeputy && candidates.some((candidate) => candidate.id === legacyDeputy)) {
+    suggestions.deputy_spo = legacyDeputy;
+  }
   const data = roles
     .filter((role) => role._count.assignments === 0 && role.roleKey)
     .map((role) => ({ role, memberId: suggestions[role.roleKey ?? ''] }))

@@ -48,7 +48,7 @@ function WizardGenerating() {
 }
 
 /**
- * Orchestrates the ISMS setup wizard (CS-438): a 6-step React Hook Form pre-filled
+ * Orchestrates the ISMS setup wizard (CS-438): a multi-step React Hook Form pre-filled
  * from the profile defaults + saved answers. Each Next validates and partially
  * saves the active step; completion runs the full save then regenerates all six
  * ISMS documents and returns the user to the overview.
@@ -95,7 +95,6 @@ export function WizardClient({ organizationId, frameworkId, fallbackData }: Wiza
     setStepIndex(resumeStepIndex({ answers: profile.answers ?? null }));
   }, [profile, defaultValues, formState.isDirty, reset]);
 
-  const members = Array.isArray(initialProfile?.members) ? initialProfile.members : [];
   const profileDefaults = initialProfile?.defaults ?? EMPTY_WIZARD_DEFAULTS;
 
   const step = WIZARD_STEPS[stepIndex];
@@ -192,8 +191,9 @@ export function WizardClient({ organizationId, frameworkId, fallbackData }: Wiza
               stepId={step.id}
               control={control}
               errors={formState.errors}
-              members={members}
               defaults={profileDefaults}
+              organizationId={organizationId}
+              objectiveRowCount={initialProfile?.objectiveRowCount ?? 0}
             />
           </Card>
 

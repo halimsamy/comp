@@ -58,8 +58,10 @@ const objectiveSchema = z.object({
 
 /** The full, completed WizardAnswers shape (validated on complete=true). */
 export const wizardAnswersSchema = z.object({
-  deputySpo: deputySpoSchema,
-  internalAuditApproach: z.enum(INTERNAL_AUDIT_APPROACHES).nullable(),
+  // Legacy: the wizard no longer asks these. 5.3 Roles holds the deputy SPO and
+  // the internal audit route; stored answers still parse.
+  deputySpo: deputySpoSchema.optional(),
+  internalAuditApproach: z.enum(INTERNAL_AUDIT_APPROACHES).nullable().optional(),
   certificationBody: z.string(),
   insurance: insuranceSchema,
   sectorRegulators: z.array(z.string()),

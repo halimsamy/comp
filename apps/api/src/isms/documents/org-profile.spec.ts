@@ -6,6 +6,7 @@ const mockDb = {
   ismsProfile: { findUnique: jest.fn() },
 };
 
+jest.mock('../../utils/compliance-filters', () => ({ filterComplianceMembers: jest.fn() }));
 jest.mock('@db', () => ({ db: mockDb }));
 
 import { loadOrgProfile } from './org-profile';

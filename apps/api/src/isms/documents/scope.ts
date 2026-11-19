@@ -60,24 +60,20 @@ export function deriveScopeNarrative(
   };
 }
 
-/** In-scope description: prefer the wizard's confirmed live capabilities. */
+/**
+ * In-scope description: prefer the wizard's confirmed live capabilities. No
+ * counts here: the narrative is seeded once, so it points at the registers
+ * that hold the live numbers (People, Vendors, Assets) instead of copying them.
+ */
 function deriveInScope(data: IsmsPlatformData): string {
   const capabilities = data.wizardAnswers.capabilitiesInProduction ?? [];
   const base =
     capabilities.length > 0
-      ? `The ISMS covers the delivery and operation of the following capabilities in production: ${capabilities.join(', ')}. All supporting information assets, personnel${data.memberCount > 0 ? ` (${data.memberCount} workforce members)` : ''}, systems and cloud infrastructure are within scope.`
-      : `All information assets, personnel${data.memberCount > 0 ? ` (${data.memberCount} workforce members)` : ''}, systems and supporting cloud infrastructure used by ${data.organizationName} to deliver its services are within the ISMS scope.`;
-  const extras: string[] = [];
-  if (data.deviceCount > 0) {
-    extras.push(`This includes the ${data.deviceCount} managed endpoints in the device inventory.`);
-  }
+      ? `The ISMS covers the delivery and operation of the following capabilities in production: ${capabilities.join(', ')}. All supporting information assets listed in the Assets register, personnel listed in People, systems and cloud infrastructure are within scope.`
+      : `All information assets listed in the Assets register, personnel listed in People, systems and supporting cloud infrastructure used by ${data.organizationName} to deliver its services are within the ISMS scope.`;
   // PCI DSS scope (Req. 12.5.2) sits inside the ISMS when both programmes run.
-  if (hasPciFramework(data.frameworkNames)) {
-    extras.push(
-      'The cardholder data environment (CDE) and all system components connected to it or able to affect its security are within scope for PCI DSS.',
-    );
-  }
-  return [base, ...extras].join(' ');
+  if (!hasPciFramework(data.frameworkNames)) return base;
+  return `${base} The cardholder data environment (CDE) and all system components connected to it or able to affect its security are within scope for PCI DSS; the assets marked in scope or connected in the Assets register define the CDE.`;
 }
 
 /** Interfaces: include the provider-managed cloud layers named in the wizard. */
@@ -85,7 +81,7 @@ function deriveInterfaces(data: IsmsPlatformData): string[] {
   const interfaces: string[] = [];
   if (data.vendorCount > 0) {
     interfaces.push(
-      `Third-party suppliers and service providers (${data.vendorCount}) that interface with organizational systems and data.`,
+      'Third-party suppliers and service providers listed in the Vendors register that interface with organizational systems and data.',
     );
   }
   for (const layer of data.wizardAnswers.cloudScopeSplit?.provider ?? []) {

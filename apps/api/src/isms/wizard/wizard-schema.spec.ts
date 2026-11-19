@@ -39,6 +39,11 @@ describe('wizardAnswersSchema (full)', () => {
     ).toBe(false);
   });
 
+  it('completes without the legacy deputy SPO and audit route (5.3 holds them)', () => {
+    const { deputySpo, internalAuditApproach, ...rest } = fullAnswers;
+    expect(wizardAnswersSchema.safeParse(rest).success).toBe(true);
+  });
+
   it('allows null internalAuditApproach', () => {
     expect(
       wizardAnswersSchema.safeParse({

@@ -38,14 +38,23 @@ const emptyInput = (narrative: unknown): DocumentExportInput => ({
 });
 
 describe('scope narrative (4.3)', () => {
-  it('names managed endpoints and adds the PCI DSS CDE only for PCI organizations', () => {
-    expect(deriveScopeNarrative(data).inScope).toContain('4 managed endpoints');
+  it('adds the PCI DSS CDE, defined by the Assets register, only for PCI organizations', () => {
     expect(deriveScopeNarrative(data).inScope).not.toContain('cardholder data');
     const pci = deriveScopeNarrative({
       ...data,
       frameworkNames: ['ISO 27001', 'PCI DSS'],
     });
     expect(pci.inScope).toContain('cardholder data environment (CDE)');
+    expect(pci.inScope).toContain('marked in scope or connected in the Assets register');
+  });
+
+  it('points at People, Vendors and Assets instead of copying their counts', () => {
+    const narrative = deriveScopeNarrative({ ...data, memberCount: 21, vendorCount: 49 });
+    const text = [narrative.inScope, ...narrative.interfaces].join(' ');
+    expect(text).not.toMatch(/\d/);
+    expect(narrative.inScope).toContain('personnel listed in People');
+    expect(narrative.inScope).toContain('information assets listed in the Assets register');
+    expect(narrative.interfaces[0]).toContain('listed in the Vendors register');
   });
 
   it('derives a schema-valid narrative referencing org + frameworks', () => {

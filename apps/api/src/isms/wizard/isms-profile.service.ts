@@ -68,13 +68,18 @@ export class IsmsProfileService {
     answers: PartialWizardAnswers | null;
     defaults: Awaited<ReturnType<typeof computeWizardDefaults>>;
     members: WizardMemberOption[];
+    /** Rows in the 6.2 Objectives register; once > 0 the wizard step is read-only. */
+    objectiveRowCount: number;
   }> {
     await this.requireFramework({ frameworkId });
 
     const profile = await this.ensureProfile({ organizationId, frameworkId });
-    const [defaults, members] = await Promise.all([
+    const [defaults, members, objectiveRowCount] = await Promise.all([
       computeWizardDefaults({ organizationId, frameworkId }),
       this.listMembers({ organizationId }),
+      db.ismsObjective.count({
+        where: { document: { organizationId, frameworkId, type: 'objectives_plan' } },
+      }),
     ]);
 
     const stored = parseStoredAnswers(profile.answers);
@@ -84,6 +89,7 @@ export class IsmsProfileService {
       answers: hasAnswers ? stored : null,
       defaults,
       members,
+      objectiveRowCount,
     };
   }
 

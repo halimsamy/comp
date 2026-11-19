@@ -151,6 +151,11 @@ vi.mock('@trycompai/design-system/icons', () => ({
 }));
 
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock('next/link', () => ({
+  default: ({ href, children }: { href: string; children: React.ReactNode }) => (
+    <a href={href}>{children}</a>
+  ),
+}));
 
 import { WizardClient } from './WizardClient';
 
@@ -188,23 +193,21 @@ describe('WizardClient', () => {
     hookState.profile = PROFILE;
   });
 
-  it('renders the first step pre-filled from defaults and members', () => {
+  it('opens on External commitments: 5.3 Roles holds the deputy SPO and audit route', () => {
     render(<WizardClient {...baseProps} />);
 
     expect(screen.getByText('ISMS setup wizard')).toBeInTheDocument();
-    expect(screen.getByText('Step 1 of 6')).toBeInTheDocument();
-    expect(screen.getByText('Leadership & accountability')).toBeInTheDocument();
-    // Member option from the profile is rendered in the deputy picker.
-    expect(screen.getByText('Alice Owner')).toBeInTheDocument();
+    expect(screen.getByText('Step 1 of 5')).toBeInTheDocument();
+    expect(screen.getAllByText('External commitments').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Leadership & accountability')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Deputy/)).not.toBeInTheDocument();
   });
 
   it('resumes on the first unsaved step after saving and returning', () => {
-    // Saved answers covering steps 1–3 (leadership, commitments, workforce &
-    // scope). Each Next / Save persists that step's full field slice, so a saved
-    // step is one whose every field is present in the stored answers.
+    // Saved answers covering steps 1–2 (commitments, workforce & scope). Each
+    // Next / Save persists that step's full field slice, so a saved step is one
+    // whose every field is present in the stored answers.
     const resumedAnswers: PartialWizardAnswers = {
-      deputySpo: { memberId: 'm2', toBeNamed: false },
-      internalAuditApproach: 'in_house',
       certificationBody: 'BSI Group',
       insurance: { has: true, insurerName: 'Acme Insure' },
       sectorRegulators: ['FINMA'],
@@ -217,11 +220,10 @@ describe('WizardClient', () => {
 
     render(<WizardClient {...baseProps} fallbackData={resumedProfile} />);
 
-    // Steps 1–3 are saved → the wizard opens on step 4 (Privacy & data), not
+    // Steps 1–2 are saved → the wizard opens on step 3 (Privacy & data), not
     // back at step 1 with the progress reset.
-    expect(screen.getByText('Step 4 of 6')).toBeInTheDocument();
-    expect(screen.getByText('Privacy & data')).toBeInTheDocument();
-    expect(screen.queryByText('Leadership & accountability')).not.toBeInTheDocument();
+    expect(screen.getByText('Step 3 of 5')).toBeInTheDocument();
+    expect(screen.getAllByText('Privacy & data').length).toBeGreaterThan(0);
   });
 
   it('saves the active step partial then advances on Next', async () => {
@@ -232,27 +234,29 @@ describe('WizardClient', () => {
     await waitFor(() => {
       expect(mockSaveAnswers).toHaveBeenCalledTimes(1);
     });
-    // Step 1 owns deputySpo + internalAuditApproach only — partial save.
+    // Step 1 owns the external commitments only — partial save.
     const payload = mockSaveAnswers.mock.calls[0][0];
-    expect(Object.keys(payload).sort()).toEqual(['deputySpo', 'internalAuditApproach']);
-    expect(payload.deputySpo).toEqual({ memberId: null, toBeNamed: false });
+    expect(Object.keys(payload).sort()).toEqual([
+      'certificationBody',
+      'insurance',
+      'sectorRegulators',
+    ]);
 
     await waitFor(() => {
-      expect(screen.getByText('Step 2 of 6')).toBeInTheDocument();
+      expect(screen.getByText('Step 2 of 5')).toBeInTheDocument();
     });
-    expect(screen.getByText('External commitments')).toBeInTheDocument();
   });
 
   it('goes back to the previous step without saving', async () => {
     render(<WizardClient {...baseProps} />);
 
     fireEvent.click(screen.getByText('Next'));
-    await waitFor(() => expect(screen.getByText('Step 2 of 6')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Step 2 of 5')).toBeInTheDocument());
 
     mockSaveAnswers.mockClear();
     fireEvent.click(screen.getByText('Back'));
 
-    await waitFor(() => expect(screen.getByText('Step 1 of 6')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Step 1 of 5')).toBeInTheDocument());
     expect(mockSaveAnswers).not.toHaveBeenCalled();
   });
 
@@ -260,13 +264,13 @@ describe('WizardClient', () => {
     render(<WizardClient {...baseProps} />);
 
     // Walk through to the final step.
-    for (let i = 0; i < 5; i += 1) {
+    for (let i = 0; i < 4; i += 1) {
       fireEvent.click(screen.getByText('Next'));
       // eslint-disable-next-line no-await-in-loop
-      await waitFor(() => expect(screen.getByText(`Step ${i + 2} of 6`)).toBeInTheDocument());
+      await waitFor(() => expect(screen.getByText(`Step ${i + 2} of 5`)).toBeInTheDocument());
     }
 
-    expect(screen.getByText('Targets & outcomes')).toBeInTheDocument();
+    expect(screen.getAllByText('Targets & outcomes').length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByText('Finish & generate'));
 
@@ -282,5 +286,7 @@ describe('WizardClient', () => {
     const completePayload = mockComplete.mock.calls[0][0];
     expect(completePayload).toHaveProperty('certificateScopeSentence');
     expect(completePayload).toHaveProperty('objectives');
+    expect(completePayload).not.toHaveProperty('deputySpo');
+    expect(completePayload).not.toHaveProperty('internalAuditApproach');
   });
 });

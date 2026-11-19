@@ -7,12 +7,6 @@
 
 import { z } from 'zod';
 
-export const INTERNAL_AUDIT_APPROACHES = [
-  'in_house',
-  'external_firm',
-  'training_planned',
-] as const;
-
 export const EU_REP_STATUSES = ['appointed', 'not_required', 'pending'] as const;
 
 export const SECTOR_REGULATOR_OPTIONS = [
@@ -23,12 +17,6 @@ export const SECTOR_REGULATOR_OPTIONS = [
   'healthcare',
   'critical_infrastructure',
 ] as const;
-
-export const INTERNAL_AUDIT_LABELS: Record<(typeof INTERNAL_AUDIT_APPROACHES)[number], string> = {
-  in_house: 'In-house team',
-  external_firm: 'External firm',
-  training_planned: 'Training planned',
-};
 
 export const EU_REP_LABELS: Record<(typeof EU_REP_STATUSES)[number], string> = {
   appointed: 'Appointed',
@@ -59,11 +47,6 @@ const objectiveSchema = z.object({
  * client both edits and submits.
  */
 export const wizardFormSchema = z.object({
-  deputySpo: z.object({
-    memberId: z.string().nullable(),
-    toBeNamed: z.boolean(),
-  }),
-  internalAuditApproach: z.enum(INTERNAL_AUDIT_APPROACHES).nullable(),
   certificationBody: z.string(),
   insurance: z.object({
     has: z.boolean(),
@@ -89,8 +72,6 @@ export type WizardFormValues = z.infer<typeof wizardFormSchema>;
 
 /** Partial answers (per-step save body). Deep-partial mirrors the API. */
 export type PartialWizardAnswers = Partial<{
-  deputySpo: Partial<WizardFormValues['deputySpo']>;
-  internalAuditApproach: WizardFormValues['internalAuditApproach'];
   certificationBody: string;
   insurance: Partial<WizardFormValues['insurance']>;
   sectorRegulators: string[];
@@ -132,6 +113,8 @@ export interface WizardProfileResponse {
   answers: PartialWizardAnswers | null;
   defaults: WizardDefaults;
   members: WizardMemberOption[];
+  /** Rows in the 6.2 Objectives register; once > 0 the objectives are edited there. */
+  objectiveRowCount?: number;
 }
 
 export interface SaveProfileResponse {

@@ -42,11 +42,6 @@ export function buildWizardDefaults({
       }));
 
   return {
-    deputySpo: {
-      memberId: saved.deputySpo?.memberId ?? null,
-      toBeNamed: saved.deputySpo?.toBeNamed ?? false,
-    },
-    internalAuditApproach: saved.internalAuditApproach ?? null,
     certificationBody: saved.certificationBody ?? '',
     insurance: {
       has: saved.insurance?.has ?? false,
