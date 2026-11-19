@@ -37,7 +37,7 @@ export const employeeVerificationRule: NativeEvidenceRule = {
   module: 'People',
   title: 'Every person who joined in the last 12 months has a completed background check or an exemption',
   reference: 'ISO/IEC 27001:2022 A.6.1; PCI DSS v4.0.1 12.7.1',
-  path: '/people/all',
+  path: '/people',
   async evaluate({ organizationId, now }) {
     const since = monthsBefore({ date: now, months: 12 });
     const joiners = (await loadScopeMembers(organizationId)).filter(
@@ -97,7 +97,7 @@ export const securityTrainingRule: NativeEvidenceRule = {
   module: 'People',
   title: 'Every in-scope person completed security awareness training in the last 12 months',
   reference: 'ISO/IEC 27001:2022 7.2, 7.3, A.6.3; PCI DSS v4.0.1 12.6.1, 12.6.3',
-  path: '/people/all',
+  path: '/people',
   async evaluate({ organizationId, now }) {
     const since = monthsBefore({ date: now, months: 12 });
     const [org, members] = await Promise.all([

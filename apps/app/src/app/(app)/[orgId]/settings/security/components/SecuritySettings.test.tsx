@@ -77,4 +77,16 @@ describe('SecuritySettings', () => {
     render(<SecuritySettings />);
     expect(screen.getByText(/couldn.t be loaded/)).toBeInTheDocument();
   });
+
+  it('shows "Restricted" only when a sign-in method is unticked', () => {
+    hasPermission.mockReturnValue(true);
+    state.settings = { ...baseSettings, allowedSignInMethods: ['google', 'magic-link'] };
+    const { rerender } = render(<SecuritySettings />);
+    expect(screen.queryByText('Restricted')).not.toBeInTheDocument();
+    expect(screen.getByText('All methods are allowed.')).toBeInTheDocument();
+
+    state.settings = { ...baseSettings, allowedSignInMethods: ['google'] };
+    rerender(<SecuritySettings />);
+    expect(screen.getByText('Restricted')).toBeInTheDocument();
+  });
 });

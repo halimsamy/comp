@@ -3,7 +3,7 @@
 import { Button } from '@trycompai/ui/button';
 import { Card } from '@trycompai/ui';
 import { isJSON } from '@/lib/utils';
-import { ChevronLeft, ChevronRight, ExternalLink, MessageSquare } from 'lucide-react';
+import { Chat, ChevronLeft, ChevronRight, Launch } from '@trycompai/design-system/icons';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { usePagination } from '../../hooks/usePagination';
@@ -75,11 +75,18 @@ export function ContextSection({ contextEntries }: ContextSectionProps) {
     <Card id="context" className="flex flex-col h-full">
       <div className="px-6 py-4 border-b">
             <div className="flex items-center gap-2">
-              <MessageSquare className="h-5 w-5 text-muted-foreground" />
+              <Chat className="h-5 w-5 text-muted-foreground" />
               <span className="text-base font-semibold">Context</span>
               <span className="text-sm text-muted-foreground">
                 ({validEntries.length})
               </span>
+              <Link
+                href={`/${orgId}/settings/context-hub`}
+                className="ml-auto inline-flex items-center gap-1 text-sm text-primary hover:underline"
+              >
+                Edit in Settings
+                <Launch className="h-3.5 w-3.5" />
+              </Link>
             </div>
       </div>
       <div className="px-6 pb-4 pt-4 flex flex-col flex-1">
@@ -93,16 +100,13 @@ export function ContextSection({ contextEntries }: ContextSectionProps) {
                   {paginatedItems.map((entry) => {
                     const formattedAnswer = formatAnswer(entry.answer ?? '');
                     return (
-                      <Link
+                      <div
                         key={entry.id}
-                        href={`/${orgId}/settings/context-hub`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                    className="group rounded-md border border-border bg-background p-3 transition-colors hover:bg-muted/50 hover:border-primary/50 h-[82px] flex items-center"
+                        className="rounded-md border border-border bg-background p-3 min-h-[82px] flex items-center"
                       >
                     <div className="flex items-start justify-between gap-2 w-full">
                           <div className="flex-1 min-w-0">
-                            <h4 className="text-sm font-semibold text-foreground group-hover:text-primary">
+                            <h4 className="text-sm font-semibold text-foreground">
                               {entry.question}
                             </h4>
                             {formattedAnswer && (
@@ -111,9 +115,8 @@ export function ContextSection({ contextEntries }: ContextSectionProps) {
                               </p>
                             )}
                           </div>
-                      <ExternalLink className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary transition-colors mt-0.5" />
                         </div>
-                      </Link>
+                      </div>
                     );
                   })}
                 </div>

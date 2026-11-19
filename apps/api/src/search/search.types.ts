@@ -6,7 +6,13 @@ export type SearchEntryType =
   | 'risk'
   | 'vendor'
   | 'person'
-  | 'isms_document';
+  | 'isms_document'
+  | 'asset'
+  | 'vulnerability'
+  | 'finding'
+  | 'audit'
+  | 'questionnaire'
+  | 'access_review';
 
 export interface SearchEntry {
   type: SearchEntryType;

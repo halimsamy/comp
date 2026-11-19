@@ -1,6 +1,8 @@
 'use client';
 
-import { canAccessRoute, type UserPermissions } from '@/lib/permissions';
+import { activeNavItemId } from '@/lib/nav';
+import { visibleSettingsItems } from '@/lib/nav-settings';
+import type { UserPermissions } from '@/lib/permissions';
 import { AppShellNav, AppShellNavItem } from '@trycompai/design-system';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -9,16 +11,11 @@ interface SettingsSidebarProps {
   orgId: string;
   showBrowserTab: boolean;
   showBillingTab?: boolean;
+  /** Omitted: show every page (permission checks still happen on each page). */
   permissions?: UserPermissions;
 }
 
-type SettingsNavItem = {
-  id: string;
-  label: string;
-  path: string;
-  hidden?: boolean;
-};
-
+/** Settings pages from the nav registry (lib/nav-settings.ts), gated like their routes. */
 export function SettingsSidebar({
   orgId,
   showBrowserTab,
@@ -26,57 +23,17 @@ export function SettingsSidebar({
   permissions,
 }: SettingsSidebarProps) {
   const pathname = usePathname() ?? '';
-  const canSee = (segment: string) => !permissions || canAccessRoute(permissions, segment);
-
-  const items: SettingsNavItem[] = [
-    { id: 'general', label: 'General', path: `/${orgId}/settings` },
-    {
-      id: 'billing',
-      label: 'Billing',
-      path: `/${orgId}/settings/billing`,
-      hidden: !showBillingTab,
-    },
-    { id: 'context', label: 'Context', path: `/${orgId}/settings/context-hub` },
-    { id: 'api', label: 'API Keys', path: `/${orgId}/settings/api-keys` },
-    { id: 'portal', label: 'Portal', path: `/${orgId}/settings/portal` },
-    { id: 'secrets', label: 'Secrets', path: `/${orgId}/settings/secrets` },
-    { id: 'roles', label: 'Roles', path: `/${orgId}/settings/roles` },
-    { id: 'notifications', label: 'Notifications', path: `/${orgId}/settings/notifications` },
-    {
-      id: 'security',
-      label: 'Security',
-      path: `/${orgId}/settings/security`,
-      hidden: !canSee('settings/security'),
-    },
-    {
-      id: 'event-log',
-      label: 'Event log',
-      path: `/${orgId}/settings/event-log`,
-      hidden: !canSee('settings/event-log'),
-    },
-    {
-      id: 'browser',
-      label: 'Browser connections',
-      path: `/${orgId}/settings/browser-connection`,
-      hidden: !showBrowserTab,
-    },
-    { id: 'user', label: 'User Settings', path: `/${orgId}/settings/user` },
-  ];
-
-  const isPathActive = (path: string) => {
-    if (path === `/${orgId}/settings`) {
-      return pathname === path;
-    }
-    return pathname.startsWith(`${path}`);
-  };
-
-  const visibleItems = items.filter((item) => !item.hidden);
+  const items = visibleSettingsItems({
+    permissions,
+    features: { billing: !!showBillingTab, browser: showBrowserTab },
+  });
+  const activeId = activeNavItemId({ items, orgId, pathname, search: null });
 
   return (
     <AppShellNav>
-      {visibleItems.map((item) => (
-        <Link key={item.id} href={item.path}>
-          <AppShellNavItem isActive={isPathActive(item.path)}>{item.label}</AppShellNavItem>
+      {items.map((item) => (
+        <Link key={item.id} href={`/${orgId}${item.path}`}>
+          <AppShellNavItem isActive={item.id === activeId}>{item.label}</AppShellNavItem>
         </Link>
       ))}
     </AppShellNav>

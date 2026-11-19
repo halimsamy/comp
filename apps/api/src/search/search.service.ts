@@ -3,6 +3,7 @@ import { db } from '@db';
 import type { AuthContext } from '../auth/types';
 import { loadRequirementDefinitions } from '../frameworks/frameworks-requirements.helper';
 import { resolvePermissionCheck } from './search-access';
+import { buildExtraIndex } from './search-extra';
 import type { SearchEntry } from './search.types';
 
 const MAX_KEYWORD_LENGTH = 200;
@@ -198,6 +199,7 @@ export class SearchService {
               ),
             )
         : none,
+      buildExtraIndex({ organizationId, can }),
     ]);
 
     return groups.flat();

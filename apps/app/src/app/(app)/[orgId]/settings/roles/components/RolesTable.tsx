@@ -1,5 +1,6 @@
 'use client';
 
+import { usePermissions } from '@/hooks/use-permissions';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,11 +29,11 @@ import {
   Text,
 } from '@trycompai/design-system';
 import { Add, Edit, OverflowMenuVertical, Search, TrashCan } from '@trycompai/design-system/icons';
-import { usePermissions } from '@/hooks/use-permissions';
 import { useParams, useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { useRoles } from '../hooks/useRoles';
+import { MemberCountLink } from './MemberCountLink';
 
 export interface CustomRole {
   id: string;
@@ -51,11 +52,7 @@ interface RolesTableProps {
   roles: CustomRole[];
 }
 
-function ActionsCell({
-  role,
-}: {
-  role: CustomRole;
-}) {
+function ActionsCell({ role }: { role: CustomRole }) {
   const router = useRouter();
   const params = useParams();
   const orgId = params.orgId as string;
@@ -108,13 +105,13 @@ function ActionsCell({
               {memberCount > 0 ? (
                 <>
                   This role is currently assigned to <strong>{memberCount}</strong>{' '}
-                  {memberCount === 1 ? 'member' : 'members'}. You must reassign or remove
-                  these members before deleting this role.
+                  {memberCount === 1 ? 'member' : 'members'}. You must reassign or remove these
+                  members before deleting this role.
                 </>
               ) : (
                 <>
-                  Are you sure you want to delete the role{' '}
-                  <strong>{role.name}</strong>? This action cannot be undone.
+                  Are you sure you want to delete the role <strong>{role.name}</strong>? This action
+                  cannot be undone.
                 </>
               )}
             </AlertDialogDescription>
@@ -194,6 +191,7 @@ export function RolesTable({ roles }: RolesTableProps) {
           <TableRow>
             <TableHead>NAME</TableHead>
             <TableHead>PERMISSIONS</TableHead>
+            <TableHead>MEMBERS</TableHead>
             <TableHead>CREATED</TableHead>
             <TableHead style={{ width: 80 }}>ACTIONS</TableHead>
           </TableRow>
@@ -201,7 +199,7 @@ export function RolesTable({ roles }: RolesTableProps) {
         <TableBody>
           {filteredRoles.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={4}>
+              <TableCell colSpan={5}>
                 <div className="flex items-center justify-center py-8">
                   <Text variant="muted">
                     {search ? 'No roles match your search' : 'No custom roles yet'}
@@ -221,6 +219,13 @@ export function RolesTable({ roles }: RolesTableProps) {
                   <Text size="sm" variant="muted">
                     {getPermissionCount(role.permissions)} resources
                   </Text>
+                </TableCell>
+                <TableCell>
+                  <MemberCountLink
+                    orgId={orgId}
+                    role={role.name}
+                    count={role._count?.members ?? 0}
+                  />
                 </TableCell>
                 <TableCell>
                   <Text size="sm" variant="muted">

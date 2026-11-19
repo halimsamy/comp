@@ -20,6 +20,8 @@ import { CertificateCheck, Download, Upload, View } from '@trycompai/design-syst
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { CustomFrameworkBadge } from './CustomFrameworkBadge';
+import { LiveStatusHint } from './LiveStatusHint';
+import type { LiveTrustStatus } from './trust-frameworks';
 import {
   CCPA,
   CCPAInProgress,
@@ -130,6 +132,8 @@ export function ComplianceFramework({
   frameworkKey,
   orgId,
   disabled,
+  liveStatus,
+  onUseLiveStatus,
 }: {
   title: string;
   description: string;
@@ -151,6 +155,9 @@ export function ComplianceFramework({
   frameworkKey: string;
   orgId: string;
   disabled?: boolean;
+  /** Status derived from the org's frameworks and audits, offered when it differs. */
+  liveStatus?: LiveTrustStatus;
+  onUseLiveStatus?: () => Promise<void>;
 }) {
   const [isEnabled, setIsEnabled] = useState(isEnabledProp);
   const [status, setStatus] = useState(statusProp);
@@ -348,6 +355,10 @@ export function ComplianceFramework({
               />
             </div>
           </div>
+
+          {liveStatus && (!isEnabled || status !== liveStatus) && (
+            <LiveStatusHint liveStatus={liveStatus} disabled={disabled} onUse={onUseLiveStatus} />
+          )}
 
           {/* File Upload Section - Only show when status is "compliant" */}
           {isEnabled && status === 'compliant' && (

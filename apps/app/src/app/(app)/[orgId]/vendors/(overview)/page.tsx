@@ -1,12 +1,18 @@
+import type { Metadata } from 'next';
 import { AppOnboarding } from '@/components/app-onboarding';
 import { ExportRegisterButton } from '@/components/register-export/ExportRegisterButton';
+import type { Vendor } from '@/hooks/use-vendors';
 import { serverApi } from '@/lib/api-server';
 import { HStack, PageHeader, PageLayout } from '@trycompai/design-system';
 import { CreateVendorSheet } from '../components/create-vendor-sheet';
+import { VendorRegisterActions } from './components/VendorRegisterActions';
+import { VendorRegisterTabs } from './components/VendorRegisterTabs';
 import { VendorsTable } from './components/VendorsTable';
 
+export const metadata: Metadata = { title: 'Vendors' };
+
 interface VendorsApiResponse {
-  data: Array<Record<string, unknown>>;
+  data: Vendor[];
   count: number;
 }
 
@@ -105,7 +111,8 @@ export default async function Page({
         <PageHeader
           title="Vendors"
           actions={
-            <HStack gap="2">
+            <HStack gap="2" wrap="wrap">
+              <VendorRegisterActions initialVendors={vendors} />
               <ExportRegisterButton
                 options={[
                   { register: 'vendors', label: 'Vendor register' },
@@ -118,12 +125,14 @@ export default async function Page({
         />
       }
     >
-      <VendorsTable
-        vendors={vendors as any}
-        assignees={assignees as any}
-        onboardingRunId={onboardingRunId}
-        orgId={orgId}
-      />
+      <VendorRegisterTabs orgId={orgId}>
+        <VendorsTable
+          vendors={vendors}
+          assignees={assignees as any}
+          onboardingRunId={onboardingRunId}
+          orgId={orgId}
+        />
+      </VendorRegisterTabs>
     </PageLayout>
   );
 }

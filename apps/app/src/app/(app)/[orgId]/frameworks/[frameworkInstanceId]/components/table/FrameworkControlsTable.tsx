@@ -1,6 +1,6 @@
 'use client';
 
-import { Loading } from '@/components/tables/risk-tasks/loading';
+import { Loading } from '@/components/frameworks/loading';
 import { Table, TableBody, TableCell, TableRow } from '@trycompai/ui/table';
 import { flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table';
 import { Suspense } from 'react';

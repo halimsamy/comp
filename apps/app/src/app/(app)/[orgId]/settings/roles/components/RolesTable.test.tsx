@@ -97,6 +97,20 @@ describe('RolesTable', () => {
       expect(screen.getByText('1 resources')).toBeInTheDocument(); // risk-manager (singular issue, but acceptable)
     });
 
+    it('links member counts to People filtered by role', () => {
+      render(<RolesTable roles={mockRoles} />);
+
+      expect(screen.getByText('MEMBERS')).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: '3 members' })).toHaveAttribute(
+        'href',
+        '/test-org-id/people?role=compliance-lead',
+      );
+      expect(screen.getByRole('link', { name: '0 members' })).toHaveAttribute(
+        'href',
+        '/test-org-id/people?role=risk-manager',
+      );
+    });
+
     it('formats dates correctly', () => {
       render(<RolesTable roles={mockRoles} />);
 

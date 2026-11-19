@@ -12,11 +12,14 @@ interface EmailPreferences {
   unassignedItemsNotifications: boolean;
   taskMentions: boolean;
   taskAssignments: boolean;
+  complianceDigest?: boolean;
+  ownershipAssignments?: boolean;
+  slaAlerts?: boolean;
   digestFrequency?: DigestFrequency;
+  complianceDigestFrequency?: DigestFrequency;
 }
 
-export const emailPreferencesKey = () =>
-  ['/v1/people/me/email-preferences'] as const;
+export const emailPreferencesKey = () => ['/v1/people/me/email-preferences'] as const;
 
 interface UseEmailPreferencesOptions {
   initialPreferences?: EmailPreferences;
@@ -46,10 +49,10 @@ export function useEmailPreferences(options?: UseEmailPreferencesOptions) {
     await mutate(preferences, false);
 
     try {
-      const response = await apiClient.put(
-        '/v1/people/me/email-preferences',
-        { preferences },
-      );
+      // PATCH merges, so keys this form doesn't know about are kept.
+      const response = await apiClient.patch('/v1/people/me/email-preferences', {
+        preferences,
+      });
       if (response.error) throw new Error(response.error);
       await mutate();
     } catch (err) {

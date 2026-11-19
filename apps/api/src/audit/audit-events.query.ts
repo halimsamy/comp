@@ -39,7 +39,10 @@ export class AuditEventsQueryDto {
   @IsDateString()
   to?: string;
 
-  @ApiPropertyOptional({ description: 'Text to find in the event description', example: 'signed in' })
+  @ApiPropertyOptional({
+    description: 'Text to find in the event description, the record name or a changed field name',
+    example: 'signed in',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(200)
@@ -88,7 +91,11 @@ export function buildAuditEventsWhere({
     }),
     ...((query.from || query.to) && { timestamp }),
     ...(query.search && {
-      description: { contains: query.search, mode: 'insensitive' },
+      OR: [
+        { description: { contains: query.search, mode: 'insensitive' } },
+        // Record name + changed field names, stored lowercased by the interceptor.
+        { data: { path: ['searchText'], string_contains: query.search.toLowerCase() } },
+      ],
     }),
   };
 }
@@ -120,8 +127,39 @@ export const AUDIT_EVENT_CSV_HEADERS = [
   'Method',
   'Path',
   'IP address',
+  'User agent',
   'Sign-in method',
+  'Outcome',
+  'Changes',
 ];
+
+const show = (value: unknown) =>
+  value === null || value === undefined || value === ''
+    ? '—'
+    : typeof value === 'string'
+      ? value
+      : JSON.stringify(value);
+
+/** "field: old → new; …" from the interceptor's `changes` record. */
+export function formatChanges(data: Prisma.JsonValue): string {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return '';
+  const changes = data.changes;
+  if (!changes || typeof changes !== 'object' || Array.isArray(changes)) return '';
+  return Object.entries(changes)
+    .map(([field, change]) => {
+      if (!change || typeof change !== 'object' || Array.isArray(change)) return field;
+      return `${field}: ${show(change.previous)} → ${show(change.current)}`;
+    })
+    .join('; ');
+}
+
+function outcome(data: Prisma.JsonValue): string {
+  const value = dataField(data, 'outcome');
+  if (value !== 'failure') return 'success';
+  const status =
+    data && typeof data === 'object' && !Array.isArray(data) ? data.statusCode : null;
+  return typeof status === 'number' ? `failure (${status})` : 'failure';
+}
 
 export function auditEventsToCsv(rows: AuditEventRow[]): string {
   return [
@@ -138,7 +176,10 @@ export function auditEventsToCsv(rows: AuditEventRow[]): string {
         dataField(row.data, 'method'),
         dataField(row.data, 'path'),
         dataField(row.data, 'ipAddress'),
+        dataField(row.data, 'userAgent'),
         dataField(row.data, 'signInMethod'),
+        outcome(row.data),
+        formatChanges(row.data),
       ]),
     ),
   ].join('\n');

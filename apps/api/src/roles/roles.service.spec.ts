@@ -106,6 +106,7 @@ jest.mock('@db', () => ({
     },
     member: {
       count: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
     },
   },
 }));
@@ -501,6 +502,40 @@ describe('RolesService', () => {
       ]);
       expect(result.customRoles).toHaveLength(1);
       expect(result.customRoles[0].isBuiltIn).toBe(false);
+    });
+
+    it('counts members per role from the comma-separated role, by exact name', async () => {
+      (mockDb.organizationRole.findMany as jest.Mock).mockResolvedValue([
+        {
+          id: 'rol_1',
+          name: 'superadmin',
+          permissions: '{}',
+          obligations: '{}',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ]);
+      (mockDb.member.findMany as jest.Mock).mockResolvedValueOnce([
+        { role: 'owner,admin' },
+        { role: 'admin' },
+        { role: 'superadmin, auditor' },
+        { role: 'employee,employee' },
+      ]);
+
+      const result = await service.listRoles('org_123');
+
+      expect(mockDb.member.findMany).toHaveBeenCalledWith({
+        where: { organizationId: 'org_123', deactivated: false },
+        select: { role: true },
+      });
+      const count = (name: string) =>
+        result.builtInRoles.find((r) => r.name === name)?.memberCount;
+      expect(count('admin')).toBe(2);
+      expect(count('owner')).toBe(1);
+      expect(count('auditor')).toBe(1);
+      expect(count('employee')).toBe(1);
+      expect(count('contractor')).toBe(0);
+      expect(result.customRoles[0]._count.members).toBe(1);
     });
   });
 

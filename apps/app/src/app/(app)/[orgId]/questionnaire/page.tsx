@@ -1,9 +1,12 @@
+import type { Metadata } from 'next';
 import { getFeatureFlags } from '@/app/posthog';
 import { serverApi } from '@/lib/api-server';
 import { auth } from '@/utils/auth';
 import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { QuestionnaireTabs } from './components/QuestionnaireTabs';
+
+export const metadata: Metadata = { title: 'Questionnaires' };
 
 interface PolicyApiResponse {
   data: Array<{

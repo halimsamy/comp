@@ -1,54 +1,16 @@
+import type { OverviewData } from './overview-data';
+import { DAY_MS } from './overview-utils';
 import {
-  isExpiringSoon,
-  reviewStatus,
-} from '../vendors/tpsp/vendor-review-status';
-import { latestTraining } from './overview-training';
-import { DAY_MS, newestDocuments, type OverviewData } from './overview-data';
+  APPROVAL_STALE_DAYS,
+  ACCESS_REVIEW_INTERVAL_DAYS,
+  card,
+  reasons,
+  type AttentionCard,
+} from './overview-attention-types';
+import { buildModuleCards } from './overview-attention-modules';
+import { peopleCard, trainingCard, vendorsCard } from './overview-attention-people';
 
-export type AttentionModule =
-  | 'tasks'
-  | 'policies'
-  | 'acknowledgements'
-  | 'training'
-  | 'vendors'
-  | 'checks'
-  | 'findings'
-  | 'accessReviews';
-
-export interface AttentionReason {
-  label: string;
-  count: number;
-}
-
-export interface AttentionCard {
-  module: AttentionModule;
-  label: string;
-  /** Items that need someone to act. */
-  needsAttention: number;
-  ok: number;
-  total: number;
-  /** Org-relative deep link, e.g. `/tasks`. */
-  href: string;
-  reasons: AttentionReason[];
-}
-
-/** PCI DSS 7.2.4: user accounts and access privileges are reviewed at least once every six months. */
-export const ACCESS_REVIEW_INTERVAL_DAYS = 183;
-export const TRAINING_EXPIRY_WINDOW_DAYS = 30;
-
-const reasons = (entries: Array<[string, number]>): AttentionReason[] =>
-  entries
-    .filter(([, count]) => count > 0)
-    .map(([label, count]) => ({ label, count }));
-
-function card(
-  input: Omit<AttentionCard, 'ok'> & { ok?: number },
-): AttentionCard {
-  return {
-    ...input,
-    ok: input.ok ?? Math.max(0, input.total - input.needsAttention),
-  };
-}
+export * from './overview-attention-types';
 
 export function buildAttentionCards({
   data,
@@ -84,6 +46,11 @@ export function buildAttentionCards({
   const needsReviewPolicies = data.policies.filter(
     (p) => p.status === 'needs_review',
   ).length;
+  const approvalStale = data.policies.filter(
+    (p) =>
+      p.submittedForApprovalAt &&
+      t - p.submittedForApprovalAt.getTime() > APPROVAL_STALE_DAYS * DAY_MS,
+  ).length;
   const reviewOverdue = data.policies.filter(
     (p) => p.status === 'published' && isPast(p.reviewDate),
   ).length;
@@ -110,56 +77,12 @@ export function buildAttentionCards({
     }
   }
 
-  const training = latestTraining({ data });
-  const trainingExpired = training.filter(
-    (entry) => entry.expiresAt.getTime() < t,
-  ).length;
-  const trainingExpiring = training.filter(
-    (entry) =>
-      entry.expiresAt.getTime() >= t &&
-      entry.expiresAt.getTime() - t <= TRAINING_EXPIRY_WINDOW_DAYS * DAY_MS,
-  ).length;
-
-  // Vendors: review cadence and assurance documents (vendor-review rules).
-  let vendorsReviewOverdue = 0;
-  let vendorsNeverReviewed = 0;
-  let vendorsDocsExpiring = 0;
-  let vendorsNeedingAttention = 0;
-  for (const vendor of data.vendors) {
-    const status = reviewStatus({
-      lastReviewedAt: vendor.lastReviewedAt,
-      nextReviewDue: vendor.nextReviewDue,
-      now,
-    });
-    const inScope =
-      vendor.criticality === 'critical' ||
-      vendor.criticality === 'high' ||
-      vendor.handlesCardholderData ||
-      vendor.affectsCdeSecurity;
-    const overdue = status === 'overdue';
-    const neverReviewed = status === 'never_reviewed' && inScope;
-    const docsExpiring = newestDocuments(vendor.documents).some((doc) =>
-      isExpiringSoon({ expiresAt: doc.expiresAt, now }),
-    );
-    if (overdue) vendorsReviewOverdue++;
-    if (neverReviewed) vendorsNeverReviewed++;
-    if (docsExpiring) vendorsDocsExpiring++;
-    if (overdue || neverReviewed || docsExpiring) vendorsNeedingAttention++;
-  }
-
   const failingChecks = data.checkRuns.filter(
     (run) => run.failedCount > 0,
   ).length;
   const erroredChecks = data.checkRuns.filter(
     (run) => run.failedCount === 0 && run.status === 'failed',
   ).length;
-
-  const findingCount = (status: string) =>
-    data.findings.find((f) => f.status === status)?.count ?? 0;
-  const findingsTotal = data.findings.reduce((sum, f) => sum + f.count, 0);
-  const openFindings = findingCount('open');
-  const revisionFindings = findingCount('needs_revision');
-  const readyFindings = findingCount('ready_for_review');
 
   const reviewsOverdue = data.accessReviews.filter(
     (r) => r.status === 'in_progress' && isPast(r.dueDate),
@@ -175,9 +98,9 @@ export function buildAttentionCards({
     card({
       module: 'tasks',
       label: 'Evidence tasks',
-      total: data.tasks.length,
+      total: data.taskProgress.total,
       ok: tasksOk,
-      needsAttention: data.tasks.length - tasksOk,
+      needsAttention: data.taskProgress.total - tasksOk,
       href: '/tasks',
       reasons: reasons([
         ['Overdue', overdueTasks.length],
@@ -194,7 +117,8 @@ export function buildAttentionCards({
       href: '/policies',
       reasons: reasons([
         ['Review overdue', reviewOverdue],
-        ['Needs review', needsReviewPolicies],
+        [`Waiting for approval over ${APPROVAL_STALE_DAYS} days`, approvalStale],
+        ['Waiting for approval', needsReviewPolicies - approvalStale],
         ['Draft', draftPolicies],
       ]),
     }),
@@ -203,35 +127,16 @@ export function buildAttentionCards({
       label: 'Policy acknowledgements',
       total: ackTotal,
       needsAttention: ackPending,
-      href: '/people/all',
+      href: '/people',
       reasons: reasons([
         ['People with pending sign-offs', peoplePending.size],
         ['Policies awaiting sign-off', policiesPending.size],
       ]),
     }),
-    card({
-      module: 'training',
-      label: 'Training',
-      total: training.length,
-      needsAttention: trainingExpired + trainingExpiring,
-      href: '/people/all',
-      reasons: reasons([
-        ['Expired', trainingExpired],
-        [`Expiring in ${TRAINING_EXPIRY_WINDOW_DAYS} days`, trainingExpiring],
-      ]),
-    }),
-    card({
-      module: 'vendors',
-      label: 'Vendors',
-      total: data.vendors.length,
-      needsAttention: vendorsNeedingAttention,
-      href: '/vendors',
-      reasons: reasons([
-        ['Review overdue', vendorsReviewOverdue],
-        ['Never reviewed', vendorsNeverReviewed],
-        ['Documents expired or expiring', vendorsDocsExpiring],
-      ]),
-    }),
+    trainingCard({ data, now }),
+    peopleCard({ data }),
+    vendorsCard({ data, now }),
+    ...buildModuleCards({ data, now }),
     card({
       module: 'checks',
       label: 'Integration checks',
@@ -241,18 +146,6 @@ export function buildAttentionCards({
       reasons: reasons([
         ['Failing', failingChecks],
         ['Errored', erroredChecks],
-      ]),
-    }),
-    card({
-      module: 'findings',
-      label: 'Audit findings',
-      total: findingsTotal,
-      needsAttention: openFindings + revisionFindings + readyFindings,
-      href: '/overview/findings',
-      reasons: reasons([
-        ['Open', openFindings],
-        ['Needs revision', revisionFindings],
-        ['Ready for review', readyFindings],
       ]),
     }),
     card({

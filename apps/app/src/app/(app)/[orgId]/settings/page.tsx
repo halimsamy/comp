@@ -1,5 +1,6 @@
 import { DeleteOrganization } from '@/components/forms/organization/delete-organization';
 import { TransferOwnership } from '@/components/forms/organization/transfer-ownership';
+import { UpdateOrganizationCompanyDetails } from '@/components/forms/organization/update-organization-company-details';
 import { UpdateOrganizationLogo } from '@/components/forms/organization/update-organization-logo';
 import { UpdateOrganizationName } from '@/components/forms/organization/update-organization-name';
 import { UpdateOrganizationWebsite } from '@/components/forms/organization/update-organization-website';
@@ -25,6 +26,9 @@ export default async function OrganizationSettings({
       id: string;
       name: string;
       website: string | null;
+      legalName: string | null;
+      registeredAddress: string | null;
+      phone: string | null;
       advancedModeEnabled: boolean;
       logo: string | null;
       logoUrl: string | null;
@@ -46,6 +50,13 @@ export default async function OrganizationSettings({
     <div className="flex flex-col gap-4">
       <UpdateOrganizationName organizationName={orgName} />
       <UpdateOrganizationWebsite organizationWebsite={orgWebsite} />
+      <UpdateOrganizationCompanyDetails
+        initialValues={{
+          legalName: organization?.legalName ?? null,
+          registeredAddress: organization?.registeredAddress ?? null,
+          phone: organization?.phone ?? null,
+        }}
+      />
       <UpdateOrganizationLogo currentLogoUrl={logoUrl} />
       <TransferOwnership
         members={organization?.eligibleMembers ?? []}

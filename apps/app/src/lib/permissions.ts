@@ -154,9 +154,10 @@ export function canAccessAuditorView(
 const MAIN_NAV_ROUTES: Array<{ segment: string; path: string }> = [
   { segment: 'overview', path: '/overview' },
   { segment: 'frameworks', path: '/frameworks' },
+  { segment: 'audits', path: '/audits' },
   { segment: 'policies', path: '/policies' },
   { segment: 'tasks', path: '/tasks' },
-  { segment: 'people', path: '/people/all' },
+  { segment: 'people', path: '/people' },
   { segment: 'risk', path: '/risk' },
   { segment: 'vendors', path: '/vendors' },
   { segment: 'integrations', path: '/integrations' },
@@ -170,6 +171,12 @@ const MAIN_NAV_ROUTES: Array<{ segment: string; path: string }> = [
  * Returns the path (e.g. "/{orgId}/policies") or null if none accessible.
  */
 export function getDefaultRoute(permissions: UserPermissions, orgId: string): string | null {
+  // Auditor-style members (read-only on the program, audit access) start in their audit workspace.
+  const isReadOnlyAuditor =
+    hasPermission(permissions, 'audit', 'read') &&
+    !hasPermission(permissions, 'control', 'update') &&
+    !hasPermission(permissions, 'organization', 'update');
+  if (isReadOnlyAuditor) return `/${orgId}/audits`;
   for (const { segment, path } of MAIN_NAV_ROUTES) {
     if (canAccessRoute(permissions, segment)) {
       return `/${orgId}${path}`;
@@ -182,6 +189,7 @@ export function getDefaultRoute(permissions: UserPermissions, orgId: string): st
 const COMPLIANCE_ROUTE_SEGMENTS = [
   'overview', 'frameworks', 'controls', 'policies', 'tasks', 'documents', 'people',
   'risk', 'vendors', 'questionnaire', 'integrations', 'cloud-tests', 'auditor', 'audits',
+  'assets', 'vulnerabilities',
 ] as const;
 
 /**

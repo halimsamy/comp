@@ -15,22 +15,26 @@ const OPTIONS: { value: DigestFrequency; label: string }[] = [
   { value: 'daily', label: 'Daily' },
 ];
 
-/** How often the task digest is sent. */
+/** How often a digest email is sent. */
 export function DigestFrequencySelect({
   value,
   onChange,
   disabled,
+  label = 'Digest frequency',
+  description = 'How often the task digest email is sent.',
 }: {
   value: DigestFrequency;
   onChange: (value: DigestFrequency) => void;
   disabled?: boolean;
+  label?: string;
+  description?: string;
 }) {
   return (
     <div className="flex flex-col gap-2 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
-        <Text weight="medium">Digest frequency</Text>
+        <Text weight="medium">{label}</Text>
         <Text size="sm" variant="muted">
-          How often the task digest email is sent.
+          {description}
         </Text>
       </div>
       <div className="w-full sm:w-[200px]">
@@ -39,7 +43,7 @@ export function DigestFrequencySelect({
           disabled={disabled}
           onValueChange={(next) => next && onChange(next === 'daily' ? 'daily' : 'weekly')}
         >
-          <SelectTrigger aria-label="Digest frequency">
+          <SelectTrigger aria-label={label}>
             <SelectValue>{OPTIONS.find((o) => o.value === value)?.label}</SelectValue>
           </SelectTrigger>
           <SelectContent>

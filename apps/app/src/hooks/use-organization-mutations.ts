@@ -6,6 +6,9 @@ import { useCallback } from 'react';
 interface UpdateOrganizationData {
   name?: string;
   website?: string;
+  legalName?: string;
+  registeredAddress?: string;
+  phone?: string;
   evidenceApprovalEnabled?: boolean;
   deviceAgentStepEnabled?: boolean;
   securityTrainingStepEnabled?: boolean;

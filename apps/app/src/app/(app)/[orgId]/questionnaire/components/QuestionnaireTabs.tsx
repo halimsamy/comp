@@ -9,6 +9,7 @@ import {
   TabsList,
   TabsTrigger,
 } from '@trycompai/design-system';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { AdditionalDocumentsSection } from '../knowledge-base/additional-documents/components';
 import { KnowledgeBaseHeader } from '../knowledge-base/components/KnowledgeBaseHeader';
 import { ContextSection } from '../knowledge-base/context/components';
@@ -44,6 +45,20 @@ export function QuestionnaireTabs({
   manualAnswers,
   documents,
 }: QuestionnaireTabsProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const activeTab = searchParams?.get('tab') === 'knowledge-base' ? 'knowledge-base' : 'questionnaires';
+
+  // Keep ?tab= in the URL so the Knowledge Base tab can be linked to directly.
+  const handleTabChange = (value: string) => {
+    const params = new URLSearchParams(searchParams?.toString());
+    if (value === 'knowledge-base') params.set('tab', 'knowledge-base');
+    else params.delete('tab');
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  };
+
   // Show onboarding if no published policies exist
   if (!hasPublishedPolicies) {
     return (
@@ -83,7 +98,7 @@ export function QuestionnaireTabs({
   }
 
   return (
-    <Tabs defaultValue="questionnaires">
+    <Tabs value={activeTab} onValueChange={handleTabChange}>
       <PageLayout
         header={
           <PageHeader

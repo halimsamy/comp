@@ -12,7 +12,9 @@ vi.mock('@/hooks/use-audit-events', async (importOriginal) => ({
   useAuditEvents,
 }));
 vi.mock('@/hooks/use-organization-members', () => ({
-  useOrganizationMembers: () => ({ members: [{ user: { id: 'usr_1', name: 'Ann', email: 'ann@x.com' } }] }),
+  useOrganizationMembers: () => ({
+    members: [{ user: { id: 'usr_1', name: 'Ann', email: 'ann@x.com' } }],
+  }),
 }));
 vi.mock('@/lib/evidence-download', () => ({ downloadEventLogCsv }));
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
@@ -42,9 +44,10 @@ describe('EventLog', () => {
   it('lists events with user, IP and type', () => {
     useAuditEvents.mockReturnValue({ events: [signIn, failed], count: 2, isLoading: false });
     render(<EventLog />);
-    expect(screen.getByText('Signed in with Google')).toBeInTheDocument();
-    expect(screen.getByText('IP 1.2.3.4')).toBeInTheDocument();
-    expect(screen.getAllByText('Sign-ins and sessions')).toHaveLength(2);
+    expect(screen.getAllByText('Signed in with Google').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('IP 1.2.3.4').length).toBeGreaterThan(0);
+    // Each event renders as a card (phones) and a table row (md+).
+    expect(screen.getAllByText('Sign-ins and sessions')).toHaveLength(4);
     expect(screen.getByText('Showing 1–2 of 2 events')).toBeInTheDocument();
   });
 
@@ -55,7 +58,12 @@ describe('EventLog', () => {
   });
 
   it('shows an error state', () => {
-    useAuditEvents.mockReturnValue({ events: [], count: 0, isLoading: false, error: new Error('x') });
+    useAuditEvents.mockReturnValue({
+      events: [],
+      count: 0,
+      isLoading: false,
+      error: new Error('x'),
+    });
     render(<EventLog />);
     expect(screen.getByText(/couldn.t be loaded/)).toBeInTheDocument();
   });
@@ -77,5 +85,38 @@ describe('EventLog', () => {
     render(<EventLog />);
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     expect(useAuditEvents).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1 }));
+  });
+
+  it('opens a detail sheet with the diff, IP, user agent and failure status', async () => {
+    const change = {
+      ...signIn,
+      id: 'aud_3',
+      description: 'Failed: Updated policy',
+      entityType: 'policy',
+      entityId: 'pol_1',
+      data: {
+        resource: 'policy',
+        outcome: 'failure',
+        statusCode: 403,
+        ipAddress: '5.6.7.8',
+        userAgent: 'Mozilla/5.0 (Mac)',
+        entityName: 'Access Control Policy',
+        changes: { status: { previous: 'draft', current: 'published' } },
+      },
+    };
+    useAuditEvents.mockReturnValue({ events: [change], count: 1, isLoading: false });
+    render(<EventLog />);
+    fireEvent.click(screen.getByRole('row', { name: /Open event: Failed: Updated policy/ }));
+    expect(await screen.findByText('Mozilla/5.0 (Mac)')).toBeInTheDocument();
+    expect(screen.getByText('Failed (403)')).toBeInTheDocument();
+    expect(screen.getByText('draft')).toBeInTheDocument();
+    expect(screen.getByText('published')).toBeInTheDocument();
+  });
+
+  it('labels the date range filters', () => {
+    useAuditEvents.mockReturnValue({ events: [], count: 0, isLoading: false });
+    render(<EventLog />);
+    expect(screen.getByText('From')).toBeInTheDocument();
+    expect(screen.getByText('To')).toBeInTheDocument();
   });
 });

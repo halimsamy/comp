@@ -42,6 +42,24 @@ export const GET_ORGANIZATION_RESPONSES: Record<string, ApiResponseOptions> = {
               description: 'Organization website URL',
               example: 'https://acme-corp.com',
             },
+            legalName: {
+              type: 'string',
+              nullable: true,
+              description: 'Registered legal name of the company',
+              example: 'Acme Corp Ltd',
+            },
+            registeredAddress: {
+              type: 'string',
+              nullable: true,
+              description: 'Registered office address',
+              example: '1 Main St, London EC1A 1AA, UK',
+            },
+            phone: {
+              type: 'string',
+              nullable: true,
+              description: 'Company phone number',
+              example: '+44 20 7946 0000',
+            },
             onboardingCompleted: {
               type: 'boolean',
               description: 'Whether onboarding is completed',

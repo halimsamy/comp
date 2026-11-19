@@ -29,6 +29,21 @@ export const NOTIFICATION_TYPES = [
     label: 'Finding Updates',
     description: 'When audit findings are created or updated',
   },
+  {
+    key: 'complianceDigest' as const,
+    label: 'Compliance Digest',
+    description: 'Summary of what needs attention across the program',
+  },
+  {
+    key: 'ownershipAssignments' as const,
+    label: 'Ownership',
+    description: 'When a user is made owner of a risk, vendor, asset or control',
+  },
+  {
+    key: 'slaAlerts' as const,
+    label: 'SLA Alerts',
+    description: 'When vulnerabilities, reviews or requests near or pass their deadline',
+  },
 ] as const;
 
 export type NotificationKey = (typeof NOTIFICATION_TYPES)[number]['key'];

@@ -1,2 +1,24 @@
 @import 'tailwindcss';
 @config '../../tailwind.config.ts';
+
+/* Below sm, the PageHeader title row stacks: the title wraps instead of being
+   truncated next to the actions, and the actions wrap onto their own line. */
+@media (max-width: 639.98px) {
+  [data-slot='page-header'] > div.justify-between {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  [data-slot='page-header'] > div.justify-between > div.truncate {
+    width: 100%;
+    white-space: normal;
+    overflow: visible;
+    overflow-wrap: anywhere;
+  }
+  [data-slot='page-header'] > div.justify-between > div.shrink-0 {
+    max-width: 100%;
+  }
+  [data-slot='page-header-actions'] {
+    flex-wrap: wrap;
+  }
+}

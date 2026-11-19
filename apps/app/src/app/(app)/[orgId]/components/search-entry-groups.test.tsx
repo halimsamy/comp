@@ -26,6 +26,14 @@ describe('searchEntryHref', () => {
     );
     expect(href(entry({ type: 'isms_document', id: 'not_a_type' }))).toBeNull();
     expect(href(entry({ type: 'requirement', id: 'req_1' }))).toBeNull();
+    expect(href(entry({ type: 'audit', id: 'aud_1' }))).toBe('/org_1/audits/aud_1');
+    expect(href(entry({ type: 'questionnaire', id: 'qst_1' }))).toBe('/org_1/questionnaire/qst_1');
+    expect(href(entry({ type: 'access_review', id: 'arv_1' }))).toBe(
+      '/org_1/people/access/reviews/arv_1',
+    );
+    expect(href(entry({ type: 'asset', id: 'ast_1' }))).toBe('/org_1/assets');
+    expect(href(entry({ type: 'vulnerability', id: 'ipf_1' }))).toBe('/org_1/vulnerabilities');
+    expect(href(entry({ type: 'finding', id: 'fnd_1' }))).toBe('/org_1/audits?tab=findings&open=fnd_1');
   });
 });
 
@@ -53,16 +61,12 @@ describe('buildSearchEntryGroups', () => {
     expect(push).toHaveBeenCalledWith('/org_1/vendors/vnd_1');
   });
 
-  it('adds ISMS overview and SoA shortcuts when the org has ISMS documents', () => {
+  it('lists ISMS documents without duplicating the ISMS and SoA pages from the nav registry', () => {
     const groups = buildSearchEntryGroups({
       organizationId: 'org_1',
       push: vi.fn(),
       entries: [entry({ type: 'isms_document', id: 'monitoring', label: 'Monitoring' })],
     });
-    expect(groups[0].items.map((i) => i.label)).toEqual([
-      'ISMS overview',
-      'Statement of Applicability',
-      'Monitoring',
-    ]);
+    expect(groups[0].items.map((i) => i.label)).toEqual(['Monitoring']);
   });
 });

@@ -1,6 +1,9 @@
+import type { Metadata } from 'next';
 import { serverApi } from '@/lib/api-server';
 import { PageHeader, PageLayout, Stack } from '@trycompai/design-system';
 import { PlatformIntegrations } from './components/PlatformIntegrations';
+
+export const metadata: Metadata = { title: 'Integrations' };
 
 interface TaskApiResponse {
   data: Array<{

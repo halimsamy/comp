@@ -30,6 +30,21 @@ export const UPDATE_ORGANIZATION_BODY: ApiBodyOptions = {
         description: 'Organization website URL',
         example: 'https://acme-corp.com',
       },
+      legalName: {
+        type: 'string',
+        description: 'Registered legal name of the company',
+        example: 'Acme Corp Ltd',
+      },
+      registeredAddress: {
+        type: 'string',
+        description: 'Registered office address',
+        example: '1 Main St, London EC1A 1AA, UK',
+      },
+      phone: {
+        type: 'string',
+        description: 'Company phone number',
+        example: '+44 20 7946 0000',
+      },
       onboardingCompleted: {
         type: 'boolean',
         description: 'Whether onboarding is completed',

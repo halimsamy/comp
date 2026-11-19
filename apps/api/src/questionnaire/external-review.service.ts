@@ -107,23 +107,28 @@ export class ExternalQuestionnaireReviewService {
       zip.addFile(file.filename, file.fileBuffer);
     }
 
-    await triggerEmail({
-      to: questionnaire.requesterEmail,
-      subject: `${questionnaire.organization.name}: your security questionnaire answers`,
-      trustPortal: true,
-      react: QuestionnaireReviewEmail({
-        preview: 'Your questionnaire answers are attached',
-        heading: 'Your questionnaire answers',
-        message: `${questionnaire.organization.name} reviewed the answers to your security questionnaire. They are attached as PDF, CSV and XLSX.`,
-      }),
-      attachments: [
-        {
-          filename: `${baseName}-answers.zip`,
-          content: zip.toBuffer(),
-          contentType: 'application/zip',
-        },
-      ],
-    });
+    // Send first: the questionnaire is only marked approved once the email is on its way.
+    try {
+      await triggerEmail({
+        to: questionnaire.requesterEmail,
+        subject: `${questionnaire.organization.name}: your security questionnaire answers`,
+        trustPortal: true,
+        react: QuestionnaireReviewEmail({
+          preview: 'Your questionnaire answers are attached',
+          heading: 'Your questionnaire answers',
+          message: `${questionnaire.organization.name} reviewed the answers to your security questionnaire. They are attached as PDF, CSV and XLSX.`,
+        }),
+        attachments: [
+          {
+            filename: `${baseName}-answers.zip`,
+            content: zip.toBuffer(),
+            contentType: 'application/zip',
+          },
+        ],
+      });
+    } catch {
+      throw new BadRequestException('Email could not be sent, try again');
+    }
 
     return db.questionnaire.update({
       where: { id: questionnaireId },

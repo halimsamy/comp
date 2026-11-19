@@ -1,15 +1,20 @@
 import type { SearchEntry, SearchEntryType } from '@/hooks/use-search-index';
 import type { CommandSearchGroup } from '@trycompai/design-system';
 import {
+  Badge,
   Book,
   Catalog,
+  DataBase,
+  Document,
   ListChecked,
   Policy,
   Rule,
   ShoppingBag,
-  Table,
+  TaskComplete,
   User,
+  UserAccess,
   Warning,
+  WarningAlt,
 } from '@trycompai/design-system/icons';
 import type { ReactNode } from 'react';
 import {
@@ -27,6 +32,12 @@ const GROUPS: Array<{ type: SearchEntryType; label: string; icon: ReactNode }> =
   { type: 'risk', label: 'Risks', icon: <Warning size={16} /> },
   { type: 'vendor', label: 'Vendors', icon: <ShoppingBag size={16} /> },
   { type: 'person', label: 'People', icon: <User size={16} /> },
+  { type: 'asset', label: 'Assets', icon: <DataBase size={16} /> },
+  { type: 'vulnerability', label: 'Vulnerabilities', icon: <Badge size={16} /> },
+  { type: 'finding', label: 'Findings', icon: <WarningAlt size={16} /> },
+  { type: 'audit', label: 'Audits', icon: <TaskComplete size={16} /> },
+  { type: 'questionnaire', label: 'Questionnaires', icon: <Document size={16} /> },
+  { type: 'access_review', label: 'Access reviews', icon: <UserAccess size={16} /> },
 ];
 
 const isIsmsType = (value: string): value is IsmsDocumentType =>
@@ -60,11 +71,25 @@ export function searchEntryHref({
       return `${base}/people/${entry.id}`;
     case 'isms_document':
       return isIsmsType(entry.id) ? `${base}/documents/isms/${ismsTypeToSlug(entry.id)}` : null;
+    // No detail pages yet: open the list.
+    case 'asset':
+      return `${base}/assets`;
+    case 'vulnerability':
+      return `${base}/vulnerabilities`;
+    case 'finding':
+      return `${base}/audits?tab=findings&open=${entry.id}`;
+    case 'audit':
+      return `${base}/audits/${entry.id}`;
+    case 'questionnaire':
+      return `${base}/questionnaire/${entry.id}`;
+    case 'access_review':
+      return `${base}/people/access/reviews/${entry.id}`;
   }
 }
 
 /**
- * Command palette groups for the org's objects. cmdk filters them client-side.
+ * Command palette groups for the org's objects (the ISMS index and SoA pages come from the nav registry).
+ * cmdk filters them client-side with paletteScore.
  * shortcut: cmdk keys items by label, so two objects with the same label share a highlight; add a suffix if that bites.
  */
 export function buildSearchEntryGroups({
@@ -76,8 +101,6 @@ export function buildSearchEntryGroups({
   organizationId: string;
   push: (href: string) => void;
 }): CommandSearchGroup[] {
-  const hasIsms = entries.some((entry) => entry.type === 'isms_document');
-
   return GROUPS.map(({ type, label, icon }) => {
     const items = entries.flatMap((entry) => {
       if (entry.type !== type) return [];
@@ -93,25 +116,6 @@ export function buildSearchEntryGroups({
         },
       ];
     });
-    // ISMS documents only exist for ISO 27001 orgs, so they also tell us to offer the SoA.
-    if (type === 'isms_document' && hasIsms) {
-      items.unshift(
-        {
-          id: 'isms:overview',
-          label: 'ISMS overview',
-          icon,
-          keywords: ['iso 27001', 'clauses 4-10'],
-          onSelect: () => push(`/${organizationId}/documents?tab=iso-27001`),
-        },
-        {
-          id: 'isms:soa',
-          label: 'Statement of Applicability',
-          icon: <Table size={16} />,
-          keywords: ['soa', 'annex a', '6.1.3'],
-          onSelect: () => push(`/${organizationId}/documents/statement-of-applicability`),
-        },
-      );
-    }
     return { id: `objects-${type}`, label, items };
   }).filter((group) => group.items.length > 0);
 }

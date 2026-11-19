@@ -1,3 +1,9 @@
+import {
+  assetsScopedSpec,
+  controlOwnersSpec,
+  idleTimeoutSpec,
+  vendorsClassifiedSpec,
+} from './checklist-items-extra';
 import type { ChecklistState } from './checklist-types';
 
 export interface ChecklistItemSpec {
@@ -16,6 +22,9 @@ export interface ChecklistItemSpec {
 }
 
 const ratio = (done: number, total: number) => ({ done, total });
+/** Opens the integrations catalogue filtered to one provider category. */
+const integrations = (category: string) =>
+  `/integrations?category=${encodeURIComponent(category)}`;
 
 export function buildItemSpecs(s: ChecklistState): ChecklistItemSpec[] {
   const has = (category: string) => s.connectedCategories.includes(category);
@@ -42,6 +51,8 @@ export function buildItemSpecs(s: ChecklistState): ChecklistItemSpec[] {
       references: [],
       done: s.hasLogo && s.hasWebsite,
     },
+    idleTimeoutSpec(s),
+    controlOwnersSpec(s),
     ...(s.hasIso27001
       ? [
           {
@@ -63,7 +74,7 @@ export function buildItemSpecs(s: ChecklistState): ChecklistItemSpec[] {
       title: 'Connect your identity provider or HR system',
       description:
         'Syncs your people, detects joiners and leavers, and checks MFA and access automatically.',
-      href: '/integrations',
+      href: integrations('Identity & Access'),
       ctaLabel: 'Connect',
       references: ['ISO 27001 A.5.16', 'ISO 27001 A.5.18', 'PCI DSS 8.2.1'],
       done: has('Identity & Access') || has('HR & People'),
@@ -74,7 +85,7 @@ export function buildItemSpecs(s: ChecklistState): ChecklistItemSpec[] {
       title: 'Connect your cloud provider',
       description:
         'Runs configuration tests against AWS, GCP or Azure and feeds the results into your evidence tasks.',
-      href: '/integrations',
+      href: integrations('Cloud'),
       ctaLabel: 'Connect',
       references: ['ISO 27001 A.8.9', 'PCI DSS 2.2.1'],
       done: has('Cloud') || s.hasLegacyCloudIntegration,
@@ -85,7 +96,7 @@ export function buildItemSpecs(s: ChecklistState): ChecklistItemSpec[] {
       title: 'Connect version control',
       description:
         'Checks branch protection and code review on your repositories.',
-      href: '/integrations',
+      href: integrations('Development'),
       ctaLabel: 'Connect',
       references: ['ISO 27001 A.8.28', 'PCI DSS 6.2.3'],
       done: has('Development'),
@@ -112,7 +123,7 @@ export function buildItemSpecs(s: ChecklistState): ChecklistItemSpec[] {
       title: 'Get employees to accept policies',
       description:
         'Employees accept published policies in the portal. PCI DSS asks for this at least every 12 months.',
-      href: '/people/all',
+      href: '/people',
       ctaLabel: 'View people',
       references: ['ISO 27001 7.3', 'PCI DSS 12.6.3'],
       done:
@@ -158,6 +169,7 @@ export function buildItemSpecs(s: ChecklistState): ChecklistItemSpec[] {
           },
         ]
       : []),
+    ...(s.hasIso27001 || s.hasPciDss ? [assetsScopedSpec(s)] : []),
     ...(s.hasPciDss && s.pciScopeTask
       ? [
           {
@@ -179,7 +191,7 @@ export function buildItemSpecs(s: ChecklistState): ChecklistItemSpec[] {
       title: 'Invite your team',
       description:
         'Add teammates (or connect your identity provider) so everyone gets policies and training.',
-      href: '/people/all',
+      href: '/people',
       ctaLabel: 'Invite people',
       references: ['ISO 27001 5.3'],
       done: s.activeMembers > 1,
@@ -220,6 +232,7 @@ export function buildItemSpecs(s: ChecklistState): ChecklistItemSpec[] {
         s.risks.total === 0 ? 'Add risks to your register first.' : null,
       progress: ratio(s.risks.withAcceptance, s.risks.total),
     },
+    vendorsClassifiedSpec(s),
     {
       id: 'vendors_assessed',
       section: 'risk',
@@ -246,7 +259,10 @@ export function buildItemSpecs(s: ChecklistState): ChecklistItemSpec[] {
       id: 'evidence_tasks',
       section: 'audit',
       title: 'Complete your evidence tasks',
-      description: 'Connect checks or upload evidence for each task.',
+      description:
+        s.tasks.notRelevant > 0
+          ? `Connect checks or upload evidence for each task. ${s.tasks.notRelevant} marked not relevant are left out.`
+          : 'Connect checks or upload evidence for each task.',
       href: '/tasks',
       ctaLabel: 'Go to evidence',
       references: [],
@@ -258,17 +274,11 @@ export function buildItemSpecs(s: ChecklistState): ChecklistItemSpec[] {
       section: 'audit',
       title: 'Invite your auditor',
       description:
-        'Give your auditor read-only access to review evidence in the Auditor View.',
-      href: '/people/all',
-      ctaLabel: 'Invite auditor',
+        'Create the audit and invite your auditor: they get read-only access to its requirements and evidence.',
+      href: '/audits',
+      ctaLabel: 'Go to audits',
       references: [],
       done: s.auditorInvited,
-      dependsOn: [
-        'policies_published',
-        ...(s.hasIso27001
-          ? ['isms_documents', 'statement_of_applicability']
-          : []),
-      ],
     },
   ];
   return specs;

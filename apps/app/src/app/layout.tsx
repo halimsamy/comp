@@ -1,4 +1,5 @@
 import '@trycompai/design-system/globals.css';
+import '../styles/shell.css';
 
 import { env } from '@/env.mjs';
 import { auth } from '@/utils/auth';
@@ -10,7 +11,6 @@ import type { Metadata } from 'next';
 import localFont from 'next/font/local';
 import { headers } from 'next/headers';
 import { NuqsAdapter } from 'nuqs/adapters/next/app';
-import { Toaster } from 'sonner';
 import { Providers } from './providers';
 
 export const dynamic = 'force-dynamic';
@@ -96,9 +96,8 @@ export default async function Layout({ children }: { children: React.ReactNode }
       </head>
       <body className={cn(`${GeistMono.variable} ${font.variable}`, 'antialiased')}>
         <NuqsAdapter>
-          <Providers session={session}>{children}</Providers>
+          <Providers userId={session?.user?.id} userEmail={session?.user?.email}>{children}</Providers>
         </NuqsAdapter>
-        <Toaster richColors />
         <VercelAnalytics />
       </body>
     </html>

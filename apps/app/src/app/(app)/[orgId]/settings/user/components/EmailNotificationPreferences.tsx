@@ -1,13 +1,6 @@
 'use client';
 
-import {
-  Button,
-  Checkbox,
-  HStack,
-  Section,
-  Stack,
-  Text,
-} from '@trycompai/design-system';
+import { Button, Checkbox, HStack, Section, Stack, Text } from '@trycompai/design-system';
 import { Locked } from '@trycompai/design-system/icons';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -21,7 +14,13 @@ interface EmailPreferences {
   unassignedItemsNotifications: boolean;
   taskMentions: boolean;
   taskAssignments: boolean;
+  complianceDigest: boolean;
+  ownershipAssignments: boolean;
+  slaAlerts: boolean;
 }
+
+// Keys added after users first saved preferences default to on.
+const NEW_KEY_DEFAULTS = { complianceDigest: true, ownershipAssignments: true, slaAlerts: true };
 
 interface RoleNotifications {
   policyNotifications: boolean;
@@ -30,10 +29,17 @@ interface RoleNotifications {
   taskMentions: boolean;
   weeklyTaskDigest: boolean;
   findingNotifications: boolean;
+  complianceDigest?: boolean;
+  ownershipAssignments?: boolean;
+  slaAlerts?: boolean;
 }
 
 interface Props {
-  initialPreferences: EmailPreferences & { digestFrequency?: DigestFrequency };
+  initialPreferences: Omit<EmailPreferences, keyof typeof NEW_KEY_DEFAULTS> &
+    Partial<EmailPreferences> & {
+      digestFrequency?: DigestFrequency;
+      complianceDigestFrequency?: DigestFrequency;
+    };
   email: string;
   isAdminOrOwner?: boolean;
   roleNotifications?: RoleNotifications | null;
@@ -49,8 +55,7 @@ const NOTIFICATION_ITEMS: {
     key: 'policyNotifications',
     roleKey: 'policyNotifications',
     label: 'Policy Notifications',
-    description:
-      'Receive emails when new policies are published or existing policies are updated',
+    description: 'Receive emails when new policies are published or existing policies are updated',
   },
   {
     key: 'taskReminders',
@@ -68,8 +73,7 @@ const NOTIFICATION_ITEMS: {
   {
     key: 'unassignedItemsNotifications',
     label: 'Unassigned Items Notifications',
-    description:
-      'Receive notifications when items need reassignment after a member is removed',
+    description: 'Receive notifications when items need reassignment after a member is removed',
   },
   {
     key: 'taskMentions',
@@ -83,6 +87,25 @@ const NOTIFICATION_ITEMS: {
     label: 'Task Assignments',
     description: 'Receive notifications when someone assigns a task to you',
   },
+  {
+    key: 'ownershipAssignments',
+    roleKey: 'ownershipAssignments',
+    label: 'Ownership',
+    description: 'Receive an email when you are made owner of a risk, vendor, asset or control',
+  },
+  {
+    key: 'slaAlerts',
+    roleKey: 'slaAlerts',
+    label: 'SLA Alerts',
+    description:
+      'Receive alerts when vulnerabilities, reviews or requests near or pass their deadline',
+  },
+  {
+    key: 'complianceDigest',
+    roleKey: 'complianceDigest',
+    label: 'Compliance Digest',
+    description: 'Receive a summary of what needs attention across the compliance program',
+  },
 ];
 
 export function EmailNotificationPreferences({
@@ -91,11 +114,21 @@ export function EmailNotificationPreferences({
   isAdminOrOwner = true,
   roleNotifications,
 }: Props) {
-  const { digestFrequency: initialFrequency, ...initialToggles } = initialPreferences;
+  const {
+    digestFrequency: initialFrequency,
+    complianceDigestFrequency: initialComplianceFrequency,
+    ...initialToggles
+  } = initialPreferences;
   const { savePreferences } = useEmailPreferences({ initialPreferences });
-  const [preferences, setPreferences] = useState<EmailPreferences>(initialToggles);
+  const [preferences, setPreferences] = useState<EmailPreferences>({
+    ...NEW_KEY_DEFAULTS,
+    ...initialToggles,
+  });
   const [digestFrequency, setDigestFrequency] = useState<DigestFrequency>(
     initialFrequency ?? 'weekly',
+  );
+  const [complianceFrequency, setComplianceFrequency] = useState<DigestFrequency>(
+    initialComplianceFrequency ?? 'weekly',
   );
   const [saving, setSaving] = useState(false);
 
@@ -108,20 +141,23 @@ export function EmailNotificationPreferences({
 
   const handleSelectAll = () => {
     const allEnabled = Object.values(preferences).every((v) => v === true);
-    setPreferences({
-      policyNotifications: !allEnabled,
-      taskReminders: !allEnabled,
-      weeklyTaskDigest: !allEnabled,
-      unassignedItemsNotifications: !allEnabled,
-      taskMentions: !allEnabled,
-      taskAssignments: !allEnabled,
+    setPreferences((prev) => {
+      const next = { ...prev };
+      for (const key of Object.keys(next) as Array<keyof EmailPreferences>) {
+        next[key] = !allEnabled;
+      }
+      return next;
     });
   };
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      await savePreferences({ ...preferences, digestFrequency });
+      await savePreferences({
+        ...preferences,
+        digestFrequency,
+        complianceDigestFrequency: complianceFrequency,
+      });
       toast.success('Email preferences updated successfully');
     } catch {
       toast.error('Failed to update preferences');
@@ -140,7 +176,7 @@ export function EmailNotificationPreferences({
   // Get effective checked state considering role settings
   const isChecked = (item: (typeof NOTIFICATION_ITEMS)[number]): boolean => {
     if (!isAdminOrOwner && roleNotifications && item.roleKey) {
-      return roleNotifications[item.roleKey];
+      return roleNotifications[item.roleKey] !== false;
     }
     return preferences[item.key];
   };
@@ -149,6 +185,11 @@ export function EmailNotificationPreferences({
     !isAdminOrOwner && roleNotifications
       ? roleNotifications.weeklyTaskDigest
       : preferences.weeklyTaskDigest;
+
+  const complianceDigestEnabled =
+    !isAdminOrOwner && roleNotifications
+      ? roleNotifications.complianceDigest !== false
+      : preferences.complianceDigest;
 
   const description = isAdminOrOwner
     ? `Manage which email notifications you receive at ${email}.`
@@ -176,9 +217,7 @@ export function EmailNotificationPreferences({
               </Text>
             </div>
             <Button onClick={handleSelectAll} variant="outline" size="sm">
-              {Object.values(preferences).every((v) => v === true)
-                ? 'Disable All'
-                : 'Enable All'}
+              {Object.values(preferences).every((v) => v === true) ? 'Disable All' : 'Enable All'}
             </Button>
           </HStack>
         )}
@@ -192,26 +231,18 @@ export function EmailNotificationPreferences({
               <label
                 key={item.key}
                 className={`flex items-start gap-4 rounded-lg border p-4 transition-colors ${
-                  locked
-                    ? 'opacity-60 cursor-default'
-                    : 'cursor-pointer hover:bg-muted/50'
+                  locked ? 'opacity-60 cursor-default' : 'cursor-pointer hover:bg-muted/50'
                 }`}
               >
                 <Checkbox
                   checked={checked}
-                  onCheckedChange={
-                    locked
-                      ? undefined
-                      : (c) => handleToggle(item.key, c === true)
-                  }
+                  onCheckedChange={locked ? undefined : (c) => handleToggle(item.key, c === true)}
                   disabled={locked}
                 />
                 <div className="flex-1 min-w-0">
                   <HStack align="center" gap="xs">
                     <Text weight="medium">{item.label}</Text>
-                    {locked && (
-                      <Locked size={14} />
-                    )}
+                    {locked && <Locked size={14} />}
                   </HStack>
                   <Text size="sm" variant="muted">
                     {item.description}
@@ -231,6 +262,13 @@ export function EmailNotificationPreferences({
           value={digestFrequency}
           onChange={setDigestFrequency}
           disabled={!digestEnabled}
+        />
+        <DigestFrequencySelect
+          label="Compliance digest frequency"
+          description="How often the compliance digest email is sent."
+          value={complianceFrequency}
+          onChange={setComplianceFrequency}
+          disabled={!complianceDigestEnabled}
         />
 
         <Text size="xs" variant="muted">

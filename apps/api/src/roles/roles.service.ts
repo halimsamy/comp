@@ -345,16 +345,21 @@ export class RolesService {
       return true;
     });
 
-    // Get member counts for custom roles
-    const memberCounts = await Promise.all(
-      customRoles.map(async (role) => {
-        const count = await db.member.count({
-          where: { organizationId, role: { contains: role.name } },
-        });
-        return { roleId: role.id, count };
-      }),
+    // Member counts per role name, from the comma-separated member.role
+    // (exact names, so "admin" never counts a "superadmin" custom role).
+    const members = await db.member.findMany({
+      where: { organizationId, deactivated: false },
+      select: { role: true },
+    });
+    const countByName = new Map<string, number>();
+    for (const m of members) {
+      for (const name of new Set(m.role.split(',').map((r) => r.trim()))) {
+        if (name) countByName.set(name, (countByName.get(name) ?? 0) + 1);
+      }
+    }
+    const countMap = new Map(
+      customRoles.map((r) => [r.id, countByName.get(r.name) ?? 0]),
     );
-    const countMap = new Map(memberCounts.map((mc) => [mc.roleId, mc.count]));
 
     // Include built-in roles info (with effective obligations: override or default)
     const builtInRoles = BUILT_IN_ROLES.map((name) => {
@@ -365,6 +370,7 @@ export class RolesService {
         isBuiltIn: true,
         description: this.getBuiltInRoleDescription(name),
         obligations: resolveEffectiveObligations(name, parsed),
+        memberCount: countByName.get(name) ?? 0,
       };
     });
 

@@ -6,6 +6,9 @@ const DEFAULT_PREFERENCES = {
   taskMentions: true,
   taskAssignments: true,
   findingNotifications: true,
+  complianceDigest: true,
+  ownershipAssignments: true,
+  slaAlerts: true,
 };
 
 export type EmailPreferenceType =
@@ -15,7 +18,10 @@ export type EmailPreferenceType =
   | 'unassignedItemsNotifications'
   | 'taskMentions'
   | 'taskAssignments'
-  | 'findingNotifications';
+  | 'findingNotifications'
+  | 'complianceDigest'
+  | 'ownershipAssignments'
+  | 'slaAlerts';
 
 // Maps EmailPreferenceType to RoleNotificationSetting field names
 const ROLE_SETTING_FIELDS: Partial<Record<EmailPreferenceType, string>> = {
@@ -25,6 +31,9 @@ const ROLE_SETTING_FIELDS: Partial<Record<EmailPreferenceType, string>> = {
   taskMentions: 'taskMentions',
   weeklyTaskDigest: 'weeklyTaskDigest',
   findingNotifications: 'findingNotifications',
+  complianceDigest: 'complianceDigest',
+  ownershipAssignments: 'ownershipAssignments',
+  slaAlerts: 'slaAlerts',
   // unassignedItemsNotifications has no role-level setting
 };
 
@@ -40,6 +49,9 @@ const PORTAL_ONLY_DEFAULTS: RoleNotificationRecord = {
   taskMentions: false,
   weeklyTaskDigest: false,
   findingNotifications: false,
+  complianceDigest: false,
+  ownershipAssignments: true,
+  slaAlerts: false,
 };
 
 export interface RoleNotificationRecord {
@@ -49,6 +61,10 @@ export interface RoleNotificationRecord {
   taskMentions: boolean;
   weeklyTaskDigest: boolean;
   findingNotifications: boolean;
+  // Optional for callers built before these columns existed; missing = on.
+  complianceDigest?: boolean;
+  ownershipAssignments?: boolean;
+  slaAlerts?: boolean;
 }
 
 /**
@@ -168,7 +184,7 @@ export async function getUnsubscribedEmails(
 
         if (matchingSettings.length > 0) {
           const enabledByRole = matchingSettings.some(
-            (s) => s[roleSettingField as keyof RoleNotificationRecord],
+            (s) => s[roleSettingField as keyof RoleNotificationRecord] !== false,
           );
           if (!enabledByRole) {
             // All roles say OFF — unsubscribed regardless of personal prefs
@@ -180,8 +196,7 @@ export async function getUnsubscribedEmails(
           // No DB records — use built-in defaults for portal-only roles
           const allPortalOnly = userRoles.every((r) => PORTAL_ONLY_ROLES.has(r));
           if (allPortalOnly) {
-            const enabled =
-              PORTAL_ONLY_DEFAULTS[roleSettingField as keyof RoleNotificationRecord];
+            const enabled = PORTAL_ONLY_DEFAULTS[roleSettingField as keyof RoleNotificationRecord];
             if (!enabled) {
               unsubscribed.add(user.email);
               continue;
@@ -294,12 +309,7 @@ export async function isUserUnsubscribed(
 
     // Check role-based notification settings if organizationId is provided
     const roleSettingField = ROLE_SETTING_FIELDS[preferenceType];
-    if (
-      organizationId &&
-      roleSettingField &&
-      db.member &&
-      db.roleNotificationSetting
-    ) {
+    if (organizationId && roleSettingField && db.member && db.roleNotificationSetting) {
       // Look up the user's roles in this organization
       const memberRecords = await db.member.findMany({
         where: {
@@ -312,22 +322,19 @@ export async function isUserUnsubscribed(
 
       if (memberRecords.length > 0) {
         // Roles can be comma-separated (e.g., "admin,auditor")
-        const userRoles = memberRecords.flatMap((m) =>
-          m.role.split(',').map((r) => r.trim()),
-        );
+        const userRoles = memberRecords.flatMap((m) => m.role.split(',').map((r) => r.trim()));
 
-        const roleSettings =
-          await db.roleNotificationSetting.findMany({
-            where: {
-              organizationId,
-              role: { in: userRoles },
-            },
-          });
+        const roleSettings = await db.roleNotificationSetting.findMany({
+          where: {
+            organizationId,
+            role: { in: userRoles },
+          },
+        });
 
         if (roleSettings.length > 0) {
           // Union: if ANY role enables this notification, it's ON
           const enabledByRole = roleSettings.some(
-            (s) => s[roleSettingField as keyof RoleNotificationRecord],
+            (s) => s[roleSettingField as keyof RoleNotificationRecord] !== false,
           );
 
           if (!enabledByRole) {
@@ -340,14 +347,9 @@ export async function isUserUnsubscribed(
           // even if their role matrix now enables the notification.
         } else {
           // No DB records — use built-in defaults for portal-only roles
-          const allPortalOnly = userRoles.every((r) =>
-            PORTAL_ONLY_ROLES.has(r),
-          );
+          const allPortalOnly = userRoles.every((r) => PORTAL_ONLY_ROLES.has(r));
           if (allPortalOnly) {
-            const enabled =
-              PORTAL_ONLY_DEFAULTS[
-                roleSettingField as keyof RoleNotificationRecord
-              ];
+            const enabled = PORTAL_ONLY_DEFAULTS[roleSettingField as keyof RoleNotificationRecord];
             if (!enabled) {
               return true;
             }

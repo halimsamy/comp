@@ -7,17 +7,15 @@ import {
 } from '@tanstack/react-query';
 import { AnalyticsProvider } from '@trycompai/analytics';
 import { Toaster } from '@trycompai/ui/sooner';
-import { Session, User } from 'better-auth';
 import { ThemeProvider } from 'next-themes';
 import type { ReactNode } from 'react';
 import SuperJSON from 'superjson';
 
 type ProviderProps = {
   children: ReactNode;
-  session: {
-    session: Session | null;
-    user: User | null;
-  } | null;
+  // Only identity for analytics: never serialize the full session (and its token) into client props.
+  userId?: string;
+  userEmail?: string;
 };
 
 let clientQueryClientSingleton: QueryClient | undefined = undefined;
@@ -59,7 +57,7 @@ export const createQueryClient = () =>
     },
   });
 
-export function Providers({ children, session }: ProviderProps) {
+export function Providers({ children, userId, userEmail }: ProviderProps) {
   const queryClient = getQueryClient();
 
   return (
@@ -70,10 +68,7 @@ export function Providers({ children, session }: ProviderProps) {
         disableTransitionOnChange
         scriptProps={{ 'data-cfasync': 'false' }}
       >
-        <AnalyticsProvider
-          userId={session?.user?.id ?? undefined}
-          userEmail={session?.user?.email ?? undefined}
-        >
+        <AnalyticsProvider userId={userId} userEmail={userEmail}>
           {children}
           <Toaster richColors />
         </AnalyticsProvider>

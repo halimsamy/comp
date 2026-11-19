@@ -28,6 +28,9 @@ export class OrganizationService {
           logo: true,
           metadata: true,
           website: true,
+          legalName: true,
+          registeredAddress: true,
+          phone: true,
           onboardingCompleted: true,
           hasAccess: true,
           fleetDmLabelId: true,
@@ -73,6 +76,9 @@ export class OrganizationService {
           logo: true,
           metadata: true,
           website: true,
+          legalName: true,
+          registeredAddress: true,
+          phone: true,
           onboardingCompleted: true,
           hasAccess: true,
           fleetDmLabelId: true,
@@ -106,6 +112,9 @@ export class OrganizationService {
         logo: updateData.logo,
         metadata: updateData.metadata,
         website: updateData.website,
+        legalName: optionalText(updateData.legalName),
+        registeredAddress: optionalText(updateData.registeredAddress),
+        phone: optionalText(updateData.phone),
         onboardingCompleted: updateData.onboardingCompleted,
         fleetDmLabelId: updateData.fleetDmLabelId,
         isFleetSetupCompleted: updateData.isFleetSetupCompleted,
@@ -129,6 +138,9 @@ export class OrganizationService {
           logo: true,
           metadata: true,
           website: true,
+          legalName: true,
+          registeredAddress: true,
+          phone: true,
           onboardingCompleted: true,
           hasAccess: true,
           fleetDmLabelId: true,
@@ -360,6 +372,9 @@ export class OrganizationService {
         taskMentions: true,
         weeklyTaskDigest: true,
         findingNotifications: true,
+        complianceDigest: true,
+        ownershipAssignments: true,
+        slaAlerts: true,
       },
       admin: {
         policyNotifications: true,
@@ -368,6 +383,9 @@ export class OrganizationService {
         taskMentions: true,
         weeklyTaskDigest: true,
         findingNotifications: true,
+        complianceDigest: true,
+        ownershipAssignments: true,
+        slaAlerts: true,
       },
       auditor: {
         policyNotifications: true,
@@ -376,6 +394,9 @@ export class OrganizationService {
         taskMentions: false,
         weeklyTaskDigest: false,
         findingNotifications: true,
+        complianceDigest: true,
+        ownershipAssignments: true,
+        slaAlerts: false,
       },
       employee: {
         policyNotifications: true,
@@ -384,6 +405,9 @@ export class OrganizationService {
         taskMentions: false,
         weeklyTaskDigest: false,
         findingNotifications: false,
+        complianceDigest: false,
+        ownershipAssignments: true,
+        slaAlerts: false,
       },
       contractor: {
         policyNotifications: true,
@@ -392,6 +416,9 @@ export class OrganizationService {
         taskMentions: false,
         weeklyTaskDigest: false,
         findingNotifications: false,
+        complianceDigest: false,
+        ownershipAssignments: true,
+        slaAlerts: false,
       },
     };
 
@@ -402,6 +429,9 @@ export class OrganizationService {
       taskMentions: true,
       weeklyTaskDigest: true,
       findingNotifications: true,
+      complianceDigest: true,
+      ownershipAssignments: true,
+      slaAlerts: true,
     };
 
     const [savedSettings, customRoles] = await Promise.all([
@@ -435,6 +465,9 @@ export class OrganizationService {
               taskMentions: saved.taskMentions,
               weeklyTaskDigest: saved.weeklyTaskDigest,
               findingNotifications: saved.findingNotifications,
+              complianceDigest: saved.complianceDigest,
+              ownershipAssignments: saved.ownershipAssignments,
+              slaAlerts: saved.slaAlerts,
             }
           : defaults,
       });
@@ -454,6 +487,9 @@ export class OrganizationService {
               taskMentions: saved.taskMentions,
               weeklyTaskDigest: saved.weeklyTaskDigest,
               findingNotifications: saved.findingNotifications,
+              complianceDigest: saved.complianceDigest,
+              ownershipAssignments: saved.ownershipAssignments,
+              slaAlerts: saved.slaAlerts,
             }
           : ALL_ON,
       });
@@ -536,6 +572,9 @@ export class OrganizationService {
       taskMentions: boolean;
       weeklyTaskDigest: boolean;
       findingNotifications: boolean;
+      complianceDigest?: boolean;
+      ownershipAssignments?: boolean;
+      slaAlerts?: boolean;
     }>,
   ) {
     try {
@@ -557,6 +596,9 @@ export class OrganizationService {
               taskMentions: setting.taskMentions,
               weeklyTaskDigest: setting.weeklyTaskDigest,
               findingNotifications: setting.findingNotifications,
+              complianceDigest: setting.complianceDigest,
+              ownershipAssignments: setting.ownershipAssignments,
+              slaAlerts: setting.slaAlerts,
             },
             update: {
               policyNotifications: setting.policyNotifications,
@@ -565,6 +607,9 @@ export class OrganizationService {
               taskMentions: setting.taskMentions,
               weeklyTaskDigest: setting.weeklyTaskDigest,
               findingNotifications: setting.findingNotifications,
+              complianceDigest: setting.complianceDigest,
+              ownershipAssignments: setting.ownershipAssignments,
+              slaAlerts: setting.slaAlerts,
             },
           }),
         ),
@@ -703,4 +748,10 @@ export class OrganizationService {
       throw error;
     }
   }
+}
+
+/** Unsent stays untouched; a blank string clears the column. */
+function optionalText(value: string | undefined): string | null | undefined {
+  if (value === undefined) return undefined;
+  return value.trim() || null;
 }

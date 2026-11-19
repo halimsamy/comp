@@ -1,23 +1,19 @@
 'use client';
 
 import { AnalyticsProvider } from '@trycompai/analytics';
-import { Session, User } from 'better-auth';
 import type { ReactNode } from 'react';
 
+// Only identity for analytics: the full session (incl. its token) must never be
+// serialized into client props.
 type ProviderProps = {
   children: ReactNode;
-  session: {
-    session: Session | null;
-    user: User | null;
-  } | null;
+  userId?: string;
+  userEmail?: string;
 };
 
-export function Providers({ children, session }: ProviderProps) {
+export function Providers({ children, userId, userEmail }: ProviderProps) {
   return (
-    <AnalyticsProvider
-      userId={session?.user?.id ?? undefined}
-      userEmail={session?.user?.email ?? undefined}
-    >
+    <AnalyticsProvider userId={userId} userEmail={userEmail}>
       {children}
     </AnalyticsProvider>
   );

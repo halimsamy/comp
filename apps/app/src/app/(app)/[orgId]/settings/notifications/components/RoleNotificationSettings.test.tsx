@@ -78,6 +78,9 @@ const sampleSettings: RoleNotificationConfig[] = [
       taskMentions: true,
       weeklyTaskDigest: false,
       findingNotifications: true,
+      complianceDigest: true,
+      ownershipAssignments: true,
+      slaAlerts: true,
     },
   },
   {
@@ -91,6 +94,9 @@ const sampleSettings: RoleNotificationConfig[] = [
       taskMentions: false,
       weeklyTaskDigest: false,
       findingNotifications: false,
+      complianceDigest: false,
+      ownershipAssignments: true,
+      slaAlerts: false,
     },
   },
 ];
@@ -153,5 +159,15 @@ describe('RoleNotificationSettings permission gating', () => {
 
     expect(screen.getByText('Admin')).toBeInTheDocument();
     expect(screen.getByText('Employee')).toBeInTheDocument();
+  });
+
+  it('shows the compliance digest, ownership and SLA alert columns', () => {
+    setMockPermissions(ADMIN_PERMISSIONS);
+    render(<RoleNotificationSettings initialSettings={sampleSettings} />);
+
+    expect(screen.getByText('Compliance Digest')).toBeInTheDocument();
+    expect(screen.getByText('Ownership')).toBeInTheDocument();
+    expect(screen.getByText('SLA Alerts')).toBeInTheDocument();
+    expect(screen.getAllByTestId('notification-checkbox')).toHaveLength(18);
   });
 });

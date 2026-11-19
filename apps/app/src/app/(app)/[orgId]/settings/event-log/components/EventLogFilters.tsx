@@ -39,13 +39,13 @@ export function EventLogFilters({
     EVENT_TYPE_OPTIONS.find((o) => o.value === (filters.resource ?? ALL))?.label ?? 'All events';
 
   return (
-    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_180px_180px_150px_150px]">
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_180px_180px_190px_190px]">
       <InputGroup>
         <InputGroupAddon>
           <Search size={16} />
         </InputGroupAddon>
         <InputGroupInput
-          placeholder="Search events"
+          placeholder="Search events, records or fields"
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
           aria-label="Search events"
@@ -82,20 +82,26 @@ export function EventLogFilters({
           ))}
         </SelectContent>
       </Select>
-      <Input
-        type="date"
-        aria-label="From date"
-        value={filters.from ?? ''}
-        max={filters.to}
-        onChange={(e) => onChange({ ...filters, from: e.target.value || undefined })}
-      />
-      <Input
-        type="date"
-        aria-label="To date"
-        value={filters.to ?? ''}
-        min={filters.from}
-        onChange={(e) => onChange({ ...filters, to: e.target.value || undefined })}
-      />
+      <label className="flex items-center gap-2 text-sm text-muted-foreground">
+        <span className="w-10 shrink-0">From</span>
+        <Input
+          type="date"
+          aria-label="From date"
+          value={filters.from ?? ''}
+          max={filters.to}
+          onChange={(e) => onChange({ ...filters, from: e.target.value || undefined })}
+        />
+      </label>
+      <label className="flex items-center gap-2 text-sm text-muted-foreground">
+        <span className="w-10 shrink-0">To</span>
+        <Input
+          type="date"
+          aria-label="To date"
+          value={filters.to ?? ''}
+          min={filters.from}
+          onChange={(e) => onChange({ ...filters, to: e.target.value || undefined })}
+        />
+      </label>
     </div>
   );
 }

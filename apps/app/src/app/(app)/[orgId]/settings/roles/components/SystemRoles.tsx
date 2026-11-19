@@ -14,8 +14,9 @@ import {
 import { ChevronRight } from '@trycompai/design-system/icons';
 import { useParams, useRouter } from 'next/navigation';
 import { SYSTEM_ROLES } from '../constants/system-roles';
+import { MemberCountLink } from './MemberCountLink';
 
-export function SystemRolesTable() {
+export function SystemRolesTable({ memberCounts = {} }: { memberCounts?: Record<string, number> }) {
   const router = useRouter();
   const { orgId } = useParams<{ orgId: string }>();
 
@@ -25,6 +26,7 @@ export function SystemRolesTable() {
         <TableRow>
           <TableHead>NAME</TableHead>
           <TableHead>DESCRIPTION</TableHead>
+          <TableHead>MEMBERS</TableHead>
           <TableHead style={{ width: 100 }} />
         </TableRow>
       </TableHeader>
@@ -54,6 +56,9 @@ export function SystemRolesTable() {
               <Text size="sm" variant="muted">
                 {role.description}
               </Text>
+            </TableCell>
+            <TableCell>
+              <MemberCountLink orgId={orgId} role={role.key} count={memberCounts[role.key] ?? 0} />
             </TableCell>
             <TableCell>
               <div className="flex justify-end">

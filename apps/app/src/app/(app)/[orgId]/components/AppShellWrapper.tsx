@@ -5,56 +5,42 @@ import Chat from '@/components/ai/chat';
 import { CheckoutCompleteDialog } from '@/components/dialogs/checkout-complete-dialog';
 import { NotificationBell } from '@/components/notifications/notification-bell';
 import { OrganizationSwitcher } from '@/components/organization-switcher';
+import { IdleSessionTimeout } from '@/components/session/IdleSessionTimeout';
 import { SidebarProvider, useSidebar } from '@/context/sidebar-context';
-import { canAccessCompliance, canAccessRoute, hasAnyPermission, type UserPermissions } from '@/lib/permissions';
-import { authClient } from '@/utils/auth-client';
-import { Badge, Globe, Locked, Logout, ManageProtection, Settings } from '@carbon/icons-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@trycompai/ui/dropdown-menu';
-import type { Onboarding, Organization } from '@db';
+import { canAccessRoute, type UserPermissions } from '@/lib/permissions';
 import type { OrganizationFromMe } from '@/types';
+import type { Onboarding, Organization } from '@db';
 import {
   AppShell,
+  AppShellAIChatTrigger,
   AppShellBody,
   AppShellContent,
   AppShellMain,
   AppShellNavbar,
-  AppShellRail,
-  AppShellAIChatTrigger,
   AppShellSidebar,
   AppShellSidebarHeader,
   AppShellUserMenu,
-  TooltipProvider,
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
   HStack,
   Logo,
-  Text,
-  ThemeSwitcher,
+  TooltipProvider,
 } from '@trycompai/design-system';
 import { useAction } from 'next-safe-action/hooks';
 import { useTheme } from 'next-themes';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AdminSidebar } from '../admin/components/AdminSidebar';
 import { ImpersonationBanner } from '../admin/components/ImpersonationBanner';
-import { SettingsSidebar } from '../settings/components/SettingsSidebar';
-import { IdleSessionTimeout } from '@/components/session/IdleSessionTimeout';
 import { SecuritySidebar } from '../security/components/SecuritySidebar';
+import { SettingsSidebar } from '../settings/components/SettingsSidebar';
 import { TrustSidebar } from '../trust/components/TrustSidebar';
-import { AppCommandSearch } from './AppCommandSearch';
 import { getAppShellSearchGroups } from './app-shell-search-groups';
+import { AppCommandSearch, AppSearchIconButton } from './AppCommandSearch';
+import { AppRail, type ShellSection } from './AppRail';
 import { AppSidebar } from './AppSidebar';
+import { AppUserMenu, MobileDrawerActions } from './AppUserMenu';
 import { ConditionalOnboardingTracker } from './ConditionalOnboardingTracker';
-import { ShellRailNavItem } from './ShellRailNavItem';
+import { useNavFeatures } from './use-nav-features';
 
 interface AppShellWrapperProps {
   children: React.ReactNode;
@@ -69,8 +55,6 @@ interface AppShellWrapperProps {
   isSecurityEnabled: boolean;
   hasAuditorRole: boolean;
   isOnlyAuditor: boolean;
-  /** CS-189: server-resolved Auditor View visibility — see resolveAuditorViewAccess. */
-  canAccessAuditorView: boolean;
   permissions: UserPermissions;
   user: {
     name: string | null;
@@ -100,14 +84,12 @@ function AppShellWrapperContent({
   isTrustNdaEnabled,
   isWebAutomationsEnabled,
   isSecurityEnabled,
-  hasAuditorRole,
   isOnlyAuditor,
-  canAccessAuditorView,
   permissions,
   user,
   isAdmin,
 }: AppShellWrapperContentProps) {
-  const { theme, resolvedTheme, setTheme } = useTheme();
+  const { resolvedTheme } = useTheme();
   const pathname = usePathname();
   const router = useRouter();
   const { isCollapsed, setIsCollapsed } = useSidebar();
@@ -116,15 +98,27 @@ function AppShellWrapperContent({
   const isTrustActive = pathname?.startsWith(`/${organization.id}/trust`);
   const isSecurityActive = pathname?.startsWith(`/${organization.id}/security`);
   const isAdminActive = pathname?.startsWith(`/${organization.id}/admin`);
+  const sectionTitle: ShellSection = isAdminActive
+    ? 'Admin'
+    : isSettingsActive
+      ? 'Settings'
+      : isTrustActive
+        ? 'Trust'
+        : isSecurityActive
+          ? 'Security'
+          : 'Compliance';
   const [logoVariant, setLogoVariant] = useState<'dark' | 'light'>('dark');
 
   useEffect(() => {
-    if (!resolvedTheme) {
-      return;
-    }
-
+    if (!resolvedTheme) return;
     setLogoVariant(resolvedTheme === 'light' ? 'dark' : 'light');
   }, [resolvedTheme]);
+
+  // #141: on tablets the secondary sidebar starts collapsed (not persisted) to leave room for content.
+  useEffect(() => {
+    if (window.matchMedia('(min-width: 768px) and (max-width: 1023.98px)').matches)
+      setIsCollapsed(true);
+  }, [setIsCollapsed]);
 
   const { execute } = useAction(updateSidebarState, {
     onError: () => {
@@ -142,18 +136,36 @@ function AppShellWrapperContent({
     [execute, isCollapsed, setIsCollapsed],
   );
 
-  const searchGroups = getAppShellSearchGroups({
+  const navFeatures = useNavFeatures({
     organizationId: organization.id,
-    router,
     permissions,
-    hasAuditorRole,
-    isOnlyAuditor,
-    canAccessAuditorView,
     isQuestionnaireEnabled,
     isTrustNdaEnabled,
     isSecurityEnabled,
-    isAdvancedModeEnabled: organization.advancedModeEnabled,
   });
+  const canSeeSettings = !isOnlyAuditor && canAccessRoute(permissions, 'settings');
+
+  const searchGroups = useMemo(
+    () =>
+      getAppShellSearchGroups({
+        organizationId: organization.id,
+        router,
+        permissions,
+        features: navFeatures,
+        isOnlyAuditor,
+        showBillingTab: isSecurityEnabled,
+        showBrowserTab: isWebAutomationsEnabled,
+      }),
+    [
+      organization.id,
+      router,
+      permissions,
+      navFeatures,
+      isOnlyAuditor,
+      isSecurityEnabled,
+      isWebAutomationsEnabled,
+    ],
+  );
 
   return (
     <TooltipProvider>
@@ -168,165 +180,69 @@ function AppShellWrapperContent({
           startContent={
             <HStack gap="xs" align="center">
               <Link href="/">
-                <Logo
-                  style={{ height: 22, width: 'auto' }}
-                  variant={logoVariant}
-                />
+                <Logo style={{ height: 22, width: 'auto' }} variant={logoVariant} />
               </Link>
               <span className="pl-3 pr-1 text-muted-foreground">/</span>
-              <OrganizationSwitcher
-                organizations={organizations}
-                organization={organization}
-                logoUrls={logoUrls}
-              />
+              {/* Below sm the switcher is clipped so the avatar stays on screen. */}
+              <div className="min-w-0 max-w-[38vw] overflow-hidden sm:max-w-none">
+                <OrganizationSwitcher
+                  organizations={organizations}
+                  organization={organization}
+                  logoUrls={logoUrls}
+                />
+              </div>
             </HStack>
           }
-          centerContent={<AppCommandSearch organizationId={organization.id} staticGroups={searchGroups} />}
+          centerContent={
+            <AppCommandSearch organizationId={organization.id} staticGroups={searchGroups} />
+          }
           endContent={
             <AppShellUserMenu>
+              <AppSearchIconButton />
               <AppShellAIChatTrigger />
               <NotificationBell />
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  id="app-shell-user-menu-trigger"
-                  className="inline-flex size-7 cursor-pointer items-center justify-center rounded-full transition-colors hover:bg-muted"
-                >
-                  <Avatar>
-                    {user.image && <AvatarImage src={user.image} />}
-                    <AvatarFallback>
-                      {user.name?.charAt(0)?.toUpperCase() || user.email?.charAt(0)?.toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  id="app-shell-user-menu-content"
-                  align="end"
-                  style={{ minWidth: '200px' }}
-                >
-                  <div className="px-2 py-1.5">
-                    <Text size="sm" weight="medium">
-                      {user.name}
-                    </Text>
-                    <Text size="xs" variant="muted">
-                      {user.email}
-                    </Text>
-                  </div>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuGroup>
-                    <Link href={`/${organization.id}/settings`}>
-                      <DropdownMenuItem>
-                        <Settings size={16} />
-                        Settings
-                      </DropdownMenuItem>
-                    </Link>
-                  </DropdownMenuGroup>
-                  <DropdownMenuSeparator />
-                  <div className="flex items-center justify-between px-2 py-1.5">
-                    <Text size="sm">Theme</Text>
-                    <ThemeSwitcher
-                      size="sm"
-                      value={(theme ?? 'system') as 'light' | 'dark' | 'system'}
-                      defaultValue="system"
-                      onChange={(value) => setTheme(value)}
-                      showSystem
-                    />
-                  </div>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={async () => {
-                      await authClient.signOut({
-                        fetchOptions: {
-                          onSuccess: () => {
-                            router.push('/auth');
-                          },
-                        },
-                      });
-                    }}
-                  >
-                    <Logout size={16} />
-                    Log out
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <AppUserMenu orgId={organization.id} user={user} />
             </AppShellUserMenu>
           }
         />
         <AppShellBody>
-          <AppShellRail>
-            {canAccessCompliance(permissions) && (
-              <ShellRailNavItem
-                href={`/${organization.id}/overview`}
-                isActive={!isSettingsActive && !isTrustActive && !isSecurityActive && !isAdminActive}
-                icon={<Badge className="size-5" />}
-                label="Compliance"
-              />
-            )}
-            {isTrustNdaEnabled && hasAnyPermission(permissions, [{ resource: 'trust', action: 'read' }]) && (
-              <ShellRailNavItem
-                href={`/${organization.id}/trust`}
-                isActive={isTrustActive}
-                icon={<Globe className="size-5" />}
-                label="Trust"
-              />
-            )}
-            {isSecurityEnabled && canAccessRoute(permissions, 'penetration-tests') ? (
-              <ShellRailNavItem
-                href={`/${organization.id}/security`}
-                isActive={isSecurityActive}
-                icon={<ManageProtection className="size-5" />}
-                label="Security"
-              />
-            ) : null}
-            {!isOnlyAuditor && canAccessRoute(permissions, 'settings') && (
-              <ShellRailNavItem
-                href={`/${organization.id}/settings`}
-                isActive={isSettingsActive}
-                icon={<Settings className="size-5" />}
-                label="Settings"
-              />
-            )}
-            {isAdmin && (
-              <ShellRailNavItem
-                href={`/${organization.id}/admin`}
-                isActive={!!isAdminActive}
-                icon={<Locked className="size-5" />}
-                label="Admin"
-              />
-            )}
-          </AppShellRail>
+          <AppRail
+            orgId={organization.id}
+            permissions={permissions}
+            section={sectionTitle}
+            showTrust={isTrustNdaEnabled}
+            showSecurity={isSecurityEnabled}
+            showSettings={canSeeSettings}
+            isAdmin={isAdmin}
+          />
           <AppShellMain>
             <AppShellSidebar collapsible>
-              <AppShellSidebarHeader
-                title={
-                  isAdminActive
-                    ? 'Admin'
-                    : isSettingsActive
-                      ? 'Settings'
-                      : isTrustActive
-                        ? 'Trust'
-                        : isSecurityActive
-                          ? 'Security'
-                          : 'Compliance'
-                }
-              />
+              <AppShellSidebarHeader title={sectionTitle} />
               {isAdminActive && isAdmin ? (
                 <AdminSidebar orgId={organization.id} />
               ) : isSettingsActive ? (
-                <SettingsSidebar orgId={organization.id} showBrowserTab={isWebAutomationsEnabled} showBillingTab={isSecurityEnabled} permissions={permissions} />
+                <SettingsSidebar
+                  orgId={organization.id}
+                  showBrowserTab={isWebAutomationsEnabled}
+                  showBillingTab={isSecurityEnabled}
+                  permissions={permissions}
+                />
               ) : isTrustActive ? (
                 <TrustSidebar orgId={organization.id} />
               ) : isSecurityActive && isSecurityEnabled ? (
                 <SecuritySidebar orgId={organization.id} />
               ) : (
                 <AppSidebar
-                  organization={organization}
-                  isQuestionnaireEnabled={isQuestionnaireEnabled}
-                  hasAuditorRole={hasAuditorRole}
-                  isOnlyAuditor={isOnlyAuditor}
+                  organizationId={organization.id}
                   permissions={permissions}
-                  canAccessAuditorView={canAccessAuditorView}
+                  features={navFeatures}
                 />
               )}
+              <MobileDrawerActions
+                orgId={organization.id}
+                user={user}
+                showSettings={canSeeSettings}
+              />
             </AppShellSidebar>
 
             <AppShellContent>

@@ -3,7 +3,7 @@
 import { cn } from '@trycompai/ui/cn';
 import { Skeleton } from '@trycompai/ui/skeleton';
 import { Table, TableBody, TableCell, TableRow } from '@trycompai/ui/table';
-import { DataTableHeader } from '../tables/risk-tasks/data-table-header';
+import { DataTableHeader } from './data-table-header';
 
 export function Loading({ isEmpty, amount }: { isEmpty: boolean; amount?: number }) {
   const data = [...Array(amount || 10)].map((_, i) => ({ id: i.toString() }));

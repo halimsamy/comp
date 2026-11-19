@@ -66,6 +66,27 @@ describe('OrganizationService.updateById', () => {
     expect(arg.data.website).toBe('https://acme.com');
   });
 
+  it('saves company details, trimming and clearing blanks', async () => {
+    await service.updateById('org_1', {
+      legalName: '  Spare Payments Ltd ',
+      registeredAddress: '',
+      phone: '+44 20 7946 0000',
+    });
+
+    const arg = mockedDb.organization.update.mock.calls[0][0];
+    expect(arg.data.legalName).toBe('Spare Payments Ltd');
+    expect(arg.data.registeredAddress).toBeNull();
+    expect(arg.data.phone).toBe('+44 20 7946 0000');
+    expect(arg.select).toMatchObject({ legalName: true, registeredAddress: true, phone: true });
+  });
+
+  it('leaves company details untouched when not sent', async () => {
+    await service.updateById('org_1', { name: 'X' });
+    const arg = mockedDb.organization.update.mock.calls[0][0];
+    expect(arg.data.legalName).toBeUndefined();
+    expect(arg.data.phone).toBeUndefined();
+  });
+
   it('persists the org-owned onboarding and portal toggles', async () => {
     await service.updateById('org_1', {
       evidenceApprovalEnabled: true,

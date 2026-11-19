@@ -3,7 +3,20 @@
 import { useApiSWR } from '@/hooks/use-api-swr';
 
 export type SearchEntryType =
-  'requirement' | 'control' | 'policy' | 'task' | 'risk' | 'vendor' | 'person' | 'isms_document';
+  | 'requirement'
+  | 'control'
+  | 'policy'
+  | 'task'
+  | 'risk'
+  | 'vendor'
+  | 'person'
+  | 'isms_document'
+  | 'asset'
+  | 'vulnerability'
+  | 'finding'
+  | 'audit'
+  | 'questionnaire'
+  | 'access_review';
 
 export interface SearchEntry {
   type: SearchEntryType;

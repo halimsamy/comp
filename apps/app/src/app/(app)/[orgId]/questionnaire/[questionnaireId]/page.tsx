@@ -50,6 +50,8 @@ export default async function QuestionnaireDetailPage({
         reviewStatus={questionnaire.reviewStatus}
         requesterEmail={questionnaire.requesterEmail}
         reviewedAt={questionnaire.reviewedAt}
+        answeredCount={questionnaire.questions.filter((q) => q.answer?.trim()).length}
+        totalCount={questionnaire.questions.length}
       />
       <QuestionnaireDetailClient
         questionnaireId={questionnaireId}

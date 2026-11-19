@@ -73,7 +73,7 @@ export const removeEmployeeRoleOrMember = authActionClient
             };
           }
 
-          revalidatePath(`/${organizationId}/people/all`);
+          revalidatePath(`/${organizationId}/people`);
           revalidateTag(`user_${currentUserId}`, 'max');
 
           return { success: true, data: { removed: true } };
@@ -92,7 +92,7 @@ export const removeEmployeeRoleOrMember = authActionClient
             };
           }
 
-          revalidatePath(`/${organizationId}/people/all`);
+          revalidatePath(`/${organizationId}/people`);
           revalidateTag(`user_${currentUserId}`, 'max');
 
           return {

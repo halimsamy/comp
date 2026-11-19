@@ -17,6 +17,9 @@ export function SignInMethodsCard({
   const [saving, setSaving] = useState(false);
   const allowed = settings.allowedSignInMethods;
   const restricted = allowed.length > 0;
+  // "Restricted" only once a method is actually blocked; every box ticked still allows everything.
+  const blocksAMethod =
+    restricted && settings.availableSignInMethods.some((m) => !allowed.includes(m.id));
 
   const save = async (next: string[]) => {
     setSaving(true);
@@ -48,7 +51,7 @@ export function SignInMethodsCard({
     <SettingsCard
       title="Allowed sign-in methods"
       description="Choose how members may sign in, for example only with your Google Workspace or Microsoft accounts. Members using another method are asked to sign in again."
-      hint={restricted ? <Badge variant="accent">Restricted</Badge> : 'All methods are allowed.'}
+      hint={blocksAMethod ? <Badge variant="accent">Restricted</Badge> : 'All methods are allowed.'}
     >
       <div className="flex flex-col gap-4">
         <div className="flex items-center justify-between gap-4">

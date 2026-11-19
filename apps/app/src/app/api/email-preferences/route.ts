@@ -1,70 +1,31 @@
-import { db } from "@db/server";
-import { verifyUnsubscribeToken } from "@/lib/unsubscribe";
-import { NextResponse } from "next/server";
-import { z } from "zod";
+import { env } from '@/env.mjs';
+import { NextResponse } from 'next/server';
 
-const updatePreferencesSchema = z.object({
-  email: z.string().email(),
-  token: z.string(),
-  preferences: z.object({
-    policyNotifications: z.boolean(),
-    taskReminders: z.boolean(),
-    weeklyTaskDigest: z.boolean(),
-    unassignedItemsNotifications: z.boolean(),
-    taskMentions: z.boolean(),
-    taskAssignments: z.boolean(),
-  }),
-});
-
+/**
+ * Unsubscribe page (no session): forwards the token-signed preference change to
+ * the API (`PATCH /v1/email/preferences`), which verifies the token and merges.
+ */
 export async function PUT(request: Request) {
+  const body = await request.text();
+  const baseUrl = env.NEXT_PUBLIC_API_URL || 'http://localhost:3333';
   try {
-    const body = await request.json();
-    const parsed = updatePreferencesSchema.safeParse(body);
-
-    if (!parsed.success) {
-      return NextResponse.json(
-        { success: false, error: "Invalid request body" },
-        { status: 400 },
-      );
-    }
-
-    const { email, token, preferences } = parsed.data;
-
-    if (!verifyUnsubscribeToken(email, token)) {
-      return NextResponse.json(
-        { success: false, error: "Invalid token" },
-        { status: 403 },
-      );
-    }
-
-    const user = await db.user.findUnique({
-      where: { email },
+    const response = await fetch(`${baseUrl}/v1/email/preferences`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body,
     });
-
-    if (!user) {
+    const data: unknown = await response.json().catch(() => null);
+    if (!response.ok) {
       return NextResponse.json(
-        { success: false, error: "User not found" },
-        { status: 404 },
+        { success: false, error: 'Could not update preferences' },
+        { status: response.status },
       );
     }
-
-    const allUnsubscribed = Object.values(preferences).every(
-      (v) => v === false,
-    );
-
-    await db.user.update({
-      where: { email },
-      data: {
-        emailPreferences: preferences,
-        emailNotificationsUnsubscribed: allUnsubscribed,
-      },
-    });
-
-    return NextResponse.json({ success: true, data: preferences });
+    return NextResponse.json({ success: true, data });
   } catch (error) {
-    console.error("Error updating unsubscribe preferences:", error);
+    console.error('Error updating unsubscribe preferences:', error);
     return NextResponse.json(
-      { success: false, error: "Failed to update preferences" },
+      { success: false, error: 'Failed to update preferences' },
       { status: 500 },
     );
   }

@@ -2,7 +2,20 @@
 
 import { usePermissions } from '@/hooks/use-permissions';
 import { apiClient } from '@/lib/api-client';
-import { Alert, AlertDescription, AlertTitle, Button } from '@trycompai/design-system';
+import {
+  Alert,
+  AlertDescription,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertTitle,
+  Button,
+} from '@trycompai/design-system';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -13,15 +26,20 @@ export function ExternalReviewBanner({
   reviewStatus,
   requesterEmail,
   reviewedAt,
+  answeredCount,
+  totalCount,
 }: {
   questionnaireId: string;
   reviewStatus: 'pending_review' | 'approved' | null | undefined;
   requesterEmail: string | null | undefined;
   reviewedAt: string | null | undefined;
+  answeredCount: number;
+  totalCount: number;
 }) {
   const router = useRouter();
   const { hasPermission } = usePermissions();
   const [approving, setApproving] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   if (!reviewStatus || !requesterEmail) return null;
 
@@ -39,7 +57,10 @@ export function ExternalReviewBanner({
     );
   }
 
+  const unanswered = totalCount - answeredCount;
+
   const handleApprove = async () => {
+    setConfirmOpen(false);
     setApproving(true);
     try {
       const res = await apiClient.post(`/v1/questionnaire/${questionnaireId}/approve-external`);
@@ -64,13 +85,31 @@ export function ExternalReviewBanner({
               answers. Check and edit them below, then approve to email them to the requester.
             </span>
             {hasPermission('questionnaire', 'update') && (
-              <Button loading={approving} onClick={handleApprove}>
+              <Button
+                loading={approving}
+                onClick={unanswered > 0 ? () => setConfirmOpen(true) : handleApprove}
+              >
                 Approve and send
               </Button>
             )}
           </div>
         </AlertDescription>
       </Alert>
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Send with unanswered questions?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {unanswered} of {totalCount} questions have no answer. {requesterEmail} will receive
+              them blank.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep reviewing</AlertDialogCancel>
+            <AlertDialogAction onClick={handleApprove}>Send anyway</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

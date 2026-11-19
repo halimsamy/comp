@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -37,7 +37,7 @@ import {
   TableHeader,
   TableRow,
 } from '@trycompai/design-system';
-import { InProgress, Search, SettingsAdjust } from '@trycompai/design-system/icons';
+import { Email, InProgress, Search, SettingsAdjust } from '@trycompai/design-system/icons';
 
 import { apiClient } from '@/lib/api-client';
 import { useMemo } from 'react';
@@ -47,6 +47,9 @@ import { buildDisplayItems, filterDisplayItems } from './filter-members';
 import { computeDeviceStatusMap } from './compute-device-status-map';
 import { MemberRow, type RequirementColumnKey } from './MemberRow';
 import { PeopleFilters } from './PeopleFilters';
+import { ComplianceFilters } from './ComplianceFilters';
+import { sendSecurityReminders } from './use-send-reminders';
+import { type ComplianceFilter, matchesCompliance, type MemberCompliance } from '../lib/people-compliance';
 import { PendingInvitationRow } from './PendingInvitationRow';
 import { TwoFactorSourceSelector } from './TwoFactorSourceSelector';
 import type {
@@ -73,6 +76,8 @@ interface TeamMembersClientProps {
   employeeSyncData: EmployeeSyncConnectionsData;
   taskCompletionMap: Record<string, TaskCompletion>;
   complianceMemberIds: string[];
+  /** #86: per-person compliance from /v1/people-lifecycle/compliance. */
+  complianceMap?: Record<string, MemberCompliance>;
   backgroundCheckStepEnabled: boolean;
   twoFactorStatusMap: Record<string, TwoFactorStatus>;
   /** Org-level tracking flags — column visibility never depends on member data. */
@@ -87,6 +92,7 @@ export function TeamMembersClient({
   employeeSyncData,
   taskCompletionMap,
   complianceMemberIds,
+  complianceMap = {},
   backgroundCheckStepEnabled,
   twoFactorStatusMap,
   requirementTracking,
@@ -107,6 +113,7 @@ export function TeamMembersClient({
     Array<{ key: RequirementColumnKey; label: string }>
   >(() => {
     const cols: Array<{ key: RequirementColumnKey; label: string }> = [];
+    if (Object.keys(complianceMap).length > 0) cols.push({ key: 'compliance', label: 'COMPLIANCE' });
     if (requirementTracking.policies) cols.push({ key: 'policies', label: 'POLICIES' });
     if (requirementTracking.training) cols.push({ key: 'training', label: 'TRAINING' });
     if (requirementTracking.hipaa) cols.push({ key: 'hipaa', label: 'HIPAA' });
@@ -116,11 +123,19 @@ export function TeamMembersClient({
     if (Object.keys(twoFactorStatusMap).length > 0)
       cols.push({ key: 'twoFactor', label: '2FA' });
     return cols;
-  }, [requirementTracking, complianceMemberIds, backgroundCheckStepEnabled, twoFactorStatusMap]);
+  }, [complianceMap, requirementTracking, complianceMemberIds, backgroundCheckStepEnabled, twoFactorStatusMap]);
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
-  const [roleFilter, setRoleFilter] = useState('');
+  // `?role=` deep link from Settings > Roles member counts.
+  const searchParams = useSearchParams();
+  const [roleFilter, setRoleFilter] = useState(() => searchParams?.get('role') ?? '');
   const [statusFilter, setStatusFilter] = useState('');
+  const [complianceFilter, setComplianceFilter] = useState<ComplianceFilter>('all');
+  const [departmentFilter, setDepartmentFilter] = useState('all');
+  const departments = useMemo(
+    () => [...new Set(data.members.map((m) => m.department).filter((d) => d && d !== 'none'))].sort(),
+    [data.members],
+  );
   const [onboardFrom, setOnboardFrom] = useState<Date | undefined>();
   const [onboardTo, setOnboardTo] = useState<Date | undefined>();
   const [offboardFrom, setOffboardFrom] = useState<Date | undefined>();
@@ -206,9 +221,12 @@ export function TeamMembersClient({
 
   const hasAnyDateFilter = !!(onboardFrom || onboardTo || offboardFrom || offboardTo);
 
+  const hasPeopleFilter = complianceFilter !== 'all' || departmentFilter !== 'all';
   const dateFilteredItems = filteredItems.filter((item) => {
-    if (item.type !== 'member') return !hasAnyDateFilter;
+    if (item.type !== 'member') return !hasAnyDateFilter && !hasPeopleFilter;
     const member = item as MemberWithUser;
+    if (departmentFilter !== 'all' && member.department !== departmentFilter) return false;
+    if (!matchesCompliance({ entry: complianceMap[member.id], filter: complianceFilter })) return false;
 
     if (onboardFrom || onboardTo) {
       if (!member.onboardDate) return false;
@@ -326,13 +344,15 @@ export function TeamMembersClient({
     }
   };
 
+  const handleSendReminder = (memberId: string) => sendSecurityReminders([memberId]);
+
   return (
     <Stack gap="4">
       {/* Search and Filters */}
       {/* Left = query (search, filters); right = view configuration (data
           sources) — the Linear/Stripe toolbar convention. */}
       <div className="flex items-center justify-between gap-4">
-        <div className="flex min-w-0 flex-1 items-center gap-3">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
         <div className="w-full md:max-w-[300px]">
           <InputGroup>
             <InputGroupAddon>
@@ -366,6 +386,22 @@ export function TeamMembersClient({
           onOffboardApply={(from, to) => { setOffboardFrom(from); setOffboardTo(to); setPage(1); }}
           onOffboardClear={() => { setOffboardFrom(undefined); setOffboardTo(undefined); setPage(1); }}
         />
+        {Object.keys(complianceMap).length > 0 && (
+          <ComplianceFilters
+            compliance={complianceFilter}
+            department={departmentFilter}
+            departments={departments}
+            onComplianceChange={(value) => { setComplianceFilter(value); setPage(1); }}
+            onDepartmentChange={(value) => { setDepartmentFilter(value); setPage(1); }}
+          />
+        )}
+        {canManageMembers && Object.keys(complianceMap).length > 0 && (
+          <div className="shrink-0">
+            <Button variant="outline" iconLeft={<Email size={16} />} onClick={() => void sendSecurityReminders()}>
+              Remind open tasks
+            </Button>
+          </div>
+        )}
         </div>
         {/* Source settings (sync / 2FA) — settings, not filters, so they get
             their own compact popover, symmetric with the Filters button. */}
@@ -615,6 +651,8 @@ export function TeamMembersClient({
                   backgroundCheckStepEnabled={backgroundCheckStepEnabled}
                   twoFactorStatus={twoFactorStatusMap[(item as MemberWithUser).id]}
                   requirementColumns={requirementColumns.map((c) => c.key)}
+                  compliance={complianceMap[(item as MemberWithUser).id]}
+                  onSendReminder={handleSendReminder}
                 />
               ) : (
                 <PendingInvitationRow

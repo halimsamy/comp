@@ -8,6 +8,10 @@ model Organization {
   onboarding                  Onboarding?
   requirementApplicability    RequirementApplicability[]
   website                     String?
+  // Company details for ISMS / SoA document headers and auditor exports.
+  legalName                   String?
+  registeredAddress           String?
+  phone                       String?
   onboardingCompleted         Boolean     @default(false)
   hasAccess                   Boolean     @default(false)
   // Internal (platform-operated) organization — e.g. Comp AI's own org.
@@ -143,10 +147,14 @@ model Organization {
   accessSystems                    AccessSystem[]
   accessAccountOwners              AccessAccountOwner[]
   accessReviews                    AccessReview[]
+  accessSystemRoles                AccessSystemRole[]
+  employeeReminderSetting          EmployeeReminderSetting?
   complianceSnapshots              ComplianceSnapshot[]
   auditEngagements                 AuditEngagement[]
   assets                           Asset[]
   vulnerabilities                  IntegrationPlatformFinding[]
+  vulnerabilityScans               VulnerabilityScan[]
+  vulnerabilitySlaPolicy           VulnerabilitySlaPolicy?
 
   @@index([slug])
 }

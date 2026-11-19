@@ -237,6 +237,9 @@ export class OrganizationController {
               taskMentions: { type: 'boolean' },
               weeklyTaskDigest: { type: 'boolean' },
               findingNotifications: { type: 'boolean' },
+              complianceDigest: { type: 'boolean' },
+              ownershipAssignments: { type: 'boolean' },
+              slaAlerts: { type: 'boolean' },
             },
           },
         },
@@ -255,6 +258,9 @@ export class OrganizationController {
         taskMentions: boolean;
         weeklyTaskDigest: boolean;
         findingNotifications: boolean;
+        complianceDigest?: boolean;
+        ownershipAssignments?: boolean;
+        slaAlerts?: boolean;
       }>;
     },
   ) {

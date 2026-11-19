@@ -96,7 +96,7 @@ export default async function Layout(props: { children: React.ReactNode }) {
       >
         <Suspense>
           <NuqsAdapter>
-            <Providers session={session}>
+            <Providers userId={session?.user?.id} userEmail={session?.user?.email}>
               <main>{children}</main>
             </Providers>
           </NuqsAdapter>

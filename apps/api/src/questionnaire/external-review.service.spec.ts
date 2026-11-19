@@ -83,6 +83,22 @@ describe('ExternalQuestionnaireReviewService', () => {
     );
   });
 
+  it('keeps the questionnaire pending when the email cannot be sent', async () => {
+    mockQuestionnaireFindFirst.mockResolvedValue({
+      filename: 'sig.xlsx',
+      reviewStatus: 'pending_review',
+      requesterEmail: 'buyer@x.com',
+      organization: { name: 'Spare' },
+      questions: [],
+    });
+    mockQuestionnaireUpdate.mockClear();
+    mockTriggerEmail.mockRejectedValueOnce(new Error('render failed'));
+    await expect(
+      service.approve({ organizationId: 'org_1', questionnaireId: 'qst_1', userId: 'usr_1' }),
+    ).rejects.toThrow('Email could not be sent, try again');
+    expect(mockQuestionnaireUpdate).not.toHaveBeenCalled();
+  });
+
   it('refuses questionnaires that are not waiting for review', async () => {
     mockQuestionnaireFindFirst.mockResolvedValue({
       filename: 'a',

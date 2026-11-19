@@ -1,4 +1,4 @@
-import { IsBoolean, IsInt, IsOptional, IsString } from 'class-validator';
+import { IsBoolean, IsInt, IsOptional, IsString, MaxLength } from 'class-validator';
 
 /**
  * Fields an organization member may update on their own organization.
@@ -29,6 +29,22 @@ export class UpdateOrganizationDto {
   @IsOptional()
   @IsString()
   website?: string;
+
+  /** Registered company name, for ISMS/SoA headers. Empty string clears it. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  legalName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  registeredAddress?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  phone?: string;
 
   @IsOptional()
   @IsBoolean()

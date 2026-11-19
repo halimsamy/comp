@@ -1,7 +1,10 @@
+import type { Metadata } from 'next';
 import { serverApi } from '@/lib/api-server';
 import { redirect } from 'next/navigation';
 import { TestsLayout } from './components/TestsLayout';
 import type { Finding, Provider } from './types';
+
+export const metadata: Metadata = { title: 'Cloud Tests' };
 
 export default async function CloudTestsPage({
   params,

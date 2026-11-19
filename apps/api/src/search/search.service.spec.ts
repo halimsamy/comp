@@ -8,6 +8,12 @@ const mockDb = {
   member: { findMany: jest.fn() },
   ismsDocument: { findMany: jest.fn() },
   organizationRole: { findMany: jest.fn() },
+  asset: { findMany: jest.fn().mockResolvedValue([]) },
+  integrationPlatformFinding: { findMany: jest.fn().mockResolvedValue([]) },
+  finding: { findMany: jest.fn().mockResolvedValue([]) },
+  auditEngagement: { findMany: jest.fn().mockResolvedValue([]) },
+  questionnaire: { findMany: jest.fn().mockResolvedValue([]) },
+  accessReview: { findMany: jest.fn().mockResolvedValue([]) },
 };
 jest.mock('@db', () => ({ db: mockDb }));
 jest.mock('../auth/auth.server', () => ({
@@ -31,17 +37,15 @@ jest.mock('@trycompai/auth', () => ({
   },
 }));
 jest.mock('../frameworks/frameworks-requirements.helper', () => ({
-  loadRequirementDefinitions: jest
-    .fn()
-    .mockResolvedValue([
-      {
-        id: 'req_1',
-        identifier: '8.3.6',
-        name: 'Passwords meet minimum complexity',
-        description:
-          'If passwords are used as authentication factors they meet the following minimum level of complexity: a minimum length of 12 characters...',
-      },
-    ]),
+  loadRequirementDefinitions: jest.fn().mockResolvedValue([
+    {
+      id: 'req_1',
+      identifier: '8.3.6',
+      name: 'Passwords meet minimum complexity',
+      description:
+        'If passwords are used as authentication factors they meet the following minimum level of complexity: a minimum length of 12 characters...',
+    },
+  ]),
 }));
 
 import { PERMISSIONS_KEY } from '../auth/permission.guard';

@@ -7,5 +7,5 @@ interface KnowledgeBasePageProps {
 // Redirect to main questionnaire page - Knowledge Base is now a tab
 export default async function KnowledgeBasePage({ params }: KnowledgeBasePageProps) {
   const { orgId } = await params;
-  redirect(`/${orgId}/questionnaire`);
+  redirect(`/${orgId}/questionnaire?tab=knowledge-base`);
 }

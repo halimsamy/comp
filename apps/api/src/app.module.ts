@@ -57,6 +57,7 @@ import { RolesModule } from './roles/roles.module';
 import { McpModule } from './mcp/mcp.module';
 import { McpDownloadModule } from './mcp-download/mcp-download.module';
 import { EmailModule } from './email/email.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { SecretsModule } from './secrets/secrets.module';
 import { SecurityPenetrationTestsModule } from './security-penetration-tests/security-penetration-tests.module';
 import { StripeModule } from './stripe/stripe.module';
@@ -138,6 +139,7 @@ import { JobRunsModule } from './job-runs/job-runs.module';
     SecuritySettingsModule,
     ControlsModule,
     EmailModule,
+    NotificationsModule,
     SecretsModule,
     SecurityPenetrationTestsModule,
     StripeModule,

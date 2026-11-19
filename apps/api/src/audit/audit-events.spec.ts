@@ -44,7 +44,10 @@ describe('audit events', () => {
       organizationId: 'org_1',
       userId: 'usr_2',
       data: { path: ['resource'], equals: 'auth' },
-      description: { contains: 'sign', mode: 'insensitive' },
+      OR: [
+        { description: { contains: 'sign', mode: 'insensitive' } },
+        { data: { path: ['searchText'], string_contains: 'sign' } },
+      ],
     });
     expect(where.timestamp).toEqual({
       gte: new Date('2026-01-01'),
@@ -84,6 +87,31 @@ describe('audit events', () => {
     expect(row).toContain('"2026-11-18T10:00:00.000Z"');
     expect(row).toContain('"1.2.3.4"');
     expect(row).not.toContain('"=cmd()');
+  });
+
+  it('adds outcome, user agent and a readable Changes column', () => {
+    const csv = auditEventsToCsv([
+      {
+        id: 'aud_2',
+        timestamp: new Date('2026-11-18T10:00:00Z'),
+        description: 'Failed: Updated policy',
+        entityType: 'policy',
+        entityId: 'pol_1',
+        data: {
+          resource: 'policy',
+          userAgent: 'Mozilla/5.0',
+          outcome: 'failure',
+          statusCode: 403,
+          changes: { status: { previous: 'draft', current: 'published' }, owner: { previous: null, current: 'Ann' } },
+        },
+        user: { name: 'Ann', email: 'ann@x.com' },
+      },
+    ]);
+    const [header, row] = csv.split('\n');
+    expect(header).toContain('"Changes"');
+    expect(row).toContain('"Mozilla/5.0"');
+    expect(row).toContain('"failure (403)"');
+    expect(row).toContain('status: draft → published; owner: — → Ann');
   });
 
   it('requires audit:read on both endpoints', () => {

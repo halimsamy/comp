@@ -30,6 +30,8 @@ export const QuestionnaireReviewEmail = ({
 }: Props) => (
   <Html>
     <Tailwind>
+      {/* Tailwind needs a <head> to inline its styles; without it render() throws. */}
+      <head />
       <Preview>{preview}</Preview>
       <Body className="mx-auto my-auto bg-[#fff] font-sans">
         <Container

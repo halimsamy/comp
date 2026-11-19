@@ -38,6 +38,7 @@ import {
   UploadTrustDocumentDto,
 } from './dto/trust-document.dto';
 import { isTrustPortalConfigured } from './is-trust-portal-configured';
+import { liveFrameworkStatus } from './trust-live-framework-status';
 
 interface VercelDomainVerification {
   type: string;
@@ -1678,12 +1679,17 @@ export class TrustPortalService {
       defaultOverviewContent = missionContext?.answer ?? null;
     }
 
-    const [trustDocumentCount, trustResourceCount, trustCustomLinkCount] =
-      await Promise.all([
-        db.trustDocument.count({ where: { organizationId } }),
-        db.trustResource.count({ where: { organizationId } }),
-        db.trustCustomLink.count({ where: { organizationId } }),
-      ]);
+    const [
+      trustDocumentCount,
+      trustResourceCount,
+      trustCustomLinkCount,
+      liveStatus,
+    ] = await Promise.all([
+      db.trustDocument.count({ where: { organizationId } }),
+      db.trustResource.count({ where: { organizationId } }),
+      db.trustCustomLink.count({ where: { organizationId } }),
+      liveFrameworkStatus(organizationId),
+    ]);
 
     const isConfigured = isTrustPortalConfigured({
       domain: trust.domain,
@@ -1751,6 +1757,8 @@ export class TrustPortalService {
       iso9001Status: trust.iso9001_status ?? 'started',
       pipedaStatus: trust.pipeda_status ?? 'started',
       ccpaStatus: trust.ccpa_status ?? 'started',
+      // Status derived from the org's frameworks and completed audits
+      liveFrameworkStatus: liveStatus,
       // Overview
       overviewTitle: trust.overviewTitle ?? null,
       overviewContent: trust.overviewContent ?? defaultOverviewContent,
@@ -1866,7 +1874,7 @@ export class TrustPortalService {
    */
   async getAllVendorsWithSync(organizationId: string) {
     const vendors = await db.vendor.findMany({
-      where: { organizationId },
+      where: { organizationId, archivedAt: null },
       orderBy: [{ trustPortalOrder: 'asc' }, { name: 'asc' }],
     });
 
@@ -1963,6 +1971,7 @@ export class TrustPortalService {
         organizationId,
         isSubProcessor: true,
         showOnTrustPortal: true,
+        archivedAt: null,
       },
       orderBy: [{ trustPortalOrder: 'asc' }, { name: 'asc' }],
       select: {

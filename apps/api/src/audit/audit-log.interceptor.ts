@@ -6,31 +6,15 @@ import {
   NestInterceptor,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { AuditLogEntityType, db, Prisma } from '@db';
 import { Observable, from, switchMap, tap } from 'rxjs';
 import { PERMISSIONS_KEY, RequiredPermission } from '../auth/permission.guard';
 import { AuthenticatedRequest } from '../auth/types';
 import { ActingUserResolver } from '../auth/acting-user.service';
 import { AUDIT_READ_KEY, SKIP_AUDIT_LOG_KEY } from './skip-audit-log.decorator';
-import {
-  MEMBER_REF_FIELDS,
-  MUTATION_METHODS,
-  REDACT_BODY_RESOURCES,
-  RESOURCE_TO_ENTITY_TYPE,
-} from './audit-log.constants';
-import {
-  type AuditContextOverride,
-  type ChangesRecord,
-  buildChanges,
-  buildDescription,
-  extractActionDescription,
-  extractCommentContext,
-  extractDownloadDescription,
-  extractEntityId,
-  extractFindingDescription,
-  extractPolicyActionDescription,
-  extractVersionDescription,
-} from './audit-log.utils';
+import { resolveAuditChanges } from './audit-log.changes';
+import { MEMBER_REF_FIELDS, MUTATION_METHODS } from './audit-log.constants';
+import { persistAuditLog } from './audit-log.persist';
+import { errorStatus, routeLabel } from './audit-log.request-meta';
 import {
   buildRelationMappingChanges,
   fetchCurrentValues,
@@ -107,14 +91,19 @@ export class AuditLogInterceptor implements NestInterceptor {
     };
     const action = METHOD_TO_ACTION[method] ?? actions[0];
 
-    if (resource === 'audit') {
+    // `audit` guards the event log itself; audits and the SoA reuse it but are real changes.
+    if (resource === 'audit' && !routeLabel(request.url)) {
       return next.handle();
     }
 
     const requestBody = (request as any).body as
-      | Record<string, unknown>
-      | undefined;
-    const entityId = (request as any).params?.id as string | undefined;
+      Record<string, unknown> | undefined;
+    // Org-level settings endpoints have no :id; their record is the organization.
+    const entityId =
+      ((request as any).params?.id as string | undefined) ??
+      (/\/v\d+\/security-settings(\?|$)/.test(request.url)
+        ? organizationId
+        : undefined);
     const isUpdate =
       (method === 'PATCH' || method === 'PUT') && requestBody && entityId;
 
@@ -171,137 +160,73 @@ export class AuditLogInterceptor implements NestInterceptor {
           });
 
     return from(Promise.all([safePreFlightPromise, actorPromise])).pipe(
-      switchMap(([{ previousValues, memberNames, relationMappingResult }, actor]) =>
-        next.handle().pipe(
-          tap({
-            next: (responseBody) => {
-              // No attributable user (e.g. an org with zero owner-role members).
-              // Skip logging rather than persist a null userId FK — mirrors the
-              // resolver's soft-failure contract.
-              if (!actor.userId) return;
+      switchMap(
+        ([{ previousValues, memberNames, relationMappingResult }, actor]) =>
+          next.handle().pipe(
+            tap({
+              next: (responseBody) => {
+                // No attributable user (e.g. an org with zero owner-role members).
+                // Skip logging rather than persist a null userId FK — mirrors the
+                // resolver's soft-failure contract.
+                if (!actor.userId) return;
 
-              const commentCtx = extractCommentContext(
-                request.url,
-                method,
-                requestBody,
-              );
+                const { changes, commentCtx, descriptionOverride } =
+                  resolveAuditChanges({
+                    request,
+                    method,
+                    resource,
+                    requestBody,
+                    responseBody,
+                    previousValues,
+                    memberNames,
+                    relationMappingResult,
+                  });
 
-              let changes: ChangesRecord | null;
-              const versionDesc = extractVersionDescription(
-                request.url,
-                method,
-                responseBody,
-                requestBody,
-              );
-              const actionDesc = extractActionDescription(request.url, method);
-              const downloadDesc = extractDownloadDescription(
-                request.url,
-                method,
-              );
-              const policyActionDesc = extractPolicyActionDescription(
-                request.url,
-                method,
-                requestBody,
-              );
-              const findingDesc = extractFindingDescription(
-                request.url,
-                method,
-                resource,
-                (request as { userRoles?: string[] }).userRoles,
-              );
-              let descriptionOverride: string | null =
-                actionDesc ??
-                versionDesc ??
-                downloadDesc ??
-                policyActionDesc ??
-                findingDesc;
-
-              const isAutomationUpdate =
-                policyActionDesc &&
-                /automations/.test(request.url) &&
-                method === 'PATCH';
-              const isAttachmentAction =
-                policyActionDesc && /attachments/.test(request.url);
-
-              if (
-                commentCtx ||
-                versionDesc ||
-                (policyActionDesc && !isAutomationUpdate && !isAttachmentAction)
-              ) {
-                // Comments and version operations don't produce meaningful diffs
-                // But preserve the comment/reason/changelog if provided in the request body
-                const note = requestBody?.comment || requestBody?.changelog;
-                const noteLabel = requestBody?.changelog
-                  ? 'changelog'
-                  : 'reason';
-                changes =
-                  note && typeof note === 'string'
-                    ? { [noteLabel]: { previous: null, current: note } }
-                    : null;
-              } else if (isAttachmentAction) {
-                // For attachments, show file details in the expandable section
-                // Upload: file info in request body. Delete: file info in response body.
-                const attachmentChanges: ChangesRecord = {};
-                const fileName =
-                  requestBody?.fileName ||
-                  (responseBody && typeof responseBody === 'object'
-                    ? (responseBody as Record<string, unknown>).fileName
-                    : null);
-                const fileType =
-                  requestBody?.fileType ||
-                  (responseBody && typeof responseBody === 'object'
-                    ? (responseBody as Record<string, unknown>).fileType
-                    : null);
-                if (fileName)
-                  attachmentChanges.file = {
-                    previous: null,
-                    current: fileName,
-                  };
-                if (fileType)
-                  attachmentChanges.type = {
-                    previous: null,
-                    current: fileType,
-                  };
-                changes =
-                  Object.keys(attachmentChanges).length > 0
-                    ? attachmentChanges
-                    : null;
-              } else if (relationMappingResult) {
-                changes = relationMappingResult.changes;
-                descriptionOverride ??= relationMappingResult.description;
-              } else if (REDACT_BODY_RESOURCES.has(resource)) {
-                // Credential resources (e.g. the secret manager) carry their
-                // secret in a generically-named field. Diffing the body would
-                // land plaintext in a store readable with only app:read, which
-                // bypasses <resource>:read. Record the action, not the payload.
-                changes = null;
-              } else {
-                changes = requestBody
-                  ? buildChanges(requestBody, previousValues, memberNames)
-                  : null;
-              }
-
-              void this.persist(
-                organizationId,
-                actor.userId,
-                actor.memberId,
-                method,
-                request.url,
-                resource,
-                action,
-                request,
-                responseBody,
-                changes,
-                commentCtx,
-                descriptionOverride,
-                impersonatedBy,
-                actor.callerLabel,
-              ).catch((err) => {
-                this.logger.error('Failed to create audit log entry', err);
-              });
-            },
-          }),
-        ),
+                void persistAuditLog({
+                  organizationId,
+                  userId: actor.userId,
+                  memberId: actor.memberId,
+                  method,
+                  path: request.url,
+                  resource,
+                  action,
+                  request,
+                  responseBody,
+                  changes,
+                  commentContext: commentCtx,
+                  descriptionOverride,
+                  impersonatedBy,
+                  callerLabel: actor.callerLabel,
+                }).catch((err) => {
+                  this.logger.error('Failed to create audit log entry', err);
+                });
+              },
+              // Rejected mutations are evidence too (PCI DSS 10.2.1.4 / 10.2.2: outcome of the
+              // action). tap re-emits the error, so the caller still gets it.
+              error: (err: unknown) => {
+                if (!actor.userId) return;
+                void persistAuditLog({
+                  organizationId,
+                  userId: actor.userId,
+                  memberId: actor.memberId,
+                  method,
+                  path: request.url,
+                  resource,
+                  action,
+                  request,
+                  responseBody: null,
+                  changes: null,
+                  commentContext: null,
+                  descriptionOverride: null,
+                  impersonatedBy,
+                  callerLabel: actor.callerLabel,
+                  failure: { statusCode: errorStatus(err) },
+                }).catch((e) => {
+                  this.logger.error('Failed to create audit log entry', e);
+                });
+              },
+            }),
+          ),
       ),
     );
   }
@@ -345,68 +270,5 @@ export class AuditLogInterceptor implements NestInterceptor {
     );
 
     return { previousValues, memberNames, relationMappingResult };
-  }
-
-  private async persist(
-    organizationId: string,
-    userId: string,
-    memberId: string | undefined,
-    method: string,
-    path: string,
-    resource: string,
-    action: string,
-    request: AuthenticatedRequest,
-    responseBody: unknown,
-    changes: ChangesRecord | null,
-    commentContext: AuditContextOverride | null,
-    descriptionOverride: string | null,
-    impersonatedBy?: string,
-    callerLabel?: string,
-  ): Promise<void> {
-    const entityType =
-      commentContext?.entityType ?? RESOURCE_TO_ENTITY_TYPE[resource] ?? null;
-    const entityId =
-      commentContext?.entityId ??
-      extractEntityId(request, method, responseBody);
-    const description =
-      commentContext?.description ??
-      descriptionOverride ??
-      buildDescription(method, action, resource);
-
-    const auditData: Record<string, unknown> = {
-      action: description,
-      method,
-      path,
-      resource,
-      permission: action,
-    };
-    if (changes) {
-      auditData.changes = changes;
-    }
-    if (impersonatedBy) {
-      auditData.impersonatedBy = impersonatedBy;
-    }
-    // Record automated-caller provenance (e.g. 'via API key "CI Pipeline"') so an
-    // owner-fallback / key-creator attribution isn't read as the user personally
-    // acting in a session — preserves non-repudiation of the audit trail.
-    if (callerLabel) {
-      auditData.via = callerLabel;
-    }
-
-    const finalDescription = `${impersonatedBy ? '[Impersonated] ' : ''}${description}${
-      callerLabel ? ` [${callerLabel}]` : ''
-    }`;
-
-    await db.auditLog.create({
-      data: {
-        organizationId,
-        userId,
-        memberId: memberId ?? null,
-        entityType,
-        entityId,
-        description: finalDescription,
-        data: auditData as Prisma.InputJsonValue,
-      },
-    });
   }
 }

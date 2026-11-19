@@ -1,9 +1,19 @@
 'use client';
 
 import type { AccessRequest } from '@/hooks/use-access-requests';
-import { Badge } from '@trycompai/ui/badge';
-import { Button } from '@trycompai/ui/button';
 import type { ColumnDef } from '@tanstack/react-table';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@trycompai/design-system';
+import { OverflowMenuVertical } from '@trycompai/design-system/icons';
+import { Badge } from '@trycompai/ui/badge';
 
 export type RequestTableRow = AccessRequest;
 
@@ -54,10 +64,21 @@ export function buildRequestColumns({
       accessorKey: 'purpose',
       header: 'Purpose',
       cell: ({ row }) => {
+        const purpose = row.original.purpose?.trim();
+        if (!purpose) return <span className="text-muted-foreground text-sm">—</span>;
         return (
-          <div className="max-w-[200px] truncate text-sm" title={row.original.purpose || ''}>
-            {row.original.purpose || '—'}
-          </div>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <div className="max-w-[160px] truncate text-sm lg:max-w-[240px]" tabIndex={0} />
+              }
+            >
+              {purpose}
+            </TooltipTrigger>
+            <TooltipContent>
+              <div className="max-w-xs whitespace-pre-wrap">{purpose}</div>
+            </TooltipContent>
+          </Tooltip>
         );
       },
     },
@@ -107,48 +128,41 @@ export function buildRequestColumns({
     },
     {
       id: 'actions',
-      header: 'Actions',
+      header: () => <span className="sr-only">Actions</span>,
       cell: ({ row }) => {
         const request = row.original;
+        const underReview = request.status === 'under_review';
         const ndaPending = request.status === 'approved' && !request.grant;
 
         return (
-          <div className="flex items-center gap-2">
-            {request.status === 'under_review' && (
-              <>
-                <Button size="sm" onClick={() => onApprove(request)} className="h-8 px-2">
-                  Approve
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => onDeny(request)}
-                  className="h-8 px-2"
-                >
-                  Deny
-                </Button>
-              </>
-            )}
-
-            {ndaPending && (
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => onResendNda(request)}
-                className="h-8 px-2"
+          <div className="flex justify-end">
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                variant="ellipsis"
+                aria-label={`Actions for ${request.name || request.email}`}
               >
-                Resend NDA
-              </Button>
-            )}
-
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => onPreviewNda(request)}
-              className="h-8 px-2"
-            >
-              Preview
-            </Button>
+                <OverflowMenuVertical />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {underReview && (
+                  <>
+                    <DropdownMenuItem onClick={() => onApprove(request)}>Approve</DropdownMenuItem>
+                    <DropdownMenuItem variant="destructive" onClick={() => onDeny(request)}>
+                      Deny
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+                {ndaPending && (
+                  <DropdownMenuItem onClick={() => onResendNda(request)}>
+                    Resend NDA
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem onClick={() => onPreviewNda(request)}>
+                  Preview NDA
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         );
       },

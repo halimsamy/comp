@@ -11,7 +11,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
-import { ComplianceFramework } from './ComplianceFramework';
+import { TrustFrameworkGrid } from './TrustFrameworkGrid';
+import type { LiveFrameworkStatusMap } from './trust-frameworks';
 import { CustomFrameworksSection } from './CustomFrameworksSection';
 import {
   TrustPortalAdditionalDocumentsSection,
@@ -172,6 +173,7 @@ export function TrustPortalSwitch({
   customFrameworks,
   faviconUrl,
   securityQuestionnaireEnabled,
+  liveFrameworkStatus,
 }: {
   enabled: boolean;
   slug: string;
@@ -224,6 +226,7 @@ export function TrustPortalSwitch({
   customFrameworks: TrustCustomFrameworkItem[];
   faviconUrl?: string | null;
   securityQuestionnaireEnabled: boolean;
+  liveFrameworkStatus?: LiveFrameworkStatusMap;
 }) {
   const { hasPermission } = usePermissions();
   const canUpdate = hasPermission('trust', 'update');
@@ -501,476 +504,29 @@ export function TrustPortalSwitch({
                   Share the frameworks your organization is compliant with or working towards.
                 </p>
               </div>
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
-                {/* ISO 27001 */}
-                <ComplianceFramework
-                  title="ISO 27001"
-                  description="An international standard for managing information security systems."
-                  isEnabled={iso27001}
-                  status={iso27001Status}
-                  onStatusChange={async (value) => {
-                    try {
-                      await updateFrameworkSettings({
-                        iso27001Status: value as 'started' | 'in_progress' | 'compliant',
-                      });
-                      toast.success('ISO 27001 status updated');
-                    } catch (error) {
-                      console.error('[trust framework update] failed', error);
-                      toast.error('Failed to update ISO 27001 status', {
-                        description: error instanceof Error ? error.message : undefined,
-                      });
-                    }
-                  }}
-                  onToggle={async (checked) => {
-                    try {
-                      await updateFrameworkSettings({
-                        iso27001: checked,
-                      });
-                      toast.success('ISO 27001 status updated');
-                    } catch (error) {
-                      console.error('[trust framework update] failed', error);
-                      toast.error('Failed to update ISO 27001 status', {
-                        description: error instanceof Error ? error.message : undefined,
-                      });
-                    }
-                  }}
-                  fileName={certificateFiles.iso27001}
-                  onFileUpload={handleFileUpload}
-                  onFilePreview={handleFilePreview}
-                  frameworkKey="iso27001"
-                  orgId={orgId}
-                  disabled={!canUpdate}
-                />
-                {/* ISO 42001 */}
-                <ComplianceFramework
-                  title="ISO 42001"
-                  description="An international standard for an Artificial Intelligence Management System."
-                  isEnabled={iso42001}
-                  status={iso42001Status}
-                  onStatusChange={async (value) => {
-                    try {
-                      await updateFrameworkSettings({
-                        iso42001Status: value as 'started' | 'in_progress' | 'compliant',
-                      });
-                      toast.success('ISO 42001 status updated');
-                    } catch (error) {
-                      console.error('[trust framework update] failed', error);
-                      toast.error('Failed to update ISO 42001 status', {
-                        description: error instanceof Error ? error.message : undefined,
-                      });
-                    }
-                  }}
-                  onToggle={async (checked) => {
-                    try {
-                      await updateFrameworkSettings({
-                        iso42001: checked,
-                      });
-                      toast.success('ISO 42001 status updated');
-                    } catch (error) {
-                      console.error('[trust framework update] failed', error);
-                      toast.error('Failed to update ISO 42001 status', {
-                        description: error instanceof Error ? error.message : undefined,
-                      });
-                    }
-                  }}
-                  fileName={certificateFiles.iso42001}
-                  onFileUpload={handleFileUpload}
-                  onFilePreview={handleFilePreview}
-                  frameworkKey="iso42001"
-                  orgId={orgId}
-                  disabled={!canUpdate}
-                />
-                {/* GDPR */}
-                <ComplianceFramework
-                  title="GDPR"
-                  description="A European regulation that governs personal data protection and user privacy."
-                  isEnabled={gdpr}
-                  status={gdprStatus}
-                  onStatusChange={async (value) => {
-                    try {
-                      await updateFrameworkSettings({
-                        gdprStatus: value as 'started' | 'in_progress' | 'compliant',
-                      });
-                      toast.success('GDPR status updated');
-                    } catch (error) {
-                      console.error('[trust framework update] failed', error);
-                      toast.error('Failed to update GDPR status', {
-                        description: error instanceof Error ? error.message : undefined,
-                      });
-                    }
-                  }}
-                  onToggle={async (checked) => {
-                    try {
-                      await updateFrameworkSettings({
-                        gdpr: checked,
-                      });
-                      toast.success('GDPR status updated');
-                    } catch (error) {
-                      console.error('[trust framework update] failed', error);
-                      toast.error('Failed to update GDPR status', {
-                        description: error instanceof Error ? error.message : undefined,
-                      });
-                    }
-                  }}
-                  fileName={certificateFiles.gdpr}
-                  onFileUpload={handleFileUpload}
-                  onFilePreview={handleFilePreview}
-                  frameworkKey="gdpr"
-                  orgId={orgId}
-                  disabled={!canUpdate}
-                />
-                {/* HIPAA */}
-                <ComplianceFramework
-                  title="HIPAA"
-                  description="A US regulation that protects sensitive patient health information and medical data."
-                  isEnabled={hipaa}
-                  status={hipaaStatus}
-                  onStatusChange={async (value) => {
-                    try {
-                      await updateFrameworkSettings({
-                        hipaaStatus: value as 'started' | 'in_progress' | 'compliant',
-                      });
-                      toast.success('HIPAA status updated');
-                    } catch (error) {
-                      console.error('[trust framework update] failed', error);
-                      toast.error('Failed to update HIPAA status', {
-                        description: error instanceof Error ? error.message : undefined,
-                      });
-                    }
-                  }}
-                  onToggle={async (checked) => {
-                    try {
-                      await updateFrameworkSettings({
-                        hipaa: checked,
-                      });
-                      toast.success('HIPAA status updated');
-                    } catch (error) {
-                      console.error('[trust framework update] failed', error);
-                      toast.error('Failed to update HIPAA status', {
-                        description: error instanceof Error ? error.message : undefined,
-                      });
-                    }
-                  }}
-                  fileName={certificateFiles.hipaa}
-                  onFileUpload={handleFileUpload}
-                  onFilePreview={handleFilePreview}
-                  frameworkKey="hipaa"
-                  orgId={orgId}
-                  disabled={!canUpdate}
-                />
-                {/* SOC 2 Type 1*/}
-                <ComplianceFramework
-                  title="SOC 2 Type 1"
-                  description="A compliance framework focused on data security, availability, and confidentiality."
-                  isEnabled={soc2type1}
-                  status={soc2type1Status}
-                  onStatusChange={async (value) => {
-                    try {
-                      await updateFrameworkSettings({
-                        soc2type1Status: value as 'started' | 'in_progress' | 'compliant',
-                      });
-                      toast.success('SOC 2 Type 1 status updated');
-                    } catch (error) {
-                      console.error('[trust framework update] failed', error);
-                      toast.error('Failed to update SOC 2 Type 1 status', {
-                        description: error instanceof Error ? error.message : undefined,
-                      });
-                    }
-                  }}
-                  onToggle={async (checked) => {
-                    try {
-                      await updateFrameworkSettings({
-                        soc2type1: checked,
-                      });
-                      toast.success('SOC 2 Type 1 status updated');
-                    } catch (error) {
-                      console.error('[trust framework update] failed', error);
-                      toast.error('Failed to update SOC 2 Type 1 status', {
-                        description: error instanceof Error ? error.message : undefined,
-                      });
-                    }
-                  }}
-                  fileName={certificateFiles.soc2type1}
-                  onFileUpload={handleFileUpload}
-                  onFilePreview={handleFilePreview}
-                  frameworkKey="soc2type1"
-                  orgId={orgId}
-                  disabled={!canUpdate}
-                />
-                {/* SOC 2 Type 2*/}
-                <ComplianceFramework
-                  title="SOC 2 Type 2"
-                  description="A compliance framework focused on data security, availability, and confidentiality."
-                  isEnabled={soc2type2}
-                  status={soc2type2Status}
-                  onStatusChange={async (value) => {
-                    try {
-                      await updateFrameworkSettings({
-                        soc2type2Status: value as 'started' | 'in_progress' | 'compliant',
-                      });
-                      toast.success('SOC 2 Type 2 status updated');
-                    } catch (error) {
-                      console.error('[trust framework update] failed', error);
-                      toast.error('Failed to update SOC 2 Type 2 status', {
-                        description: error instanceof Error ? error.message : undefined,
-                      });
-                    }
-                  }}
-                  onToggle={async (checked) => {
-                    try {
-                      await updateFrameworkSettings(
-                        checked ? { soc2type2: true } : { soc2: false, soc2type2: false },
-                      );
-                      toast.success('SOC 2 Type 2 status updated');
-                    } catch (error) {
-                      console.error('[trust framework update] failed', error);
-                      toast.error('Failed to update SOC 2 Type 2 status', {
-                        description: error instanceof Error ? error.message : undefined,
-                      });
-                    }
-                  }}
-                  fileName={certificateFiles.soc2type2}
-                  onFileUpload={handleFileUpload}
-                  onFilePreview={handleFilePreview}
-                  frameworkKey="soc2type2"
-                  orgId={orgId}
-                  disabled={!canUpdate}
-                />
-                {/* SOC 3 */}
-                <ComplianceFramework
-                  title="SOC 3"
-                  description="A compliance framework focused on data security, availability, and confidentiality."
-                  isEnabled={soc3}
-                  status={soc3Status}
-                  onStatusChange={async (value) => {
-                    try {
-                      await updateFrameworkSettings({
-                        soc3Status: value as 'started' | 'in_progress' | 'compliant',
-                      });
-                      toast.success('SOC 3 status updated');
-                    } catch (error) {
-                      console.error('[trust framework update] failed', error);
-                      toast.error('Failed to update SOC 3 status', {
-                        description: error instanceof Error ? error.message : undefined,
-                      });
-                    }
-                  }}
-                  onToggle={async (checked) => {
-                    try {
-                      await updateFrameworkSettings({
-                        soc3: checked,
-                      });
-                      toast.success('SOC 3 status updated');
-                    } catch (error) {
-                      console.error('[trust framework update] failed', error);
-                      toast.error('Failed to update SOC 3 status', {
-                        description: error instanceof Error ? error.message : undefined,
-                      });
-                    }
-                  }}
-                  fileName={certificateFiles.soc3}
-                  onFileUpload={handleFileUpload}
-                  onFilePreview={handleFilePreview}
-                  frameworkKey="soc3"
-                  orgId={orgId}
-                  disabled={!canUpdate}
-                />
-                {/* PCI DSS */}
-                <ComplianceFramework
-                  title="PCI DSS"
-                  description="A compliance framework focused on data security, availability, and confidentiality."
-                  isEnabled={pcidss}
-                  status={pcidssStatus}
-                  onStatusChange={async (value) => {
-                    try {
-                      await updateFrameworkSettings({
-                        pcidssStatus: value as 'started' | 'in_progress' | 'compliant',
-                      });
-                      toast.success('PCI DSS status updated');
-                    } catch (error) {
-                      console.error('[trust framework update] failed', error);
-                      toast.error('Failed to update PCI DSS status', {
-                        description: error instanceof Error ? error.message : undefined,
-                      });
-                    }
-                  }}
-                  onToggle={async (checked) => {
-                    try {
-                      await updateFrameworkSettings({
-                        pcidss: checked,
-                      });
-                      toast.success('PCI DSS status updated');
-                    } catch (error) {
-                      console.error('[trust framework update] failed', error);
-                      toast.error('Failed to update PCI DSS status', {
-                        description: error instanceof Error ? error.message : undefined,
-                      });
-                    }
-                  }}
-                  fileName={certificateFiles.pcidss}
-                  onFileUpload={handleFileUpload}
-                  onFilePreview={handleFilePreview}
-                  frameworkKey="pcidss"
-                  orgId={orgId}
-                  disabled={!canUpdate}
-                />
-                {/* NEN 7510 */}
-                <ComplianceFramework
-                  title="NEN 7510"
-                  description="A Dutch standard for managing information security systems."
-                  isEnabled={nen7510}
-                  status={nen7510Status}
-                  onStatusChange={async (value) => {
-                    try {
-                      await updateFrameworkSettings({
-                        nen7510Status: value as 'started' | 'in_progress' | 'compliant',
-                      });
-                      toast.success('NEN 7510 status updated');
-                    } catch (error) {
-                      console.error('[trust framework update] failed', error);
-                      toast.error('Failed to update NEN 7510 status', {
-                        description: error instanceof Error ? error.message : undefined,
-                      });
-                    }
-                  }}
-                  onToggle={async (checked) => {
-                    try {
-                      await updateFrameworkSettings({
-                        nen7510: checked,
-                      });
-                      toast.success('NEN 7510 status updated');
-                    } catch (error) {
-                      console.error('[trust framework update] failed', error);
-                      toast.error('Failed to update NEN 7510 status', {
-                        description: error instanceof Error ? error.message : undefined,
-                      });
-                    }
-                  }}
-                  fileName={certificateFiles.nen7510}
-                  onFileUpload={handleFileUpload}
-                  onFilePreview={handleFilePreview}
-                  frameworkKey="nen7510"
-                  orgId={orgId}
-                  disabled={!canUpdate}
-                />
-                {/* ISO 9001 */}
-                <ComplianceFramework
-                  title="ISO 9001"
-                  description="An international standard for quality management systems."
-                  isEnabled={iso9001}
-                  status={iso9001Status}
-                  onStatusChange={async (value) => {
-                    try {
-                      await updateFrameworkSettings({
-                        iso9001Status: value as 'started' | 'in_progress' | 'compliant',
-                      });
-                      toast.success('ISO 9001 status updated');
-                    } catch (error) {
-                      console.error('[trust framework update] failed', error);
-                      toast.error('Failed to update ISO 9001 status', {
-                        description: error instanceof Error ? error.message : undefined,
-                      });
-                    }
-                  }}
-                  onToggle={async (checked) => {
-                    try {
-                      await updateFrameworkSettings({
-                        iso9001: checked,
-                      });
-                      toast.success('ISO 9001 status updated');
-                    } catch (error) {
-                      console.error('[trust framework update] failed', error);
-                      toast.error('Failed to update ISO 9001 status', {
-                        description: error instanceof Error ? error.message : undefined,
-                      });
-                    }
-                  }}
-                  fileName={certificateFiles.iso9001}
-                  onFileUpload={handleFileUpload}
-                  onFilePreview={handleFilePreview}
-                  frameworkKey="iso9001"
-                  orgId={orgId}
-                  disabled={!canUpdate}
-                />
-                {/* PIPEDA */}
-                <ComplianceFramework
-                  title="PIPEDA"
-                  description="Personal Information Protection and Electronic Documents Act"
-                  isEnabled={pipeda}
-                  status={pipedaStatus}
-                  onStatusChange={async (value) => {
-                    try {
-                      await updateFrameworkSettings({
-                        pipedaStatus: value as 'started' | 'in_progress' | 'compliant',
-                      });
-                      toast.success('PIPEDA status updated');
-                    } catch (error) {
-                      console.error('[trust framework update] failed', error);
-                      toast.error('Failed to update PIPEDA status', {
-                        description: error instanceof Error ? error.message : undefined,
-                      });
-                    }
-                  }}
-                  onToggle={async (checked) => {
-                    try {
-                      await updateFrameworkSettings({
-                        pipeda: checked,
-                      });
-                      toast.success('PIPEDA status updated');
-                    } catch (error) {
-                      console.error('[trust framework update] failed', error);
-                      toast.error('Failed to update PIPEDA status', {
-                        description: error instanceof Error ? error.message : undefined,
-                      });
-                    }
-                  }}
-                  fileName={certificateFiles.pipeda}
-                  onFileUpload={handleFileUpload}
-                  onFilePreview={handleFilePreview}
-                  frameworkKey="pipeda"
-                  orgId={orgId}
-                  disabled={!canUpdate}
-                />
-                {/* CCPA */}
-                <ComplianceFramework
-                  title="CCPA"
-                  description="California Consumer Privacy Act"
-                  isEnabled={ccpa}
-                  status={ccpaStatus}
-                  onStatusChange={async (value) => {
-                    try {
-                      await updateFrameworkSettings({
-                        ccpaStatus: value as 'started' | 'in_progress' | 'compliant',
-                      });
-                      toast.success('CCPA status updated');
-                    } catch (error) {
-                      console.error('[trust framework update] failed', error);
-                      toast.error('Failed to update CCPA status', {
-                        description: error instanceof Error ? error.message : undefined,
-                      });
-                    }
-                  }}
-                  onToggle={async (checked) => {
-                    try {
-                      await updateFrameworkSettings({
-                        ccpa: checked,
-                      });
-                      toast.success('CCPA status updated');
-                    } catch (error) {
-                      console.error('[trust framework update] failed', error);
-                      toast.error('Failed to update CCPA status', {
-                        description: error instanceof Error ? error.message : undefined,
-                      });
-                    }
-                  }}
-                  fileName={certificateFiles.ccpa}
-                  onFileUpload={handleFileUpload}
-                  onFilePreview={handleFilePreview}
-                  frameworkKey="ccpa"
-                  orgId={orgId}
-                  disabled={!canUpdate}
-                />
-              </div>
+              <TrustFrameworkGrid
+                orgId={orgId}
+                values={{
+                  iso27001: { enabled: iso27001, status: iso27001Status },
+                  iso42001: { enabled: iso42001, status: iso42001Status },
+                  gdpr: { enabled: gdpr, status: gdprStatus },
+                  hipaa: { enabled: hipaa, status: hipaaStatus },
+                  soc2type1: { enabled: soc2type1, status: soc2type1Status },
+                  soc2type2: { enabled: soc2type2, status: soc2type2Status },
+                  soc3: { enabled: soc3, status: soc3Status },
+                  pcidss: { enabled: pcidss, status: pcidssStatus },
+                  nen7510: { enabled: nen7510, status: nen7510Status },
+                  iso9001: { enabled: iso9001, status: iso9001Status },
+                  pipeda: { enabled: pipeda, status: pipedaStatus },
+                  ccpa: { enabled: ccpa, status: ccpaStatus },
+                }}
+                liveStatus={liveFrameworkStatus ?? {}}
+                certificateFiles={certificateFiles}
+                canUpdate={canUpdate}
+                onSave={updateFrameworkSettings}
+                onFileUpload={handleFileUpload}
+                onFilePreview={handleFilePreview}
+              />
 
               <CustomFrameworksSection
                 orgId={orgId}
