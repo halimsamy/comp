@@ -9,6 +9,7 @@ jest.mock('@db', () => {
       findUnique: jest.fn(),
       update: jest.fn(),
     },
+    policy: { findFirst: jest.fn() },
     // Advisory lock taken by invalidateApprovalIfNeeded (serializes vs approve).
     $executeRaw: jest.fn(),
     // Run the callback with the same mock as the transaction client.
@@ -134,6 +135,65 @@ describe('IsmsNarrativeService', () => {
         }),
       },
       select: { id: true, draftNarrative: true },
+    });
+  });
+
+  describe('governing policy link (9.2 / 9.3)', () => {
+    const linked = { programme: 'Annual audit.', governingPolicyId: 'pol_1' };
+
+    beforeEach(() => {
+      (mockDb.ismsDocument.findFirst as jest.Mock).mockResolvedValue({
+        id: 'doc_1',
+        type: 'internal_audit',
+      });
+      (mockDb.ismsDocument.findUnique as jest.Mock).mockResolvedValue({
+        status: 'draft',
+      });
+    });
+
+    it('checks the policy within the org, excluding archived ones', async () => {
+      (mockDb.policy.findFirst as jest.Mock).mockResolvedValue({ name: 'IA' });
+      await service.save({
+        documentId: 'doc_1',
+        organizationId: 'org_1',
+        narrative: linked,
+      });
+      expect(mockDb.policy.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            id: 'pol_1',
+            organizationId: 'org_1',
+            isArchived: false,
+            archivedAt: null,
+          },
+        }),
+      );
+      expect(mockDb.ismsDocument.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: { draftNarrative: linked },
+        }),
+      );
+    });
+
+    it("rejects another org's or an archived policy and writes nothing", async () => {
+      (mockDb.policy.findFirst as jest.Mock).mockResolvedValue(null);
+      await expect(
+        service.save({
+          documentId: 'doc_1',
+          organizationId: 'org_1',
+          narrative: linked,
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(mockDb.ismsDocument.update).not.toHaveBeenCalled();
+    });
+
+    it('skips the policy check when nothing is linked', async () => {
+      await service.save({
+        documentId: 'doc_1',
+        organizationId: 'org_1',
+        narrative: { programme: 'Annual audit.' },
+      });
+      expect(mockDb.policy.findFirst).not.toHaveBeenCalled();
     });
   });
 });

@@ -335,6 +335,15 @@ export interface IsmsOrgProfile {
 }
 
 /** Everything a section builder needs to render a document's export sections. */
+/** A linked governing policy, frozen into the export input (9.2 / 9.3). */
+export interface GoverningPolicyExport {
+  name: string;
+  status: string;
+  version: number | null;
+  /** YYYY-MM-DD, or null when never published. */
+  lastPublishedAt: string | null;
+}
+
 export interface DocumentExportInput {
   contextIssues: Array<{
     kind: string;
@@ -375,6 +384,8 @@ export interface DocumentExportInput {
   audits?: AuditExportRow[];
   /** Review instances with resolved names — only populated for the Management Review document (9.3). */
   reviews?: ReviewExportRow[];
+  /** The policy the 9.2 programme / 9.3 procedure links to, when linked and still active. */
+  governingPolicy?: GoverningPolicyExport;
   /** Risk Register + vendor rows — only populated for the Risk Treatment Plan (6.1.3). */
   riskTreatment?: {
     risks: RiskTreatmentExportRow[];

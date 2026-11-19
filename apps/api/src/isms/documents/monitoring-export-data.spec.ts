@@ -121,21 +121,24 @@ describe('mapMetrics', () => {
     expect(mapMetrics([baseMetric], extras)[0].currentValue).toBe('—');
   });
 
-  it('prefers explicit target text, else the linked objective target', () => {
+  it('shows the linked objective target over the metric target (6.2 holds it)', () => {
     const withObjective = {
       ...baseMetric,
-      target: null,
+      target: 'Stale metric target',
       objective: { objective: 'Maintain uptime', target: '99.9% SLA' },
     } as unknown as MetricWithExportIncludes;
     expect(mapMetrics([withObjective], extras)[0].target).toBe('99.9% SLA');
 
-    const explicitWins = {
+    const objectiveWithoutTarget = {
       ...withObjective,
-      target: 'Explicit target',
+      objective: { objective: 'Maintain uptime', target: null },
     } as unknown as MetricWithExportIncludes;
-    expect(mapMetrics([explicitWins], extras)[0].target).toBe(
-      'Explicit target',
+    expect(mapMetrics([objectiveWithoutTarget], extras)[0].target).toBe(
+      'Stale metric target',
     );
+
+    const unlinked = { ...baseMetric, objective: null } as unknown as MetricWithExportIncludes;
+    expect(mapMetrics([unlinked], extras)[0].target).toBe('≥ 99.9% availability');
   });
 
   it('humanizes the cadence', () => {

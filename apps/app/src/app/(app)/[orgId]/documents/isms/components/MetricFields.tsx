@@ -26,6 +26,8 @@ interface MetricFieldsProps {
   memberOptions: ApproverOption[];
   /** Custom metrics may rename themselves; seeded metric names stay fixed. */
   showName: boolean;
+  /** Target of the linked 6.2 objective; when set it replaces the editable target. */
+  objectiveTarget?: string | null;
 }
 
 /** "Who monitors" / "Who analyses" picker; empty = defaults to the SPO. */
@@ -67,7 +69,12 @@ function MemberSelect({
  * form (MonitoringForm) and the row editor (MonitoringRow) so both edit the
  * same field set with one schema.
  */
-export function MetricFields({ control, memberOptions, showName }: MetricFieldsProps) {
+export function MetricFields({
+  control,
+  memberOptions,
+  showName,
+  objectiveTarget,
+}: MetricFieldsProps) {
   return (
     <Stack gap="3">
       {showName ? (
@@ -130,13 +137,17 @@ export function MetricFields({ control, memberOptions, showName }: MetricFieldsP
           />
         </IsmsFieldLabel>
         <IsmsFieldLabel label="Target">
-          <Controller
-            control={control}
-            name="target"
-            render={({ field: { ref: _ref, ...field } }) => (
-              <Input {...field} aria-label="Metric target" />
-            )}
-          />
+          {objectiveTarget ? (
+            <p className="pt-2 text-sm">{objectiveTarget} (from the 6.2 objective)</p>
+          ) : (
+            <Controller
+              control={control}
+              name="target"
+              render={({ field: { ref: _ref, ...field } }) => (
+                <Input {...field} aria-label="Metric target" />
+              )}
+            />
+          )}
         </IsmsFieldLabel>
         <IsmsFieldLabel label="Who monitors">
           <Controller

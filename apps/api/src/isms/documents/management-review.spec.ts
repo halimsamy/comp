@@ -12,7 +12,8 @@ import {
   reviewConclusionSentence,
   SEED_REVIEW_INPUT_DEFINITIONS,
 } from './management-review-defaults';
-import type { IsmsPlatformData } from './types';
+import { buildManagementReviewSections } from './management-review-sections';
+import type { DocumentExportInput, IsmsPlatformData } from './types';
 
 const PLATFORM_DATA = { organizationName: 'Acme Corp' } as IsmsPlatformData;
 
@@ -235,5 +236,37 @@ describe('seedReviewInputsIfMissing', () => {
       documentId: 'doc_1',
     });
     expect(tx.ismsReviewInput.createMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('buildManagementReviewSections procedure', () => {
+  const input: DocumentExportInput = {
+    contextIssues: [],
+    interestedParties: [],
+    requirements: [],
+    objectives: [],
+    narrative: { procedure: 'We review annually.', governingPolicyId: 'pol_1' },
+    reviews: [],
+  };
+
+  it('renders the paragraph when no linked policy resolved', () => {
+    expect(buildManagementReviewSections(input)[1].paragraphs?.[0]?.text).toBe(
+      'We review annually.',
+    );
+  });
+
+  it('references the linked policy, flagging an unpublished one', () => {
+    const sections = buildManagementReviewSections({
+      ...input,
+      governingPolicy: {
+        name: 'ISMS Monitoring, Management Review & Improvement',
+        status: 'draft',
+        version: null,
+        lastPublishedAt: null,
+      },
+    });
+    expect(sections[1].paragraphs?.[0]?.text).toBe(
+      "Defined in the policy 'ISMS Monitoring, Management Review & Improvement' (not yet published).",
+    );
   });
 });

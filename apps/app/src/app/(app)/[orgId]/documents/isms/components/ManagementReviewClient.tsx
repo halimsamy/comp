@@ -161,9 +161,9 @@ export function ManagementReviewClient({
             <ProcedureCard
               narrative={document.draftNarrative}
               canEdit={canManage}
-              onSave={(procedure) =>
+              onSave={(narrative) =>
                 run(
-                  hook.saveNarrative({ procedure }),
+                  hook.saveNarrative(narrative),
                   'Procedure saved',
                   'Failed to save procedure',
                 )

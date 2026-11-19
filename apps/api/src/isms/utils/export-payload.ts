@@ -26,8 +26,10 @@ import {
   loadRiskTreatmentExtras,
   type RiskTreatmentExtras,
 } from '../documents/risk-treatment-export-data';
+import { resolveGoverningPolicy } from '../documents/governing-policy';
 import type {
   DocumentExportInput,
+  GoverningPolicyExport,
   IsmsOrgProfile,
   RoleExportRow,
 } from '../documents/types';
@@ -50,6 +52,9 @@ export interface IsmsExportSnapshot {
   input: DocumentExportInput;
   metadata: IsmsExportMetadata;
 }
+
+/** 9.2 / 9.3 extras also carry the linked governing policy, if any. */
+type WithGoverningPolicy<T> = T & { governingPolicy?: GoverningPolicyExport };
 
 /** Prisma include for a document being exported or snapshotted. */
 export const EXPORT_DOCUMENT_INCLUDE = {
@@ -149,24 +154,34 @@ export async function resolveMonitoringExtras(
 export async function resolveInternalAuditExtras(
   document: LoadedExportDocument,
   client?: Prisma.TransactionClient,
-): Promise<InternalAuditExtras | undefined> {
+): Promise<WithGoverningPolicy<InternalAuditExtras> | undefined> {
   if (document.type !== 'internal_audit') return undefined;
-  return loadInternalAuditExtras({
-    organizationId: document.organizationId,
-    client,
-  });
+  const { organizationId } = document;
+  return {
+    ...(await loadInternalAuditExtras({ organizationId, client })),
+    governingPolicy: await resolveGoverningPolicy({
+      organizationId,
+      narrative: document.draftNarrative,
+      client: client ?? db,
+    }),
+  };
 }
 
 /** The Management Review document (9.3) resolves action-owner names; other types don't. */
 export async function resolveManagementReviewExtras(
   document: LoadedExportDocument,
   client?: Prisma.TransactionClient,
-): Promise<ManagementReviewExtras | undefined> {
+): Promise<WithGoverningPolicy<ManagementReviewExtras> | undefined> {
   if (document.type !== 'management_review') return undefined;
-  return loadManagementReviewExtras({
-    organizationId: document.organizationId,
-    client,
-  });
+  const { organizationId } = document;
+  return {
+    ...(await loadManagementReviewExtras({ organizationId, client })),
+    governingPolicy: await resolveGoverningPolicy({
+      organizationId,
+      narrative: document.draftNarrative,
+      client: client ?? db,
+    }),
+  };
 }
 
 /** The Risk Treatment Plan (6.1.3) reads the Risk Register + vendors; other types don't. */
@@ -226,8 +241,8 @@ export function buildExportInput({
   orgProfile?: IsmsOrgProfile;
   rolesExtras?: RolesExtras;
   monitoringExtras?: MonitoringExtras;
-  internalAuditExtras?: InternalAuditExtras;
-  managementReviewExtras?: ManagementReviewExtras;
+  internalAuditExtras?: WithGoverningPolicy<InternalAuditExtras>;
+  managementReviewExtras?: WithGoverningPolicy<ManagementReviewExtras>;
   riskTreatmentExtras?: RiskTreatmentExtras;
 }): DocumentExportInput {
   return {
@@ -270,6 +285,9 @@ export function buildExportInput({
       ? mapReviews(document.reviews, managementReviewExtras)
       : undefined,
     riskTreatment: riskTreatmentExtras,
+    governingPolicy:
+      internalAuditExtras?.governingPolicy ??
+      managementReviewExtras?.governingPolicy,
   };
 }
 

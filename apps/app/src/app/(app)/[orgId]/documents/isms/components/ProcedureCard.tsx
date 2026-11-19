@@ -16,6 +16,7 @@ import { useEffect, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { parseProcedure } from './management-review-constants';
+import { GoverningPolicyPicker, parseGoverningPolicyId } from './GoverningPolicyPicker';
 import { IsmsRegisterCard } from './shared';
 
 const procedureSchema = z.object({
@@ -27,7 +28,8 @@ type ProcedureFormValues = z.infer<typeof procedureSchema>;
 interface ProcedureCardProps {
   narrative: unknown;
   canEdit: boolean;
-  onSave: (procedure: string) => Promise<void>;
+  /** Saves the whole narrative: the paragraph plus the optional policy link. */
+  onSave: (narrative: { procedure: string; governingPolicyId?: string }) => Promise<void>;
 }
 
 /**
@@ -37,7 +39,11 @@ interface ProcedureCardProps {
  */
 export function ProcedureCard({ narrative, canEdit, onSave }: ProcedureCardProps) {
   const procedure = parseProcedure(narrative);
+  const policyId = parseGoverningPolicyId(narrative);
   const [isEditing, setIsEditing] = useState(false);
+  // The paragraph is kept while linked, so unlinking restores it.
+  const save = ({ text, link }: { text: string; link: string | null }) =>
+    onSave({ procedure: text, ...(link ? { governingPolicyId: link } : {}) });
 
   const {
     control,
@@ -56,14 +62,14 @@ export function ProcedureCard({ narrative, canEdit, onSave }: ProcedureCardProps
 
   const handleSave = handleSubmit(async (values) => {
     try {
-      await onSave(values.procedure.trim());
+      await save({ text: values.procedure.trim(), link: policyId });
     } catch {
       return;
     }
     setIsEditing(false);
   });
 
-  const headerActions = canEdit ? (
+  const headerActions = canEdit && !policyId ? (
     isEditing ? (
       <HStack align="center" gap="2">
         <Button
@@ -109,32 +115,42 @@ export function ProcedureCard({ narrative, canEdit, onSave }: ProcedureCardProps
         <Stack gap="1">
           <Heading level="4">Procedure</Heading>
           <Text size="sm" variant="muted">
-            Rendered verbatim into the generated Clause 9.3 document.
+            {policyId
+              ? 'The generated Clause 9.3 document references the linked policy.'
+              : 'Rendered verbatim into the generated Clause 9.3 document.'}
           </Text>
         </Stack>
       }
       headerEnd={headerActions}
     >
-      {isEditing ? (
-        <Field>
-          <Controller
-            control={control}
-            name="procedure"
-            render={({ field: { ref: _ref, ...field }, fieldState }) => (
-              <>
-                <Textarea {...field} rows={4} aria-label="Review procedure" />
-                <FieldError>{fieldState.error?.message}</FieldError>
-              </>
-            )}
-          />
-        </Field>
-      ) : (
-        // whitespace-pre-wrap inherits into the Text span, preserving the
-        // paragraph breaks a multi-line procedure was written with.
-        <div className="whitespace-pre-wrap">
-          <Text size="sm">{procedure || 'No procedure recorded yet.'}</Text>
-        </div>
-      )}
+      <Stack gap="4">
+        <GoverningPolicyPicker
+          policyId={policyId}
+          canEdit={canEdit}
+          paragraphName="procedure"
+          onChange={(link) => save({ text: procedure, link })}
+        />
+        {policyId ? null : isEditing ? (
+          <Field>
+            <Controller
+              control={control}
+              name="procedure"
+              render={({ field: { ref: _ref, ...field }, fieldState }) => (
+                <>
+                  <Textarea {...field} rows={4} aria-label="Review procedure" />
+                  <FieldError>{fieldState.error?.message}</FieldError>
+                </>
+              )}
+            />
+          </Field>
+        ) : (
+          // whitespace-pre-wrap inherits into the Text span, preserving the
+          // paragraph breaks a multi-line procedure was written with.
+          <div className="whitespace-pre-wrap">
+            <Text size="sm">{procedure || 'No procedure recorded yet.'}</Text>
+          </div>
+        )}
+      </Stack>
     </IsmsRegisterCard>
   );
 }

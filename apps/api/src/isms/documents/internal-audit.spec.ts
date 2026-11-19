@@ -218,6 +218,27 @@ describe('buildInternalAuditSections', () => {
     expect(sections[2].emptyText).toBe('No internal audits recorded yet.');
   });
 
+  it('references the linked governing policy instead of the paragraph', () => {
+    const sections = buildInternalAuditSections({
+      ...baseInput,
+      governingPolicy: {
+        name: 'Internal Audit Procedure',
+        status: 'published',
+        version: 3,
+        lastPublishedAt: '2026-05-01',
+      },
+      audits: [],
+    });
+    expect(sections[1]).toEqual({
+      heading: 'Programme',
+      paragraphs: [
+        {
+          text: "Defined in the policy 'Internal Audit Procedure' (version 3, published 2026-05-01).",
+        },
+      ],
+    });
+  });
+
   it('shows a programme placeholder when the narrative is missing or invalid', () => {
     const sections = buildInternalAuditSections({
       ...baseInput,

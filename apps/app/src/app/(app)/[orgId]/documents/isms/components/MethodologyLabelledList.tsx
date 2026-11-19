@@ -17,6 +17,8 @@ interface MethodologyLabelledListProps<T extends FieldValues> {
   values: string[];
   /** Per-row validation messages (aligned with labels), shown under each row. */
   rowErrors?: (string | undefined)[];
+  /** Read-only computed text per row (aligned with labels), shown above the description. */
+  computed?: string[];
 }
 
 /**
@@ -34,6 +36,7 @@ export function MethodologyLabelledList<T extends FieldValues>({
   canEdit,
   values,
   rowErrors,
+  computed,
 }: MethodologyLabelledListProps<T>) {
   return (
     <div className="flex flex-col gap-2">
@@ -47,7 +50,12 @@ export function MethodologyLabelledList<T extends FieldValues>({
             key={label}
             className="grid grid-cols-1 gap-1 sm:grid-cols-[180px_1fr] sm:items-start sm:gap-3"
           >
-            <span className="pt-2 text-sm font-medium">{label}</span>
+            <div className="flex flex-col gap-0.5 pt-2">
+              <span className="text-sm font-medium">{label}</span>
+              {computed?.[index] && (
+                <span className="text-xs text-muted-foreground">{computed[index]}</span>
+              )}
+            </div>
             {canEdit ? (
               <div className="flex flex-col gap-1">
                 <Controller

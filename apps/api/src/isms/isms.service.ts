@@ -341,6 +341,7 @@ export class IsmsService {
                 id: true,
                 name: true,
                 target: true,
+                cadence: true,
                 measurements: {
                   orderBy: [{ periodStart: 'desc' }, { recordedAt: 'desc' }],
                   take: 1,

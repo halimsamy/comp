@@ -12,6 +12,7 @@ import {
   METHODOLOGY_LEVEL_LABELS,
   METHODOLOGY_LIKELIHOOD_LABELS,
   METHODOLOGY_TREATMENT_LABELS,
+  ownerAcceptanceText,
 } from './risk-methodology-constants';
 import { RiskLevelMatrixPreview } from './RiskLevelMatrixPreview';
 
@@ -92,7 +93,8 @@ const CLOSING_FIELDS = [
   {
     name: 'frequency',
     label: 'Frequency of assessment',
-    helper: 'How often risks are reviewed (default: quarterly review, annual formal reassessment).',
+    helper:
+      'Review triggers beyond the periodic register review, whose interval is set in the settings above (default: annual Management Review, ad hoc on material change).',
     rows: 3,
   },
   {
@@ -117,6 +119,8 @@ export function RiskMethodologyForm({ narrative, canEdit, onSave }: RiskMethodol
   const handleSave = handleSubmit(async (values) => {
     await onSave(values);
   });
+
+  const thresholdIndex = METHODOLOGY_LEVELS.indexOf(watch('acceptanceRequiredFromLevel'));
 
   const proseField = ({
     name,
@@ -186,17 +190,6 @@ export function RiskMethodologyForm({ narrative, canEdit, onSave }: RiskMethodol
         <RiskLevelMatrixPreview />
       </div>
 
-      <MethodologyLabelledList<RiskMethodologyValues>
-        title="Acceptance thresholds"
-        helper="The acceptance requirement each risk level triggers (default: low levels accepted, medium with owner sign-off, high levels must be treated)."
-        labels={METHODOLOGY_LEVEL_LABELS}
-        name="acceptanceThresholds"
-        control={control}
-        canEdit={canEdit}
-        values={watch('acceptanceThresholds')}
-        rowErrors={errors.acceptanceThresholds?.map?.((e) => e?.message)}
-      />
-
       <MethodologyRiskSettingsFields
         control={control}
         canEdit={canEdit}
@@ -204,6 +197,20 @@ export function RiskMethodologyForm({ narrative, canEdit, onSave }: RiskMethodol
           acceptanceRequiredFromLevel: watch('acceptanceRequiredFromLevel'),
           reviewIntervalMonths: watch('reviewIntervalMonths'),
         }}
+      />
+
+      <MethodologyLabelledList<RiskMethodologyValues>
+        title="Approval and escalation"
+        helper="Who approves or is escalated to for each risk level. Whether the risk owner must record an acceptance is set by the threshold above and shown under each level."
+        labels={METHODOLOGY_LEVEL_LABELS}
+        name="acceptanceThresholds"
+        control={control}
+        canEdit={canEdit}
+        values={watch('acceptanceThresholds')}
+        rowErrors={errors.acceptanceThresholds?.map?.((e) => e?.message)}
+        computed={METHODOLOGY_LEVEL_LABELS.map((_, levelIndex) =>
+          ownerAcceptanceText({ levelIndex, thresholdIndex }),
+        )}
       />
 
       <MethodologyLabelledList<RiskMethodologyValues>

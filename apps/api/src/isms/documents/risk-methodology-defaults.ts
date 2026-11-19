@@ -60,12 +60,16 @@ export const DEFAULT_IMPACT_DESCRIPTIONS: string[] = [
   'Existential impact on the organisation; extended service outage; multi-jurisdiction regulator engagement; significant financial or reputational loss.',
 ];
 
-/** Acceptance requirement per risk-level band (very-low .. very-high). */
+/**
+ * Approval and escalation per risk-level band (very-low .. very-high). Whether
+ * the risk owner must record an acceptance is NOT restated here: it is computed
+ * from acceptanceRequiredFromLevel (the export's "Owner acceptance" column).
+ */
 export const DEFAULT_ACCEPTANCE_THRESHOLDS: string[] = [
-  'Accepted by default. Recorded in the register; no formal owner acceptance event required.',
-  'Accepted by default. Recorded in the register; a risk-owner acceptance event is recommended.',
-  'Accepted with risk-owner sign-off. An owner acceptance event is recorded in Comp AI.',
-  'Must be treated. If retained on business grounds, requires top-management approval and a documented acceptance event.',
+  'No further approval. Recorded in the risk register.',
+  'No further approval. Recorded in the risk register.',
+  'No further approval beyond the risk owner.',
+  'Must be treated. If retained on business grounds, requires top-management approval.',
   'Must be treated. Retention only in exceptional circumstances with top-management approval; escalated to the next Management Review.',
 ];
 
@@ -94,7 +98,9 @@ export function defaultMethodologyResponsibilities(): string {
 }
 
 export function defaultMethodologyFrequency(): string {
-  return 'Risks are reviewed at least quarterly by the Security & Privacy Owner for changes in likelihood, impact, or treatment status; formally annually at the Management Review (Clause 9.3), where trends and outstanding acceptances are considered; and ad hoc on any material change to the ISMS scope, the vendor register, or the regulatory environment, or after a security incident.';
+  // The periodic interval is the structured reviewIntervalMonths setting,
+  // rendered right after this paragraph; do not restate it here.
+  return 'In addition to the periodic register review below, risks are reviewed by the Security & Privacy Owner for changes in likelihood, impact, or treatment status; formally annually at the Management Review (Clause 9.3), where trends and outstanding acceptances are considered; and ad hoc on any material change to the ISMS scope, the vendor register, or the regulatory environment, or after a security incident.';
 }
 
 export function defaultMethodologyDocumentation(): string {

@@ -10,6 +10,7 @@ import {
   defaultProgrammeText,
   SEED_AUDIT_CONTROL_DEFINITIONS,
 } from './internal-audit-defaults';
+import { governingPolicyIdSchema, governingPolicyText } from './governing-policy';
 
 type Tx = Prisma.TransactionClient;
 
@@ -20,6 +21,8 @@ type Tx = Prisma.TransactionClient;
  */
 export const internalAuditNarrativeSchema = z.object({
   programme: z.string().trim().min(1),
+  /** Optional policy that defines the programme; the paragraph stays as fallback. */
+  governingPolicyId: governingPolicyIdSchema,
 });
 
 export type InternalAuditNarrative = z.infer<
@@ -252,7 +255,9 @@ export function buildInternalAuditSections(
   input: DocumentExportInput,
 ): IsmsExportSection[] {
   const audits = input.audits ?? [];
-  const programme = parseProgramme(input.narrative);
+  const programme = input.governingPolicy
+    ? governingPolicyText(input.governingPolicy)
+    : parseProgramme(input.narrative);
 
   const sections: IsmsExportSection[] = [
     {

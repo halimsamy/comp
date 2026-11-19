@@ -58,8 +58,70 @@ export async function seedMetricsIfMissing({
   const missing = SEED_METRIC_DEFINITIONS.filter(
     (metric) => !existingKeys.has(metric.metricKey),
   );
-  if (missing.length === 0) return;
+  if (missing.length > 0) {
+    await createSeedMetrics({ tx, documentId, missing, existing });
+  }
+  await linkSeededMetricsToObjectives({ tx, documentId });
+}
 
+/**
+ * Default 6.2 objective text per seeded metric (objectives.ts deriveObjectives).
+ * The objective holds the target; the metric measures it.
+ */
+export const DEFAULT_OBJECTIVE_BY_METRIC_KEY: Record<string, string> = {
+  training_completion: 'Achieve high security-awareness training completion',
+  risk_treatment_status: 'Resolve high and critical risks within SLA',
+  vendor_review_currency: 'Complete scheduled vendor security reviews',
+};
+
+/**
+ * Link seeded metrics with no objective to the same org/framework's 6.2
+ * objective carrying the default text. Never overwrites a chosen link; an
+ * edited objective text stays unlinked (link it by hand).
+ */
+async function linkSeededMetricsToObjectives({
+  tx,
+  documentId,
+}: {
+  tx: Tx;
+  documentId: string;
+}): Promise<void> {
+  const document = await tx.ismsDocument.findUnique({
+    where: { id: documentId },
+    select: { organizationId: true, frameworkId: true },
+  });
+  if (!document) return;
+  const objectives = await tx.ismsObjective.findMany({
+    where: {
+      objective: { in: Object.values(DEFAULT_OBJECTIVE_BY_METRIC_KEY) },
+      document: { ...document, type: 'objectives_plan' },
+    },
+    orderBy: { position: 'asc' },
+    select: { id: true, objective: true },
+  });
+  for (const [metricKey, text] of Object.entries(
+    DEFAULT_OBJECTIVE_BY_METRIC_KEY,
+  )) {
+    const objective = objectives.find((row) => row.objective === text);
+    if (!objective) continue;
+    await tx.ismsMetric.updateMany({
+      where: { documentId, metricKey, objectiveId: null },
+      data: { objectiveId: objective.id },
+    });
+  }
+}
+
+async function createSeedMetrics({
+  tx,
+  documentId,
+  missing,
+  existing,
+}: {
+  tx: Tx;
+  documentId: string;
+  missing: typeof SEED_METRIC_DEFINITIONS;
+  existing: Array<{ position: number }>;
+}): Promise<void> {
   const maxPosition = existing.reduce(
     (max, metric) => Math.max(max, metric.position),
     -1,

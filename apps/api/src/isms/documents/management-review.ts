@@ -5,6 +5,7 @@ import {
   defaultProcedureText,
   SEED_REVIEW_INPUT_DEFINITIONS,
 } from './management-review-defaults';
+import { governingPolicyIdSchema } from './governing-policy';
 
 type Tx = Prisma.TransactionClient;
 
@@ -16,6 +17,8 @@ type Tx = Prisma.TransactionClient;
  */
 export const managementReviewNarrativeSchema = z.object({
   procedure: z.string().trim().min(1),
+  /** Optional policy that defines the procedure; the paragraph stays as fallback. */
+  governingPolicyId: governingPolicyIdSchema,
 });
 
 export type ManagementReviewNarrative = z.infer<

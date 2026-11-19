@@ -16,6 +16,7 @@ import { useEffect, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { parseProgramme } from './internal-audit-constants';
+import { GoverningPolicyPicker, parseGoverningPolicyId } from './GoverningPolicyPicker';
 import { IsmsRegisterCard } from './shared';
 
 const programmeSchema = z.object({
@@ -27,7 +28,8 @@ type ProgrammeFormValues = z.infer<typeof programmeSchema>;
 interface ProgrammeCardProps {
   narrative: unknown;
   canEdit: boolean;
-  onSave: (programme: string) => Promise<void>;
+  /** Saves the whole narrative: the paragraph plus the optional policy link. */
+  onSave: (narrative: { programme: string; governingPolicyId?: string }) => Promise<void>;
 }
 
 /**
@@ -37,7 +39,11 @@ interface ProgrammeCardProps {
  */
 export function ProgrammeCard({ narrative, canEdit, onSave }: ProgrammeCardProps) {
   const programme = parseProgramme(narrative);
+  const policyId = parseGoverningPolicyId(narrative);
   const [isEditing, setIsEditing] = useState(false);
+  // The paragraph is kept while linked, so unlinking restores it.
+  const save = ({ text, link }: { text: string; link: string | null }) =>
+    onSave({ programme: text, ...(link ? { governingPolicyId: link } : {}) });
 
   const {
     control,
@@ -56,14 +62,14 @@ export function ProgrammeCard({ narrative, canEdit, onSave }: ProgrammeCardProps
 
   const handleSave = handleSubmit(async (values) => {
     try {
-      await onSave(values.programme.trim());
+      await save({ text: values.programme.trim(), link: policyId });
     } catch {
       return;
     }
     setIsEditing(false);
   });
 
-  const headerActions = canEdit ? (
+  const headerActions = canEdit && !policyId ? (
     isEditing ? (
       <HStack align="center" gap="2">
         <Button
@@ -109,32 +115,42 @@ export function ProgrammeCard({ narrative, canEdit, onSave }: ProgrammeCardProps
         <Stack gap="1">
           <Heading level="4">Programme</Heading>
           <Text size="sm" variant="muted">
-            Rendered verbatim into the generated Clause 9.2 document.
+            {policyId
+              ? 'The generated Clause 9.2 document references the linked policy.'
+              : 'Rendered verbatim into the generated Clause 9.2 document.'}
           </Text>
         </Stack>
       }
       headerEnd={headerActions}
     >
-      {isEditing ? (
-        <Field>
-          <Controller
-            control={control}
-            name="programme"
-            render={({ field: { ref: _ref, ...field }, fieldState }) => (
-              <>
-                <Textarea {...field} rows={4} aria-label="Audit programme" />
-                <FieldError>{fieldState.error?.message}</FieldError>
-              </>
-            )}
-          />
-        </Field>
-      ) : (
-        // whitespace-pre-wrap inherits into the Text span, preserving the
-        // paragraph breaks a multi-line programme was written with.
-        <div className="whitespace-pre-wrap">
-          <Text size="sm">{programme || 'No programme recorded yet.'}</Text>
-        </div>
-      )}
+      <Stack gap="4">
+        <GoverningPolicyPicker
+          policyId={policyId}
+          canEdit={canEdit}
+          paragraphName="programme"
+          onChange={(link) => save({ text: programme, link })}
+        />
+        {policyId ? null : isEditing ? (
+          <Field>
+            <Controller
+              control={control}
+              name="programme"
+              render={({ field: { ref: _ref, ...field }, fieldState }) => (
+                <>
+                  <Textarea {...field} rows={4} aria-label="Audit programme" />
+                  <FieldError>{fieldState.error?.message}</FieldError>
+                </>
+              )}
+            />
+          </Field>
+        ) : (
+          // whitespace-pre-wrap inherits into the Text span, preserving the
+          // paragraph breaks a multi-line programme was written with.
+          <div className="whitespace-pre-wrap">
+            <Text size="sm">{programme || 'No programme recorded yet.'}</Text>
+          </div>
+        )}
+      </Stack>
     </IsmsRegisterCard>
   );
 }

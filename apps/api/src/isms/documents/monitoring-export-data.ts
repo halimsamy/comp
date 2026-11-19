@@ -108,13 +108,17 @@ function currentValueText(metric: MetricWithExportIncludes): string {
   return `${latest.value} (${label})`;
 }
 
-/** The target column: explicit free text wins, else the linked objective. */
+/**
+ * The target column. A linked 6.2 objective holds the target (one source of
+ * truth); the metric's own free text is only used when the objective has none.
+ */
 function targetText(metric: MetricWithExportIncludes): string {
-  if (metric.target?.trim()) return metric.target;
-  if (metric.objective) {
-    return metric.objective.target || metric.objective.objective;
-  }
-  return '';
+  return (
+    metric.objective?.target?.trim() ||
+    metric.target?.trim() ||
+    metric.objective?.objective ||
+    ''
+  );
 }
 
 /**

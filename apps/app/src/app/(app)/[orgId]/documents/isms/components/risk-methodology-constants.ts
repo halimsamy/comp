@@ -40,3 +40,20 @@ export const METHODOLOGY_TREATMENT_LABELS = [
   'Transfer (ISO 27001: Share)',
   'Accept (ISO 27001: Retain)',
 ] as const;
+
+/**
+ * The computed "Owner acceptance in Comp AI" column of the 6.1.2 acceptance
+ * table, per level index (0 = very low), from the acceptance threshold index.
+ * Mirrors ownerAcceptanceText in apps/api/src/isms/documents/risk-methodology.ts.
+ */
+export function ownerAcceptanceText({
+  levelIndex,
+  thresholdIndex,
+}: {
+  levelIndex: number;
+  thresholdIndex: number;
+}): string {
+  return levelIndex >= thresholdIndex
+    ? 'Required: risk-owner acceptance recorded'
+    : 'Not required (accepted by default)';
+}

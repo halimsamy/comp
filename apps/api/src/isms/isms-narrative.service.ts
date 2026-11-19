@@ -6,6 +6,10 @@ import {
 import { db } from '@db';
 import type { Prisma } from '@db';
 import { narrativeSchemaForType } from './documents/registry';
+import {
+  findGoverningPolicy,
+  governingPolicyIdOf,
+} from './documents/governing-policy';
 import { invalidateApprovalIfNeeded } from './utils/approval';
 
 /**
@@ -46,6 +50,18 @@ export class IsmsNarrativeService {
         `Invalid narrative: ${parsed.error.issues
           .map((issue) => `${issue.path.join('.')} ${issue.message}`)
           .join('; ')}`,
+      );
+    }
+
+    // Tenant check: a linked governing policy (9.2 / 9.3) must be an active
+    // policy of this organization.
+    const policyId = governingPolicyIdOf(parsed.data);
+    if (
+      policyId &&
+      !(await findGoverningPolicy({ organizationId, policyId, client: db }))
+    ) {
+      throw new BadRequestException(
+        'Governing policy not found or archived in this organization',
       );
     }
 

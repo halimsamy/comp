@@ -15,6 +15,7 @@ import {
 } from './shared';
 import { OBJECTIVE_STATUS_LABELS } from './objectives-status';
 import { ObjectivesRowEditor } from './ObjectivesRowEditor';
+import { periodLabel, toPeriodKey } from './monitoring-periods';
 
 const STATUS_VARIANT: Record<IsmsObjectiveStatus, 'outline' | 'secondary' | 'accent' | 'destructive'> =
   {
@@ -36,6 +37,21 @@ interface ObjectivesRowProps {
   ownerOptions: ApproverOption[];
   onSave: (update: ObjectiveRowUpdate) => Promise<void>;
   onDelete: () => Promise<void>;
+}
+
+/**
+ * "Training completion: 96% (Q3 2026, provisional)". The objective holds the target, so the
+ * metric's own target is not repeated here.
+ */
+export function measuredByText(metric: NonNullable<IsmsObjective['metrics']>[number]): string {
+  const latest = metric.measurements[0];
+  if (!latest) return `${metric.name}: not measured yet`;
+  const key = toPeriodKey(latest.periodStart);
+  const notes = [
+    key && metric.cadence ? periodLabel(metric.cadence, key) : null,
+    latest.provisional ? 'provisional' : null,
+  ].filter(Boolean);
+  return `${metric.name}: ${latest.value}${notes.length ? ` (${notes.join(', ')})` : ''}`;
 }
 
 function ownerDisplay({
@@ -171,20 +187,11 @@ export function ObjectivesRow({
           {objective.measurementMethod ?? '—'}
         </IsmsRegisterField>
         <IsmsRegisterField label="Plan">{objective.plan ?? '—'}</IsmsRegisterField>
-        <IsmsRegisterField label="Progress (9.1)">
+        <IsmsRegisterField label="Measured by (9.1)">
           {objective.metrics?.length
-            ? objective.metrics.map((metric) => {
-                const latest = metric.measurements[0];
-                return (
-                  <div key={metric.id}>
-                    {metric.name}:{' '}
-                    {latest
-                      ? `${latest.value}${latest.provisional ? ' (provisional)' : ''}`
-                      : 'not measured yet'}
-                    {metric.target ? ` · target ${metric.target}` : ''}
-                  </div>
-                );
-              })
+            ? objective.metrics.map((metric) => (
+                <div key={metric.id}>{measuredByText(metric)}</div>
+              ))
             : 'No metric linked. Link one in Monitoring (9.1).'}
         </IsmsRegisterField>
       </Grid>

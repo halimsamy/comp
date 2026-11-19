@@ -141,9 +141,9 @@ export function InternalAuditClient({
             <ProgrammeCard
               narrative={document.draftNarrative}
               canEdit={canManage}
-              onSave={(programme) =>
+              onSave={(narrative) =>
                 run(
-                  hook.saveNarrative({ programme }),
+                  hook.saveNarrative(narrative),
                   'Programme saved',
                   'Failed to save programme',
                 )

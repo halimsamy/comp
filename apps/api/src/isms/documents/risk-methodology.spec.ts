@@ -119,6 +119,47 @@ describe('buildRiskMethodologySections', () => {
     ]);
   });
 
+  it.each([
+    ['very-low', 0],
+    ['low', 1],
+    ['medium', 2],
+    ['high', 3],
+    ['very-high', 4],
+  ] as const)(
+    'computes the owner-acceptance column from threshold %s',
+    (threshold, firstRequired) => {
+      const narrative = defaultRiskMethodologyNarrative('Acme Corp');
+      const sections = buildRiskMethodologySections({
+        ...input,
+        narrative: { ...narrative, acceptanceRequiredFromLevel: threshold },
+      });
+      const table = sections.find(
+        (section) => section.heading === 'Acceptance thresholds',
+      )?.table;
+      expect(table?.headers).toEqual([
+        'Risk level',
+        'Owner acceptance in Comp AI',
+        'Approval and escalation',
+      ]);
+      table?.rows.forEach((row, index) => {
+        expect(row[1]).toBe(
+          index >= firstRequired
+            ? 'Required: risk-owner acceptance recorded'
+            : 'Not required (accepted by default)',
+        );
+        expect(row[2]).toBe(narrative.acceptanceThresholds[index]);
+      });
+    },
+  );
+
+  it('keeps the default texts free of the threshold and review cadence', () => {
+    const narrative = defaultRiskMethodologyNarrative('Acme Corp');
+    for (const text of narrative.acceptanceThresholds) {
+      expect(text).not.toMatch(/sign-off|accepted by default|acceptance event/i);
+    }
+    expect(narrative.frequency).not.toMatch(/quarterly/i);
+  });
+
   it('falls back to emptyText when the narrative is missing or invalid', () => {
     const sections = buildRiskMethodologySections({
       ...input,

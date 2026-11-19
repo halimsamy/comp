@@ -172,7 +172,12 @@ export function MonitoringRow({
       }
     >
       {isEditing ? (
-        <MetricFields control={control} memberOptions={memberOptions} showName={isCustom} />
+        <MetricFields
+          control={control}
+          memberOptions={memberOptions}
+          showName={isCustom}
+          objectiveTarget={metric.objective?.target}
+        />
       ) : (
         <Stack gap="4">
           <Grid cols={{ base: '1', md: '2' }} gap="3">
@@ -187,10 +192,10 @@ export function MonitoringRow({
               {personDisplay(metric.analyzeMemberId)}
             </IsmsRegisterField>
             <IsmsRegisterField label="Target">
-              {metric.target ||
-                (metric.objective
-                  ? (metric.objective.target ?? metric.objective.objective)
-                  : '—')}
+              {/* A linked 6.2 objective holds the target (same rule as the export). */}
+              {metric.objective?.target
+                ? `${metric.objective.target} (from the 6.2 objective)`
+                : metric.target || metric.objective?.objective || '—'}
             </IsmsRegisterField>
             <IsmsRegisterField label="Source">
               {metric.dataSource === 'computed' ? 'Computed by Comp AI' : 'Manual entry'}

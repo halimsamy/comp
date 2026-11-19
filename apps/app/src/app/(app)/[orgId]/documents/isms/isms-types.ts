@@ -135,6 +135,7 @@ export interface IsmsObjective {
     id: string;
     name: string;
     target: string | null;
+    cadence: IsmsMetricCadence | null;
     /** The latest measurement only. */
     measurements: Array<{ value: string; periodStart: string; provisional: boolean }>;
   }>;
@@ -297,11 +298,15 @@ export interface IsmsAudit {
 /** Narrative shape for the Internal Audit document: the Programme paragraph. */
 export interface IsmsInternalAuditNarrative {
   programme: string;
+  /** Optional policy that defines the programme; the paragraph is the fallback. */
+  governingPolicyId?: string;
 }
 
 /** Narrative shape for the Management Review document: the Procedure paragraph. */
 export interface IsmsManagementReviewNarrative {
   procedure: string;
+  /** Optional policy that defines the procedure; the paragraph is the fallback. */
+  governingPolicyId?: string;
 }
 
 /** An attendee frozen at selection (clause 9.3): member id + display name. */

@@ -25,8 +25,10 @@ import {
 import {
   acceptanceRequiredFromLevelSchema,
   DEFAULT_RISK_METHODOLOGY_SETTINGS,
+  isAcceptanceRequired,
   parseRiskMethodologySettings,
   reviewIntervalMonthsSchema,
+  RISK_LEVELS,
 } from '../../risks/risk-methodology-settings';
 
 /**
@@ -45,7 +47,7 @@ export const riskMethodologyNarrativeSchema = z.object({
   likelihoodDescriptions: z.array(z.string()).length(5),
   /** One description per impact level, ascending (insignificant .. severe). */
   impactDescriptions: z.array(z.string()).length(5),
-  /** One acceptance requirement per risk-level band, ascending (very-low .. very-high). */
+  /** Approval and escalation per risk-level band, ascending (very-low .. very-high). */
   acceptanceThresholds: z.array(z.string()).length(5),
   /** One description per treatment option (mitigate, avoid, transfer, accept). */
   treatmentOptions: z.array(z.string()).length(4),
@@ -132,6 +134,19 @@ function labelledRows(
   return labels.map((label, index) => [label, descriptions[index] ?? '']);
 }
 
+/** Owner-acceptance column, computed from the threshold the Risks module reads. */
+export function ownerAcceptanceText({
+  level,
+  threshold,
+}: {
+  level: RiskLevel;
+  threshold: RiskLevel;
+}): string {
+  return isAcceptanceRequired({ level, threshold })
+    ? 'Required: risk-owner acceptance recorded'
+    : 'Not required (accepted by default)';
+}
+
 export function buildRiskMethodologySections(
   input: DocumentExportInput,
 ): IsmsExportSection[] {
@@ -186,11 +201,19 @@ export function buildRiskMethodologySections(
       heading: 'Acceptance thresholds',
       intro: `Risk levels trigger different acceptance requirements. Comp AI asks the risk owner for a formal acceptance from a ${LEVEL_LABEL[settings.acceptanceRequiredFromLevel]} residual level upward:`,
       table: {
-        headers: ['Risk level', 'Acceptance requirement'],
-        rows: labelledRows(
-          METHODOLOGY_LEVEL_LABELS,
-          narrative.acceptanceThresholds,
-        ),
+        headers: [
+          'Risk level',
+          'Owner acceptance in Comp AI',
+          'Approval and escalation',
+        ],
+        rows: METHODOLOGY_LEVEL_LABELS.map((label, index) => [
+          label,
+          ownerAcceptanceText({
+            level: RISK_LEVELS[index],
+            threshold: settings.acceptanceRequiredFromLevel,
+          }),
+          narrative.acceptanceThresholds[index] ?? '',
+        ]),
       },
     },
     {

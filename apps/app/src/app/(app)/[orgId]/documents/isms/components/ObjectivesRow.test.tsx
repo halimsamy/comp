@@ -140,6 +140,7 @@ describe('ObjectivesRow', () => {
               id: 'met_1',
               name: 'Phishing click rate',
               target: '< 5%',
+              cadence: 'quarterly',
               measurements: [{ value: '4%', periodStart: '2026-10-01', provisional: true }],
             },
           ],
@@ -150,6 +151,8 @@ describe('ObjectivesRow', () => {
         onDelete={vi.fn()}
       />,
     );
-    expect(screen.getByText('Phishing click rate: 4% (provisional) · target < 5%')).toBeInTheDocument();
+    // The objective holds the target; the metric's own target is not repeated.
+    expect(screen.getByText('Phishing click rate: 4% (Q4 2026, provisional)')).toBeInTheDocument();
+    expect(screen.queryByText(/< 5%/)).not.toBeInTheDocument();
   });
 });

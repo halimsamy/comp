@@ -40,12 +40,22 @@ describe('metricValidationMessages (clause 9.1 submit gate)', () => {
 });
 
 describe('seedMetricsIfMissing', () => {
-  const makeTx = (existing: Array<{ metricKey: string | null; position: number }>) => {
+  const makeTx = (
+    existing: Array<{ metricKey: string | null; position: number }>,
+    objectives: Array<{ id: string; objective: string }> = [],
+  ) => {
     const tx = {
       ismsMetric: {
         findMany: jest.fn().mockResolvedValue(existing),
         createMany: jest.fn().mockResolvedValue({ count: 0 }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
+      ismsDocument: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ organizationId: 'org_1', frameworkId: 'fw_1' }),
+      },
+      ismsObjective: { findMany: jest.fn().mockResolvedValue(objectives) },
     };
     return tx as unknown as Prisma.TransactionClient & typeof tx;
   };
@@ -96,6 +106,36 @@ describe('seedMetricsIfMissing', () => {
     );
     await seedMetricsIfMissing({ tx, documentId: 'doc_1' });
     expect(tx.ismsMetric.createMany).not.toHaveBeenCalled();
+  });
+
+  it('links unlinked seeded metrics to the default 6.2 objectives of the same org/framework', async () => {
+    const tx = makeTx(
+      [{ metricKey: 'training_completion', position: 0 }],
+      [
+        { id: 'obj_training', objective: 'Achieve high security-awareness training completion' },
+        { id: 'obj_vendors', objective: 'Complete scheduled vendor security reviews' },
+      ],
+    );
+    await seedMetricsIfMissing({ tx, documentId: 'doc_1' });
+
+    expect(tx.ismsObjective.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          document: { organizationId: 'org_1', frameworkId: 'fw_1', type: 'objectives_plan' },
+        }),
+      }),
+    );
+    // Only unlinked metrics are touched; a chosen link is never overwritten.
+    expect(tx.ismsMetric.updateMany).toHaveBeenCalledWith({
+      where: { documentId: 'doc_1', metricKey: 'training_completion', objectiveId: null },
+      data: { objectiveId: 'obj_training' },
+    });
+    expect(tx.ismsMetric.updateMany).toHaveBeenCalledWith({
+      where: { documentId: 'doc_1', metricKey: 'vendor_review_currency', objectiveId: null },
+      data: { objectiveId: 'obj_vendors' },
+    });
+    // No default risk objective (edited or absent): that metric stays unlinked.
+    expect(tx.ismsMetric.updateMany).toHaveBeenCalledTimes(2);
   });
 });
 

@@ -1,6 +1,7 @@
 import type { IsmsExportSection } from '../utils/export-shared';
 import type { DocumentExportInput, ReviewExportRow } from './types';
 import { managementReviewNarrativeSchema } from './management-review';
+import { governingPolicyText } from './governing-policy';
 
 function parseProcedure(narrative: unknown): string | null {
   const parsed = managementReviewNarrativeSchema.safeParse(narrative);
@@ -176,7 +177,9 @@ export function buildManagementReviewSections(
   input: DocumentExportInput,
 ): IsmsExportSection[] {
   const reviews = input.reviews ?? [];
-  const procedure = parseProcedure(input.narrative);
+  const procedure = input.governingPolicy
+    ? governingPolicyText(input.governingPolicy)
+    : parseProcedure(input.narrative);
 
   const sections: IsmsExportSection[] = [
     {
