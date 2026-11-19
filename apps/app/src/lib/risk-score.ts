@@ -24,18 +24,18 @@ export interface RiskScore {
   level: RiskLevel;
 }
 
+/**
+ * Level of a raw likelihood × impact product (1-25). Delegates to the
+ * normalized-score bands, the one banding rule published in 6.1.2, so raw
+ * and score callers (matrix cells, badges, acceptance, RTP) always agree.
+ */
 export function getRiskLevel(raw: number): RiskLevel {
-  if (raw > 16) return 'very-high';
-  if (raw > 9) return 'high';
-  if (raw > 4) return 'medium';
-  if (raw > 1) return 'low';
-  return 'very-low';
+  return getRiskLevelFromScore(Math.max(1, Math.ceil(raw / 2.5)));
 }
 
 /**
- * Like `getRiskLevel`, but indexed off the normalized 1-10 score so callers
- * that show the score (Treatment Plan hero, RiskScale) and the level label
- * stay consistent. Buckets mirror RiskScale's 5 visual segments (2 score
+ * The banding rule, over the normalized 1-10 score, so callers that show the
+ * score (Treatment Plan hero, RiskScale) and the level label stay consistent. Buckets mirror RiskScale's 5 visual segments (2 score
  * units each):
  *
  *   1-2 → very-low,  3-4 → low,  5-6 → medium,  7-8 → high,  9-10 → very-high

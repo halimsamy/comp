@@ -1,6 +1,12 @@
 import { db } from '@db';
-import { GENERAL_TRAINING_VIDEO_IDS } from '@trycompai/company';
 import { filterComplianceMembers } from '../../utils/compliance-filters';
+import { trainingStatusForOrg } from '../../people-lifecycle/training-status';
+import { policyAckCoverage } from '../../overview/policy-ack-coverage';
+import {
+  isVendorInReviewScope,
+  reviewStatus,
+} from '../../vendors/tpsp/vendor-review-status';
+import { IsmsNonconformityService } from '../isms-nonconformity.service';
 import { loadSlaDays, slaDueDate } from '../../assets/vulnerability-sla';
 import {
   findingAgeing,
@@ -25,21 +31,23 @@ export async function computePlatformMetrics({
   organizationId: string;
   now?: Date;
 }): Promise<Record<ComputedMetricKey, ComputedMetricValue>> {
+  // Each metric reuses the rule of the module that owns the data, so the 9.1
+  // value never disagrees with People, the Overview, Vendors or the 10.2 register.
   const [
     members,
     policies,
-    findings,
-    nonconformities,
+    register,
+    training,
     risks,
     vendors,
     tasks,
-    issues,
     vulnerabilities,
     slaDays,
   ] = await Promise.all([
+      // Same member set as the Overview acknowledgements card.
       db.member.findMany({
-        where: { organizationId, deactivated: false },
-        select: { id: true, role: true, user: { select: { role: true } } },
+        where: { organizationId, isActive: true, deactivated: false },
+        select: { id: true, role: true, department: true, user: { select: { role: true } } },
       }),
       db.policy.findMany({
         where: {
@@ -49,19 +57,17 @@ export async function computePlatformMetrics({
           isArchived: false,
           archivedAt: null,
         },
-        select: { signedBy: true },
-      }),
-      db.ismsAuditFinding.findMany({
-        where: {
-          status: { not: 'closed' },
-          audit: { document: { organizationId } },
+        select: {
+          id: true,
+          status: true,
+          isRequiredToSign: true,
+          signedBy: true,
+          visibility: true,
+          visibleToDepartments: true,
         },
-        select: { createdAt: true, dueDate: true },
       }),
-      db.ismsNonconformity.findMany({
-        where: { organizationId, status: { not: 'closed' } },
-        select: { createdAt: true, dueDate: true },
-      }),
+      new IsmsNonconformityService().list({ organizationId }),
+      trainingStatusForOrg(organizationId, now),
       db.risk.findMany({
         where: { organizationId },
         select: {
@@ -72,12 +78,15 @@ export async function computePlatformMetrics({
         },
       }),
       db.vendor.findMany({
-        where: { organizationId },
+        where: { organizationId, archivedAt: null },
         select: {
           criticality: true,
+          handlesCardholderData: true,
+          affectsCdeSecurity: true,
+          inherentProbability: true,
+          inherentImpact: true,
           lastReviewedAt: true,
           nextReviewDue: true,
-          documents: { where: { type: 'dpa' }, select: { id: true }, take: 1 },
         },
       }),
       db.task.findMany({
@@ -87,11 +96,6 @@ export async function computePlatformMetrics({
           status: { not: 'not_relevant' },
         },
         select: { reviewDate: true },
-      }),
-      // Auditor findings share the one issue register with the 10.2 NCs.
-      db.finding.findMany({
-        where: { organizationId, status: { not: 'closed' } },
-        select: { createdAt: true },
       }),
       db.integrationPlatformFinding.findMany({
         where: {
@@ -105,43 +109,21 @@ export async function computePlatformMetrics({
     ]);
 
   const inScope = await filterComplianceMembers(members, organizationId);
-  const memberIds = inScope.map((member) => member.id);
-  const completions = await db.employeeTrainingVideoCompletion.findMany({
-    where: { memberId: { in: memberIds }, completedAt: { not: null } },
-    select: { memberId: true, videoId: true },
-  });
-  const completedVideoIdsByMember = new Map<string, Set<string>>();
-  for (const completion of completions) {
-    const set = completedVideoIdsByMember.get(completion.memberId) ?? new Set();
-    set.add(completion.videoId);
-    completedVideoIdsByMember.set(completion.memberId, set);
-  }
 
   return {
-    training_completion: trainingCompletion({
-      memberIds,
-      completedVideoIdsByMember,
-      requiredVideoIds: GENERAL_TRAINING_VIDEO_IDS,
-    }),
+    training_completion: trainingCompletion({ members: training.members }),
     policy_acknowledgement: policyAcknowledgement({
-      memberIds,
-      requiredPolicies: policies,
+      coverage: policyAckCoverage({ policies, members: inScope }),
     }),
     finding_ageing: findingAgeing({
-      openItems: [
-        ...findings,
-        ...nonconformities,
-        ...issues.map((issue) => ({ ...issue, dueDate: null })),
-      ],
+      openItems: register.data.filter((row) => row.status !== 'closed'),
       now,
     }),
     risk_treatment_status: riskTreatmentStatus({ risks }),
     vendor_review_currency: vendorReviewCurrency({
-      vendors: vendors.map(({ documents, ...vendor }) => ({
-        ...vendor,
-        hasDpa: documents.length > 0,
-      })),
-      now,
+      statuses: vendors
+        .filter((vendor) => isVendorInReviewScope(vendor))
+        .map((vendor) => reviewStatus({ ...vendor, now })),
     }),
     task_on_time: taskOnTimeRate({ tasks, now }),
     vulnerability_remediation: vulnerabilityRemediationWithinSla({

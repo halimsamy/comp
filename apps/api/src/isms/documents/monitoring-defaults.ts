@@ -12,9 +12,9 @@ export const SEED_METRIC_DEFINITIONS: SeedMetricDefinition[] = [
     metricKey: 'training_completion',
     name: 'Security awareness training completion',
     whatIsMeasured:
-      'Percentage of workforce members who have completed their assigned security-awareness training.',
+      'Percentage of in-scope workforce members whose security-awareness and assigned role training is complete and not expired.',
     method:
-      'Comp AI training tracker: completed assignments over total assigned, per campaign with monthly follow-up.',
+      'Computed by Comp AI with the People training rule (the same one the Overview training card uses): members with complete, in-date training over all members who must train.',
     cadence: 'monthly',
     target: '95% completion or above',
   },
@@ -22,19 +22,19 @@ export const SEED_METRIC_DEFINITIONS: SeedMetricDefinition[] = [
     metricKey: 'vendor_review_currency',
     name: 'Vendor review currency',
     whatIsMeasured:
-      'Percentage of critical vendors with an in-date security review and a signed DPA.',
+      'Percentage of vendors in periodic-review scope with an in-date security review.',
     method:
-      'Comp AI vendor register: critical vendors with a review inside its window and a signed DPA, over all critical vendors.',
+      'Computed by Comp AI with the Vendors review rule: non-archived vendors in review scope (critical or high criticality, PCI DSS 12.8 scope, or high inherent risk) whose review is not overdue or missing, over all vendors in scope.',
     cadence: 'quarterly',
-    target: '100% of critical vendors current',
+    target: '100% of in-scope vendors current',
   },
   {
     metricKey: 'finding_ageing',
     name: 'Open audit findings and corrective-action ageing',
     whatIsMeasured:
-      'Count of open audit findings and the age of each open corrective action.',
+      'Count of open nonconformities and auditor findings in the 10.2 register, and the age of each.',
     method:
-      'Corrective-action records in Comp AI: open findings and days since each was raised, against its due date.',
+      'Computed by Comp AI from the 10.2 nonconformity register (internal-audit nonconformities, auditor findings and standalone records; observations and OFIs are excluded): open items by days since raised, against their due date.',
     cadence: 'monthly',
     target: 'No corrective action open beyond its due date',
   },
@@ -54,7 +54,7 @@ export const SEED_METRIC_DEFINITIONS: SeedMetricDefinition[] = [
     whatIsMeasured:
       'Percentage of workforce members who have acknowledged all policies assigned to them.',
     method:
-      'Comp AI policy tracker: members with all assigned policies acknowledged, over all members with assignments.',
+      'Computed by Comp AI with the Overview acknowledgement rule: members who signed every published policy that requires sign-off and is visible to them (department-scoped policies count only for those departments), over all members with such policies.',
     cadence: 'quarterly',
     target: '95% acknowledgement coverage or above',
   },

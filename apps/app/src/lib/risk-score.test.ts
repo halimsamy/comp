@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getRiskLevel, getRiskScore } from './risk-score';
+import { getRiskLevel, getRiskLevelFromScore, getRiskScore } from './risk-score';
 
 describe('getRiskScore', () => {
   it('returns 1/10 very-low at the minimum corner (1×1)', () => {
@@ -37,15 +37,23 @@ describe('getRiskScore', () => {
 });
 
 describe('getRiskLevel', () => {
-  it('matches the risk-matrix thresholds used elsewhere', () => {
+  it('bands raw products with the normalized-score rule published in 6.1.2', () => {
     expect(getRiskLevel(1)).toBe('very-low');
-    expect(getRiskLevel(2)).toBe('low');
-    expect(getRiskLevel(4)).toBe('low');
-    expect(getRiskLevel(5)).toBe('medium');
-    expect(getRiskLevel(9)).toBe('medium');
-    expect(getRiskLevel(10)).toBe('high');
+    expect(getRiskLevel(5)).toBe('very-low');
+    expect(getRiskLevel(6)).toBe('low');
+    expect(getRiskLevel(9)).toBe('low');
+    expect(getRiskLevel(10)).toBe('low');
+    expect(getRiskLevel(12)).toBe('medium');
+    expect(getRiskLevel(15)).toBe('medium');
     expect(getRiskLevel(16)).toBe('high');
-    expect(getRiskLevel(17)).toBe('very-high');
+    expect(getRiskLevel(20)).toBe('high');
     expect(getRiskLevel(25)).toBe('very-high');
+  });
+
+  it('never disagrees with getRiskLevelFromScore for any rating', () => {
+    for (let raw = 1; raw <= 25; raw++) {
+      expect(getRiskLevel(raw)).toBe(getRiskLevelFromScore(Math.max(1, Math.ceil(raw / 2.5))));
+    }
+    expect(getRiskScore('possible', 'moderate').level).toBe('low');
   });
 });

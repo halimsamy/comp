@@ -9,6 +9,7 @@ import {
 } from './overview-attention-types';
 import { buildModuleCards } from './overview-attention-modules';
 import { peopleCard, trainingCard, vendorsCard } from './overview-attention-people';
+import { policyAckCoverage } from './policy-ack-coverage';
 
 export * from './overview-attention-types';
 
@@ -55,27 +56,7 @@ export function buildAttentionCards({
     (p) => p.status === 'published' && isPast(p.reviewDate),
   ).length;
 
-  // Acknowledgements: one per (required published policy, member who can see it).
-  let ackTotal = 0;
-  let ackPending = 0;
-  const peoplePending = new Set<string>();
-  const policiesPending = new Set<string>();
-  for (const policy of data.policies) {
-    if (!policy.isRequiredToSign || policy.status !== 'published') continue;
-    for (const member of data.members) {
-      if (
-        policy.visibility === 'DEPARTMENT' &&
-        !policy.visibleToDepartments.includes(member.department)
-      ) {
-        continue;
-      }
-      ackTotal++;
-      if (policy.signedBy.includes(member.id)) continue;
-      ackPending++;
-      peoplePending.add(member.id);
-      policiesPending.add(policy.id);
-    }
-  }
+  const acks = policyAckCoverage({ policies: data.policies, members: data.members });
 
   const failingChecks = data.checkRuns.filter(
     (run) => run.failedCount > 0,
@@ -125,12 +106,12 @@ export function buildAttentionCards({
     card({
       module: 'acknowledgements',
       label: 'Policy acknowledgements',
-      total: ackTotal,
-      needsAttention: ackPending,
+      total: acks.total,
+      needsAttention: acks.pending,
       href: '/people',
       reasons: reasons([
-        ['People with pending sign-offs', peoplePending.size],
-        ['Policies awaiting sign-off', policiesPending.size],
+        ['People with pending sign-offs', acks.peoplePending.size],
+        ['Policies awaiting sign-off', acks.policiesPending.size],
       ]),
     }),
     trainingCard({ data, now }),

@@ -5,12 +5,10 @@ import { Impact, Likelihood } from '@db';
 // lets the UI and the exported Risk Treatment Plan disagree about a risk's
 // level. Only the UI-only LEVEL_COLOR CSS tokens are omitted here.
 //
-// NOTE the two banding functions disagree for mid-range raws (e.g. raw 9 is
-// "medium" by getRiskLevel but "low" by the normalized-score bands). The
-// surfaces users act on (RiskScoreBadge, RisksTable severity, TreatmentHero)
-// classify via getRiskLevelFromScore — CS-727 (acceptances + both 6.1.x
-// documents) uses the SAME score-based bands so the documents and the
-// acceptance dialog can never contradict the page the user is looking at.
+// NOTE there is ONE banding rule: getRiskLevelFromScore over the normalized
+// 1-10 score (published in the 6.1.2 methodology). getRiskLevel(raw) only
+// normalizes and delegates, so matrix cells, badges, acceptances and both
+// 6.1.x documents can never classify the same rating differently.
 
 export const LIKELIHOOD_SCORES: Record<Likelihood, number> = {
   very_unlikely: 1,
@@ -36,18 +34,18 @@ export interface RiskScore {
   level: RiskLevel;
 }
 
+/**
+ * Level of a raw likelihood × impact product (1-25). Delegates to the
+ * normalized-score bands, the one banding rule published in 6.1.2, so raw
+ * and score callers (matrix cells, badges, acceptance, RTP) always agree.
+ */
 export function getRiskLevel(raw: number): RiskLevel {
-  if (raw > 16) return 'very-high';
-  if (raw > 9) return 'high';
-  if (raw > 4) return 'medium';
-  if (raw > 1) return 'low';
-  return 'very-low';
+  return getRiskLevelFromScore(Math.max(1, Math.ceil(raw / 2.5)));
 }
 
 /**
- * Like `getRiskLevel`, but indexed off the normalized 1-10 score so callers
- * that show the score (Treatment Plan hero, RiskScale) and the level label
- * stay consistent. Buckets mirror RiskScale's 5 visual segments (2 score
+ * The banding rule, over the normalized 1-10 score, so callers that show the
+ * score (Treatment Plan hero, RiskScale) and the level label stay consistent. Buckets mirror RiskScale's 5 visual segments (2 score
  * units each):
  *
  *   1-2 → very-low,  3-4 → low,  5-6 → medium,  7-8 → high,  9-10 → very-high

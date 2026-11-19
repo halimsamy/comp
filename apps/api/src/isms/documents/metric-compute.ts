@@ -3,6 +3,7 @@
  * plain rows (loaded by metric-compute-data.ts) and returns the value written
  * into a measurement plus a one-line note an auditor can read.
  */
+import type { VendorReviewStatus } from '../../vendors/tpsp/vendor-review-status';
 
 /** measurement.source / metric.dataSource for values Comp AI computes itself. */
 export const COMPUTED_SOURCE = 'computed';
@@ -36,41 +37,40 @@ function percent({ part, total }: { part: number; total: number }): string {
   return `${Math.round((part / total) * 1000) / 10}%`;
 }
 
+/** Over trainingStatusForOrg, the rule People and the Overview training card use. */
 export function trainingCompletion({
-  memberIds,
-  completedVideoIdsByMember,
-  requiredVideoIds,
+  members,
 }: {
-  memberIds: string[];
-  completedVideoIdsByMember: Map<string, Set<string>>;
-  requiredVideoIds: readonly string[];
+  members: Array<{ status: string }>;
 }): ComputedMetricValue {
-  const done = memberIds.filter((id) => {
-    const completed = completedVideoIdsByMember.get(id) ?? new Set<string>();
-    return requiredVideoIds.every((videoId) => completed.has(videoId));
-  }).length;
+  const required = members.filter((member) => member.status !== 'not_required');
+  const done = required.filter((member) => member.status === 'complete').length;
+  const expired = required.filter((member) => member.status === 'expired').length;
   return {
-    value: percent({ part: done, total: memberIds.length }),
-    note: `${done} of ${memberIds.length} in-scope members completed all required security training.`,
+    value: percent({ part: done, total: required.length }),
+    note: `${done} of ${required.length} in-scope members have current security-awareness and role training; ${expired} expired.`,
   };
 }
 
+/** Over policyAckCoverage, the rule the Overview acknowledgements card uses. */
 export function policyAcknowledgement({
-  memberIds,
-  requiredPolicies,
+  coverage,
 }: {
-  memberIds: string[];
-  requiredPolicies: Array<{ signedBy: string[] }>;
+  coverage: {
+    requiredPolicies: number;
+    pending: number;
+    peopleAssigned: Set<string>;
+    peoplePending: Set<string>;
+  };
 }): ComputedMetricValue {
-  if (requiredPolicies.length === 0) {
+  if (coverage.requiredPolicies === 0) {
     return { value: 'n/a', note: 'No published policies require sign-off yet.' };
   }
-  const done = memberIds.filter((id) =>
-    requiredPolicies.every((policy) => policy.signedBy.includes(id)),
-  ).length;
+  const total = coverage.peopleAssigned.size;
+  const done = total - coverage.peoplePending.size;
   return {
-    value: percent({ part: done, total: memberIds.length }),
-    note: `${done} of ${memberIds.length} in-scope members acknowledged all ${requiredPolicies.length} published policies that require sign-off.`,
+    value: percent({ part: done, total }),
+    note: `${done} of ${total} in-scope members acknowledged every policy assigned to them; ${coverage.pending} sign-offs pending across ${coverage.requiredPolicies} published policies that require sign-off.`,
   };
 }
 
@@ -123,32 +123,24 @@ export function riskTreatmentStatus({
   };
 }
 
-export interface VendorReviewRow {
-  criticality: string | null;
-  lastReviewedAt: Date | null;
-  nextReviewDue: Date | null;
-  hasDpa: boolean;
-}
-
+/**
+ * Vendors in review scope (isVendorInReviewScope) with a review that is current
+ * or due soon (reviewStatus), the rule the Vendors list and Overview use.
+ */
 export function vendorReviewCurrency({
-  vendors,
-  now,
+  statuses,
 }: {
-  vendors: VendorReviewRow[];
-  now: Date;
+  statuses: VendorReviewStatus[];
 }): ComputedMetricValue {
-  // Measured over critical vendors; until any vendor is classified, over all of them.
-  const critical = vendors.filter((vendor) => vendor.criticality === 'critical');
-  const scope = critical.length > 0 ? critical : vendors;
-  const inDate = (vendor: VendorReviewRow) =>
-    vendor.lastReviewedAt !== null &&
-    (vendor.nextReviewDue === null || vendor.nextReviewDue.getTime() >= now.getTime());
-  const done = scope.filter((vendor) => inDate(vendor) && vendor.hasDpa).length;
-  const overdue = scope.filter((vendor) => !inDate(vendor)).length;
-  const label = critical.length > 0 ? 'critical vendors' : 'vendors (none classified critical yet)';
+  if (statuses.length === 0) {
+    return { value: 'n/a', note: 'No vendor is in scope for periodic review yet.' };
+  }
+  const done = statuses.filter((s) => s === 'current' || s === 'due_soon').length;
+  const overdue = statuses.filter((s) => s === 'overdue').length;
+  const never = statuses.filter((s) => s === 'never_reviewed').length;
   return {
-    value: percent({ part: done, total: scope.length }),
-    note: `${done} of ${scope.length} ${label} have an in-date security review and a DPA on file; ${overdue} have no review or an overdue one.`,
+    value: percent({ part: done, total: statuses.length }),
+    note: `${done} of ${statuses.length} vendors in review scope have an in-date review; ${overdue} overdue and ${never} never reviewed.`,
   };
 }
 

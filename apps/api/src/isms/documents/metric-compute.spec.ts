@@ -12,40 +12,42 @@ const now = new Date('2026-11-18T00:00:00.000Z');
 const daysAgo = (days: number) => new Date(now.getTime() - days * 86_400_000);
 
 describe('computed 9.1 metrics', () => {
-  it('training completion counts members with every required video', () => {
+  it('training completion counts complete over members who must train', () => {
     const result = trainingCompletion({
-      memberIds: ['a', 'b', 'c', 'd'],
-      completedVideoIdsByMember: new Map([
-        ['a', new Set(['sat-1', 'sat-2'])],
-        ['b', new Set(['sat-1'])],
-      ]),
-      requiredVideoIds: ['sat-1', 'sat-2'],
+      members: [
+        { status: 'complete' },
+        { status: 'expired' },
+        { status: 'incomplete' },
+        { status: 'not_required' },
+      ],
     });
-    expect(result.value).toBe('25%');
-    expect(result.note).toContain('1 of 4');
+    expect(result.value).toBe('33.3%');
+    expect(result.note).toContain('1 of 3');
+    expect(result.note).toContain('1 expired');
   });
 
   it('reports n/a when nobody is in scope', () => {
-    expect(
-      trainingCompletion({
-        memberIds: [],
-        completedVideoIdsByMember: new Map(),
-        requiredVideoIds: ['sat-1'],
-      }).value,
-    ).toBe('n/a');
+    expect(trainingCompletion({ members: [{ status: 'not_required' }] }).value).toBe('n/a');
   });
 
-  it('policy acknowledgement needs every required policy signed', () => {
+  it('policy acknowledgement uses the coverage of people with assigned policies', () => {
     const result = policyAcknowledgement({
-      memberIds: ['a', 'b', 'c'],
-      requiredPolicies: [{ signedBy: ['a', 'b'] }, { signedBy: ['a'] }],
+      coverage: {
+        requiredPolicies: 2,
+        pending: 2,
+        peopleAssigned: new Set(['a', 'b', 'c']),
+        peoplePending: new Set(['b', 'c']),
+      },
     });
     expect(result.value).toBe('33.3%');
+    expect(result.note).toContain('2 sign-offs pending');
   });
 
   it('policy acknowledgement is n/a until a policy requires sign-off', () => {
     expect(
-      policyAcknowledgement({ memberIds: ['a'], requiredPolicies: [] }).value,
+      policyAcknowledgement({
+        coverage: { requiredPolicies: 0, pending: 0, peopleAssigned: new Set(), peoplePending: new Set() },
+      }).value,
     ).toBe('n/a');
   });
 
@@ -77,30 +79,16 @@ describe('computed 9.1 metrics', () => {
     expect(result.note).toContain('1 high residual risks have no plan');
   });
 
-  it('vendor review currency counts assessed vendors', () => {
-    expect(
-      vendorReviewCurrency({
-        now,
-        vendors: [
-          { criticality: 'critical', lastReviewedAt: daysAgo(30), nextReviewDue: daysAgo(-300), hasDpa: true },
-          { criticality: 'critical', lastReviewedAt: daysAgo(400), nextReviewDue: daysAgo(35), hasDpa: true },
-          { criticality: 'critical', lastReviewedAt: daysAgo(10), nextReviewDue: null, hasDpa: false },
-          { criticality: 'low', lastReviewedAt: null, nextReviewDue: null, hasDpa: false },
-        ],
-      }).value,
-    ).toBe('33.3%');
-  });
-
-  it('vendor review currency falls back to all vendors when none is critical', () => {
+  it('vendor review currency counts current and due-soon reviews as in date', () => {
     const result = vendorReviewCurrency({
-      now,
-      vendors: [
-        { criticality: null, lastReviewedAt: daysAgo(30), nextReviewDue: null, hasDpa: true },
-        { criticality: null, lastReviewedAt: null, nextReviewDue: null, hasDpa: true },
-      ],
+      statuses: ['current', 'due_soon', 'overdue', 'never_reviewed'],
     });
     expect(result.value).toBe('50%');
-    expect(result.note).toContain('none classified critical');
+    expect(result.note).toContain('1 overdue and 1 never reviewed');
+  });
+
+  it('vendor review currency is n/a with no vendor in review scope', () => {
+    expect(vendorReviewCurrency({ statuses: [] }).value).toBe('n/a');
   });
 
   it('task on-time rate treats a past next-due date as late', () => {
