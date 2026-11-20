@@ -174,9 +174,11 @@ export class TrainingService {
     if (!completedAt) return { sent: false, reason: 'no_completion_date' };
 
     await this.trainingEmailService.sendTrainingCompletedEmail({
+      memberId,
       toEmail: resolved.email,
       toName: resolved.userName,
       organizationName: resolved.organizationName,
+      primaryColor: resolved.primaryColor,
       completedAt,
     });
     this.logger.log(`Training completion email sent to ${resolved.email}`);
@@ -201,8 +203,10 @@ export class TrainingService {
 
     const pdf =
       await this.trainingCertificatePdfService.generateTrainingCertificatePdf({
+        memberId,
         userName: resolved.userName,
         organizationName: resolved.organizationName,
+        primaryColor: resolved.primaryColor,
         completedAt,
       });
 
@@ -241,9 +245,11 @@ export class TrainingService {
     if (!completedAt) return { sent: false, reason: 'no_completion_date' };
 
     await this.trainingEmailService.sendHipaaTrainingCompletedEmail({
+      memberId,
       toEmail: resolved.email,
       toName: resolved.userName,
       organizationName: resolved.organizationName,
+      primaryColor: resolved.primaryColor,
       completedAt,
     });
     this.logger.log(
@@ -270,8 +276,10 @@ export class TrainingService {
 
     const pdf =
       await this.trainingCertificatePdfService.generateHipaaCertificatePdf({
+        memberId,
         userName: resolved.userName,
         organizationName: resolved.organizationName,
+        primaryColor: resolved.primaryColor,
         completedAt,
       });
 
@@ -285,14 +293,14 @@ export class TrainingService {
     memberId: string,
     organizationId: string,
   ): Promise<
-    | { userName: string; email: string; organizationName: string }
+    | { userName: string; email: string; organizationName: string; primaryColor: string | null }
     | { reason: string }
   > {
     const member = await db.member.findUnique({
       where: { id: memberId },
       include: {
         user: { select: { email: true, name: true } },
-        organization: { select: { name: true } },
+        organization: { select: { name: true, primaryColor: true } },
       },
     });
 
@@ -305,6 +313,7 @@ export class TrainingService {
       userName: member.user.name || 'Team Member',
       email: member.user.email,
       organizationName: member.organization?.name || 'Organization',
+      primaryColor: member.organization?.primaryColor ?? null,
     };
   }
 }

@@ -7,6 +7,7 @@ import {
   EncryptedPDFError,
 } from 'pdf-lib';
 import { AttachmentsService } from '../attachments/attachments.service';
+import { renderHousePdf } from '../utils/house-pdf';
 
 @Injectable()
 export class NdaPdfService {
@@ -19,132 +20,97 @@ export class NdaPdfService {
     signerName: string;
     signerEmail: string;
     agreementId: string;
+    primaryColor?: string | null;
   }): Promise<Buffer> {
-    const { organizationName, signerName, signerEmail, agreementId } = params;
+    const { organizationName, signerName, signerEmail, agreementId, primaryColor } = params;
+    // ISO dates in UTC, matching the ISMS export metadata.
+    const iso = new Date().toISOString();
+    const date = iso.slice(0, 10);
+    const signedAt = `${date} ${iso.slice(11, 16)} UTC`;
 
-    const pdfDoc = await PDFDocument.create();
-    const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-    const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
-
-    const page = pdfDoc.addPage([595, 842]);
-    const { width, height } = page.getSize();
-
-    const margin = 50;
-    let yPosition = height - margin;
-
-    page.drawText('NON-DISCLOSURE AGREEMENT', {
-      x: margin,
-      y: yPosition,
-      size: 18,
-      font: helveticaBold,
-      color: rgb(0, 0, 0),
+    const housePdf = renderHousePdf({
+      title: 'Non-Disclosure Agreement',
+      subtitle: `${organizationName} and ${signerName}`,
+      label: 'Agreement',
+      documentCode: `NDA-${this.shortId(agreementId).toUpperCase()}`,
+      organizationName,
+      primaryColor: primaryColor ?? null,
+      rows: [
+        { label: 'Document ID', value: agreementId },
+        { label: 'Disclosing party', value: organizationName },
+        { label: 'Receiving party', value: signerName },
+        { label: 'Date', value: date },
+      ],
+      sections: [
+        {
+          heading: '',
+          intro: `This Non-Disclosure Agreement ("Agreement") is entered into on ${date} between ${organizationName} ("Disclosing Party") and ${signerName} ("Receiving Party").`,
+        },
+        {
+          heading: '1. Confidential information',
+          intro:
+            'The Receiving Party acknowledges that they will receive access to confidential compliance documentation and policy materials.',
+        },
+        {
+          heading: '2. Obligations',
+          intro: 'The Receiving Party agrees to:',
+          blocks: [
+            {
+              kind: 'bullets',
+              items: [
+                'a) Maintain all confidential information in strict confidence',
+                'b) Not disclose confidential information to any third party without prior written consent',
+                'c) Use confidential information solely for evaluation purposes',
+                'd) Return or destroy all confidential materials upon request',
+              ],
+            },
+          ],
+        },
+        {
+          heading: '3. Term',
+          intro:
+            'This Agreement shall remain in effect for a period of two (2) years from the date of execution.',
+        },
+        {
+          heading: '4. Remedies',
+          intro:
+            'The Receiving Party acknowledges that unauthorized disclosure may cause irreparable harm.',
+        },
+        {
+          heading: '5. Receiving party',
+          intro:
+            'By signing below, the Receiving Party agrees to be bound by the terms of this Agreement.',
+          keyValues: [
+            { label: 'Name', value: signerName },
+            { label: 'Email', value: signerEmail },
+            { label: 'Signed', value: signedAt },
+          ],
+        },
+      ],
     });
 
-    yPosition -= 40;
-
-    page.drawText(`Organization: ${organizationName}`, {
-      x: margin,
-      y: yPosition,
-      size: 12,
-      font: helvetica,
-    });
-
-    yPosition -= 20;
-
-    const now = new Date();
-    page.drawText(`Date: ${now.toLocaleDateString('en-US')}`, {
-      x: margin,
-      y: yPosition,
-      size: 12,
-      font: helvetica,
-    });
-
-    yPosition -= 40;
-
-    const ndaText = `This Non-Disclosure Agreement ("Agreement") is entered into on ${now.toLocaleDateString('en-US')} between ${organizationName} ("Disclosing Party") and ${signerName} ("Receiving Party").
-
-1. CONFIDENTIAL INFORMATION
-The Receiving Party acknowledges that they will receive access to confidential compliance documentation and policy materials.
-
-2. OBLIGATIONS
-The Receiving Party agrees to:
-   a) Maintain all confidential information in strict confidence
-   b) Not disclose confidential information to any third party without prior written consent
-   c) Use confidential information solely for evaluation purposes
-   d) Return or destroy all confidential materials upon request
-
-3. TERM
-This Agreement shall remain in effect for a period of two (2) years from the date of execution.
-
-4. REMEDIES
-The Receiving Party acknowledges that unauthorized disclosure may cause irreparable harm.
-
-By signing below, the Receiving Party agrees to be bound by the terms of this Agreement.`;
-
-    const lines = this.wrapText(ndaText, width - 2 * margin, helvetica, 11);
-    for (const line of lines) {
-      if (yPosition < margin + 100) {
-        const newPage = pdfDoc.addPage([595, 842]);
-        yPosition = newPage.getSize().height - margin;
-      }
-      page.drawText(line, {
-        x: margin,
-        y: yPosition,
-        size: 11,
-        font: helvetica,
-      });
-      yPosition -= 15;
-    }
-
-    yPosition -= 40;
-
-    page.drawText('RECEIVING PARTY:', {
-      x: margin,
-      y: yPosition,
-      size: 12,
-      font: helveticaBold,
-    });
-
-    yPosition -= 30;
-
-    page.drawText(`Name: ${signerName}`, {
-      x: margin,
-      y: yPosition,
-      size: 11,
-      font: helvetica,
-    });
-
-    yPosition -= 20;
-
-    page.drawText(`Email: ${signerEmail}`, {
-      x: margin,
-      y: yPosition,
-      size: 11,
-      font: helvetica,
-    });
-
-    yPosition -= 20;
-
-    page.drawText(`Signed: ${now.toLocaleString('en-US')}`, {
-      x: margin,
-      y: yPosition,
-      size: 11,
-      font: helvetica,
-    });
-
-    await this.addWatermark(pdfDoc, signerName, signerEmail, agreementId);
-
-    const pdfBytes = await pdfDoc.save();
-    return Buffer.from(pdfBytes);
+    // The house footer already carries "NDA-<id> · Page n of m".
+    const pdfDoc = await PDFDocument.load(housePdf);
+    await this.addWatermark({ pdfDoc, email: signerEmail, docId: agreementId, footer: false });
+    return Buffer.from(await pdfDoc.save());
   }
 
-  private async addWatermark(
-    pdfDoc: PDFDocument,
-    name: string,
-    email: string,
-    agreementId: string,
-    customWatermarkText?: string,
-  ) {
+  private shortId(id: string): string {
+    // Drop prefixes such as 'tna_' (prefixed CUIDs) or 'preview-'.
+    return id.split(/[-_]/).pop()?.slice(0, 8) ?? id;
+  }
+
+  private async addWatermark({
+    pdfDoc,
+    email,
+    docId,
+    footer = true,
+  }: {
+    pdfDoc: PDFDocument;
+    email: string;
+    docId: string;
+    footer?: boolean;
+  }) {
     const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
     const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const pages = pdfDoc.getPages();
@@ -200,8 +166,9 @@ By signing below, the Receiving Party agrees to be bound by the terms of this Ag
         }
       }
 
+      if (!footer) continue;
       // Add small footer with page number and document ID
-      const footerText = `Page ${pageNumber} of ${pages.length}  •  Document ID: ${agreementId.split('-').pop()?.slice(0, 8)}`;
+      const footerText = `Page ${pageNumber} of ${pages.length}  •  Document ID: ${this.shortId(docId)}`;
 
       page.drawText(footerText, {
         x: width / 2 - fontRegular.widthOfTextAtSize(footerText, 8) / 2,
@@ -211,44 +178,6 @@ By signing below, the Receiving Party agrees to be bound by the terms of this Ag
         color: rgb(0.6, 0.6, 0.6),
       });
     }
-  }
-
-  private wrapText(
-    text: string,
-    maxWidth: number,
-    font: any,
-    fontSize: number,
-  ): string[] {
-    const paragraphs = text.split('\n');
-    const lines: string[] = [];
-
-    for (const paragraph of paragraphs) {
-      if (!paragraph.trim()) {
-        lines.push('');
-        continue;
-      }
-
-      const words = paragraph.split(' ');
-      let currentLine = '';
-
-      for (const word of words) {
-        const testLine = currentLine ? `${currentLine} ${word}` : word;
-        const testWidth = font.widthOfTextAtSize(testLine, fontSize);
-
-        if (testWidth > maxWidth && currentLine) {
-          lines.push(currentLine);
-          currentLine = word;
-        } else {
-          currentLine = testLine;
-        }
-      }
-
-      if (currentLine) {
-        lines.push(currentLine);
-      }
-    }
-
-    return lines;
   }
 
   async uploadNdaPdf(
@@ -281,9 +210,11 @@ By signing below, the Receiving Party agrees to be bound by the terms of this Ag
       email: string;
       docId: string;
       watermarkText?: string;
+      /** false for house-rendered PDFs, which already carry their own page footer. */
+      footer?: boolean;
     },
   ): Promise<Buffer> {
-    const { name, email, docId, watermarkText } = params;
+    const { email, docId, footer } = params;
 
     let pdfDoc: PDFDocument;
     try {
@@ -308,7 +239,7 @@ By signing below, the Receiving Party agrees to be bound by the terms of this Ag
       throw error;
     }
 
-    await this.addWatermark(pdfDoc, name, email, docId, watermarkText);
+    await this.addWatermark({ pdfDoc, email, docId, footer });
     const pdfBytes = await pdfDoc.save();
     return Buffer.from(pdfBytes);
   }

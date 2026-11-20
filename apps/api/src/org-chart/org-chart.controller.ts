@@ -5,12 +5,18 @@ import {
   Post,
   Delete,
   Body,
+  HttpCode,
+  HttpStatus,
+  Res,
   UseGuards,
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import {
+  ApiBody,
   ApiHeader,
+  ApiProduces,
   ApiOperation,
   ApiResponse,
   ApiSecurity,
@@ -23,6 +29,7 @@ import { RequirePermission } from '../auth/require-permission.decorator';
 import { OrgChartService } from './org-chart.service';
 import { UpsertOrgChartDto } from './dto/upsert-org-chart.dto';
 import { UploadOrgChartDto } from './dto/upload-org-chart.dto';
+import { ExportOrgChartPdfDto } from './dto/export-org-chart-pdf.dto';
 
 @ApiTags('Org Chart')
 @Controller({ path: 'org-chart', version: '1' })
@@ -74,6 +81,29 @@ export class OrgChartController {
     @Body() dto: UploadOrgChartDto,
   ) {
     return await this.orgChartService.uploadImage(organizationId, dto);
+  }
+
+  @Post('pdf')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission('organization', 'read')
+  @ApiOperation({
+    summary: 'Export the organization chart as a PDF',
+    description:
+      'Wraps a PNG rendering of the org chart in a branded PDF document with the chart name, as-of date and headcount. Used by the web app export button.',
+  })
+  @ApiBody({ type: ExportOrgChartPdfDto })
+  @ApiProduces('application/pdf')
+  @ApiResponse({ status: 200, description: 'PDF file' })
+  @ApiResponse({ status: 400, description: 'Image is not a PNG data URL' })
+  @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }))
+  async exportOrgChartPdf(
+    @OrganizationId() organizationId: string,
+    @Body() dto: ExportOrgChartPdfDto,
+    @Res() res: Response,
+  ): Promise<void> {
+    const pdf = await this.orgChartService.renderPdf({ organizationId, dto });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.send(pdf);
   }
 
   @Delete()

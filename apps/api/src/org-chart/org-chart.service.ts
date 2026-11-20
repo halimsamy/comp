@@ -14,6 +14,8 @@ import { db } from '@db';
 import { s3Client, BUCKET_NAME, getSignedUrl } from '@/app/s3';
 import type { UpsertOrgChartDto } from './dto/upsert-org-chart.dto';
 import type { UploadOrgChartDto } from './dto/upload-org-chart.dto';
+import type { ExportOrgChartPdfDto } from './dto/export-org-chart-pdf.dto';
+import { renderOrgChartPdf } from './org-chart-pdf';
 
 @Injectable()
 export class OrgChartService {
@@ -249,6 +251,25 @@ export class OrgChartService {
       this.logger.error(`Failed to generate signed URL for ${s3Key}:`, error);
       return null;
     }
+  }
+
+  /** House-style PDF of a chart the browser already rendered to PNG. */
+  async renderPdf({
+    organizationId,
+    dto,
+  }: {
+    organizationId: string;
+    dto: ExportOrgChartPdfDto;
+  }): Promise<Buffer> {
+    const org = await db.organization.findUnique({
+      where: { id: organizationId },
+      select: { name: true, primaryColor: true },
+    });
+    return renderOrgChartPdf({
+      ...dto,
+      organizationName: org?.name ?? null,
+      primaryColor: org?.primaryColor ?? null,
+    });
   }
 
   private async deleteS3Object(s3Key: string): Promise<void> {

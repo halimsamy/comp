@@ -1,5 +1,5 @@
 import { HIPAA_TRAINING_ID } from '@trycompai/company';
-import type { CertificateDetails } from './training-certificate-pdf.service';
+import { certificateIdFor, type CertificateDetails } from './training-certificate-pdf.service';
 import { GENERAL_TRAINING_MODULE_ID, type TrainingCycle } from './training-cycles';
 
 const GENERAL_MODULES = [1, 2, 3, 4, 5].map((n) => `Security Awareness Training - Part ${n}`);
@@ -14,8 +14,11 @@ export function certificateDetails({
   memberId: string;
   module: { frameworkReference: string | null; title: string } | null;
 }): CertificateDetails {
-  const day = cycle.completedAt.toISOString().slice(0, 10).replace(/-/g, '');
-  const certificateId = `TC-${memberId.slice(-6)}-${cycle.moduleId.slice(-6)}-${day}`.toUpperCase();
+  const certificateId = certificateIdFor({
+    memberId,
+    moduleId: cycle.moduleId,
+    completedAt: cycle.completedAt,
+  });
   if (cycle.moduleId === GENERAL_TRAINING_MODULE_ID) {
     return {
       validUntil: cycle.expiresAt,

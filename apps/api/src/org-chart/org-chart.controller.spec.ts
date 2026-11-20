@@ -24,6 +24,7 @@ describe('OrgChartController', () => {
     upsertInteractive: jest.fn(),
     uploadImage: jest.fn(),
     delete: jest.fn(),
+    renderPdf: jest.fn(),
   };
 
   const mockGuard = { canActivate: jest.fn().mockReturnValue(true) };
@@ -112,6 +113,21 @@ describe('OrgChartController', () => {
 
       expect(result).toEqual(mockResult);
       expect(service.uploadImage).toHaveBeenCalledWith('org_1', dto);
+    });
+  });
+
+  describe('exportOrgChartPdf', () => {
+    it('renders the PDF for the organization and sends it as application/pdf', async () => {
+      const dto = { name: 'Chart', asOf: '2026-11-20', peopleCount: 3, image: 'data:image/png;base64,AA==' };
+      const pdf = Buffer.from('%PDF-');
+      mockService.renderPdf.mockResolvedValue(pdf);
+      const res = { setHeader: jest.fn(), send: jest.fn() };
+
+      await controller.exportOrgChartPdf('org_1', dto, res as never);
+
+      expect(service.renderPdf).toHaveBeenCalledWith({ organizationId: 'org_1', dto });
+      expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'application/pdf');
+      expect(res.send).toHaveBeenCalledWith(pdf);
     });
   });
 

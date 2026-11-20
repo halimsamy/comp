@@ -112,3 +112,10 @@ actions:
     update:
       x-speakeasy-mcp:
         disabled: true
+
+  # 12. Org chart PDF export takes a base64 PNG the browser rendered and returns
+  #   binary PDF bytes — neither fits a JSON-RPC tool call. Web UI only.
+  - target: "$.paths['/v1/org-chart/pdf'].post"
+    update:
+      x-speakeasy-mcp:
+        disabled: true

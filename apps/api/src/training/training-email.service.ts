@@ -13,19 +13,23 @@ export class TrainingEmailService {
   ) {}
 
   async sendTrainingCompletedEmail(params: {
+    memberId: string;
     toEmail: string;
     toName: string;
     organizationName: string;
     completedAt: Date;
+    primaryColor?: string | null;
   }): Promise<void> {
-    const { toEmail, toName, organizationName, completedAt } = params;
+    const { memberId, toEmail, toName, organizationName, completedAt, primaryColor } = params;
 
     // Generate the certificate PDF
     const certificatePdf =
       await this.certificatePdfService.generateTrainingCertificatePdf({
+        memberId,
         userName: toName,
         organizationName,
         completedAt,
+        primaryColor,
       });
 
     this.logger.log(
@@ -61,18 +65,22 @@ export class TrainingEmailService {
   }
 
   async sendHipaaTrainingCompletedEmail(params: {
+    memberId: string;
     toEmail: string;
     toName: string;
     organizationName: string;
     completedAt: Date;
+    primaryColor?: string | null;
   }): Promise<void> {
-    const { toEmail, toName, organizationName, completedAt } = params;
+    const { memberId, toEmail, toName, organizationName, completedAt, primaryColor } = params;
 
     const certificatePdf =
       await this.certificatePdfService.generateHipaaCertificatePdf({
+        memberId,
         userName: toName,
         organizationName,
         completedAt,
+        primaryColor,
       });
 
     this.logger.log(

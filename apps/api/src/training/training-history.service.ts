@@ -76,7 +76,7 @@ export class TrainingHistoryService {
         where: { id: memberId, organizationId },
         select: {
           user: { select: { name: true } },
-          organization: { select: { name: true } },
+          organization: { select: { name: true, primaryColor: true } },
         },
       }),
       db.trainingModule.findFirst({
@@ -87,8 +87,10 @@ export class TrainingHistoryService {
     const userName = member?.user.name || 'Team Member';
 
     const pdf = await this.certificatePdfService.generateCustomCertificatePdf({
+      memberId,
       userName,
       organizationName: member?.organization.name || 'Organization',
+      primaryColor: member?.organization.primaryColor,
       completedAt: cycle.completedAt,
       title: cycle.title,
       details: certificateDetails({ cycle, memberId, module }),

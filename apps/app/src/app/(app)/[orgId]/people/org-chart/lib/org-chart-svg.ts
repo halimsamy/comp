@@ -39,17 +39,23 @@ export function orgChartToSvg({
 }: {
   nodes: ChartNode[];
   edges: ChartEdge[];
+  /** Empty title = no header (the house PDF cover already names the chart). */
   title: string;
   subtitle: string;
 }): { svg: string; width: number; height: number } {
+  const header = title ? HEADER : 0;
   const xs = nodes.map((n) => n.position.x);
   const ys = nodes.map((n) => n.position.y);
   const minX = nodes.length ? Math.min(...xs) : 0;
   const minY = nodes.length ? Math.min(...ys) : 0;
-  const width = Math.max(480, (nodes.length ? Math.max(...xs) - minX : 0) + NODE_W + PAD * 2);
-  const height = (nodes.length ? Math.max(...ys) - minY : 0) + NODE_H + PAD * 2 + HEADER;
+  const chartWidth = (nodes.length ? Math.max(...xs) - minX : 0) + NODE_W + PAD * 2;
+  // PDF (no header): the API fits the image to the 174 mm text width, so at least 870 px keeps
+  // 14 px names near 8pt instead of enlarging a small chart past the house body text.
+  const width = Math.max(title ? 480 : 870, chartWidth);
+  const height = (nodes.length ? Math.max(...ys) - minY : 0) + NODE_H + PAD * 2 + header;
+  const offsetX = (width - chartWidth) / 2 + PAD;
   const pos = new Map(
-    nodes.map((n) => [n.id, { x: n.position.x - minX + PAD, y: n.position.y - minY + PAD + HEADER }]),
+    nodes.map((n) => [n.id, { x: n.position.x - minX + offsetX, y: n.position.y - minY + PAD + header }]),
   );
 
   const lines = edges.flatMap((e) => {
@@ -79,8 +85,12 @@ export function orgChartToSvg({
   const svg = [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" font-family="Helvetica, Arial, sans-serif">`,
     `<rect width="100%" height="100%" fill="#ffffff"/>`,
-    `<text x="${PAD}" y="${PAD}" font-size="18" font-weight="600" fill="#0f172a">${text(title, 80)}</text>`,
-    `<text x="${PAD}" y="${PAD + 20}" font-size="12" fill="#64748b">${text(subtitle, 120)}</text>`,
+    ...(title
+      ? [
+          `<text x="${PAD}" y="${PAD}" font-size="18" font-weight="600" fill="#0f172a">${text(title, 80)}</text>`,
+          `<text x="${PAD}" y="${PAD + 20}" font-size="12" fill="#64748b">${text(subtitle, 120)}</text>`,
+        ]
+      : []),
     ...lines,
     ...boxes,
     '</svg>',

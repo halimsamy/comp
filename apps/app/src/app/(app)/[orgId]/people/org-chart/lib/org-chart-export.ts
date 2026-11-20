@@ -1,6 +1,6 @@
 'use client';
 
-import { jsPDF } from 'jspdf';
+import { api } from '@/lib/api-client';
 import { orgChartToSvg, type ChartEdge, type ChartNode } from './org-chart-svg';
 
 function triggerDownload({ href, fileName }: { href: string; fileName: string }) {
@@ -49,7 +49,13 @@ export async function exportOrgChart({
   format: 'png' | 'pdf';
 }) {
   const dateLabel = date.toISOString().slice(0, 10);
-  const rendered = orgChartToSvg({ nodes, edges, title: name, subtitle: `As of ${dateLabel}` });
+  // The PDF cover already carries the name and date; the PNG keeps its own header.
+  const rendered = orgChartToSvg({
+    nodes,
+    edges,
+    title: format === 'png' ? name : '',
+    subtitle: `As of ${dateLabel}`,
+  });
   const png = await svgToPngDataUrl(rendered);
   const baseName = `${name.replace(/[^a-zA-Z0-9]+/g, '-').toLowerCase()}-${dateLabel}`;
 
@@ -58,8 +64,17 @@ export async function exportOrgChart({
     return;
   }
 
-  const orientation = rendered.width >= rendered.height ? 'landscape' : 'portrait';
-  const doc = new jsPDF({ orientation, unit: 'pt', format: [rendered.width, rendered.height] });
-  doc.addImage(png, 'PNG', 0, 0, rendered.width, rendered.height);
-  doc.save(`${baseName}.pdf`);
+  // The API wraps the PNG in the house-style PDF (cover, metadata, footer) shared by every export.
+  const response = await api.raw('/v1/org-chart/pdf', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, asOf: date.toISOString(), peopleCount: nodes.length, image: png }),
+  });
+  if (!response.ok) throw new Error('Failed to export org chart PDF');
+  const href = URL.createObjectURL(await response.blob());
+  try {
+    triggerDownload({ href, fileName: `${baseName}.pdf` });
+  } finally {
+    URL.revokeObjectURL(href);
+  }
 }
