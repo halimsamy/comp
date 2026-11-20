@@ -35,6 +35,8 @@ export interface IsmsExportMetadata {
   primaryColor: string | null;
   /** Replaces the document metadata table (e.g. auto-evidence snapshots have no version or review). */
   rows?: IsmsKeyValue[];
+  /** Cover line under the title; defaults to "Clause <clause>", '' hides it. */
+  subtitle?: string;
 }
 
 export interface IsmsExportResult {
@@ -87,6 +89,8 @@ export interface IsmsExportTable {
    * the default ink color, so fills must stay light enough for black text.
    */
   cellFills?: (string | null)[][];
+  /** Fixed PDF column widths in mm (summing to 174); autotable sizes columns from content otherwise. */
+  columnWidths?: number[];
 }
 
 export const DOCX_MIME_TYPE =
@@ -167,4 +171,19 @@ export function metadataRows(metadata: IsmsExportMetadata): IsmsKeyValue[] {
     { label: 'Classification', value: metadata.classification },
     { label: 'Next review', value: metadata.nextReview },
   ];
+}
+
+// WinAnsi (cp1252): the only glyphs the built-in Helvetica/Courier can draw.
+const NOT_WIN_ANSI = /[^\n\r\t\x20-\x7e\xa0-\xff€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ]/gu;
+const PDF_TEXT_SUBSTITUTES: Record<string, string> = {
+  '≥': '>=', '≤': '<=', '≠': '!=', '→': '->', '←': '<-', '⇒': '=>', '✓': 'v', '✔': 'v', '✗': 'x', '✘': 'x',
+  '−': '-', '‐': '-', '‑': '-', '\u2009': ' ', '\u202f': ' ', '\u2007': ' ', '\u200b': '', '\u200c': '', '\u200d': '', '\ufeff': '', '\ufe0f': '',
+};
+
+/**
+ * One character outside WinAnsi makes jsPDF draw the whole line as letter-spaced
+ * garbage and mis-measure it, so every string is mapped to WinAnsi first.
+ */
+export function toPdfText(text: string): string {
+  return text.replace(NOT_WIN_ANSI, (ch) => PDF_TEXT_SUBSTITUTES[ch] ?? (/\p{Extended_Pictographic}/u.test(ch) ? '' : '?'));
 }

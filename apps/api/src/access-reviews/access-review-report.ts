@@ -2,6 +2,7 @@ import type { AccessReviewDecision } from '@db';
 import type { IsmsExportSection } from '../isms/utils/export-shared';
 import { formatExportDate } from '../isms/utils/export-shared';
 import { renderIsmsPdf } from '../isms/utils/pdf-renderer';
+import { numberSections } from '../tasks/evidence-export/record-pdf';
 
 export const FLAG_LABELS: Record<string, string> = {
   owner_departed: 'Owner left',
@@ -75,12 +76,26 @@ export interface ReportReview {
 const mfaLabel = (value: boolean | null) =>
   value === null ? '—' : value ? 'Yes' : 'No';
 
+// Fits the longest word of each column on A4 (174mm), so emails and names never
+// break mid-word; the justification shares the Decision cell to make room.
+const ACCOUNT_COLUMN_WIDTHS = [52.5, 24, 24, 11.5, 21, 18, 23];
+
+const decisionCell = (i: ReportItem) =>
+  [
+    i.decision
+      ? `${DECISION_LABELS[i.decision]}\n${i.decidedByName ?? '—'}\n${formatExportDate(i.decidedAt)}`
+      : 'Pending',
+    i.comment,
+  ]
+    .filter(Boolean)
+    .join('\n');
+
 function buildSections(review: ReportReview): IsmsExportSection[] {
   const s = summarizeItems(review.items);
   const actions = review.items.filter(
     (i) => i.decision === 'revoke' || i.decision === 'modify',
   );
-  return [
+  return numberSections([
     {
       heading: 'Summary',
       keyValues: [
@@ -133,8 +148,8 @@ function buildSections(review: ReportReview): IsmsExportSection[] {
           'Last login',
           'Flags',
           'Decision',
-          'Justification',
         ],
+        columnWidths: ACCOUNT_COLUMN_WIDTHS,
         rows: review.items
           .filter((i) => i.reviewSystemId === sys.id)
           .map((i) => [
@@ -146,10 +161,7 @@ function buildSections(review: ReportReview): IsmsExportSection[] {
             mfaLabel(i.mfaEnabled),
             formatExportDate(i.lastLoginAt),
             i.flags.map((f) => FLAG_LABELS[f] ?? f).join(', ') || '—',
-            i.decision
-              ? `${DECISION_LABELS[i.decision]}\n${i.decidedByName ?? '—'}, ${formatExportDate(i.decidedAt)}`
-              : 'Pending',
-            i.comment ?? '',
+            decisionCell(i),
           ]),
       },
     })),
@@ -177,7 +189,7 @@ function buildSections(review: ReportReview): IsmsExportSection[] {
         },
       }),
     },
-  ];
+  ]);
 }
 
 export function renderAccessReviewPdf({
