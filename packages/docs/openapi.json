@@ -27637,6 +27637,62 @@
         }
       }
     },
+    "/v1/org-chart/pdf": {
+      "post": {
+        "description": "Wraps a PNG rendering of the org chart in a branded PDF document with the chart name, as-of date and headcount. Used by the web app export button.",
+        "operationId": "OrgChartController_exportOrgChartPdf_v1",
+        "parameters": [
+          {
+            "name": "X-Organization-Id",
+            "in": "header",
+            "description": "Organization ID (required for session auth, optional for API key auth)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExportOrgChartPdfDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "PDF file"
+          },
+          "400": {
+            "description": "Image is not a PNG data URL"
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "Export the organization chart as a PDF",
+        "tags": [
+          "Org Chart"
+        ],
+        "x-mint": {
+          "metadata": {
+            "title": "Export the organization chart as a PDF | Comp AI API",
+            "sidebarTitle": "Export the organization chart as a PDF",
+            "description": "Wraps a PNG rendering of the org chart in a branded PDF document with the chart name, as-of date and headcount. Used by the web app export button.",
+            "og:title": "Export the organization chart as a PDF | Comp AI API",
+            "og:description": "Wraps a PNG rendering of the org chart in a branded PDF document with the chart name, as-of date and headcount. Used by the web app export button."
+          }
+        },
+        "x-speakeasy-mcp": {
+          "name": "export-org-chart-pdf"
+        }
+      }
+    },
     "/v1/onboarding/checklist": {
       "get": {
         "description": "Returns the setup checklist (systems, policies, ISMS and SoA, people, risks, vendors, evidence, auditor) computed from live data, with progress, locks and deep links.",
@@ -41016,6 +41072,36 @@
           "fileName",
           "fileType",
           "fileData"
+        ]
+      },
+      "ExportOrgChartPdfDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Chart name shown as the document title",
+            "example": "Acme org chart"
+          },
+          "asOf": {
+            "type": "string",
+            "description": "Date the chart reflects (ISO 8601)",
+            "example": "2026-11-20"
+          },
+          "peopleCount": {
+            "type": "number",
+            "description": "Number of people on the chart",
+            "example": 42
+          },
+          "image": {
+            "type": "string",
+            "description": "The rendered chart as a PNG data URL (data:image/png;base64,...)"
+          }
+        },
+        "required": [
+          "name",
+          "asOf",
+          "peopleCount",
+          "image"
         ]
       },
       "SkipChecklistItemDto": {
