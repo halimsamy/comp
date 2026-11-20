@@ -1,8 +1,9 @@
 import { PolicyPdfRendererService } from '../../trust-portal/policy-pdf-renderer.service';
+import { pdfText } from './pdf-text.test-util';
 
 /** Text drawn by jsPDF (one `(...) Tj` per line or run). */
 function drawnText(pdf: Buffer): string[] {
-  return [...pdf.toString('latin1').matchAll(/\((.*?)\)\s*Tj/g)].map((m) => m[1]);
+  return [...pdfText(pdf).matchAll(/\((.*?)\)\s*Tj/g)].map((m) => m[1]);
 }
 
 describe('policy PDF lists (export policy renderer)', () => {

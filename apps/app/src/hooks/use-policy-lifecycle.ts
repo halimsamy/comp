@@ -55,15 +55,6 @@ export interface PolicyAcknowledgements {
   history: PolicyAcknowledgementHistoryItem[];
 }
 
-export interface DocumentControl {
-  policyName: string;
-  organizationName: string;
-  primaryColor: string | null;
-  logo: { dataUrl: string; format: 'PNG' | 'JPEG' } | null;
-  rows: { label: string; value: string }[];
-  revisions?: { version: string; date: string; approvedBy: string; changes: string }[];
-}
-
 export interface PolicyReminderResult {
   sent: number;
   alreadyRemindedToday: number;
@@ -137,10 +128,6 @@ export function useMemberPolicyAcknowledgements({ memberId }: { memberId: string
     return Array.isArray(body.data) ? body.data : [];
   });
   return { history: data ?? [], error, isLoading };
-}
-
-export async function fetchPolicyDocumentControl(policyId: string) {
-  return unwrap(apiClient.get<DocumentControl>(`/v1/policies/${policyId}/document-control`));
 }
 
 /** Downloads the acknowledgement CSV; filters are optional. */

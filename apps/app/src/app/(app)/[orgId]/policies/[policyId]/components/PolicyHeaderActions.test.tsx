@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   setMockPermissions,
@@ -17,11 +18,11 @@ vi.mock('@/hooks/use-permissions', () => ({
 
 // Mock usePolicy hook
 const mockRegeneratePolicy = vi.fn();
-const mockGetPdfUrl = vi.fn();
+const mockGetRenderedPdfUrl = vi.fn();
 vi.mock('../hooks/usePolicy', () => ({
   usePolicy: () => ({
     regeneratePolicy: mockRegeneratePolicy,
-    getPdfUrl: mockGetPdfUrl,
+    getRenderedPdfUrl: mockGetRenderedPdfUrl,
   }),
   policyKey: vi.fn(),
 }));
@@ -36,10 +37,6 @@ vi.mock('../hooks/useAuditLogs', () => ({
   auditLogsKey: vi.fn(),
 }));
 
-vi.mock('@/hooks/use-audit-logs', () => ({
-  useAuditLogs: () => ({ logs: [] }),
-}));
-
 // Mock useSWRConfig
 vi.mock('swr', () => ({
   useSWRConfig: () => ({
@@ -51,11 +48,6 @@ vi.mock('swr', () => ({
 vi.mock('@/hooks/use-job-run', () => ({
   useJobRun: () => ({ run: undefined, error: undefined, isLoading: false }),
   isJobRunFinished: () => false,
-}));
-
-// Mock pdf-generator
-vi.mock('@/lib/pdf-generator', () => ({
-  generatePolicyPDF: vi.fn(),
 }));
 
 // Mock sonner
@@ -190,6 +182,33 @@ describe('PolicyHeaderActions', () => {
       );
 
       expect(screen.getByRole('button')).toBeInTheDocument();
+    });
+  });
+
+  describe('download as PDF', () => {
+    beforeEach(() => {
+      setMockPermissions(ADMIN_PERMISSIONS);
+    });
+
+    const download = async () => {
+      const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+      render(<PolicyHeaderActions policy={basePolicy} organizationId="org-1" />);
+      await userEvent.click(screen.getByRole('button'));
+      await userEvent.click(await screen.findByText('Download as PDF'));
+      await waitFor(() => expect(clickSpy).toHaveBeenCalled());
+      const link = clickSpy.mock.contexts[0] as HTMLAnchorElement;
+      clickSpy.mockRestore();
+      return link;
+    };
+
+    it('downloads the API-rendered PDF (uploaded PDFs get a house cover there)', async () => {
+      mockGetRenderedPdfUrl.mockResolvedValue('https://s3/rendered.pdf');
+
+      const link = await download();
+
+      expect(mockGetRenderedPdfUrl).toHaveBeenCalled();
+      expect(link.href).toBe('https://s3/rendered.pdf');
+      expect(link.download).toBe('Test Policy.pdf');
     });
   });
 });

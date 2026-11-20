@@ -153,19 +153,14 @@ export function usePolicy({ policyId, organizationId, initialData }: UsePolicyOp
     [policyId],
   );
 
-  const getPdfUrl = useCallback(
-    async (versionId?: string) => {
-      const params = new URLSearchParams();
-      if (versionId) params.set('versionId', versionId);
-      const qs = params.toString();
-      const response = await apiClient.get<{ url: string | null }>(
-        `/v1/policies/${policyId}/pdf/signed-url${qs ? `?${qs}` : ''}`,
-      );
-      if (response.error) throw new Error(response.error);
-      return response.data?.url ?? null;
-    },
-    [policyId],
-  );
+  /** The policy rendered from its content in the house PDF style (signed URL). */
+  const getRenderedPdfUrl = useCallback(async () => {
+    const response = await apiClient.get<{ downloadUrl: string; name: string }>(
+      `/v1/policies/download-all?policyIds=${encodeURIComponent(policyId)}`,
+    );
+    if (response.error) throw new Error(response.error);
+    return response.data?.downloadUrl ?? null;
+  }, [policyId]);
 
   return {
     policy: data ?? null,
@@ -180,6 +175,6 @@ export function usePolicy({ policyId, organizationId, initialData }: UsePolicyOp
     denyChanges,
     addControlMappings,
     removeControlMapping,
-    getPdfUrl,
+    getRenderedPdfUrl,
   };
 }

@@ -110,10 +110,19 @@ function classification(policy: Pick<DocumentControlPolicy, 'visibility' | 'visi
 
 /** Approved (or legacy-published) versions, newest first, for "Revision history". */
 export async function getRevisionHistory(policyId: string) {
+  const policy = await db.policy.findUnique({
+    where: { id: policyId },
+    select: { currentVersion: { select: { version: true } } },
+  });
+  const currentVersion = policy?.currentVersion?.version ?? 0;
   const versions = await db.policyVersion.findMany({
     where: {
       policyId,
-      OR: [{ approvedAt: { not: null } }, { publishedById: { not: null } }],
+      // publishedById is also set on rejected/pending drafts, so it only counts up to the live version.
+      OR: [
+        { approvedAt: { not: null } },
+        { publishedById: { not: null }, version: { lte: currentVersion } },
+      ],
     },
     orderBy: { version: 'desc' },
     select: {

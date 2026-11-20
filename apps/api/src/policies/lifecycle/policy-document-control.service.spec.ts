@@ -1,4 +1,5 @@
-import { buildDocumentControlRows } from './policy-document-control.service';
+import { db } from '@db';
+import { buildDocumentControlRows, getRevisionHistory } from './policy-document-control.service';
 
 jest.mock('@db', () => ({ db: {} }));
 jest.mock('../../app/s3', () => ({
@@ -56,5 +57,22 @@ describe('buildDocumentControlRows', () => {
     expect(rows.find((r) => r.label === 'Approved by')?.value).toBe('—');
     expect(rows.find((r) => r.label === 'Review frequency')?.value).toBe('Not set');
     expect(rows.find((r) => r.label === 'Classification')?.value).toBe('Internal - IT, HR');
+  });
+});
+
+describe('getRevisionHistory', () => {
+  it('only counts published versions up to the live version, so rejected drafts are not listed', async () => {
+    const findMany = jest.fn().mockResolvedValue([]);
+    Object.assign(db, {
+      policy: { findUnique: jest.fn().mockResolvedValue({ currentVersion: { version: 2 } }) },
+      policyVersion: { findMany },
+    });
+
+    await getRevisionHistory('pol_1');
+
+    expect(findMany.mock.calls[0][0].where).toEqual({
+      policyId: 'pol_1',
+      OR: [{ approvedAt: { not: null } }, { publishedById: { not: null }, version: { lte: 2 } }],
+    });
   });
 });

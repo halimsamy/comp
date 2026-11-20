@@ -1,7 +1,5 @@
 'use client';
 
-import { fetchPolicyDocumentControl } from '@/hooks/use-policy-lifecycle';
-import { useAuditLogs } from '@/hooks/use-audit-logs';
 import { Button } from '@trycompai/ui/button';
 import { useSWRConfig } from 'swr';
 import {
@@ -21,7 +19,6 @@ import {
 } from '@trycompai/ui/dropdown-menu';
 import { Icons } from '@trycompai/ui/icons';
 import type { Member, Policy, PolicyVersion, User } from '@db';
-import type { JSONContent } from '@tiptap/react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -49,14 +46,9 @@ export function PolicyHeaderActions({
   const [isDownloading, setIsDownloading] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
 
-  const { regeneratePolicy, getPdfUrl } = usePolicy({
+  const { regeneratePolicy, getRenderedPdfUrl } = usePolicy({
     policyId: policy?.id ?? '',
     organizationId,
-  });
-
-  const { logs: auditLogs } = useAuditLogs({
-    entityType: 'policy',
-    entityId: policy?.id ?? '',
   });
 
   // Real-time task tracking
@@ -143,53 +135,20 @@ export function PolicyHeaderActions({
     setIsDownloading(true);
 
     try {
-      // Always call the API to check for an uploaded PDF (also creates audit log)
-      const url = await getPdfUrl(policy.currentVersion?.id);
-
-      if (url) {
-        // Download the uploaded PDF directly
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `${policy.name || 'Policy'}.pdf`;
-        link.target = '_blank';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        return;
-      }
-
-      // Fall back to generating PDF from content
-      const contentSource = policy.currentVersion?.content ?? policy.content;
-
-      if (!contentSource) {
+      // The API renders the house PDF; an uploaded PDF keeps its pages after a house cover.
+      const url = await getRenderedPdfUrl();
+      if (!url) {
         toast.error('Policy content not available for download');
         return;
       }
 
-      // Convert content to JSONContent array
-      let policyContent: JSONContent[];
-      if (Array.isArray(contentSource)) {
-        policyContent = contentSource as JSONContent[];
-      } else if (typeof contentSource === 'object' && contentSource !== null) {
-        policyContent = [contentSource as JSONContent];
-      } else {
-        toast.error('Invalid policy content format');
-        return;
-      }
-
-      // Generate and download the PDF
-      const approvalLogs = auditLogs.filter((log) =>
-        log.description?.toLowerCase().includes('approved'),
-      );
-      // Document control is best-effort: a failure must not block the download.
-      const documentControl = await fetchPolicyDocumentControl(policy.id).catch(() => undefined);
-      const { generatePolicyPDF } = await import('@/lib/pdf-generator');
-      await generatePolicyPDF(
-        policyContent,
-        approvalLogs,
-        policy.name || 'Policy Document',
-        documentControl,
-      );
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${policy.name || 'Policy'}.pdf`;
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     } catch (error) {
       console.error('Error downloading policy PDF:', error);
       toast.error('Failed to generate policy PDF');
