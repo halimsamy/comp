@@ -119,7 +119,7 @@ export async function getAutomationHeaders({
 }): Promise<TaskEvidenceSummary> {
   const task = await db.task.findFirst({
     where: { id: taskId, organizationId },
-    include: { organization: { select: { name: true } } },
+    include: { organization: { select: { name: true, primaryColor: true } } },
   });
 
   if (!task) {
@@ -181,6 +181,7 @@ export async function getAutomationHeaders({
     taskTitle: task.title,
     organizationId,
     organizationName: task.organization.name,
+    primaryColor: task.organization.primaryColor,
     automations: [
       ...groupAppRunHeaders(appRuns),
       ...groupCustomRunHeaders(customRuns),

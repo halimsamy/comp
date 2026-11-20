@@ -106,6 +106,7 @@ export class EvidenceExportService {
     const pdfBuffer = generateAutomationPDF(automation, {
       organizationName: headers.organizationName,
       taskTitle: headers.taskTitle,
+      primaryColor: headers.primaryColor,
     });
 
     this.logger.log('Automation evidence PDF generated', {
@@ -348,6 +349,7 @@ export class EvidenceExportService {
     const context = {
       organizationName: headers.organizationName,
       taskTitle: headers.taskTitle,
+      primaryColor: headers.primaryColor,
     };
 
     if (options.includeRawJson) {

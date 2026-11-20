@@ -1,3 +1,4 @@
+import { inflateSync } from 'zlib';
 import { applicabilityLabel, generateSOAExportFile, toAnnexCode } from './export-generator';
 
 const metadata = { preparedBy: 'Halim', answeredQuestions: 1, totalQuestions: 2 };
@@ -15,6 +16,18 @@ const question = (id: string, closure: string, isApplicable: boolean | null) => 
   },
   answer: null,
 });
+
+/** PDF text with FlateDecode content streams inflated (the house renderer compresses). */
+function pdfText(pdf: Buffer): string {
+  const raw = pdf.toString('latin1');
+  return raw.replace(/stream\r?\n([\s\S]*?)\r?\nendstream/g, (whole, body: string) => {
+    try {
+      return inflateSync(Buffer.from(body, 'latin1')).toString('latin1');
+    } catch {
+      return whole;
+    }
+  });
+}
 
 describe('SoA export', () => {
   it('never prints an unanswered control as Yes or N/A', () => {
@@ -34,15 +47,29 @@ describe('SoA export', () => {
       [question('q1', '5.15', true), question('q2', '7.4', null)],
       'ISO 27001',
       3,
-      metadata,
+      { ...metadata, organizationName: 'Spare Payments' },
     );
-    const text = fileBuffer.toString('latin1');
+    const text = pdfText(fileBuffer);
     expect(mimeType).toBe('application/pdf');
     expect(filename).toBe('statement-of-applicability-iso-27001-v3.pdf');
-    expect(text).toContain('Control: A.5.15');
-    expect(text).toContain('Applicable: Yes \\(inherited from AWS\\)');
-    expect(text).toContain('Implementation: In progress');
-    expect(text).toContain('Applicable: Not yet decided');
-    expect(text).toContain('Prepared by: Halim');
+    // House cover + ISMS metadata table.
+    expect(text).toContain('(Statement of Applicability)');
+    expect(text).toContain('Clause 6.1.3 d\\)');
+    expect(text).toContain('ISO/IEC 27001:2022');
+    expect(text).toContain('(Prepared by)');
+    expect(text).toContain('(Halim)');
+    expect(text).toContain('1 / 2 controls answered \\(50%\\)');
+    // Controls table.
+    expect(text).toContain('(A.5.15)');
+    // The narrow Applicable column wraps the supplier note.
+    expect(text).toContain('Yes \\(inherited');
+    expect(text).toContain('from AWS\\)');
+    expect(text).toContain('(Implementation:)');
+    expect(text).toContain('(In progress)');
+    expect(text).toContain('v3 \u00B7 DRAFT');
+    expect(text).toContain('(Not yet decided)');
+    // Org-prefixed ISMS document ID, version kept out of it.
+    expect(text).toContain('SP-ISMS-SOA');
+    expect(text).not.toContain('SOA-v3');
   });
 });

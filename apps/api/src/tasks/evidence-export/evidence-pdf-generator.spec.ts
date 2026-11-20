@@ -1,12 +1,10 @@
 import {
   generateAutomationPDF,
-  generateTaskSummaryPDF,
+  generateAutomationPDFFromStream,
   sanitizeFilename,
 } from './evidence-pdf-generator';
-import type {
-  NormalizedAutomation,
-  TaskEvidenceSummary,
-} from './evidence-export.types';
+import type { NormalizedAutomation } from './evidence-export.types';
+import { pdfText } from './pdf-text.test-util';
 
 describe('Evidence PDF Generator', () => {
   describe('sanitizeFilename', () => {
@@ -99,6 +97,71 @@ describe('Evidence PDF Generator', () => {
       // Check that it's a valid PDF by checking the header
       const header = pdfBuffer.slice(0, 5).toString('ascii');
       expect(header).toBe('%PDF-');
+
+      // House layout: cover, metadata, run table, results table, evidence JSON.
+      const text = pdfText(pdfBuffer);
+      expect(text).toContain('(Test Organization)');
+      expect(text).toContain('(MFA Enabled Check)');
+      expect(text).toContain('(Document ID)');
+      expect(text).toContain('(Google Workspace)');
+      expect(text).toContain('(1. Run history)');
+      expect(text).toContain('(2. Run details)');
+      expect(text).toContain('(SUCCESS)');
+      expect(text).toContain('(PASS)');
+      expect(text).toContain('(user/user@example.com)');
+      expect(text).toContain('"mfaEnabled": true');
+      expect(text).toContain('EVD-MFA-CHECK');
+    });
+
+    it('builds the same report from streamed run batches', async () => {
+      const run = {
+        id: 'ear_1',
+        type: 'custom_automation' as const,
+        automationName: 'Custom',
+        automationId: 'ea_1',
+        status: 'failed' as const,
+        startedAt: null,
+        completedAt: null,
+        durationMs: null,
+        totalChecked: 0,
+        passedCount: 0,
+        failedCount: 0,
+        evaluationStatus: 'fail' as const,
+        evaluationReason: 'Missing evidence',
+        logs: null,
+        output: { apiKey: 'secret-value', count: 2 },
+        error: 'Timeout',
+        results: [],
+        createdAt: new Date('2024-01-15T10:00:00Z'),
+      };
+      async function* batches() {
+        yield [run];
+        yield [{ ...run, id: 'ear_2', error: 'Second batch error' }];
+      }
+      const pdf = await generateAutomationPDFFromStream(
+        {
+          id: 'ea_1',
+          name: 'Custom',
+          type: 'custom_automation',
+          runs: [],
+          totalRuns: 2,
+          successfulRuns: 0,
+          failedRuns: 2,
+          latestRunAt: run.createdAt,
+        },
+        {
+          organizationName: 'Acme',
+          taskTitle: 'Task',
+          primaryColor: '#123456',
+        },
+        batches(),
+      );
+      const text = pdfText(pdf);
+      expect(text).toContain('(Missing evidence)');
+      expect(text).toContain('(Timeout)');
+      expect(text).toContain('(Second batch error)');
+      expect(text).toContain('"count": 2');
+      expect(text).not.toContain('secret-value');
     });
 
     it('should generate a PDF buffer for a custom automation', () => {
@@ -134,12 +197,10 @@ describe('Evidence PDF Generator', () => {
         latestRunAt: new Date('2024-01-15T10:00:00Z'),
       };
 
-      const context = {
+      const pdfBuffer = generateAutomationPDF(automation, {
         organizationName: 'Test Organization',
         taskTitle: 'Collect Evidence',
-      };
-
-      const pdfBuffer = generateAutomationPDF(automation, context);
+      });
 
       expect(pdfBuffer).toBeInstanceOf(Buffer);
       expect(pdfBuffer.length).toBeGreaterThan(0);
@@ -157,72 +218,10 @@ describe('Evidence PDF Generator', () => {
         latestRunAt: null,
       };
 
-      const context = {
+      const pdfBuffer = generateAutomationPDF(automation, {
         organizationName: 'Test Organization',
         taskTitle: 'Test Task',
-      };
-
-      const pdfBuffer = generateAutomationPDF(automation, context);
-
-      expect(pdfBuffer).toBeInstanceOf(Buffer);
-      expect(pdfBuffer.length).toBeGreaterThan(0);
-    });
-  });
-
-  describe('generateTaskSummaryPDF', () => {
-    it('should generate a summary PDF for a task with multiple automations', () => {
-      const summary: TaskEvidenceSummary = {
-        taskId: 'tsk_123',
-        taskTitle: 'Implement Security Controls',
-        organizationId: 'org_123',
-        organizationName: 'Test Organization',
-        automations: [
-          {
-            id: 'mfa-check',
-            name: 'MFA Enabled Check',
-            type: 'app_automation',
-            integrationName: 'Google Workspace',
-            runs: [],
-            totalRuns: 5,
-            successfulRuns: 4,
-            failedRuns: 1,
-            latestRunAt: new Date('2024-01-15T10:00:00Z'),
-          },
-          {
-            id: 'ea_123',
-            name: 'Custom Evidence Collection',
-            type: 'custom_automation',
-            runs: [],
-            totalRuns: 3,
-            successfulRuns: 3,
-            failedRuns: 0,
-            latestRunAt: new Date('2024-01-16T10:00:00Z'),
-          },
-        ],
-        exportedAt: new Date('2024-01-17T10:00:00Z'),
-      };
-
-      const pdfBuffer = generateTaskSummaryPDF(summary);
-
-      expect(pdfBuffer).toBeInstanceOf(Buffer);
-      expect(pdfBuffer.length).toBeGreaterThan(0);
-
-      // Check that it's a valid PDF
-      const header = pdfBuffer.slice(0, 5).toString('ascii');
-      expect(header).toBe('%PDF-');
-    });
-
-    it('should handle tasks with no automations', () => {
-      const summary: TaskEvidenceSummary = {
-        taskId: 'tsk_123',
-        taskTitle: 'Empty Task',
-        organizationId: 'org_123',
-        organizationName: 'Test Organization',
-        automations: [],
-        exportedAt: new Date('2024-01-17T10:00:00Z'),
-      };
-
-      const pdfBuffer = generateTaskSummaryPDF(summary);
+      });
 
       expect(pdfBuffer).toBeInstanceOf(Buffer);
       expect(pdfBuffer.length).toBeGreaterThan(0);

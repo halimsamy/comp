@@ -1,414 +1,192 @@
 /**
  * Evidence PDF Generator
- * Generates PDF documents for automation evidence export
+ * Task evidence summary and automation run reports in the house PDF style
+ * (same cover, metadata table, sections and footer as the ISMS documents).
  */
 
-import { jsPDF } from 'jspdf';
 import { format } from 'date-fns';
-import { inspect } from 'node:util';
-import stringify from 'safe-stable-stringify';
-import { redactSensitiveData } from './evidence-redaction';
+import {
+  renderHousePdf,
+  type HouseKeyValue,
+  type PdfBlock,
+} from '../../utils/house-pdf';
+import { cleanTextForPDF, formatJsonForPDF } from './evidence-pdf-format';
 import type {
   NormalizedAutomation,
   NormalizedEvidenceRun,
   TaskEvidenceSummary,
 } from './evidence-export.types';
 
-interface PDFConfig {
-  doc: jsPDF;
-  pageWidth: number;
-  pageHeight: number;
-  margin: number;
-  contentWidth: number;
-  lineHeight: number;
-  defaultFontSize: number;
-  yPosition: number;
-}
+type AutomationContext = {
+  organizationName: string;
+  taskTitle: string;
+  primaryColor?: string | null;
+};
 
-/**
- * Clean text for safe PDF rendering
- */
-function cleanTextForPDF(text: string): string {
-  if (!text) return '';
+const RUN_HEADERS = ['#', 'Run', 'Status', 'Duration', 'Outcome'];
 
-  // Strip invisible/control unicode chars
-  const stripped = text
-    .replace(/\u00AD/g, '')
-    .replace(/[\u200B-\u200F]/g, '')
-    .replace(/[\u202A-\u202E]/g, '')
-    .replace(/[\u2060-\u206F]/g, '')
-    .replace(/\uFEFF/g, '')
-    .replace(/\uFFFD/g, '');
+const when = (date: Date) => format(date, 'PPpp');
+const typeLabel = (type: NormalizedAutomation['type']) =>
+  type === 'app_automation' ? 'App Automation' : 'Custom Automation';
+// Prefixed CUIDs ("ea_…", "tsk_…") are shortened; check slugs ("github-mfa") stay readable.
+const docCode = (id: string) =>
+  `EVD-${(/^[a-z]+_/.test(id) ? id.slice(-8) : id).toUpperCase()}`;
 
-  // Replace problematic characters
-  const replacements: Record<string, string> = {
-    '\u2018': "'",
-    '\u2019': "'",
-    '\u201C': '"',
-    '\u201D': '"',
-    '\u2013': '-',
-    '\u2014': '-',
-    '\u2026': '...',
-    '\u00A0': ' ',
-    '\u2022': '*',
-  };
-
-  let cleaned = stripped;
-  for (const [unicode, replacement] of Object.entries(replacements)) {
-    cleaned = cleaned.replace(new RegExp(unicode, 'g'), replacement);
-  }
-
-  return cleaned;
-}
-
-/**
- * Check and handle page breaks
- */
-function checkPageBreak(
-  config: PDFConfig,
-  requiredHeight: number = config.lineHeight,
-): void {
-  if (config.yPosition + requiredHeight > config.pageHeight - config.margin) {
-    config.doc.addPage();
-    config.yPosition = config.margin;
-  }
-}
-
-/**
- * Add text with word wrapping
- */
-function addText(
-  config: PDFConfig,
-  text: string,
-  options: {
-    fontSize?: number;
-    bold?: boolean;
-    color?: [number, number, number];
-    indent?: number;
-  } = {},
-): void {
-  const {
-    fontSize = config.defaultFontSize,
-    bold = false,
-    color = [0, 0, 0],
-    indent = 0,
-  } = options;
-
-  const cleanText = cleanTextForPDF(text);
-  config.doc.setFontSize(fontSize);
-  config.doc.setTextColor(color[0], color[1], color[2]);
-  config.doc.setFont('helvetica', bold ? 'bold' : 'normal');
-
-  const lines: string[] = config.doc.splitTextToSize(
-    cleanText,
-    config.contentWidth - indent,
-  ) as string[];
-
-  for (const line of lines) {
-    checkPageBreak(config);
-    config.doc.text(line, config.margin + indent, config.yPosition);
-    config.yPosition += config.lineHeight;
-  }
-}
-
-/**
- * Add a section header
- */
-function addSectionHeader(config: PDFConfig, title: string): void {
-  config.yPosition += config.lineHeight;
-  checkPageBreak(config, config.lineHeight * 2);
-  addText(config, title, { fontSize: 12, bold: true });
-  config.yPosition += config.lineHeight * 0.5;
-}
-
-/**
- * Add a horizontal line separator
- */
-function addSeparator(config: PDFConfig): void {
-  checkPageBreak(config);
-  config.doc.setDrawColor(200, 200, 200);
-  config.doc.setLineWidth(0.3);
-  config.doc.line(
-    config.margin,
-    config.yPosition,
-    config.margin + config.contentWidth,
-    config.yPosition,
-  );
-  config.yPosition += config.lineHeight;
-}
-
-/**
- * Format JSON for display in PDF
- */
-const MAX_INSPECT_DEPTH = 4;
-
-const safeStringify = stringify.configure({
-  bigint: true,
-  circularValue: '[Circular]',
-});
-
-function safeJsonStringify(data: unknown): string | null {
-  try {
-    return (
-      safeStringify(
-        data,
-        (_key, value) => {
-          if (value instanceof Date) {
-            return value.toISOString();
-          }
-          if (value instanceof Error) {
-            return {
-              name: value.name,
-              message: value.message,
-              stack: value.stack,
-            };
-          }
-          if (value instanceof Map) {
-            return { type: 'Map', entries: Array.from(value.entries()) };
-          }
-          if (value instanceof Set) {
-            return { type: 'Set', values: Array.from(value.values()) };
-          }
-          if (typeof value === 'function') {
-            return `[Function ${value.name || 'anonymous'}]`;
-          }
-          if (typeof value === 'symbol') {
-            return value.toString();
-          }
-          return value;
-        },
-        2,
-      ) ?? null
-    );
-  } catch {
-    return null;
-  }
-}
-
-function formatJsonForPDF(data: unknown): string {
-  const redacted = redactSensitiveData(data);
-
-  if (redacted === null || redacted === undefined) return 'N/A';
-
-  if (typeof redacted === 'string') {
-    return redacted;
-  }
-
-  if (typeof redacted === 'number' || typeof redacted === 'boolean') {
-    return String(redacted);
-  }
-
-  if (typeof redacted === 'bigint') {
-    return redacted.toString();
-  }
-
-  const json = safeJsonStringify(redacted);
-  if (json !== null && json !== undefined) {
-    return json;
-  }
-
-  const inspected = inspect(redacted, {
-    depth: MAX_INSPECT_DEPTH,
-    breakLength: 80,
-    maxArrayLength: 50,
-  });
-
-  return inspected;
-}
-
-/**
- * Add page numbers to all pages
- */
-function addPageNumbers(config: PDFConfig): void {
-  const totalPages = config.doc.internal.pages.length - 1;
-  for (let i = 1; i <= totalPages; i++) {
-    config.doc.setPage(i);
-    config.doc.setFontSize(8);
-    config.doc.setFont('helvetica', 'normal');
-    config.doc.setTextColor(128, 128, 128);
-    config.doc.text(
-      `Page ${i} of ${totalPages}`,
-      config.pageWidth - config.margin - 25,
-      config.pageHeight - 10,
-    );
-  }
-}
-
-function createPDFConfig(doc: jsPDF): PDFConfig {
-  return {
-    doc,
-    pageWidth: doc.internal.pageSize.getWidth(),
-    pageHeight: doc.internal.pageSize.getHeight(),
-    margin: 20,
-    contentWidth: doc.internal.pageSize.getWidth() - 40,
-    lineHeight: 6,
-    defaultFontSize: 10,
-    yPosition: 20,
-  };
-}
-
-function renderAutomationHeader(
-  config: PDFConfig,
-  header: NormalizedAutomation,
-  context: { organizationName: string; taskTitle: string },
-): void {
-  addText(config, context.organizationName, { fontSize: 14, bold: true });
-  config.yPosition += config.lineHeight * 0.5;
-  addText(config, `Task: ${context.taskTitle}`, { fontSize: 11 });
-  config.yPosition += config.lineHeight;
-
-  const typeLabel =
-    header.type === 'app_automation' ? 'App Automation' : 'Custom Automation';
-  addText(config, `${typeLabel}: ${header.name}`, {
-    fontSize: 13,
-    bold: true,
-  });
-
-  if (header.integrationName) {
-    addText(config, `Integration: ${header.integrationName}`, {
-      fontSize: 10,
-      color: [100, 100, 100],
-    });
-  }
-
-  config.yPosition += config.lineHeight;
-
-  addText(config, `Exported: ${format(new Date(), 'PPpp')}`, {
-    fontSize: 9,
-    color: [128, 128, 128],
-  });
-
-  addSeparator(config);
-
-  addSectionHeader(config, 'Summary');
-  addText(config, `Total Runs: ${header.totalRuns}`);
-  addText(config, `Successful: ${header.successfulRuns}`);
-  addText(config, `Failed: ${header.failedRuns}`);
-
-  if (header.latestRunAt) {
-    addText(config, `Latest Run: ${format(header.latestRunAt, 'PPpp')}`);
-  }
-
-  addSeparator(config);
-  addSectionHeader(config, 'Run History');
-}
-
-function renderRunToPDF(config: PDFConfig, run: NormalizedEvidenceRun): void {
-  checkPageBreak(config, config.lineHeight * 8);
-
-  const statusColor = getStatusColor(run.status, run.failedCount > 0);
-  addText(config, `Run: ${format(run.createdAt, 'PPpp')}`, {
-    fontSize: 10,
-    bold: true,
-  });
-  addText(config, `Status: ${run.status.toUpperCase()}`, {
-    fontSize: 9,
-    color: statusColor,
-  });
-
-  if (run.durationMs) {
-    addText(config, `Duration: ${run.durationMs}ms`, { fontSize: 9 });
-  }
-
+function runOutcome(run: NormalizedEvidenceRun): string {
   if (run.type === 'app_automation') {
-    addText(
-      config,
-      `Checked: ${run.totalChecked} | Passed: ${run.passedCount} | Failed: ${run.failedCount}`,
-      { fontSize: 9 },
-    );
+    return `Checked ${run.totalChecked} · Passed ${run.passedCount} · Failed ${run.failedCount}`;
+  }
+  return run.evaluationStatus
+    ? `Evaluation ${run.evaluationStatus.toUpperCase()}`
+    : '—';
+}
+
+const runDuration = (run: NormalizedEvidenceRun) =>
+  run.durationMs ? `${run.durationMs}ms` : '—';
+
+/** One run: overview row + the detail blocks (metrics, error, output, logs, results). */
+function runToPdf(
+  run: NormalizedEvidenceRun,
+  index: number,
+): { row: string[]; blocks: PdfBlock[] } {
+  const row = [
+    String(index),
+    when(run.createdAt),
+    run.status.toUpperCase(),
+    runDuration(run),
+    runOutcome(run),
+  ];
+
+  const facts: HouseKeyValue[] = [
+    { label: 'Status', value: run.status.toUpperCase() },
+    { label: 'Duration', value: runDuration(run) },
+  ];
+  if (run.type === 'app_automation') {
+    facts.push({ label: 'Results', value: runOutcome(run) });
   } else if (run.evaluationStatus) {
-    addText(config, `Evaluation: ${run.evaluationStatus.toUpperCase()}`, {
-      fontSize: 9,
-      color: run.evaluationStatus === 'pass' ? [0, 128, 0] : [200, 0, 0],
+    facts.push({
+      label: 'Evaluation',
+      value: run.evaluationStatus.toUpperCase(),
     });
     if (run.evaluationReason) {
-      addText(config, `Reason: ${run.evaluationReason}`, {
-        fontSize: 9,
-        indent: 10,
+      facts.push({
+        label: 'Reason',
+        value: cleanTextForPDF(run.evaluationReason),
       });
     }
   }
+  if (run.error)
+    facts.push({ label: 'Error', value: cleanTextForPDF(run.error) });
 
-  if (run.error) {
-    config.yPosition += config.lineHeight * 0.5;
-    addText(config, 'Error:', {
-      fontSize: 9,
-      bold: true,
-      color: [200, 0, 0],
-    });
-    addText(config, run.error, {
-      fontSize: 8,
-      color: [150, 0, 0],
-      indent: 10,
-    });
-  }
-
+  const blocks: PdfBlock[] = [
+    { kind: 'subheading', text: `Run ${index} · ${when(run.createdAt)}` },
+    { kind: 'keyValues', rows: facts },
+  ];
   if (run.output) {
-    config.yPosition += config.lineHeight * 0.5;
-    addText(config, 'Output:', { fontSize: 9, bold: true });
-    addMonospaceText(config, formatJsonForPDF(run.output));
+    blocks.push({ kind: 'paragraph', text: 'Output', bold: true });
+    blocks.push({ kind: 'code', text: formatJsonForPDF(run.output) });
   }
-
   if (run.logs) {
-    config.yPosition += config.lineHeight * 0.5;
-    addText(config, 'Logs:', { fontSize: 9, bold: true });
-    addMonospaceText(config, formatJsonForPDF(run.logs));
+    blocks.push({ kind: 'paragraph', text: 'Logs', bold: true });
+    blocks.push({ kind: 'code', text: formatJsonForPDF(run.logs) });
   }
-
   if (run.results.length > 0) {
-    config.yPosition += config.lineHeight * 0.5;
-    addText(config, `Results (${run.results.length}):`, {
-      fontSize: 9,
+    blocks.push({
+      kind: 'paragraph',
+      text: `Results (${run.results.length})`,
       bold: true,
     });
-
+    blocks.push({
+      kind: 'table',
+      table: {
+        headers: ['Result', 'Check', 'Resource', 'Details'],
+        // Fixed widths (sum = 174mm content width) so long resource IDs wrap instead of squeezing Details.
+        columnWidths: [16, 42, 50, 66],
+        rows: run.results.map((result) => [
+          result.passed ? 'PASS' : 'FAIL',
+          cleanTextForPDF(result.title),
+          cleanTextForPDF(`${result.resourceType}/${result.resourceId}`),
+          cleanTextForPDF(
+            [
+              result.description,
+              result.severity ? `Severity: ${result.severity}` : null,
+              result.remediation ? `Remediation: ${result.remediation}` : null,
+            ]
+              .filter(Boolean)
+              .join('\n') || '—',
+          ),
+        ]),
+      },
+    });
     for (const result of run.results) {
-      checkPageBreak(config, config.lineHeight * 5);
-
-      const resultIcon = result.passed ? '[PASS]' : '[FAIL]';
-      const resultColor: [number, number, number] = result.passed
-        ? [0, 100, 0]
-        : [180, 0, 0];
-
-      addText(config, `${resultIcon} ${result.title}`, {
-        fontSize: 9,
-        bold: true,
-        color: resultColor,
-        indent: 10,
+      if (!result.evidence) continue;
+      blocks.push({
+        kind: 'paragraph',
+        text: cleanTextForPDF(
+          `Evidence: ${result.title} (${result.resourceType}/${result.resourceId})`,
+        ),
+        muted: true,
       });
-
-      addText(
-        config,
-        `Resource: ${result.resourceType}/${result.resourceId}`,
-        { fontSize: 8, indent: 15 },
-      );
-
-      if (result.description) {
-        addText(config, result.description, { fontSize: 8, indent: 15 });
-      }
-      if (result.severity) {
-        addText(config, `Severity: ${result.severity}`, {
-          fontSize: 8,
-          indent: 15,
-        });
-      }
-      if (result.remediation) {
-        addText(config, `Remediation: ${result.remediation}`, {
-          fontSize: 8,
-          indent: 15,
-        });
-      }
-      if (result.evidence) {
-        addText(config, 'Evidence:', { fontSize: 8, bold: true, indent: 15 });
-        addMonospaceText(config, formatJsonForPDF(result.evidence), 20);
-      }
-
-      config.yPosition += config.lineHeight * 0.5;
+      blocks.push({ kind: 'code', text: formatJsonForPDF(result.evidence) });
     }
   }
+  return { row, blocks };
+}
 
-  config.yPosition += config.lineHeight;
-  addSeparator(config);
+/** Accumulates runs one at a time so callers can feed batches and drop them. */
+class AutomationReport {
+  private readonly rows: string[][] = [];
+  private readonly blocks: PdfBlock[] = [];
+
+  constructor(
+    private readonly header: NormalizedAutomation,
+    private readonly context: AutomationContext,
+  ) {}
+
+  add(run: NormalizedEvidenceRun): void {
+    const { row, blocks } = runToPdf(run, this.rows.length + 1);
+    this.rows.push(row);
+    this.blocks.push(...blocks);
+  }
+
+  render(): Buffer {
+    const { header, context } = this;
+    const rows: HouseKeyValue[] = [
+      { label: 'Document ID', value: docCode(header.id) },
+      { label: 'Task', value: cleanTextForPDF(context.taskTitle) },
+      { label: 'Automation type', value: typeLabel(header.type) },
+      ...(header.integrationName
+        ? [{ label: 'Integration', value: header.integrationName }]
+        : []),
+      { label: 'Total runs', value: String(header.totalRuns) },
+      { label: 'Successful', value: String(header.successfulRuns) },
+      { label: 'Failed', value: String(header.failedRuns) },
+      {
+        label: 'Latest run',
+        value: header.latestRunAt ? when(header.latestRunAt) : '—',
+      },
+      { label: 'Exported', value: when(new Date()) },
+    ];
+    return renderHousePdf({
+      title: cleanTextForPDF(header.name),
+      label: typeLabel(header.type),
+      subtitle: 'Automation evidence',
+      documentCode: docCode(header.id),
+      organizationName: context.organizationName,
+      primaryColor: context.primaryColor ?? null,
+      rows,
+      sections: [
+        {
+          heading: '1. Run history',
+          emptyText: 'No runs recorded for this automation.',
+          table: { headers: RUN_HEADERS, rows: this.rows },
+        },
+        ...(this.blocks.length
+          ? [{ heading: '2. Run details', blocks: this.blocks }]
+          : []),
+      ],
+    });
+  }
 }
 
 /**
@@ -417,103 +195,28 @@ function renderRunToPDF(config: PDFConfig, run: NormalizedEvidenceRun): void {
  */
 export function generateAutomationPDF(
   automation: NormalizedAutomation,
-  context: { organizationName: string; taskTitle: string },
+  context: AutomationContext,
 ): Buffer {
-  const config = createPDFConfig(new jsPDF());
-  renderAutomationHeader(config, automation, context);
-  for (const run of automation.runs) {
-    renderRunToPDF(config, run);
-  }
-  addPageNumbers(config);
-  return Buffer.from(config.doc.output('arraybuffer'));
+  const report = new AutomationReport(automation, context);
+  for (const run of automation.runs) report.add(run);
+  return report.render();
 }
 
 /**
- * Build a PDF incrementally from an async stream of run batches.
- * Peak memory = one batch of runs + the jsPDF document (lightweight page objects).
+ * Build a PDF from an async stream of run batches. Each batch's raw runs are
+ * released once converted to compact text blocks; only the text is kept
+ * until the document is rendered.
  */
 export async function generateAutomationPDFFromStream(
   header: NormalizedAutomation,
-  context: { organizationName: string; taskTitle: string },
+  context: AutomationContext,
   runBatches: AsyncIterable<NormalizedEvidenceRun[]>,
 ): Promise<Buffer> {
-  const config = createPDFConfig(new jsPDF());
-  renderAutomationHeader(config, header, context);
+  const report = new AutomationReport(header, context);
   for await (const batch of runBatches) {
-    for (const run of batch) {
-      renderRunToPDF(config, run);
-    }
+    for (const run of batch) report.add(run);
   }
-  addPageNumbers(config);
-  return Buffer.from(config.doc.output('arraybuffer'));
-}
-
-/**
- * Add monospace text block for JSON/logs
- */
-function addMonospaceText(
-  config: PDFConfig,
-  text: string,
-  indent: number = 10,
-): void {
-  const monospaceLineHeight = 4;
-  const textWidth = config.contentWidth - indent - 4;
-
-  config.doc.setFontSize(7);
-  config.doc.setFont('courier', 'normal');
-  config.doc.setTextColor(60, 60, 60);
-
-  const lines = text.split('\n');
-
-  for (const line of lines) {
-    const wrappedLines = config.doc.splitTextToSize(
-      line,
-      textWidth,
-    ) as string[];
-
-    for (const wrappedLine of wrappedLines) {
-      checkPageBreak(config, monospaceLineHeight + 2);
-      config.doc.setFillColor(245, 245, 245);
-      config.doc.rect(
-        config.margin + indent,
-        config.yPosition - 2,
-        textWidth + 2,
-        monospaceLineHeight + 2,
-        'F',
-      );
-      config.doc.text(
-        cleanTextForPDF(wrappedLine),
-        config.margin + indent + 2,
-        config.yPosition + 2,
-      );
-      config.yPosition += monospaceLineHeight;
-    }
-  }
-
-  config.yPosition += config.lineHeight * 0.5;
-
-  // Reset font
-  config.doc.setFont('helvetica', 'normal');
-  config.doc.setFontSize(config.defaultFontSize);
-}
-
-/**
- * Get color for status display
- */
-function getStatusColor(
-  status: string,
-  hasFailed: boolean,
-): [number, number, number] {
-  if (status === 'failed' || hasFailed) {
-    return [180, 0, 0];
-  }
-  if (status === 'success') {
-    return [0, 100, 0];
-  }
-  if (status === 'running') {
-    return [0, 100, 180];
-  }
-  return [100, 100, 100];
+  return report.render();
 }
 
 /**
@@ -523,82 +226,57 @@ export function generateTaskSummaryPDF(
   summary: TaskEvidenceSummary,
   options?: { attachmentsCount?: number },
 ): Buffer {
-  const doc = new jsPDF();
-  const config: PDFConfig = {
-    doc,
-    pageWidth: doc.internal.pageSize.getWidth(),
-    pageHeight: doc.internal.pageSize.getHeight(),
-    margin: 20,
-    contentWidth: doc.internal.pageSize.getWidth() - 40,
-    lineHeight: 6,
-    defaultFontSize: 10,
-    yPosition: 20,
-  };
-
-  // Header
-  addText(config, summary.organizationName, { fontSize: 16, bold: true });
-  config.yPosition += config.lineHeight;
-  addText(config, 'Evidence Export Summary', { fontSize: 14 });
-  config.yPosition += config.lineHeight;
-  addText(config, `Task: ${summary.taskTitle}`, { fontSize: 12 });
-  config.yPosition += config.lineHeight * 0.5;
-  addText(config, `Exported: ${format(summary.exportedAt, 'PPpp')}`, {
-    fontSize: 9,
-    color: [128, 128, 128],
-  });
-
-  addSeparator(config);
-
-  // Contents overview
-  addSectionHeader(config, 'Contents');
-
-  const appAutomations = summary.automations.filter(
+  const appCount = summary.automations.filter(
     (a) => a.type === 'app_automation',
-  );
-  const customAutomations = summary.automations.filter(
-    (a) => a.type === 'custom_automation',
-  );
-
+  ).length;
   const attachmentsCount = options?.attachmentsCount ?? 0;
-  if (attachmentsCount > 0) {
-    addText(config, `Attachments: ${attachmentsCount}`);
-  }
-  addText(config, `Total Automations: ${summary.automations.length}`);
-  addText(config, `App Automations: ${appAutomations.length}`);
-  addText(config, `Custom Automations: ${customAutomations.length}`);
-
-  config.yPosition += config.lineHeight;
-
-  // List each automation with summary
-  for (const automation of summary.automations) {
-    checkPageBreak(config, config.lineHeight * 4);
-
-    const typeLabel =
-      automation.type === 'app_automation' ? '[APP]' : '[CUSTOM]';
-
-    addText(config, `${typeLabel} ${automation.name}`, {
-      fontSize: 10,
-      bold: true,
-    });
-    addText(
-      config,
-      `  Runs: ${automation.totalRuns} | Passed: ${automation.successfulRuns} | Failed: ${automation.failedRuns}`,
-      { fontSize: 9 },
-    );
-
-    if (automation.latestRunAt) {
-      addText(config, `  Last Run: ${format(automation.latestRunAt, 'PPpp')}`, {
-        fontSize: 9,
-        color: [100, 100, 100],
-      });
-    }
-
-    config.yPosition += config.lineHeight * 0.5;
-  }
-
-  addPageNumbers(config);
-
-  return Buffer.from(doc.output('arraybuffer'));
+  const rows: HouseKeyValue[] = [
+    { label: 'Document ID', value: docCode(summary.taskId) },
+    { label: 'Task', value: cleanTextForPDF(summary.taskTitle) },
+    { label: 'Exported', value: when(summary.exportedAt) },
+    ...(attachmentsCount > 0
+      ? [{ label: 'Attachments', value: String(attachmentsCount) }]
+      : []),
+    { label: 'Total automations', value: String(summary.automations.length) },
+    { label: 'App automations', value: String(appCount) },
+    {
+      label: 'Custom automations',
+      value: String(summary.automations.length - appCount),
+    },
+  ];
+  return renderHousePdf({
+    title: cleanTextForPDF(summary.taskTitle),
+    label: 'Evidence Export Summary',
+    subtitle: 'Task evidence',
+    documentCode: docCode(summary.taskId),
+    organizationName: summary.organizationName,
+    primaryColor: summary.primaryColor ?? null,
+    rows,
+    sections: [
+      {
+        heading: '1. Automations',
+        emptyText: 'No automations for this task.',
+        table: {
+          headers: [
+            'Automation',
+            'Type',
+            'Runs',
+            'Successful',
+            'Failed',
+            'Last run',
+          ],
+          rows: summary.automations.map((automation) => [
+            cleanTextForPDF(automation.name),
+            automation.type === 'app_automation' ? 'App' : 'Custom',
+            String(automation.totalRuns),
+            String(automation.successfulRuns),
+            String(automation.failedRuns),
+            automation.latestRunAt ? when(automation.latestRunAt) : '—',
+          ]),
+        },
+      },
+    ],
+  });
 }
 
 /**

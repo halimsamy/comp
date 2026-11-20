@@ -1,8 +1,10 @@
+import { inflateSync } from 'zlib';
 import {
   generateExportFile,
   generateXLSX,
   generateCSV,
   generatePDF,
+  answerBlocks,
 } from './export-generator';
 import ExcelJS from 'exceljs';
 import type { QuestionAnswer } from './question-parser';
@@ -84,6 +86,17 @@ describe('generateCSV', () => {
   });
 });
 
+/** PDF bytes with content streams inflated, so drawn text is searchable. */
+function pdfText(buffer: Buffer): string {
+  return buffer.toString('latin1').replace(/stream\r?\n([\s\S]*?)\r?\nendstream/g, (whole, body: string) => {
+    try {
+      return inflateSync(Buffer.from(body, 'latin1')).toString('latin1');
+    } catch {
+      return whole;
+    }
+  });
+}
+
 describe('generatePDF', () => {
   it('should produce a valid PDF buffer', () => {
     const buffer = generatePDF(sampleQAs, 'TestVendor');
@@ -92,6 +105,22 @@ describe('generatePDF', () => {
     expect(buffer.length).toBeGreaterThan(0);
     // PDF files start with %PDF
     expect(buffer.toString('utf-8', 0, 4)).toBe('%PDF');
+
+    const text = pdfText(buffer);
+    expect(text).toContain('(TestVendor)');
+    expect(text).toContain('(1.1 Do you have MFA?)');
+    expect(text).toContain('(No answer provided)');
+    expect(text).toContain('(2 of 3)');
+  });
+
+  it('puts the organization on the cover and footer', () => {
+    const text = pdfText(
+      generatePDF(sampleQAs, 'TestVendor', {
+        organizationName: 'Acme Corp',
+        primaryColor: '#123456',
+      }),
+    );
+    expect(text).toContain('(Acme Corp)');
   });
 
   it('should handle empty QAs', () => {
@@ -99,6 +128,25 @@ describe('generatePDF', () => {
 
     expect(Buffer.isBuffer(buffer)).toBe(true);
     expect(buffer.toString('utf-8', 0, 4)).toBe('%PDF');
+  });
+});
+
+describe('answerBlocks', () => {
+  it('splits paragraphs on blank lines and turns list lines into bullets', () => {
+    expect(
+      answerBlocks('Intro line\n- one\n* two\n\n• three\n\nClosing'),
+    ).toEqual([
+      { kind: 'paragraph', text: 'Intro line' },
+      { kind: 'bullets', items: ['one', 'two'] },
+      { kind: 'bullets', items: ['three'] },
+      { kind: 'paragraph', text: 'Closing' },
+    ]);
+  });
+
+  it('keeps the muted placeholder for empty answers', () => {
+    expect(answerBlocks('  ')).toEqual([
+      { kind: 'paragraph', text: 'No answer provided', muted: true },
+    ]);
   });
 });
 

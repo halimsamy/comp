@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs';
-import { jsPDF } from 'jspdf';
+import { formatExportDate } from '../../isms/utils/export-shared';
+import { renderHousePdf, type PdfBlock } from '../../utils/house-pdf';
 import type { QuestionAnswer } from './question-parser';
 
 export type ExportFormat = 'pdf' | 'csv' | 'xlsx';
@@ -17,6 +18,7 @@ export async function generateExportFile(
   questionsAndAnswers: QuestionAnswer[],
   format: ExportFormat,
   vendorName: string,
+  branding?: ExportBranding,
 ): Promise<ExportResult> {
   // Remove original extension if present and get base name
   const baseName = vendorName.replace(/\.[^/.]+$/, '');
@@ -42,7 +44,7 @@ export async function generateExportFile(
     case 'pdf':
     default:
       return {
-        fileBuffer: generatePDF(questionsAndAnswers, baseName),
+        fileBuffer: generatePDF(questionsAndAnswers, baseName, branding),
         mimeType: 'application/pdf',
         filename: `${sanitizedBaseName}.pdf`,
       };
@@ -94,59 +96,72 @@ export function generateCSV(questionsAndAnswers: QuestionAnswer[]): string {
   return rows.map((row) => row.map((cell) => `"${cell}"`).join(',')).join('\n');
 }
 
+/** Organization shown on the PDF cover and footer, and its accent colour. */
+export interface ExportBranding {
+  organizationName: string | null;
+  primaryColor: string | null;
+}
+
 /**
- * Generates a PDF buffer from questions and answers
+ * Generates a PDF buffer from questions and answers, in the house PDF style.
  */
 export function generatePDF(
   questionsAndAnswers: QuestionAnswer[],
   vendorName?: string,
+  branding?: ExportBranding,
 ): Buffer {
-  const doc = new jsPDF();
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 20;
-  const contentWidth = pageWidth - 2 * margin;
-  let yPosition = margin;
-  const lineHeight = 7;
-
-  // Title
-  doc.setFontSize(16);
-  doc.setFont('helvetica', 'bold');
-  const title = vendorName ? `Questionnaire: ${vendorName}` : 'Questionnaire';
-  doc.text(title, margin, yPosition);
-  yPosition += lineHeight * 2;
-
-  // Generated date
-  doc.setFontSize(10);
-  doc.setFont('helvetica', 'normal');
-  doc.text(`Generated: ${new Date().toLocaleDateString()}`, margin, yPosition);
-  yPosition += lineHeight * 2;
-
-  // Questions and answers
-  doc.setFontSize(11);
-  questionsAndAnswers.forEach((qa, index) => {
-    if (yPosition > pageHeight - 40) {
-      doc.addPage();
-      yPosition = margin;
-    }
-
-    // Question
-    doc.setFont('helvetica', 'bold');
-    const questionText = `Q${index + 1}: ${qa.question}`;
-    const questionLines = doc.splitTextToSize(questionText, contentWidth);
-    doc.text(questionLines, margin, yPosition);
-    yPosition += questionLines.length * lineHeight + 2;
-
-    // Answer
-    doc.setFont('helvetica', 'normal');
-    const answerText = qa.answer || 'No answer provided';
-    const answerLines = doc.splitTextToSize(
-      `A${index + 1}: ${answerText}`,
-      contentWidth,
-    );
-    doc.text(answerLines, margin, yPosition);
-    yPosition += answerLines.length * lineHeight + 4;
+  const answered = questionsAndAnswers.filter((qa) => qa.answer?.trim()).length;
+  return renderHousePdf({
+    title: vendorName || 'Questionnaire',
+    label: 'Security Questionnaire',
+    subtitle: 'Questions and answers',
+    documentCode: 'QUESTIONNAIRE',
+    organizationName: branding?.organizationName ?? null,
+    primaryColor: branding?.primaryColor ?? null,
+    rows: [
+      { label: 'Questionnaire', value: vendorName || 'Questionnaire' },
+      { label: 'Generated', value: formatExportDate(new Date()) },
+      { label: 'Questions', value: String(questionsAndAnswers.length) },
+      { label: 'Answered', value: `${answered} of ${questionsAndAnswers.length}` },
+    ],
+    sections: [
+      {
+        heading: '1. Questions and answers',
+        emptyText: 'No questions in this questionnaire.',
+        blocks: questionsAndAnswers.flatMap((qa, index): PdfBlock[] => [
+          { kind: 'subheading', text: `1.${index + 1} ${qa.question}` },
+          ...answerBlocks(qa.answer),
+        ]),
+      },
+    ],
   });
+}
 
-  return Buffer.from(doc.output('arraybuffer'));
+const BULLET_LINE = /^\s*[-*•]\s+/;
+
+/** Splits an answer into paragraphs on blank lines and markdown list lines into house bullets. */
+export function answerBlocks(answer: string | null | undefined): PdfBlock[] {
+  if (!answer?.trim()) {
+    return [{ kind: 'paragraph', text: 'No answer provided', muted: true }];
+  }
+  const blocks: PdfBlock[] = [];
+  for (const chunk of answer.split(/\n\s*\n/)) {
+    let text: string[] = [];
+    let items: string[] = [];
+    const flush = () => {
+      if (text.length) blocks.push({ kind: 'paragraph', text: text.join('\n') });
+      if (items.length) blocks.push({ kind: 'bullets', items });
+      text = [];
+      items = [];
+    };
+    for (const line of chunk.split('\n')) {
+      if (!line.trim()) continue;
+      const isBullet = BULLET_LINE.test(line);
+      if (isBullet ? text.length : items.length) flush();
+      if (isBullet) items.push(line.replace(BULLET_LINE, '').trim());
+      else text.push(line.trim());
+    }
+    flush();
+  }
+  return blocks;
 }

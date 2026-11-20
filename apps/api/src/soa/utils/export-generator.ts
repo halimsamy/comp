@@ -1,4 +1,9 @@
-import { jsPDF } from 'jspdf';
+import {
+  metadataRows,
+  standardLabel,
+  type IsmsExportMetadata,
+} from '../../isms/utils/export-shared';
+import { renderIsmsPdf } from '../../isms/utils/pdf-renderer';
 
 export type SOAExportFormat = 'pdf';
 
@@ -27,6 +32,8 @@ export interface SOAExportMetadata {
   declinedAt?: Date | string | null;
   status?: string | null;
   approverName?: string | null;
+  organizationName?: string | null;
+  primaryColor?: string | null;
 }
 
 export interface SOAExportResult {
@@ -59,133 +66,106 @@ function generateSOAPDF(
   version: number,
   metadata: SOAExportMetadata,
 ): Buffer {
-  const pdf = new jsPDF();
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
-  const margin = 20;
-  const contentWidth = pageWidth - margin * 2;
-  const lineHeight = 7;
-  let y = margin;
-
-  const ensureSpace = (requiredHeight: number) => {
-    if (y + requiredHeight > pageHeight - margin) {
-      pdf.addPage();
-      y = margin;
-    }
-  };
-  const writeLines = (
-    lines: string[],
-    fontStyle: 'normal' | 'bold' = 'normal',
-  ) => {
-    if (lines.length === 0) return;
-    pdf.setFont('helvetica', fontStyle);
-    for (const line of lines) {
-      ensureSpace(lineHeight);
-      pdf.text(line, margin, y);
-      y += lineHeight;
-    }
-  };
-
-  pdf.setFont('helvetica', 'bold');
-  pdf.setFontSize(16);
-  pdf.text('Statement of Applicability', margin, y);
-  y += lineHeight * 1.8;
-
-  pdf.setFont('helvetica', 'normal');
-  pdf.setFontSize(10);
-  pdf.text(`Framework: ${frameworkName}`, margin, y);
-  y += lineHeight;
-  pdf.text(`Version: v${version}`, margin, y);
-  y += lineHeight;
-  const progressPercentage =
+  const progress =
     metadata.totalQuestions > 0
       ? Math.round((metadata.answeredQuestions / metadata.totalQuestions) * 100)
       : 0;
-  pdf.text(
-    `Progress: ${metadata.answeredQuestions} / ${metadata.totalQuestions} (${progressPercentage}%)`,
-    margin,
-    y,
-  );
-  y += lineHeight;
-  pdf.text(`Prepared by: ${metadata.preparedBy || 'Comp AI'}`, margin, y);
-  y += lineHeight;
-  const approvalStatusText = metadata.approvedAt
-    ? `Approved on ${new Date(metadata.approvedAt).toLocaleDateString()}`
-    : metadata.declinedAt
-      ? `Declined on ${new Date(metadata.declinedAt).toLocaleDateString()}`
-      : metadata.status === 'needs_review'
-        ? 'Pending approval'
-        : 'Not approved';
-  const approvalActorLabel = metadata.approvedAt
-    ? 'Approved by'
-    : metadata.declinedAt
-      ? 'Declined by'
-      : metadata.status === 'needs_review'
-        ? 'Pending approval by'
-        : 'Approver';
-  pdf.text(`Approval status: ${approvalStatusText}`, margin, y);
-  y += lineHeight;
-  pdf.text(`${approvalActorLabel}: ${metadata.approverName || 'N/A'}`, margin, y);
-  y += lineHeight;
-  pdf.text(`Exported: ${new Date().toLocaleDateString()}`, margin, y);
-  y += lineHeight * 2;
+  const ismsMetadata: IsmsExportMetadata = {
+    title: 'Statement of Applicability',
+    clause: '6.1.3 d)',
+    documentCode: `${orgCode(metadata.organizationName ?? null)}-ISMS-SOA`,
+    standardLabel: standardLabel(frameworkName),
+    frameworkName,
+    version,
+    preparedBy: metadata.preparedBy || 'Comp AI',
+    owner: null,
+    status: soaStatus(metadata),
+    approverName: metadata.approverName ?? null,
+    approvedAt: metadata.approvedAt ?? null,
+    declinedAt: metadata.declinedAt ?? null,
+    classification: 'Internal',
+    nextReview: 'Annual, or on material change',
+    issueDate: metadata.approvedAt ?? new Date(),
+    organizationName: metadata.organizationName ?? null,
+    primaryColor: metadata.primaryColor ?? null,
+  };
+  const rows = [
+    // preparedBy is whoever submitted the SoA, not its owner: keep the old label.
+    ...metadataRows(ismsMetadata).map((row) =>
+      row.label === 'Owner' ? { label: 'Prepared by', value: row.value } : row,
+    ),
+    {
+      label: 'Progress',
+      value: `${metadata.answeredQuestions} / ${metadata.totalQuestions} controls answered (${progress}%)`,
+    },
+  ];
 
-  pdf.setFontSize(11);
-  for (let i = 0; i < questions.length; i++) {
-    const question = questions[i];
-    const mapped = question.columnMapping ?? {
-      title: null,
-      control_objective: null,
-      isApplicable: null,
-      justification: null,
-    };
+  return renderIsmsPdf({
+    metadata: { ...ismsMetadata, rows },
+    sections: [
+      {
+        heading: '1. Annex A controls',
+        intro:
+          'The applicability decision, implementation status and justification for each control, as required by ISO/IEC 27001:2022 clause 6.1.3 d).',
+        emptyText: 'No controls in this Statement of Applicability.',
+        table: {
+          headers: ['Control', 'Title and objective', 'Applicable', 'Justification'],
+          // mm, summing to the 174mm A4 content width; auto-sizing left Title narrow and rows tall.
+          columnWidths: [18, 66, 30, 60],
+          rows: questions.map((question, index) => soaRow(question, index)),
+        },
+      },
+    ],
+  });
+}
 
-    const isApplicableLabel = applicabilityLabel(mapped.isApplicable);
+function soaRow(question: SOAExportQuestion, index: number): string[] {
+  const mapped = question.columnMapping ?? {
+    title: null,
+    control_objective: null,
+    isApplicable: null,
+    justification: null,
+  };
+  const justification =
+    typeof mapped.justification === 'string' && mapped.justification.trim()
+      ? mapped.justification
+      : question.answer || 'No justification provided';
+  const title = mapped.title || question.text || 'Untitled Control';
+  const inherited = mapped.inheritedFrom ? ` (inherited from ${mapped.inheritedFrom})` : '';
+  const implementation =
+    mapped.isApplicable === true && mapped.implementation
+      ? `\nImplementation:\n${mapped.implementation}`
+      : '';
+  return [
+    mapped.closure ? toAnnexCode(mapped.closure) : String(index + 1),
+    mapped.control_objective ? `${title}\n\n${mapped.control_objective}` : title,
+    `${applicabilityLabel(mapped.isApplicable)}${inherited}${implementation}`,
+    justification,
+  ];
+}
 
-    const justification =
-      typeof mapped.justification === 'string' && mapped.justification.trim()
-        ? mapped.justification
-        : question.answer || 'No justification provided';
+/**
+ * Org code for the document ID ("Spare Payments" -> "SP"), same rule as the ISMS packs.
+ * shortcut: copy of the private orgCode in isms/utils/export-metadata.ts, export and reuse it when that file is next touched.
+ */
+function orgCode(name: string | null): string {
+  const cleaned = (name ?? '').replace(/[^A-Za-z0-9 ]/g, ' ').trim();
+  if (!cleaned) return 'ORG';
+  const words = cleaned.split(/\s+/);
+  if (words.length === 1) return words[0].slice(0, 4).toUpperCase();
+  return words
+    .map((word) => word[0])
+    .join('')
+    .slice(0, 4)
+    .toUpperCase();
+}
 
-    const title = `${i + 1}. ${mapped.title || question.text || 'Untitled Control'}`;
-    const closure = mapped.closure ? `Control: ${toAnnexCode(mapped.closure)}` : null;
-    const objective = mapped.control_objective
-      ? `Objective: ${mapped.control_objective}`
-      : null;
-    const inherited = mapped.inheritedFrom ? ` (inherited from ${mapped.inheritedFrom})` : '';
-    const applicability = `Applicable: ${isApplicableLabel}${inherited}`;
-    const implementation =
-      mapped.isApplicable === true && mapped.implementation
-        ? `Implementation: ${mapped.implementation}`
-        : null;
-    const justificationText = `Justification: ${justification}`;
-
-    const titleLines = pdf.splitTextToSize(title, contentWidth);
-    const closureLines = closure
-      ? pdf.splitTextToSize(closure, contentWidth)
-      : [];
-    const objectiveLines = objective
-      ? pdf.splitTextToSize(objective, contentWidth)
-      : [];
-    const applicabilityLines = pdf.splitTextToSize(applicability, contentWidth);
-    const implementationLines = implementation
-      ? pdf.splitTextToSize(implementation, contentWidth)
-      : [];
-    const justificationLines = pdf.splitTextToSize(
-      justificationText,
-      contentWidth,
-    );
-    writeLines(titleLines, 'bold');
-    writeLines(closureLines);
-    writeLines(objectiveLines);
-    writeLines(applicabilityLines);
-    writeLines(implementationLines);
-    writeLines(justificationLines);
-    ensureSpace(lineHeight * 0.5);
-    y += lineHeight * 0.5;
-  }
-
-  return Buffer.from(pdf.output('arraybuffer'));
+/** SoA document status in the ISMS vocabulary of the metadata table. */
+function soaStatus(metadata: SOAExportMetadata): string | null {
+  if (metadata.declinedAt) return 'declined';
+  if (metadata.approvedAt || metadata.status === 'completed') return 'approved';
+  if (metadata.status === 'needs_review') return 'needs_review';
+  return 'draft';
 }
 
 /** Yes / No, or "Not yet decided" for a control without an answer (never shown as Yes). */

@@ -71,7 +71,11 @@ export async function loadTaskBundle({
       name: `${prefix}-${sanitizeFilename(header.name)}-${header.id.slice(-8)}.pdf`,
       pdf: await generateAutomationPDFFromStream(
         header,
-        { organizationName: headers.organizationName, taskTitle: headers.taskTitle },
+        {
+          organizationName: headers.organizationName,
+          taskTitle: headers.taskTitle,
+          primaryColor: headers.primaryColor,
+        },
         runsInPeriod(streamAutomationRuns({ taskId, header }), period),
       ),
     });

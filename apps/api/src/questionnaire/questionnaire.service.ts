@@ -158,6 +158,14 @@ export class QuestionnaireService {
     });
 
     const vendorName = dto.vendorName || dto.fileName || 'questionnaire';
+    const organization = await db.organization.findUnique({
+      where: { id: dto.organizationId },
+      select: { name: true, primaryColor: true },
+    });
+    const branding = {
+      organizationName: organization?.name ?? null,
+      primaryColor: organization?.primaryColor ?? null,
+    };
 
     // Check if we need to export in all formats
     if (dto.exportInAllExtensions) {
@@ -170,6 +178,7 @@ export class QuestionnaireService {
           answered.map((a) => ({ question: a.question, answer: a.answer })),
           format,
           vendorName,
+          branding,
         );
         zip.addFile(exportFile.filename, exportFile.fileBuffer);
       }
@@ -205,6 +214,7 @@ export class QuestionnaireService {
       answered.map((a) => ({ question: a.question, answer: a.answer })),
       dto.format,
       vendorName,
+      branding,
     );
 
     await persistQuestionnaireResult(
@@ -493,6 +503,7 @@ export class QuestionnaireService {
         questions: {
           orderBy: { questionIndex: 'asc' },
         },
+        organization: { select: { name: true, primaryColor: true } },
       },
     });
 
@@ -515,6 +526,10 @@ export class QuestionnaireService {
       questionsAndAnswers,
       dto.format,
       questionnaire.filename,
+      {
+        organizationName: questionnaire.organization?.name ?? null,
+        primaryColor: questionnaire.organization?.primaryColor ?? null,
+      },
     );
   }
 

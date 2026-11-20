@@ -438,6 +438,7 @@ export class SOAService {
         framework: {
           select: { name: true },
         },
+        organization: { select: { name: true, primaryColor: true } },
         approver: {
           select: {
             user: {
@@ -521,6 +522,8 @@ export class SOAService {
       status: document.status,
       approverName:
         document.approver?.user?.name || document.approver?.user?.email || null,
+      organizationName: document.organization?.name ?? null,
+      primaryColor: document.organization?.primaryColor ?? null,
     };
 
     return generateSOAExportFile(

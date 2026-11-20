@@ -75,6 +75,8 @@ export interface TaskEvidenceSummary {
   taskTitle: string;
   organizationId: string;
   organizationName: string;
+  /** Organization brand colour for the PDF accent (null = house default). */
+  primaryColor?: string | null;
   automations: NormalizedAutomation[];
   exportedAt: Date;
 }

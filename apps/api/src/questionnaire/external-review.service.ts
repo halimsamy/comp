@@ -87,7 +87,7 @@ export class ExternalQuestionnaireReviewService {
         filename: true,
         reviewStatus: true,
         requesterEmail: true,
-        organization: { select: { name: true } },
+        organization: { select: { name: true, primaryColor: true } },
         questions: {
           orderBy: { questionIndex: 'asc' },
           select: { question: true, answer: true },
@@ -103,7 +103,10 @@ export class ExternalQuestionnaireReviewService {
     const zip = new AdmZip();
     const formats: ExportFormat[] = ['pdf', 'csv', 'xlsx'];
     for (const format of formats) {
-      const file = await generateExportFile(questionnaire.questions, format, baseName);
+      const file = await generateExportFile(questionnaire.questions, format, baseName, {
+        organizationName: questionnaire.organization.name,
+        primaryColor: questionnaire.organization.primaryColor,
+      });
       zip.addFile(file.filename, file.fileBuffer);
     }
 

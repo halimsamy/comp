@@ -21,6 +21,9 @@ jest.mock('@db', () => ({
     securityQuestionnaireManualAnswer: {
       upsert: jest.fn(),
     },
+    organization: {
+      findUnique: jest.fn(),
+    },
   },
   Prisma: {
     JsonNull: 'DbNull',
@@ -454,6 +457,7 @@ describe('QuestionnaireService', () => {
         ],
         'csv',
         'test.pdf',
+        { organizationName: null, primaryColor: null },
       );
     });
 

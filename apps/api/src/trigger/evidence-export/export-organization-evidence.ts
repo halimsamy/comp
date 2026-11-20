@@ -273,7 +273,7 @@ async function populateArchive({
 
         const pdfBuffer = await generateAutomationPDFFromStream(
           automationHeader,
-          { organizationName, taskTitle: headers.taskTitle },
+          { organizationName, taskTitle: headers.taskTitle, primaryColor: headers.primaryColor },
           streamAutomationRuns({ taskId, header: automationHeader }),
         );
         archive.append(pdfBuffer, { name: `${filePrefix}.pdf` });

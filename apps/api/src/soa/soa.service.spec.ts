@@ -667,6 +667,8 @@ describe('SOAService', () => {
           declinedAt: new Date('2026-04-20T00:00:00.000Z'),
           status: 'declined',
           approverName: 'Approver Name',
+          organizationName: null,
+          primaryColor: null,
         },
         'pdf',
       );
