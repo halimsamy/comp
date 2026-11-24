@@ -57,7 +57,11 @@ export function VulnerabilitiesClient({
   );
   const { policy } = useSlaPolicy();
   const searchParams = useSearchParams();
-  const [tab, setTab] = useState<Tab>('open');
+  // Deep link (/vulnerabilities?tab=scans) from evidence rules and the retired Documents form.
+  const [tab, setTab] = useState<Tab>(() => {
+    const requested = searchParams?.get('tab');
+    return requested === 'scans' || requested === 'sla' ? requested : 'open';
+  });
   // Deep link from owner and SLA emails (/vulnerabilities?id=ipf_…) opens that finding.
   const [selectedId, setSelectedId] = useState<string | null>(
     () => searchParams?.get('id') ?? null,

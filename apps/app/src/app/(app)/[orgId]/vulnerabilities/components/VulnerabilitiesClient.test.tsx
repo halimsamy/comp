@@ -26,8 +26,9 @@ vi.mock('@/hooks/use-vulnerability-program', () => ({
   useVulnerabilityScans: () => ({ scans: undefined, isLoading: true }),
   openVulnerabilityFile: vi.fn(),
 }));
+const nav = vi.hoisted(() => ({ params: new URLSearchParams() }));
 vi.mock('next/navigation', () => ({
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => nav.params,
   useParams: () => ({ orgId: 'org_1' }),
 }));
 vi.mock('@/lib/evidence-download', () => ({ downloadRegisterCsv: vi.fn() }));
@@ -38,6 +39,7 @@ const renderClient = () => render(<VulnerabilitiesClient assets={[]} memberOptio
 beforeEach(() => {
   state.vulnerabilities = VULNERABILITIES;
   state.error = undefined;
+  nav.params = new URLSearchParams();
   setMockPermissions({ integration: ['read', 'create', 'update'] });
 });
 
@@ -53,6 +55,12 @@ describe('VulnerabilitiesClient', () => {
     expect(within(row).getByText('In CDE')).toBeInTheDocument();
     expect(screen.getByText('OpenSSL overflow')).toBeInTheDocument();
     expect(screen.queryByText('Old finding')).not.toBeInTheDocument();
+  });
+
+  it('opens the tab named in the link', () => {
+    nav.params = new URLSearchParams('tab=scans');
+    renderClient();
+    expect(screen.getByRole('tab', { name: 'Scans' })).toHaveAttribute('aria-selected', 'true');
   });
 
   it('switches to the resolved history', () => {

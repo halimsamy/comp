@@ -198,6 +198,8 @@ export const evidenceFormDefinitions: Record<EvidenceFormType, EvidenceFormDefin
     // PCI DSS 11.4.2 / 11.4.3: at least once every 12 months.
     cadenceMonths: 12,
     portalAccessible: false,
+    // Recorded under Vulnerabilities > Scans, which files each pentest as this form's evidence.
+    hidden: true,
     fields: [
       {
         key: 'testDate',
