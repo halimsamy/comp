@@ -61,4 +61,5 @@ enum DeviceSource {
   agent
   fleet
   integration
+  manual // added by an admin; the four checks are attested, not measured
 }

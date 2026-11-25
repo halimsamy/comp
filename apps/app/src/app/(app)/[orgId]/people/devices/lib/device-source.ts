@@ -1,3 +1,4 @@
+import { getDeviceComplianceStatus, type DeviceComplianceStatus } from '@trycompai/utils/devices';
 import type { DeviceWithChecks, SourceComplianceCheck } from '../types';
 
 /**
@@ -9,7 +10,21 @@ export function sourceLabel(device: DeviceWithChecks): string {
     return device.integrationProvider?.name ?? 'Integration';
   }
   if (device.source === 'fleet') return 'Fleet';
+  if (device.source === 'manual') return 'Manual';
   return 'Comp Agent';
+}
+
+/**
+ * CompAI's status for a stored device. Manual devices carry an admin's
+ * attestation, not check-ins, so they never go stale.
+ */
+export function storedDeviceStatus(device: {
+  source: string;
+  isCompliant: boolean;
+  lastCheckIn: Date | null;
+}): DeviceComplianceStatus {
+  if (device.source === 'manual') return device.isCompliant ? 'compliant' : 'non_compliant';
+  return getDeviceComplianceStatus(device);
 }
 
 /**
@@ -21,7 +36,7 @@ export function sourceKey(device: DeviceWithChecks): string {
   if (device.source === 'integration') {
     return `integration:${device.integrationProvider?.slug ?? 'unknown'}`;
   }
-  return device.source; // 'device_agent' | 'fleet'
+  return device.source; // 'device_agent' | 'fleet' | 'manual'
 }
 
 /**

@@ -51,7 +51,7 @@ export interface DeviceWithChecks {
     email: string;
   };
   /** Indicates which system reported this device */
-  source: 'device_agent' | 'fleet' | 'integration';
+  source: 'device_agent' | 'fleet' | 'integration' | 'manual';
   /**
    * Set only when `source === 'integration'`: the provider that imported this
    * device, so the UI can label its provenance instead of mislabeling it as an

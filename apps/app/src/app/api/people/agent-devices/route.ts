@@ -6,13 +6,15 @@ import type {
 import { getOrgIsInternal } from '@/lib/org-participation';
 import { requireApiPermission } from '@/lib/permissions.server';
 import { db } from '@db/server';
-import { daysSinceCheckIn, getDeviceComplianceStatus } from '@trycompai/utils/devices';
+import { storedDeviceStatus } from '@/app/(app)/[orgId]/people/devices/lib/device-source';
+import { daysSinceCheckIn } from '@trycompai/utils/devices';
 import { NextResponse } from 'next/server';
 
 /** Maps the DB `DeviceSource` enum to the frontend source discriminant. */
 function mapSource(source: string): DeviceWithChecks['source'] {
   if (source === 'integration') return 'integration';
   if (source === 'fleet') return 'fleet';
+  if (source === 'manual') return 'manual';
   return 'device_agent';
 }
 
@@ -97,10 +99,7 @@ export async function GET(req: Request) {
     )
     .map((device) => {
       const source = mapSource(device.source);
-      const complianceStatus = getDeviceComplianceStatus({
-        isCompliant: device.isCompliant,
-        lastCheckIn: device.lastCheckIn,
-      });
+      const complianceStatus = storedDeviceStatus(device);
       const provider =
         source === 'integration' && device.integrationConnectionId
           ? providerByConnectionId.get(device.integrationConnectionId)

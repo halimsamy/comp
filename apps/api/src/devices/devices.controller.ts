@@ -1,5 +1,6 @@
-import { Controller, Delete, Get, HttpCode, Param, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Post, UseGuards } from '@nestjs/common';
 import {
+  ApiBody,
   ApiOperation,
   ApiParam,
   ApiResponse,
@@ -11,8 +12,10 @@ import { HybridAuthGuard } from '../auth/hybrid-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
 import type { AuthContext as AuthContextType } from '../auth/types';
+import { CreateDeviceDto } from './dto/create-device.dto';
 import { DevicesByMemberResponseDto } from './dto/devices-by-member-response.dto';
 import { DevicesService } from './devices.service';
+import { createManualDevice } from './manual-device';
 
 @ApiTags('Devices')
 @Controller({ path: 'devices', version: '1' })
@@ -219,6 +222,23 @@ export class DevicesController {
           },
         }),
     };
+  }
+
+  @Post()
+  @RequirePermission('member', 'update')
+  @ApiOperation({
+    summary: 'Add a device manually',
+    description:
+      'Records an employee device that has no agent or device sync, with attested disk encryption, antivirus, password policy and screen lock checks.',
+  })
+  @ApiBody({ type: CreateDeviceDto })
+  @ApiResponse({ status: 201, description: 'Device added' })
+  @ApiResponse({ status: 404, description: 'Member not found' })
+  async createDevice(
+    @OrganizationId() organizationId: string,
+    @Body() body: CreateDeviceDto,
+  ) {
+    return createManualDevice({ organizationId, dto: body });
   }
 
   @Delete(':id')

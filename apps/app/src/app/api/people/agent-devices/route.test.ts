@@ -5,6 +5,8 @@ vi.mock('@/lib/permissions.server', () => ({
   requireApiPermission: vi.fn(),
 }));
 
+vi.mock('@/lib/org-participation', () => ({ getOrgIsInternal: vi.fn(async () => false) }));
+
 vi.mock('@db/server', () => ({
   db: {
     device: {
@@ -124,6 +126,15 @@ describe('GET /api/people/agent-devices', () => {
     const body = await res.json();
     expect(body.data[0].complianceStatus).toBe('stale');
     expect(body.data[0].daysSinceLastCheckIn).toBeNull();
+  });
+
+  it('labels a manually added device and never marks it stale', async () => {
+    const monthAgo = new Date(FIXED_NOW.getTime() - 30 * 24 * 60 * 60 * 1000);
+    mockedFindMany.mockResolvedValue([deviceRow({ source: 'manual', lastCheckIn: monthAgo })]);
+    const res = await GET(req());
+    const body = await res.json();
+    expect(body.data[0].source).toBe('manual');
+    expect(body.data[0].complianceStatus).toBe('compliant');
   });
 
   it('returns hasActiveAgentSession=true for devices with an unexpired linked session, false otherwise', async () => {

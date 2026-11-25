@@ -151,6 +151,7 @@ export const DeviceDetails = ({ device, onClose }: DeviceDetailsProps) => {
                   </Badge>
                 )}
                 {device.source === 'fleet' && <Badge variant="outline">Fleet (Legacy)</Badge>}
+                {device.source === 'manual' && <Badge variant="outline">Added manually</Badge>}
               </div>
               <Text size="sm" variant="muted">
                 {PLATFORM_LABELS[device.platform] ?? device.platform} {device.osVersion}
@@ -198,7 +199,11 @@ export const DeviceDetails = ({ device, onClose }: DeviceDetailsProps) => {
             </div>
             <div>
               <Text size="sm" variant="muted">
-                {device.source === 'integration' ? 'Last synced' : 'Last Check-in'}
+                {device.source === 'integration'
+                  ? 'Last synced'
+                  : device.source === 'manual'
+                    ? 'Added'
+                    : 'Last Check-in'}
               </Text>
               <Text size="sm" weight="medium">
                 {device.lastCheckIn ? new Date(device.lastCheckIn).toLocaleString() : 'Never'}

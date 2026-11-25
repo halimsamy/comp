@@ -1,9 +1,12 @@
 'use client';
 
-import { Skeleton } from '@trycompai/design-system';
-import { useMemo } from 'react';
+import { usePermissions } from '@/hooks/use-permissions';
+import { Button, Skeleton } from '@trycompai/design-system';
+import { Add } from '@trycompai/design-system/icons';
+import { useMemo, useState } from 'react';
 import { useAgentDevices } from '../hooks/useAgentDevices';
 import { useFleetHosts } from '../hooks/useFleetHosts';
+import { AddDeviceDialog } from './AddDeviceDialog';
 import { DeviceAgentDevicesList } from './DeviceAgentDevicesList';
 import { DeviceComplianceChart } from './DeviceComplianceChart';
 import { DeviceSyncProviderSelector } from './DeviceSyncProviderSelector';
@@ -18,7 +21,11 @@ export function DevicesTabContent({ isCurrentUserOwner }: DevicesTabContentProps
     agentDevices,
     isLoading: isAgentLoading,
     error: agentError,
+    mutate: refreshAgentDevices,
   } = useAgentDevices();
+  const { hasPermission } = usePermissions();
+  const canAddDevice = hasPermission('member', 'update');
+  const [addOpen, setAddOpen] = useState(false);
   const {
     fleetHosts,
     isLoading: isFleetLoading,
@@ -66,7 +73,19 @@ export function DevicesTabContent({ isCurrentUserOwner }: DevicesTabContentProps
 
   return (
     <div className="space-y-6">
-      <DeviceSyncProviderSelector />
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-end">
+        <div className="sm:flex-1">
+          <DeviceSyncProviderSelector />
+        </div>
+        {canAddDevice && (
+          <div>
+            <Button iconLeft={<Add size={16} />} onClick={() => setAddOpen(true)}>
+              Add device
+            </Button>
+          </div>
+        )}
+      </div>
+      <AddDeviceDialog open={addOpen} onOpenChange={setAddOpen} onAdded={refreshAgentDevices} />
       <DeviceComplianceChart
         fleetDevices={filteredFleetDevices}
         agentDevices={agentDevices}

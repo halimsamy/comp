@@ -4,6 +4,7 @@ import { DevicesService } from './devices.service';
 import { HybridAuthGuard } from '../auth/hybrid-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
 import type { AuthContext as AuthContextType } from '../auth/types';
+import { createManualDevice } from './manual-device';
 
 jest.mock('@db', () => ({
   ...jest.requireActual('@prisma/client'),
@@ -18,6 +19,8 @@ jest.mock('@db', () => ({
     },
   },
 }));
+
+jest.mock('./manual-device', () => ({ createManualDevice: jest.fn() }));
 
 jest.mock('../auth/auth.server', () => ({
   auth: { api: { getSession: jest.fn() } },
@@ -225,6 +228,29 @@ describe('DevicesController', () => {
       await expect(
         controller.deleteDevice('dev_1', 'org_1', mockAuthContext),
       ).rejects.toThrow('Only organization owners can remove devices');
+    });
+  });
+
+  describe('createDevice', () => {
+    it('creates a manual device in the caller organization', async () => {
+      const body = {
+        memberId: 'mem_2',
+        name: 'Linux box',
+        platform: 'linux' as const,
+        osVersion: 'Ubuntu 24.04',
+        diskEncryptionEnabled: true,
+        antivirusEnabled: true,
+        passwordPolicySet: true,
+        screenLockEnabled: true,
+      };
+      jest.mocked(createManualDevice).mockResolvedValue({ id: 'dev_9', name: 'Linux box', isCompliant: true });
+
+      await expect(controller.createDevice('org_1', body)).resolves.toEqual({
+        id: 'dev_9',
+        name: 'Linux box',
+        isCompliant: true,
+      });
+      expect(createManualDevice).toHaveBeenCalledWith({ organizationId: 'org_1', dto: body });
     });
   });
 });

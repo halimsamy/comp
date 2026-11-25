@@ -9,7 +9,8 @@ import { getFleetInstance } from '@/lib/fleet';
 import { serverApi } from '@/lib/server-api-client';
 import type { EmployeeTrainingVideoCompletion, Member, User } from '@db';
 import { db } from '@db/server';
-import { daysSinceCheckIn, getDeviceComplianceStatus } from '@trycompai/utils/devices';
+import { daysSinceCheckIn } from '@trycompai/utils/devices';
+import { storedDeviceStatus } from '../devices/lib/device-source';
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
@@ -320,6 +321,7 @@ const getMemberDevice = async (
   const device =
     devices.find((d) => d.source === 'agent') ??
     devices.find((d) => d.source === 'fleet') ??
+    devices.find((d) => d.source === 'manual') ??
     devices[0];
 
   const source: DeviceWithChecks['source'] =
@@ -327,7 +329,9 @@ const getMemberDevice = async (
       ? 'integration'
       : device.source === 'fleet'
         ? 'fleet'
-        : 'device_agent';
+        : device.source === 'manual'
+          ? 'manual'
+          : 'device_agent';
 
   // Resolve the provider (name/slug) so an imported device shows its provenance
   // instead of being mislabeled as an agent device.
@@ -345,10 +349,7 @@ const getMemberDevice = async (
     }
   }
 
-  const complianceStatus = getDeviceComplianceStatus({
-    isCompliant: device.isCompliant,
-    lastCheckIn: device.lastCheckIn,
-  });
+  const complianceStatus = storedDeviceStatus(device);
 
   return {
     id: device.id,
