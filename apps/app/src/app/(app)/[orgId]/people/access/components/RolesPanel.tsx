@@ -22,14 +22,13 @@ import {
   TableRow,
   Text,
 } from '@trycompai/design-system';
-import { Add, TrashCan, Upload } from '@trycompai/design-system/icons';
+import { Add, TrashCan } from '@trycompai/design-system/icons';
 import { useMemo, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { formatDay } from '../lib/access-labels';
 import { AllowedTypesCard } from './AllowedTypesCard';
-import { RbacImportDialog } from './RbacImportDialog';
 
 const roleSchema = z.object({
   name: z.string().trim().min(1, 'Name the role').max(200),
@@ -50,7 +49,6 @@ export function RolesPanel() {
   const { hasPermission } = usePermissions();
   const canEdit = hasPermission('member', 'update');
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const [importOpen, setImportOpen] = useState(false);
   const systemKey = selectedKey ?? systems[0]?.key ?? null;
   const system = systems.find((s) => s.key === systemKey) ?? null;
   const systemRoles = useMemo(() => roles.filter((r) => r.systemKey === systemKey), [roles, systemKey]);
@@ -87,10 +85,6 @@ export function RolesPanel() {
     }
   };
 
-  const handleImported = async () => {
-    await Promise.all([mutate(), refreshSystems()]);
-  };
-
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -110,11 +104,6 @@ export function RolesPanel() {
             </SelectContent>
           </Select>
         </div>
-        {canEdit && (
-          <Button variant="outline" iconLeft={<Upload size={16} />} onClick={() => setImportOpen(true)}>
-            Import from RBAC matrix
-          </Button>
-        )}
       </div>
 
       <Text size="sm" variant="muted">
@@ -210,7 +199,6 @@ export function RolesPanel() {
         <AllowedTypesCard system={system} canEdit={canEdit} onSaved={refreshSystems} />
       )}
 
-      <RbacImportDialog open={importOpen} onOpenChange={setImportOpen} onImported={handleImported} />
     </div>
   );
 }

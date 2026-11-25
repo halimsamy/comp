@@ -30,13 +30,6 @@ export interface PrivilegedAccount {
   flags: AccessFlag[];
 }
 
-export interface RbacImportGroup {
-  name: string;
-  sources: string[];
-  roleCount: number;
-  merged: boolean;
-}
-
 export type MemberAccessAccount = AccessAccount & { system: Pick<AccessSystem, 'key' | 'name' | 'kind' | 'logoUrl'> };
 
 export type AccountTypeKey = 'human' | 'service' | 'shared';
@@ -81,16 +74,6 @@ const accessRoleApi = {
       systemId: string;
       types: { type: AccountTypeKey; allowed: boolean; justification?: string }[];
     }) => call(api.put(`/v1/access/systems/${systemId}/allowed-types`, { types }), 'Failed to save account types'),
-    previewRbacImport: () =>
-      call(
-        api.post<{ preview: RbacImportGroup[] }>('/v1/access/import-from-rbac-matrix', {}),
-        'Failed to read the RBAC matrix',
-      ),
-    applyRbacImport: (groups: { name: string; sources: string[] }[]) =>
-      call(
-        api.post<{ systems: number; roles: number }>('/v1/access/import-from-rbac-matrix', { groups }),
-        'Failed to import the RBAC matrix',
-      ),
     listPrivileged: async () => {
       const data = await call(
         api.get<{ data: PrivilegedAccount[] }>('/v1/access/privileged-accounts'),
