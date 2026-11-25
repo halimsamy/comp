@@ -11552,6 +11552,50 @@
         "x-speakeasy-mcp": {
           "name": "get-all-devices"
         }
+      },
+      "post": {
+        "description": "Records an employee device that has no agent or device sync, with attested disk encryption, antivirus, password policy and screen lock checks.",
+        "operationId": "DevicesController_createDevice_v1",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDeviceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Device added"
+          },
+          "404": {
+            "description": "Member not found"
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "Add a device manually",
+        "tags": [
+          "Devices"
+        ],
+        "x-mint": {
+          "metadata": {
+            "title": "Add a device manually | Comp AI API",
+            "sidebarTitle": "Add a device manually",
+            "description": "Records an employee device that has no agent or device sync, with attested disk encryption, antivirus, password policy and screen lock checks.",
+            "og:title": "Add a device manually | Comp AI API",
+            "og:description": "Records an employee device that has no agent or device sync, with attested disk encryption, antivirus, password policy and screen lock checks."
+          }
+        },
+        "x-speakeasy-mcp": {
+          "name": "create-device"
+        }
       }
     },
     "/v1/devices/member/{memberId}": {
@@ -31027,6 +31071,14 @@
             }
           },
           {
+            "name": "frameworkInstanceId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "formType",
             "required": true,
             "in": "path",
@@ -31050,14 +31102,6 @@
                 "targeted_risk_analysis",
                 "significant_change_record"
               ],
-              "type": "string"
-            }
-          },
-          {
-            "name": "frameworkInstanceId",
-            "required": true,
-            "in": "query",
-            "schema": {
               "type": "string"
             }
           }
@@ -32581,6 +32625,111 @@
         },
         "x-speakeasy-mcp": {
           "name": "import-accounts"
+        }
+      }
+    },
+    "/v1/access/systems/{id}/accounts/add": {
+      "post": {
+        "description": "Adds one account to a manual system, or updates it when an account with the same id exists. The rest of the list is kept.",
+        "operationId": "AccessAccountsController_addAccount_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Manual system id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportAccountDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "Add an account to a manual system",
+        "tags": [
+          "Access"
+        ],
+        "x-mint": {
+          "metadata": {
+            "title": "Add an account to a manual system | Comp AI API",
+            "sidebarTitle": "Add an account to a manual system",
+            "description": "Adds one account to a manual system, or updates it when an account with the same id exists. The rest of the list is kept.",
+            "og:title": "Add an account to a manual system | Comp AI API",
+            "og:description": "Adds one account to a manual system, or updates it when an account with the same id exists. The rest of the list is kept."
+          }
+        },
+        "x-speakeasy-mcp": {
+          "name": "add-account"
+        }
+      }
+    },
+    "/v1/access/systems/{id}/accounts/{accountId}": {
+      "delete": {
+        "description": "Removes one account and its owner mapping, for example after its access was revoked. Access reviews keep their snapshot.",
+        "operationId": "AccessAccountsController_removeAccount_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Manual system id",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "accountId",
+            "required": true,
+            "in": "path",
+            "description": "Account id (username or email)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "Remove an account from a manual system",
+        "tags": [
+          "Access"
+        ],
+        "x-mint": {
+          "metadata": {
+            "title": "Remove an account from a manual system | Comp AI API",
+            "sidebarTitle": "Remove an account from a manual system",
+            "description": "Removes one account and its owner mapping, for example after its access was revoked. Access reviews keep their snapshot.",
+            "og:title": "Remove an account from a manual system | Comp AI API",
+            "og:description": "Removes one account and its owner mapping, for example after its access was revoked. Access reviews keep their snapshot."
+          }
+        },
+        "x-speakeasy-mcp": {
+          "name": "remove-account"
         }
       }
     },
@@ -38076,6 +38225,73 @@
           "count",
           "member",
           "authType"
+        ]
+      },
+      "CreateDeviceDto": {
+        "type": "object",
+        "properties": {
+          "memberId": {
+            "type": "string",
+            "description": "Member who uses the device",
+            "example": "mem_abc123"
+          },
+          "name": {
+            "type": "string",
+            "description": "Device name",
+            "example": "Jane's MacBook Pro"
+          },
+          "hostname": {
+            "type": "string",
+            "description": "Hostname (defaults to the name)"
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "macos",
+              "windows",
+              "linux"
+            ]
+          },
+          "osVersion": {
+            "type": "string",
+            "description": "Operating system version",
+            "example": "15.1"
+          },
+          "serialNumber": {
+            "type": "string",
+            "description": "Hardware serial number"
+          },
+          "hardwareModel": {
+            "type": "string",
+            "description": "Hardware model",
+            "example": "MacBook Pro 14\""
+          },
+          "diskEncryptionEnabled": {
+            "type": "boolean",
+            "description": "Disk encryption is on"
+          },
+          "antivirusEnabled": {
+            "type": "boolean",
+            "description": "Antivirus is running"
+          },
+          "passwordPolicySet": {
+            "type": "boolean",
+            "description": "A password policy is enforced"
+          },
+          "screenLockEnabled": {
+            "type": "boolean",
+            "description": "Screen lock is on"
+          }
+        },
+        "required": [
+          "memberId",
+          "name",
+          "platform",
+          "osVersion",
+          "diskEncryptionEnabled",
+          "antivirusEnabled",
+          "passwordPolicySet",
+          "screenLockEnabled"
         ]
       },
       "BulkSubmitForApprovalDto": {
