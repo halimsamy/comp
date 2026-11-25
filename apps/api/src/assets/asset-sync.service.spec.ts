@@ -8,6 +8,7 @@ jest.mock('@db', () => ({
       findMany: jest.fn(),
       createMany: jest.fn(),
       updateMany: jest.fn(),
+      update: jest.fn(),
     },
     device: { findMany: jest.fn() },
     vulnerabilitySlaPolicy: { findUnique: jest.fn().mockResolvedValue(null) },

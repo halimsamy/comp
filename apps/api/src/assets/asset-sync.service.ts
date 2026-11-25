@@ -6,6 +6,7 @@ import {
   classifyResourceType,
   displayNameFromResourceId,
 } from './asset-classify';
+import { adoptManualComputers } from './device-asset-adoption';
 import {
   integrationVulnerabilityKey,
   isVulnerabilityResult,
@@ -123,6 +124,7 @@ export class AssetSyncService {
       where: { organizationId },
       select: { id: true, name: true, hostname: true, memberId: true },
     });
+    await adoptManualComputers({ organizationId, devices });
     return this.upsertAssets({
       organizationId,
       source: 'device',
