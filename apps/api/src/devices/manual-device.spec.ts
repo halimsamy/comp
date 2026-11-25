@@ -3,12 +3,12 @@ import { NotFoundException } from '@nestjs/common';
 jest.mock('@db', () => ({
   db: {
     member: { findFirst: jest.fn() },
-    device: { create: jest.fn() },
+    device: { create: jest.fn(), findFirst: jest.fn(), update: jest.fn() },
   },
 }));
 
 import { db } from '@db';
-import { createManualDevice } from './manual-device';
+import { createManualDevice, updateManualDevice } from './manual-device';
 
 const mocked = (fn: unknown) => fn as jest.Mock;
 const dto = {
@@ -52,5 +52,32 @@ describe('createManualDevice', () => {
       }),
     );
     expect(second.isCompliant).toBe(false);
+  });
+});
+
+describe('updateManualDevice', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('only edits manual devices of the organization', async () => {
+    mocked(db.device.findFirst).mockResolvedValue(null);
+    await expect(
+      updateManualDevice({ organizationId: 'org_1', id: 'dev_agent', dto }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(db.device.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'dev_agent', organizationId: 'org_1', source: 'manual' } }),
+    );
+    expect(db.device.update).not.toHaveBeenCalled();
+  });
+
+  it('replaces the details and recomputes compliance', async () => {
+    mocked(db.device.findFirst).mockResolvedValue({ id: 'dev_1' });
+    mocked(db.member.findFirst).mockResolvedValue({ id: 'mem_1' });
+    await updateManualDevice({ organizationId: 'org_1', id: 'dev_1', dto: { ...dto, antivirusEnabled: false } });
+    expect(db.device.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'dev_1' },
+        data: expect.objectContaining({ name: 'Linux box', antivirusEnabled: false, isCompliant: false }),
+      }),
+    );
   });
 });

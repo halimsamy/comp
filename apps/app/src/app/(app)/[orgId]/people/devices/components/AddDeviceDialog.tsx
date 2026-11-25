@@ -20,11 +20,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@trycompai/design-system';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { CHECK_FIELDS, PLATFORM_LABELS } from '../lib/device-source';
+import type { DeviceWithChecks } from '../types';
 
 const deviceSchema = z.object({
   memberId: z.string().min(1, 'Choose who uses the device'),
@@ -51,6 +52,18 @@ const EMPTY: DeviceValues = {
   screenLockEnabled: false,
 };
 
+const valuesOf = (device: DeviceWithChecks): DeviceValues => ({
+  memberId: device.memberId ?? '',
+  name: device.name,
+  platform: device.platform,
+  osVersion: device.osVersion,
+  serialNumber: device.serialNumber ?? '',
+  diskEncryptionEnabled: device.diskEncryptionEnabled,
+  antivirusEnabled: device.antivirusEnabled,
+  passwordPolicySet: device.passwordPolicySet,
+  screenLockEnabled: device.screenLockEnabled,
+});
+
 const FieldError = ({ message }: { message?: string }) =>
   message ? (
     <span role="alert" className="text-xs text-destructive">
@@ -58,15 +71,20 @@ const FieldError = ({ message }: { message?: string }) =>
     </span>
   ) : null;
 
-/** Records a device without the agent or device sync; its checks are attested. */
+/**
+ * Records a device without the agent or device sync; its checks are attested.
+ * With `device`, edits that manual device instead.
+ */
 export function AddDeviceDialog({
   open,
   onOpenChange,
   onAdded,
+  device,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onAdded: () => Promise<unknown>;
+  device?: DeviceWithChecks | null;
 }) {
   const { members } = useOrganizationMembers();
   const active = useMemo(() => (Array.isArray(members) ? members : []).filter((m) => !m.deactivated), [members]);
@@ -77,14 +95,19 @@ export function AddDeviceDialog({
     formState: { errors, isSubmitting },
   } = useForm<DeviceValues>({ resolver: zodResolver(deviceSchema), defaultValues: EMPTY });
 
+  useEffect(() => {
+    if (open) reset(device ? valuesOf(device) : EMPTY);
+  }, [open, device, reset]);
+
   const handleSave = handleSubmit(async ({ serialNumber, ...values }) => {
-    const response = await api.post('/v1/devices', { ...values, ...(serialNumber ? { serialNumber } : {}) });
+    const body = { ...values, ...(serialNumber ? { serialNumber } : {}) };
+    const response = device ? await api.put(`/v1/devices/${device.id}`, body) : await api.post('/v1/devices', body);
     if (response.error) {
       toast.error(response.error);
       return;
     }
     await onAdded();
-    toast.success('Device added');
+    toast.success(device ? 'Device updated' : 'Device added');
     reset(EMPTY);
     onOpenChange(false);
   });
@@ -93,7 +116,7 @@ export function AddDeviceDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="md">
         <DialogHeader>
-          <DialogTitle>Add a device</DialogTitle>
+          <DialogTitle>{device ? `Edit ${device.name}` : 'Add a device'}</DialogTitle>
           <DialogDescription>
             For devices without the Comp AI agent or device sync. Confirm each security check yourself; the
             device counts as compliant only when all four are on.
@@ -204,7 +227,7 @@ export function AddDeviceDialog({
             Cancel
           </Button>
           <Button type="submit" form="add-device-form" loading={isSubmitting}>
-            Add device
+            {device ? 'Save changes' : 'Add device'}
           </Button>
         </DialogFooter>
       </DialogContent>

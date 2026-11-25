@@ -29,8 +29,9 @@ import {
   devicesCsvFilename,
   downloadDevicesCsv,
 } from '../lib/devices-csv';
-import { DeviceTableRow } from './DeviceListCells';
+import { DeviceTableRow } from './DeviceTableRow';
 import { sourceKey, sourceLabel } from '../lib/device-source';
+import { AddDeviceDialog } from './AddDeviceDialog';
 import { DeviceDetails } from './DeviceDetails';
 import { RemoveDeviceAlert } from '../../all/components/RemoveDeviceAlert';
 
@@ -45,6 +46,8 @@ export const DeviceAgentDevicesList = ({
   const { removeDeviceAgent } = usePeopleActions();
   const { hasPermission } = usePermissions();
   const canRemoveDevice = hasPermission('member', 'delete');
+  const canEditDevice = hasPermission('member', 'update');
+  const [editDevice, setEditDevice] = useState<DeviceWithChecks | null>(null);
   const { mutate } = useSWRConfig();
   const [selectedDevice, setSelectedDevice] = useState<DeviceWithChecks | null>(null);
   const [actionDevice, setActionDevice] = useState<DeviceWithChecks | null>(null);
@@ -216,11 +219,18 @@ export const DeviceAgentDevicesList = ({
                   setActionDevice(d);
                   setIsRemoveDeviceAlertOpen(true);
                 }}
+                onRequestEdit={canEditDevice ? setEditDevice : undefined}
               />
             ))}
           </TableBody>
         </Table>
       )}
+      <AddDeviceDialog
+        open={editDevice !== null}
+        device={editDevice}
+        onOpenChange={(open) => !open && setEditDevice(null)}
+        onAdded={() => mutate(['people-agent-devices', orgId])}
+      />
       <RemoveDeviceAlert
         open={isRemoveDeviceAlertOpen}
         title="Remove Device"

@@ -11555,7 +11555,7 @@
       },
       "post": {
         "description": "Records an employee device that has no agent or device sync, with attested disk encryption, antivirus, password policy and screen lock checks.",
-        "operationId": "DevicesController_createDevice_v1",
+        "operationId": "ManualDevicesController_createDevice_v1",
         "parameters": [],
         "requestBody": {
           "required": true,
@@ -11731,6 +11731,60 @@
         },
         "x-speakeasy-mcp": {
           "name": "delete-device"
+        }
+      },
+      "put": {
+        "description": "Replaces the details and attested checks of a device that was added manually. Agent and synced devices report their own checks and cannot be edited.",
+        "operationId": "ManualDevicesController_updateDevice_v1",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Device id",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDeviceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Device updated"
+          },
+          "404": {
+            "description": "Manual device or member not found"
+          }
+        },
+        "security": [
+          {
+            "apikey": []
+          }
+        ],
+        "summary": "Update a manually added device",
+        "tags": [
+          "Devices"
+        ],
+        "x-mint": {
+          "metadata": {
+            "title": "Update a manually added device | Comp AI API",
+            "sidebarTitle": "Update a manually added device",
+            "description": "Replaces the details and attested checks of a device that was added manually. Agent and synced devices report their own checks and cannot be edited.",
+            "og:title": "Update a manually added device | Comp AI API",
+            "og:description": "Replaces the details and attested checks of a device that was added manually. Agent and synced devices report their own checks and cannot be edited."
+          }
+        },
+        "x-speakeasy-mcp": {
+          "name": "update-device"
         }
       }
     },

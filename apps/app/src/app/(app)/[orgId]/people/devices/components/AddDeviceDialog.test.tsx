@@ -3,8 +3,8 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AddDeviceDialog } from './AddDeviceDialog';
 
-const { post } = vi.hoisted(() => ({ post: vi.fn() }));
-vi.mock('@/lib/api-client', () => ({ api: { post } }));
+const { post, put } = vi.hoisted(() => ({ post: vi.fn(), put: vi.fn() }));
+vi.mock('@/lib/api-client', () => ({ api: { post, put } }));
 vi.mock('@/hooks/use-organization-members', () => ({
   useOrganizationMembers: () => ({
     members: [
@@ -54,5 +54,51 @@ describe('AddDeviceDialog', () => {
       screenLockEnabled: false,
     });
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('edits a manual device: pre-fills it and saves with PUT', async () => {
+    put.mockResolvedValue({ data: { id: 'dev_lap1' } });
+    const onAdded = vi.fn().mockResolvedValue(undefined);
+    const device = {
+      id: 'dev_lap1',
+      name: 'LAP-001',
+      hostname: 'LAP-001',
+      platform: 'macos' as const,
+      osVersion: 'Not recorded',
+      serialNumber: null,
+      hardwareModel: null,
+      isCompliant: true,
+      diskEncryptionEnabled: true,
+      antivirusEnabled: true,
+      passwordPolicySet: true,
+      screenLockEnabled: true,
+      checkDetails: null,
+      lastCheckIn: null,
+      agentVersion: null,
+      installedAt: '2026-11-25',
+      memberId: 'mem_1',
+      user: { name: 'Jane Doe', email: 'jane@acme.com' },
+      source: 'manual' as const,
+      complianceStatus: 'compliant' as const,
+      daysSinceLastCheckIn: 0,
+      hasActiveAgentSession: false,
+    };
+    render(<AddDeviceDialog open device={device} onOpenChange={vi.fn()} onAdded={onAdded} />);
+
+    expect(screen.getByText('Edit LAP-001')).toBeInTheDocument();
+    expect(screen.getByLabelText('Device name')).toHaveValue('LAP-001');
+    fireEvent.change(screen.getByLabelText('OS version'), { target: { value: '15.1' } });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Antivirus' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() => expect(onAdded).toHaveBeenCalled());
+    expect(post).not.toHaveBeenCalled();
+    expect(put).toHaveBeenCalledWith('/v1/devices/dev_lap1', expect.objectContaining({
+      memberId: 'mem_1',
+      name: 'LAP-001',
+      osVersion: '15.1',
+      antivirusEnabled: false,
+      diskEncryptionEnabled: true,
+    }));
   });
 });
