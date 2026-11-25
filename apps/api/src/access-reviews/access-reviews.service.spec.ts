@@ -276,6 +276,20 @@ describe('AccessReviewsService', () => {
       ).rejects.toThrow('assigned to another reviewer');
     });
 
+    it("lets another member decide the assigned reviewer's own account", async () => {
+      mocked(db.accessReviewItem.findMany).mockResolvedValue([
+        item('ari_1', { ownerMemberId: 'mem_rev', reviewSystem: { reviewerId: 'mem_rev', systemName: 'Comp AI' } }),
+      ]);
+      await expect(
+        service.decide({
+          organizationId: ORG,
+          id: 'arv_1',
+          callerMemberId: 'mem_admin',
+          dto: { itemIds: ['ari_1'], decision: 'keep' },
+        }),
+      ).resolves.toEqual({ updated: 1, skipped: 0 });
+    });
+
     it('requires a note for modify decisions', async () => {
       await expect(
         service.decide({

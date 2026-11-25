@@ -180,9 +180,12 @@ describe('AccessReviewsService remediation and sign-off', () => {
       expect(db.accessReview.update).not.toHaveBeenCalled();
     });
 
-    it('403s when the caller owns an account in the review (#80)', async () => {
+    it('lets a member whose own account is in the review sign off', async () => {
+      mocked(db.accessReviewItem.findMany).mockResolvedValue([
+        { decision: 'keep', flags: [], remediatedAt: null },
+      ]);
       mocked(db.accessReviewItem.findFirst).mockResolvedValue({ id: 'ari_mine' });
-      await expect(signOff()).rejects.toThrow('Another manager must sign off');
+      await expect(signOff()).resolves.toBeDefined();
     });
 
     it('keeps the sign-off when attaching the report fails', async () => {

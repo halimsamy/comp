@@ -13,7 +13,8 @@ import type { DecideAccessReviewItemsDto } from './dto/access-reviews.dto';
  * - remediation is cleared only when one row's decision actually changes;
  * - keeping a flagged account needs a justification;
  * - nobody decides on their own account;
- * - a system with an assigned reviewer is decided by that reviewer only;
+ * - a system with an assigned reviewer is decided by that reviewer only, except
+ *   the reviewer's own account, which anyone else may decide;
  * - every change is written to the audit log.
  */
 export async function decideItems({
@@ -59,7 +60,10 @@ export async function decideItems({
     );
   }
   const otherReviewer = items.find(
-    (i) => i.reviewSystem.reviewerId && i.reviewSystem.reviewerId !== callerMemberId,
+    (i) =>
+      i.reviewSystem.reviewerId &&
+      i.reviewSystem.reviewerId !== callerMemberId &&
+      i.ownerMemberId !== i.reviewSystem.reviewerId,
   );
   if (otherReviewer) {
     throw new ForbiddenException(
@@ -128,7 +132,12 @@ export async function decideItems({
   return { updated: targets.length, skipped: items.length - targets.length };
 }
 
-/** PCI 7.2.4 separation of duties: whoever started the review or owns an account in it can't sign off. */
+/**
+ * PCI 7.2.4 separation of duties: whoever started the review can't sign it off.
+ * Owning an account in it doesn't block sign-off: nobody can decide their own
+ * account, so it was already reviewed by someone else (and every member has a
+ * Comp AI account, which would otherwise leave nobody able to sign).
+ */
 export async function assertIndependentSignOff({
   organizationId,
   reviewId,
@@ -142,11 +151,7 @@ export async function assertIndependentSignOff({
     where: { id: reviewId, organizationId },
     select: { createdById: true },
   });
-  const ownsItem = await db.accessReviewItem.findFirst({
-    where: { reviewId, organizationId, ownerMemberId: callerMemberId },
-    select: { id: true },
-  });
-  if (!callerMemberId || review?.createdById === callerMemberId || ownsItem) {
+  if (!callerMemberId || review?.createdById === callerMemberId) {
     throw new ForbiddenException('Another manager must sign off');
   }
 }
