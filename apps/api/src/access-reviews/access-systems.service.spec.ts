@@ -8,7 +8,7 @@ jest.mock('@db', () => ({
       update: jest.fn(),
       delete: jest.fn(),
     },
-    accessSystemAccount: { deleteMany: jest.fn(), createMany: jest.fn() },
+    accessSystemAccount: { deleteMany: jest.fn(), createMany: jest.fn(), upsert: jest.fn() },
     accessAccountOwner: { deleteMany: jest.fn(), upsert: jest.fn() },
     $transaction: jest.fn(),
   },
@@ -185,6 +185,54 @@ describe('AccessSystemsService', () => {
           accountId: 'a',
           memberId: 'mem_x',
         }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('single accounts', () => {
+    beforeEach(() => {
+      mocked(db.accessSystem.findFirst).mockResolvedValue({ id: 'asy_1' });
+    });
+
+    it('adds one account without touching the rest of the list', async () => {
+      const result = await service.addAccount({
+        organizationId: ORG,
+        id: 'asy_1',
+        account: { accountId: ' jdoe ', email: 'Jane@Acme.com', roles: [' admin '], isAdmin: true },
+      });
+      expect(result).toEqual({ accountId: 'jdoe' });
+      expect(db.accessSystemAccount.upsert).toHaveBeenCalledWith({
+        where: { systemId_externalId: { systemId: 'asy_1', externalId: 'jdoe' } },
+        create: expect.objectContaining({ email: 'jane@acme.com', roles: ['admin'], isAdmin: true }),
+        update: expect.objectContaining({ email: 'jane@acme.com', roles: ['admin'], isAdmin: true }),
+      });
+      expect(db.accessSystemAccount.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('removes one account with its owner mapping', async () => {
+      mocked(db.$transaction).mockResolvedValue([{ count: 1 }, { count: 0 }]);
+      await expect(
+        service.removeAccount({ organizationId: ORG, id: 'asy_1', accountId: 'jdoe' }),
+      ).resolves.toEqual({ deleted: true });
+      expect(db.accessSystemAccount.deleteMany).toHaveBeenCalledWith({
+        where: { systemId: 'asy_1', externalId: 'jdoe' },
+      });
+      expect(db.accessAccountOwner.deleteMany).toHaveBeenCalledWith({
+        where: { organizationId: ORG, systemKey: 'manual:asy_1', accountId: 'jdoe' },
+      });
+    });
+
+    it('404s when the account is not on the system', async () => {
+      mocked(db.$transaction).mockResolvedValue([{ count: 0 }, { count: 0 }]);
+      await expect(
+        service.removeAccount({ organizationId: ORG, id: 'asy_1', accountId: 'nobody' }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('404s for a system of another organization', async () => {
+      mocked(db.accessSystem.findFirst).mockResolvedValue(null);
+      await expect(
+        service.addAccount({ organizationId: ORG, id: 'asy_other', account: { accountId: 'x' } }),
       ).rejects.toBeInstanceOf(NotFoundException);
     });
   });

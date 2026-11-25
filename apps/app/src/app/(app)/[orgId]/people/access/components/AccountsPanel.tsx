@@ -6,6 +6,7 @@ import {
   useAccessMutations,
   useAccessSystems,
   type AccessAccount,
+  type ImportedAccount,
 } from '@/hooks/use-access-reviews';
 import { usePermissions } from '@/hooks/use-permissions';
 import {
@@ -23,16 +24,16 @@ import {
   Spinner,
   Text,
 } from '@trycompai/design-system';
-import { Add, Download, TrashCan, Upload } from '@trycompai/design-system/icons';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { ACCOUNT_FILTERS, filterByFlag, formatDay, matchesSearch, type AccountFilter } from '../lib/access-labels';
 import { buildAccountsCsv } from '../lib/accounts-csv';
 import { AccountOwnerDialog, type OwnerOption, type OwnerValues } from './AccountOwnerDialog';
+import { AccountsActions } from './AccountsActions';
 import { AccountsTable } from './AccountsTable';
+import { AddAccountDialog } from './AddAccountDialog';
 import { AddSystemDialog, type SystemValues } from './AddSystemDialog';
 import { ConfirmDeleteDialog } from './ConfirmDeleteDialog';
-import { ExportAccessButtons } from './ExportAccessButtons';
 import { ImportAccountsDialog } from './ImportAccountsDialog';
 
 /** Vanta-style account inventory: pick a system, filter by flag, map owners, export. */
@@ -49,6 +50,8 @@ export function AccountsPanel({ members }: { members: OwnerOption[] }) {
   const [search, setSearch] = useState('');
   const [ownerTarget, setOwnerTarget] = useState<AccessAccount | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [addAccountOpen, setAddAccountOpen] = useState(false);
+  const [removeTarget, setRemoveTarget] = useState<AccessAccount | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -106,6 +109,29 @@ export function AccountsPanel({ members }: { members: OwnerOption[] }) {
     } catch (caught) {
       toast.error(caught instanceof Error ? caught.message : 'Failed to import accounts');
       throw caught;
+    }
+  };
+
+  const handleAddAccount = async (account: ImportedAccount) => {
+    if (!manualId) return;
+    try {
+      await mutations.addAccount({ id: manualId, account });
+      await refresh();
+      toast.success('Account added');
+    } catch (caught) {
+      toast.error(caught instanceof Error ? caught.message : 'Failed to add the account');
+      throw caught;
+    }
+  };
+
+  const handleRemoveAccount = async () => {
+    if (!manualId || !removeTarget) return;
+    try {
+      await mutations.removeAccount({ id: manualId, accountId: removeTarget.accountId });
+      await refresh();
+      toast.success('Account removed');
+    } catch (caught) {
+      toast.error(caught instanceof Error ? caught.message : 'Failed to remove the account');
     }
   };
 
@@ -169,27 +195,17 @@ export function AccountsPanel({ members }: { members: OwnerOption[] }) {
             />
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" iconLeft={<Download size={16} />} onClick={handleExport} disabled={visible.length === 0}>
-            Export CSV
-          </Button>
-          <ExportAccessButtons systems={systems} />
-          {canUpdate && manualId && (
-            <>
-              <Button variant="outline" iconLeft={<Upload size={16} />} onClick={() => setImportOpen(true)}>
-                Import CSV
-              </Button>
-              <Button variant="outline" iconLeft={<TrashCan size={16} />} onClick={() => setConfirmDelete(true)}>
-                Delete system
-              </Button>
-            </>
-          )}
-          {canUpdate && (
-            <Button iconLeft={<Add size={16} />} onClick={() => setAddOpen(true)}>
-              Add system
-            </Button>
-          )}
-        </div>
+        <AccountsActions
+          systems={systems}
+          isManual={Boolean(manualId)}
+          canUpdate={canUpdate}
+          canExportSystem={visible.length > 0}
+          onAddAccount={() => setAddAccountOpen(true)}
+          onAddSystem={() => setAddOpen(true)}
+          onImport={() => setImportOpen(true)}
+          onExportSystem={handleExport}
+          onDeleteSystem={() => setConfirmDelete(true)}
+        />
       </div>
 
       <div className="flex flex-wrap gap-2" role="group" aria-label="Filter accounts">
@@ -224,14 +240,19 @@ export function AccountsPanel({ members }: { members: OwnerOption[] }) {
             <EmptyDescription>
               {accounts.length === 0
                 ? manualId
-                  ? 'Import the user export of this system as CSV to review its accounts.'
+                  ? 'Add its accounts one by one, or import the user export of this system as CSV.'
                   : 'Accounts appear after the integration check runs. Connect Google Workspace, GitHub or AWS under Integrations, or add a system and import a CSV.'
                 : 'No accounts match these filters.'}
             </EmptyDescription>
           </EmptyHeader>
         </Empty>
       ) : (
-        <AccountsTable accounts={visible} canMapOwners={canUpdate} onMapOwner={setOwnerTarget} />
+        <AccountsTable
+          accounts={visible}
+          canMapOwners={canUpdate}
+          onMapOwner={setOwnerTarget}
+          onRemove={canUpdate && manualId ? setRemoveTarget : undefined}
+        />
       )}
 
       <AccountOwnerDialog
@@ -247,6 +268,20 @@ export function AccountsPanel({ members }: { members: OwnerOption[] }) {
         description="The system, its accounts and owner mappings are deleted. Past access reviews keep their snapshot."
         onOpenChange={setConfirmDelete}
         onConfirm={handleDeleteSystem}
+      />
+      <ConfirmDeleteDialog
+        open={removeTarget !== null}
+        title={`Remove ${removeTarget?.name ?? 'this account'}?`}
+        description="Remove it once its access is gone from the system. Access reviews keep their snapshot."
+        confirmLabel="Remove"
+        onOpenChange={(open) => !open && setRemoveTarget(null)}
+        onConfirm={handleRemoveAccount}
+      />
+      <AddAccountDialog
+        systemName={system?.name ?? ''}
+        open={addAccountOpen}
+        onOpenChange={setAddAccountOpen}
+        onSave={handleAddAccount}
       />
       <ImportAccountsDialog
         systemName={system?.name ?? ''}

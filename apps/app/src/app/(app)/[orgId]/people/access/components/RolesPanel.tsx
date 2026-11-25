@@ -147,7 +147,7 @@ export function RolesPanel() {
                   </div>
                 </TableCell>
                 <TableCell>
-                  <div className="max-w-[260px]">
+                  <div className="min-w-[200px] max-w-[420px] whitespace-normal break-words">
                     <Text size="sm">{role.permissionsScope ?? '—'}</Text>
                   </div>
                 </TableCell>

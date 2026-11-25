@@ -45,6 +45,8 @@ describe('access controllers', () => {
     create: jest.fn(),
     remove: jest.fn(),
     importAccounts: jest.fn(),
+    addAccount: jest.fn(),
+    removeAccount: jest.fn(),
     setOwner: jest.fn(),
   };
   const reviews = {
@@ -84,6 +86,8 @@ describe('access controllers', () => {
     ['setOwner', 'update'],
     ['createSystem', 'update'],
     ['importAccounts', 'update'],
+    ['addAccount', 'update'],
+    ['removeAccount', 'update'],
     ['deleteSystem', 'update'],
   ] as const)('accounts %s requires member:%s', (method, action) => {
     const metadata = Reflect.getMetadata(

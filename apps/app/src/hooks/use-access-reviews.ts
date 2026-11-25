@@ -187,6 +187,16 @@ export function useAccessMutations() {
         }),
         'Failed to import accounts',
       ),
+    addAccount: ({ id, account }: { id: string; account: ImportedAccount }) =>
+      call(
+        api.post<{ accountId: string }>(`/v1/access/systems/${id}/accounts/add`, account),
+        'Failed to add the account',
+      ),
+    removeAccount: ({ id, accountId }: { id: string; accountId: string }) =>
+      call(
+        api.delete(`/v1/access/systems/${id}/accounts/${encodeURIComponent(accountId)}`),
+        'Failed to remove the account',
+      ),
     createReview: (body: {
       name: string;
       dueDate: string;

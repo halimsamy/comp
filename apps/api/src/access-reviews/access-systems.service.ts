@@ -70,19 +70,9 @@ export class AccessSystemsService {
     const unique = new Map<string, ImportAccountDto>();
     for (const account of accounts)
       unique.set(account.accountId.trim(), account);
-    const rows = [...unique.entries()].map(([externalId, a]) => ({
-      systemId: system.id,
-      externalId,
-      name: a.name?.trim() || null,
-      email: a.email?.trim().toLowerCase() || null,
-      type: a.type ?? null,
-      status: a.status ?? 'active',
-      roles: (a.roles ?? []).map((r) => r.trim()).filter(Boolean),
-      isAdmin: Boolean(a.isAdmin),
-      mfaEnabled: a.mfaEnabled ?? null,
-      lastLoginAt: parseDate(a.lastLoginAt),
-      accountCreatedAt: parseDate(a.createdAt),
-    }));
+    const rows = [...unique.entries()].map(([externalId, a]) =>
+      toAccountRow({ systemId: system.id, externalId, account: a }),
+    );
     const mappings = await importedOwnerMappings({
       organizationId,
       systemKey: `manual:${system.id}`,
@@ -100,6 +90,60 @@ export class AccessSystemsService {
     // A fresh inventory confirms (or contradicts) pending revocations; the import itself is already saved.
     await reconcileRevocations({ organizationId, accounts: this.accounts }).catch(() => undefined);
     return { imported: rows.length, ownersMapped: mappings.length };
+  }
+
+  /** Add one account to a manual system, or update it when the account id exists. */
+  async addAccount({
+    organizationId,
+    id,
+    account,
+  }: {
+    organizationId: string;
+    id: string;
+    account: ImportAccountDto;
+  }) {
+    const system = await this.find({ organizationId, id });
+    const externalId = account.accountId.trim();
+    const row = toAccountRow({ systemId: system.id, externalId, account });
+    const mappings = await importedOwnerMappings({
+      organizationId,
+      systemKey: `manual:${system.id}`,
+      accounts: [[externalId, account]],
+    });
+    await db.$transaction([
+      db.accessSystemAccount.upsert({
+        where: { systemId_externalId: { systemId: system.id, externalId } },
+        create: row,
+        update: row,
+      }),
+      ...mappings,
+    ]);
+    return { accountId: externalId };
+  }
+
+  /** Remove one account (e.g. after revoking it), with its owner mapping. */
+  async removeAccount({
+    organizationId,
+    id,
+    accountId,
+  }: {
+    organizationId: string;
+    id: string;
+    accountId: string;
+  }) {
+    const system = await this.find({ organizationId, id });
+    const [{ count }] = await db.$transaction([
+      db.accessSystemAccount.deleteMany({
+        where: { systemId: system.id, externalId: accountId },
+      }),
+      db.accessAccountOwner.deleteMany({
+        where: { organizationId, systemKey: `manual:${system.id}`, accountId },
+      }),
+    ]);
+    if (count === 0) throw new NotFoundException('Account not found');
+    // The account is gone, which confirms a pending revocation of it.
+    await reconcileRevocations({ organizationId, accounts: this.accounts }).catch(() => undefined);
+    return { deleted: true };
   }
 
   /** Map an account to a member, mark it a service account, or clear the mapping. */
@@ -176,4 +220,28 @@ export class AccessSystemsService {
     if (!system) throw new NotFoundException('System not found');
     return system;
   }
+}
+
+function toAccountRow({
+  systemId,
+  externalId,
+  account: a,
+}: {
+  systemId: string;
+  externalId: string;
+  account: ImportAccountDto;
+}) {
+  return {
+    systemId,
+    externalId,
+    name: a.name?.trim() || null,
+    email: a.email?.trim().toLowerCase() || null,
+    type: a.type ?? null,
+    status: a.status ?? 'active',
+    roles: (a.roles ?? []).map((r) => r.trim()).filter(Boolean),
+    isAdmin: Boolean(a.isAdmin),
+    mfaEnabled: a.mfaEnabled ?? null,
+    lastLoginAt: parseDate(a.lastLoginAt),
+    accountCreatedAt: parseDate(a.createdAt),
+  };
 }

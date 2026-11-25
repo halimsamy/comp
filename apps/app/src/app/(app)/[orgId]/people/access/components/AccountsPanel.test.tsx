@@ -80,14 +80,19 @@ describe('AccountsPanel', () => {
     expect(screen.queryByText('jane@acme.com')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Map' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Add system/ })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Import CSV/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Add account/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Remove/ })).not.toBeInTheDocument();
   });
 
-  it('offers CSV import only for manual systems', () => {
+  it('adds and removes single accounts and imports CSVs only on manual systems', async () => {
     hasPermission.mockReturnValue(true);
     useAccessSystems.mockReturnValue({ systems: [system('manual', 'manual:asy_1')], isLoading: false, mutate: vi.fn() });
     render(<AccountsPanel members={[]} />);
-    expect(screen.getByRole('button', { name: /Import CSV/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Add account/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Remove Jane' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+    expect(await screen.findByText('Import accounts (CSV)')).toBeInTheDocument();
+    expect(screen.getByText('Delete system')).toBeInTheDocument();
   });
 
   it('is read-only without member:update', () => {
@@ -95,6 +100,6 @@ describe('AccountsPanel', () => {
     render(<AccountsPanel members={[]} />);
     expect(screen.queryByRole('button', { name: 'Map' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Add system/ })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Export CSV/ })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'More actions' })).toBeEnabled();
   });
 });

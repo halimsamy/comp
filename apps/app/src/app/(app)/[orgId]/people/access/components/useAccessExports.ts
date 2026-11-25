@@ -4,8 +4,6 @@ import { downloadCsv } from '@/components/risks/workspace/risk-actions-csv';
 import type { AccessAccount, AccessSystem } from '@/hooks/use-access-reviews';
 import { useAccessRoleMutations } from '@/hooks/use-access-roles';
 import { api } from '@/lib/api-client';
-import { Button } from '@trycompai/design-system';
-import { Download } from '@trycompai/design-system/icons';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { FLAG_LABEL } from '../lib/access-labels';
@@ -14,7 +12,7 @@ import { buildAllSystemsCsv, csvCell } from '../lib/accounts-csv';
 const day = () => new Date().toISOString().slice(0, 10);
 
 /** #97: one CSV of every system's accounts, and a privileged-users list for PCI DSS 7.2.2 / 8.4.1. */
-export function ExportAccessButtons({ systems }: { systems: AccessSystem[] }) {
+export function useAccessExports(systems: AccessSystem[]) {
   const { listPrivileged } = useAccessRoleMutations();
   const [busy, setBusy] = useState<'all' | 'privileged' | null>(null);
 
@@ -64,26 +62,5 @@ export function ExportAccessButtons({ systems }: { systems: AccessSystem[] }) {
     }
   };
 
-  return (
-    <>
-      <Button
-        variant="outline"
-        iconLeft={<Download size={16} />}
-        onClick={() => void handleExportAll()}
-        loading={busy === 'all'}
-        disabled={systems.length === 0 || busy !== null}
-      >
-        Export all systems
-      </Button>
-      <Button
-        variant="outline"
-        iconLeft={<Download size={16} />}
-        onClick={() => void handleExportPrivileged()}
-        loading={busy === 'privileged'}
-        disabled={busy !== null}
-      >
-        Export privileged users
-      </Button>
-    </>
-  );
+  return { busy, handleExportAll, handleExportPrivileged };
 }

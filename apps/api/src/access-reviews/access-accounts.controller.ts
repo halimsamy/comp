@@ -25,6 +25,7 @@ import { AccessAccountsService } from './access-accounts.service';
 import { AccessSystemsService } from './access-systems.service';
 import {
   CreateAccessSystemDto,
+  ImportAccountDto,
   ImportAccountsDto,
   SetAccountOwnerDto,
   SystemAccountsQueryDto,
@@ -135,6 +136,40 @@ export class AccessAccountsController {
       id,
       accounts: body.accounts,
     });
+  }
+
+  @Post('systems/:id/accounts/add')
+  @RequirePermission('member', 'update')
+  @ApiOperation({
+    summary: 'Add an account to a manual system',
+    description:
+      'Adds one account to a manual system, or updates it when an account with the same id exists. The rest of the list is kept.',
+  })
+  @ApiParam({ name: 'id', description: 'Manual system id' })
+  @ApiBody({ type: ImportAccountDto })
+  async addAccount(
+    @OrganizationId() organizationId: string,
+    @Param('id') id: string,
+    @Body() body: ImportAccountDto,
+  ) {
+    return this.systems.addAccount({ organizationId, id, account: body });
+  }
+
+  @Delete('systems/:id/accounts/:accountId')
+  @RequirePermission('member', 'update')
+  @ApiOperation({
+    summary: 'Remove an account from a manual system',
+    description:
+      'Removes one account and its owner mapping, for example after its access was revoked. Access reviews keep their snapshot.',
+  })
+  @ApiParam({ name: 'id', description: 'Manual system id' })
+  @ApiParam({ name: 'accountId', description: 'Account id (username or email)' })
+  async removeAccount(
+    @OrganizationId() organizationId: string,
+    @Param('id') id: string,
+    @Param('accountId') accountId: string,
+  ) {
+    return this.systems.removeAccount({ organizationId, id, accountId });
   }
 
   @Delete('systems/:id')

@@ -96,7 +96,7 @@ export function ReviewItemsTable({
                 <span className="whitespace-nowrap">{item.ownerName ?? 'Unmapped'}</span>
               </TableCell>
               <TableCell>
-                <div className="max-w-[200px]">
+                <div className="min-w-[140px] max-w-[240px] whitespace-normal break-words">
                   <Text size="sm">{item.roles.join(', ') || '—'}</Text>
                 </div>
               </TableCell>

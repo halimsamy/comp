@@ -12,6 +12,7 @@ import {
   TableRow,
   Text,
 } from '@trycompai/design-system';
+import { TrashCan } from '@trycompai/design-system/icons';
 import { formatDay, ownerLabel } from '../lib/access-labels';
 import { AccessFlagBadges, MfaCell } from './AccessFlagBadges';
 
@@ -20,10 +21,13 @@ export function AccountsTable({
   accounts,
   canMapOwners,
   onMapOwner,
+  onRemove,
 }: {
   accounts: AccessAccount[];
   canMapOwners: boolean;
   onMapOwner: (account: AccessAccount) => void;
+  /** Manual systems only: remove one account. */
+  onRemove?: (account: AccessAccount) => void;
 }) {
   return (
     <Table>
@@ -36,6 +40,7 @@ export function AccountsTable({
           <TableHead>Last login</TableHead>
           <TableHead>Status</TableHead>
           <TableHead>Flags</TableHead>
+          {onRemove && <TableHead />}
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -66,7 +71,7 @@ export function AccountsTable({
               </div>
             </TableCell>
             <TableCell>
-              <div className="max-w-[220px]">
+              <div className="min-w-[140px] max-w-[260px] whitespace-normal break-words">
                 <Text size="sm">{account.roles.join(', ') || '—'}</Text>
               </div>
             </TableCell>
@@ -82,6 +87,18 @@ export function AccountsTable({
             <TableCell>
               <AccessFlagBadges flags={account.flags} />
             </TableCell>
+            {onRemove && (
+              <TableCell>
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  aria-label={`Remove ${account.name}`}
+                  onClick={() => onRemove(account)}
+                >
+                  <TrashCan size={14} />
+                </Button>
+              </TableCell>
+            )}
           </TableRow>
         ))}
       </TableBody>
