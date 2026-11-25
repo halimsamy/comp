@@ -100,6 +100,31 @@ describe('org chart (#43)', () => {
     mockDb.organizationChartSnapshot.findFirst.mockResolvedValue(snapshot(['m0', 'm1', 'm2']));
     expect((await orgChartRule.evaluate(ctx)).holds).toBe(false);
   });
+
+  it('shows who reports to whom from the chart lines', async () => {
+    mockDb.member.findMany.mockResolvedValue(members);
+    mockRoleHolders.mockResolvedValue([]);
+    const node = (id: string, name: string) => ({ id, data: { name, title: 'T', memberId: id } });
+    mockDb.organizationChartSnapshot.findFirst.mockResolvedValue({
+      id: 'ocs', name: 'Q4', createdAt: daysAgo(20),
+      nodes: [node('ceo', 'Ceo'), node('cto', 'Cto'), node('coo', 'Coo'), node('dev', 'Dev')],
+      edges: [
+        { id: 'e1', source: 'ceo', target: 'cto' },
+        { id: 'e2', source: 'cto', target: 'dev' },
+        { id: 'e3', source: 'coo', target: 'dev' },
+        { id: 'e4', source: 'gone', target: 'coo' },
+      ],
+    });
+    const { sections } = await orgChartRule.evaluate(ctx);
+    const roles = sections.find((s) => s.heading === 'Roles')?.table;
+    expect(roles?.headers).toEqual(['Name', 'Title', 'Reports to']);
+    expect(roles?.rows.map((r) => [r[0], r[2]])).toEqual([
+      ['Ceo', '—'],
+      ['Cto', 'Ceo'],
+      ['Coo', '—'],
+      ['Dev', 'Cto, Coo'],
+    ]);
+  });
 });
 
 describe('governance rules', () => {

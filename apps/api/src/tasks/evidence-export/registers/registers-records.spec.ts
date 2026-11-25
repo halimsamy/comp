@@ -7,6 +7,7 @@ const mockDb = {
   taskItem: { findMany: jest.fn() },
   finding: { findMany: jest.fn() },
   member: { findMany: jest.fn() },
+  trainingModule: { findMany: jest.fn() },
 };
 jest.mock('@db', () => ({ db: mockDb }));
 jest.mock('@trycompai/auth', () => ({ statement: {}, BUILT_IN_ROLE_PERMISSIONS: {} }));
@@ -134,9 +135,28 @@ describe('training, vendor and risk records', () => {
       },
     ]);
 
+    mockDb.trainingModule.findMany.mockResolvedValue([]);
+
     const [row] = parse(await REGISTERS['training-records'].build(ORG));
 
     expect(row).toMatchObject({ Completed: '2026-02-01', Expires: '2027-02-01', Source: 'Admin', 'Certificate attached': 'Yes' });
+  });
+
+  it('cites the requirements named by each completion\'s module', async () => {
+    mockListTraining.mockResolvedValue([
+      { moduleId: 'trm_1', training: 'Secure coding', completedAt: d('2026-02-01'), source: 'admin' },
+      { moduleId: 'sat-1', training: 'Awareness', completedAt: d('2026-01-01'), source: 'portal' },
+    ]);
+    mockDb.trainingModule.findMany.mockResolvedValue([
+      { id: 'trm_1', frameworkReference: 'PCI DSS 6.2.2' },
+    ]);
+
+    const table = await REGISTERS['training-records'].cited?.(ORG);
+
+    expect(mockDb.trainingModule.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { organizationId: 'org_1' } }),
+    );
+    expect(table?.cites).toEqual(['PCI DSS 6.2.2', '']);
   });
 
   it('lists vendor reviews with the documents reviewed by name', async () => {
@@ -242,7 +262,7 @@ describe('findings register (#171)', () => {
         type: 'iso27001',
         severity: 'low',
         status: 'open',
-        content: 'Policy outdated',
+        content: 'ISO 27001 A.5.1: Policy outdated',
         revisionNote: null,
         policy: { name: 'Access Control' },
         createdAt: d('2026-04-02'),
@@ -256,5 +276,7 @@ describe('findings register (#171)', () => {
       ['NC-001', 'Standalone', 'Incident', 'INC-7', 'Ada'],
       ['fnd_2', 'Finding', 'Iso27001', 'Policy: Access Control', ''],
     ]);
+    // Each row's citation prefix, for placing it under the requirements it names.
+    expect((await REGISTERS.findings.cited?.(ORG))?.cites).toEqual(['', 'ISO 27001 A.5.1']);
   });
 });

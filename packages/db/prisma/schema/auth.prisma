@@ -31,6 +31,7 @@ model User {
   publishedFrameworkVersions FrameworkVersion[]   @relation("FrameworkVersionPublisher")
   offboardingChecklistCompletions OffboardingChecklistCompletion[] @relation("OffboardingChecklistCompletedBy")
   offboardingAccessRevocations    OffboardingAccessRevocation[]    @relation("AccessRevocationRevokedBy")
+  attestedDevices                 Device[]                         @relation("DeviceAttestedBy")
 
   oauthApplications OauthApplication[]
   oauthAccessTokens OauthAccessToken[]

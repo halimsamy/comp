@@ -17,6 +17,7 @@ export const ORG_CHART_COVERAGE = 0.9;
 const chartNodes = z.array(
   z
     .object({
+      id: z.string().optional(),
       data: z
         .object({
           name: z.string().optional(),
@@ -27,6 +28,21 @@ const chartNodes = z.array(
     })
     .passthrough(),
 );
+
+/** Chart lines run from the manager's bottom handle (source) to the report (target). */
+const chartEdges = z.array(z.object({ source: z.string(), target: z.string() }).passthrough());
+
+/** "Reports to" per node id, from the chart's lines; a node may have several managers. */
+function reportingLines({ nodes, edges }: { nodes: z.infer<typeof chartNodes>; edges: unknown }) {
+  const parsed = chartEdges.safeParse(edges ?? []);
+  const nameOf = new Map(nodes.map((n) => [n.id, n.data.name ?? '—']));
+  const managers = new Map<string, string[]>();
+  for (const e of parsed.success ? parsed.data : []) {
+    const manager = nameOf.get(e.source);
+    if (manager) managers.set(e.target, [...(managers.get(e.target) ?? []), manager]);
+  }
+  return managers;
+}
 
 /**
  * ISO 27001 5.3, A.5.2: a dated org chart snapshot within 12 months that shows
@@ -49,6 +65,7 @@ export const orgChartRule: NativeEvidenceRule = {
     ]);
     const parsed = chartNodes.safeParse(snapshot?.nodes ?? []);
     const nodes = parsed.success ? parsed.data : [];
+    const managers = reportingLines({ nodes, edges: snapshot?.edges });
     const onChart = new Set(nodes.flatMap((n) => (n.data.memberId ? [n.data.memberId] : [])));
     const missing = members.filter((m) => !onChart.has(m.id));
     const missingHolders = holders.filter((h) => !onChart.has(h.memberId));
@@ -91,8 +108,12 @@ export const orgChartRule: NativeEvidenceRule = {
           emptyText: 'The snapshot has no people.',
           ...(nodes.length > 0 && {
             table: {
-              headers: ['Name', 'Title'],
-              rows: nodes.map((n) => [n.data.name ?? '—', n.data.title ?? '—']),
+              headers: ['Name', 'Title', 'Reports to'],
+              rows: nodes.map((n) => [
+                n.data.name ?? '—',
+                n.data.title ?? '—',
+                (n.id && managers.get(n.id)?.join(', ')) || '—',
+              ]),
             },
           }),
         },

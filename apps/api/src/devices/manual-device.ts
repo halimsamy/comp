@@ -9,15 +9,18 @@ import type { CreateDeviceDto } from './dto/create-device.dto';
 export async function createManualDevice({
   organizationId,
   dto,
+  attestedById,
 }: {
   organizationId: string;
   dto: CreateDeviceDto;
+  /** The user attesting the checks; null when the caller has no user identity. */
+  attestedById: string | null;
 }) {
   const member = await findActiveMember({ organizationId, memberId: dto.memberId });
   return db.device.create({
     data: {
       organizationId,
-      ...manualDeviceData({ memberId: member.id, dto }),
+      ...manualDeviceData({ memberId: member.id, dto, attestedById }),
       source: 'manual',
     },
     select: { id: true, name: true, isCompliant: true },
@@ -29,10 +32,12 @@ export async function updateManualDevice({
   organizationId,
   id,
   dto,
+  attestedById,
 }: {
   organizationId: string;
   id: string;
   dto: CreateDeviceDto;
+  attestedById: string | null;
 }) {
   const device = await db.device.findFirst({
     where: { id, organizationId, source: 'manual' },
@@ -42,7 +47,7 @@ export async function updateManualDevice({
   const member = await findActiveMember({ organizationId, memberId: dto.memberId });
   return db.device.update({
     where: { id: device.id },
-    data: manualDeviceData({ memberId: member.id, dto }),
+    data: manualDeviceData({ memberId: member.id, dto, attestedById }),
     select: { id: true, name: true, isCompliant: true },
   });
 }
@@ -62,7 +67,16 @@ async function findActiveMember({
   return member;
 }
 
-function manualDeviceData({ memberId, dto }: { memberId: string; dto: CreateDeviceDto }) {
+function manualDeviceData({
+  memberId,
+  dto,
+  attestedById,
+}: {
+  memberId: string;
+  dto: CreateDeviceDto;
+  attestedById: string | null;
+}) {
+  const now = new Date();
   const checks = {
     diskEncryptionEnabled: dto.diskEncryptionEnabled,
     antivirusEnabled: dto.antivirusEnabled,
@@ -80,6 +94,8 @@ function manualDeviceData({ memberId, dto }: { memberId: string; dto: CreateDevi
     hardwareModel: dto.hardwareModel?.trim() || null,
     ...checks,
     isCompliant: Object.values(checks).every(Boolean),
-    lastCheckIn: new Date(),
+    lastCheckIn: now,
+    attestedById,
+    attestedAt: now,
   };
 }

@@ -160,11 +160,19 @@ function orgCode(name: string | null): string {
     .toUpperCase();
 }
 
-/** SoA document status in the ISMS vocabulary of the metadata table. */
-function soaStatus(metadata: SOAExportMetadata): string | null {
+/**
+ * SoA document status in the ISMS vocabulary of the metadata table. Only an
+ * approval makes it "approved": `completed` alone means every control is
+ * answered, and a decline also leaves the status at `completed`.
+ */
+export function soaStatus(
+  metadata: Pick<SOAExportMetadata, 'approvedAt' | 'declinedAt' | 'status'>,
+): string {
   if (metadata.declinedAt) return 'declined';
-  if (metadata.approvedAt || metadata.status === 'completed') return 'approved';
+  if (metadata.approvedAt) return 'approved';
   if (metadata.status === 'needs_review') return 'needs_review';
+  // Fully answered but not yet approved: not a draft (the approval line still says "Not approved").
+  if (metadata.status === 'completed') return 'completed';
   return 'draft';
 }
 

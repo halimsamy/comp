@@ -48,10 +48,13 @@ export const REGISTERS_BY_CONTROL_TEMPLATE: Record<string, RegisterKey[]> = {
  * Registers that evidence one specific requirement, by framework family and
  * requirement identifier. Used where a control template maps too broadly
  * (e.g. Access Rights covers ~30 PCI requirements; the access review only
- * evidences the periodic-review ones).
+ * evidences the periodic-review ones), and where no mapped control template
+ * brings in a register that auditors look for there.
  */
 export const REGISTERS_BY_REQUIREMENT: Record<FrameworkFamily, Record<string, RegisterKey[]>> = {
   iso27001: {
+    '5.2': ['policy-acknowledgements'],
+    '5.3': ['people'],
     '6.1.2': ['risk-reviews'],
     '6.1.3': ['risk-treatment-actions'],
     '7.2': ['training-records'],
@@ -59,24 +62,93 @@ export const REGISTERS_BY_REQUIREMENT: Record<FrameworkFamily, Record<string, Re
     '8.2': ['risk-reviews'],
     '8.3': ['risk-treatment-actions'],
     '10.2': ['findings'],
+    'A.5.1': ['policy-acknowledgements'],
+    'A.5.2': ['people'],
+    'A.5.3': ['access-roles'],
     'A.5.15': ['access-reviews', 'access-roles'],
-    'A.5.18': ['access-reviews'],
+    'A.5.16': ['access-roles'],
+    'A.5.18': ['access-reviews', 'access-roles'],
     'A.5.22': ['vendor-reviews'],
-    'A.6.3': ['training-records'],
+    // Continuity and availability: the BIA's outage and single-point-of-failure risks.
+    'A.5.29': ['risks'],
+    'A.5.30': ['risks'],
+    'A.6.3': ['training-records', 'policy-acknowledgements'],
+    'A.7.2': ['people'],
     'A.8.2': ['access-reviews', 'privileged-users', 'access-roles'],
+    'A.8.3': ['access-roles'],
+    'A.8.4': ['access-roles'],
+    'A.8.5': ['access-roles'],
+    // Vulnerability register (and Vulnerability scans/) whatever controls are mapped.
+    'A.8.8': ['vulnerabilities'],
+    // Asset inventory as the backup, redundancy, logging, crypto and network system list.
+    'A.8.13': ['assets'],
+    'A.8.14': ['assets', 'risks'],
+    'A.8.15': ['assets'],
+    'A.8.16': ['assets'],
+    'A.8.18': ['access-roles'],
+    'A.8.20': ['assets'],
+    'A.8.21': ['assets'],
+    'A.8.22': ['assets'],
+    'A.8.24': ['assets'],
   },
   pci: {
+    // Network inventory (VPC, ALB, CloudFront/WAF, bastion, private data stores).
+    '1.2.3': ['assets'],
+    '1.2.4': ['assets'],
+    '1.2.5': ['assets'],
+    '1.3.1': ['assets'],
+    '1.3.2': ['assets'],
+    '1.4.1': ['assets'],
+    '1.4.2': ['assets'],
+    '1.4.4': ['assets'],
+    // Key and data-store inventory (KMS keys, encrypted stores).
+    '3.5.1': ['assets'],
+    '3.6.1': ['assets'],
+    '3.6.1.1': ['assets'],
+    '3.6.1.4': ['assets'],
+    '4.2.1.1': ['assets'],
+    // Components evaluated as not at risk from malware.
+    '5.2.3': ['assets'],
+    '5.2.3.1': ['assets'],
+    '6.2.2': ['training-records'],
+    '6.5.4': ['access-roles'],
+    '7.1.2': ['access-roles'],
     '7.2.1': ['access-roles'],
     '7.2.2': ['access-roles', 'privileged-users'],
     '7.2.3': ['access-roles'],
     '7.2.4': ['access-reviews', 'privileged-users'],
+    '7.2.5': ['access-roles'],
     '7.2.5.1': ['access-reviews'],
+    '7.2.6': ['access-roles'],
+    '7.3.1': ['access-roles'],
+    '7.3.2': ['access-roles'],
+    '7.3.3': ['access-roles'],
+    '8.2.2': ['access-roles'],
     '8.2.6': ['access-reviews'],
-    '12.6.3': ['training-records'],
-    '12.6.3.1': ['training-records'],
-    '12.6.3.2': ['training-records'],
+    '8.4.1': ['access-roles'],
+    '8.4.2': ['access-roles'],
+    '8.6.1': ['access-roles'],
+    // Log-producing system components.
+    '10.2.1': ['assets'],
+    '10.6.1': ['assets'],
+    '12.3.3': ['assets'],
+    // ASV scan findings; its mapped controls bring no vulnerability register.
+    '11.3.2': ['vulnerabilities'],
+    // Personnel acknowledge the security policy and acceptable use (12.1.1, 12.6.x).
+    '12.1.1': ['policy-acknowledgements'],
+    // Remediation tracking for the periodic BAU reviews.
+    '12.4.2': ['findings'],
+    '12.4.2.1': ['findings'],
+    '12.6.1': ['policy-acknowledgements'],
+    '12.6.2': ['policy-acknowledgements'],
+    '12.6.3': ['training-records', 'policy-acknowledgements'],
+    '12.6.3.1': ['training-records', 'policy-acknowledgements'],
+    '12.6.3.2': ['training-records', 'policy-acknowledgements'],
     '12.8.4': ['vendor-reviews'],
     '12.8.5': ['vendor-reviews'],
+    // Incident response training (module frameworkReference "PCI DSS 12.10.4, 12.10.4.1").
+    '12.10.4': ['training-records'],
+    '12.10.4.1': ['training-records'],
   },
 };
 

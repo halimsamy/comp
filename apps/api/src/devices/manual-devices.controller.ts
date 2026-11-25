@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Post, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Param, Post, Put, Req, UseGuards } from '@nestjs/common';
 import {
   ApiBody,
   ApiOperation,
@@ -7,10 +7,12 @@ import {
   ApiSecurity,
   ApiTags,
 } from '@nestjs/swagger';
+import { ActingUserResolver } from '../auth/acting-user.service';
 import { OrganizationId } from '../auth/auth-context.decorator';
 import { HybridAuthGuard } from '../auth/hybrid-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
+import type { AuthenticatedRequest } from '../auth/types';
 import { CreateDeviceDto } from './dto/create-device.dto';
 import { createManualDevice, updateManualDevice } from './manual-device';
 
@@ -20,6 +22,8 @@ import { createManualDevice, updateManualDevice } from './manual-device';
 @UseGuards(HybridAuthGuard, PermissionGuard)
 @ApiSecurity('apikey')
 export class ManualDevicesController {
+  constructor(private readonly actingUser: ActingUserResolver) {}
+
   @Post()
   @RequirePermission('member', 'update')
   @ApiOperation({
@@ -33,8 +37,10 @@ export class ManualDevicesController {
   async createDevice(
     @OrganizationId() organizationId: string,
     @Body() body: CreateDeviceDto,
+    @Req() req: AuthenticatedRequest,
   ) {
-    return createManualDevice({ organizationId, dto: body });
+    const attestedById = await this.attester({ req, organizationId });
+    return createManualDevice({ organizationId, dto: body, attestedById });
   }
 
   @Put(':id')
@@ -52,7 +58,21 @@ export class ManualDevicesController {
     @OrganizationId() organizationId: string,
     @Param('id') id: string,
     @Body() body: CreateDeviceDto,
+    @Req() req: AuthenticatedRequest,
   ) {
-    return updateManualDevice({ organizationId, id, dto: body });
+    const attestedById = await this.attester({ req, organizationId });
+    return updateManualDevice({ organizationId, id, dto: body, attestedById });
+  }
+
+  /** The real person attesting the checks; never the owner fallback (export shows "Not recorded"). */
+  private async attester({
+    req,
+    organizationId,
+  }: {
+    req: AuthenticatedRequest;
+    organizationId: string;
+  }): Promise<string | null> {
+    const { userId, source } = await this.actingUser.resolve(req, organizationId);
+    return source === 'org-owner-fallback' ? null : userId;
   }
 }

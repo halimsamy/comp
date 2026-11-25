@@ -14,6 +14,7 @@ export async function buildDeviceRegisterCsv({
     where: { organizationId },
     include: {
       member: { select: { user: { select: { name: true, email: true } } } },
+      attestedBy: { select: { name: true, email: true } },
     },
     orderBy: [{ memberId: 'asc' }, { name: 'asc' }],
   });
@@ -37,6 +38,8 @@ export async function buildDeviceRegisterCsv({
       'Screen lock',
       'Last check-in',
       'Enrolled',
+      'Checks attested by',
+      'Checks attested at',
     ],
     rows: devices.map((d) => [
       d.id,
@@ -56,6 +59,9 @@ export async function buildDeviceRegisterCsv({
       d.screenLockEnabled,
       d.lastCheckIn,
       d.installedAt,
+      // Only manual devices are attested; legacy ones predate attester capture.
+      d.source === 'manual' ? personName(d.attestedBy) || 'Not recorded' : '',
+      d.attestedAt,
     ]),
   });
 }

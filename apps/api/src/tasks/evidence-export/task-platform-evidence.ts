@@ -73,6 +73,8 @@ export async function appendTaskPlatformEvidence({
   }
 
   for (const form of await listTaskForms({ organizationId, taskId })) {
+    // Retired forms (Network Diagram, RBAC Matrix, meetings...) are deprecated: never exported.
+    if (form.retiredTo) continue;
     const bundle = await loadDocumentBundle({
       organizationId,
       formType: toDbEvidenceFormType(form.formType),

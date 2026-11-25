@@ -11,6 +11,7 @@ import {
   type PdfBlock,
 } from '../../utils/house-pdf';
 import { cleanTextForPDF, formatJsonForPDF } from './evidence-pdf-format';
+import { taskDescriptionSection, taskDetailRows } from './task-summary-details';
 import type {
   NormalizedAutomation,
   NormalizedEvidenceRun,
@@ -233,6 +234,7 @@ export function generateTaskSummaryPDF(
   const rows: HouseKeyValue[] = [
     { label: 'Document ID', value: docCode(summary.taskId) },
     { label: 'Task', value: cleanTextForPDF(summary.taskTitle) },
+    ...(summary.task ? taskDetailRows(summary.task) : []),
     { label: 'Exported', value: when(summary.exportedAt) },
     ...(attachmentsCount > 0
       ? [{ label: 'Attachments', value: String(attachmentsCount) }]
@@ -253,6 +255,7 @@ export function generateTaskSummaryPDF(
     primaryColor: summary.primaryColor ?? null,
     rows,
     sections: [
+      ...(summary.task ? [taskDescriptionSection(summary.task)] : []),
       {
         heading: '1. Automations',
         emptyText: 'No automations for this task.',

@@ -107,3 +107,20 @@ export async function appendPolicies({
     archive.append(render(policy), { name: `${folderPath}/${fileName}` });
   }
 }
+
+/**
+ * Renders each policy once per export. shortcut: PDFs are cached for the whole
+ * export (fine for one org's framework); render per folder if policy counts grow.
+ */
+export function cachedPolicyRenderer(
+  render: (policy: ApprovedPolicy) => Buffer,
+): (policy: ApprovedPolicy) => Buffer {
+  const rendered = new Map<string, Buffer>();
+  return (policy) => {
+    const cached = rendered.get(policy.id);
+    if (cached) return cached;
+    const pdf = render(policy);
+    rendered.set(policy.id, pdf);
+    return pdf;
+  };
+}

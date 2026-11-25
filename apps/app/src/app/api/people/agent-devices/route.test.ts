@@ -137,6 +137,27 @@ describe('GET /api/people/agent-devices', () => {
     expect(body.data[0].complianceStatus).toBe('compliant');
   });
 
+  it('returns who attested a manual device, and no attestation for other sources', async () => {
+    mockedFindMany.mockResolvedValue([
+      deviceRow({
+        source: 'manual',
+        attestedBy: { name: null, email: 'admin@example.com' },
+        attestedAt: new Date('2026-04-10T09:00:00.000Z'),
+      }),
+      deviceRow({ id: 'dev_2', source: 'manual', attestedBy: null, attestedAt: null }),
+      deviceRow({ id: 'dev_3', source: 'agent' }),
+    ]);
+    const body = await (await GET(req())).json();
+    expect(mockedFindMany.mock.calls[0][0].include.attestedBy).toEqual({
+      select: { name: true, email: true },
+    });
+    expect(body.data.map((d: { attestation?: unknown }) => d.attestation)).toEqual([
+      { by: 'admin@example.com', at: '2026-04-10T09:00:00.000Z' },
+      { by: null, at: null },
+      undefined,
+    ]);
+  });
+
   it('returns hasActiveAgentSession=true for devices with an unexpired linked session, false otherwise', async () => {
     const future = new Date(FIXED_NOW.getTime() + 60 * 60 * 1000); // 1 hour ahead
     const past = new Date(FIXED_NOW.getTime() - 60 * 60 * 1000);   // 1 hour ago

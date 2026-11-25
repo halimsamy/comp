@@ -3,6 +3,8 @@
  * Normalized data structures for automation evidence export
  */
 
+import type { TaskDetails } from './task-summary-details';
+
 /**
  * Normalized evidence run - combines app automations and custom automations into a unified format
  */
@@ -79,6 +81,8 @@ export interface TaskEvidenceSummary {
   primaryColor?: string | null;
   automations: NormalizedAutomation[];
   exportedAt: Date;
+  /** Description, status, assignee/approver and review dates, shown on the summary PDF. */
+  task?: TaskDetails;
 }
 
 /**

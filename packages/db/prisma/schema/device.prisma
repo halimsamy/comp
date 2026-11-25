@@ -39,6 +39,11 @@ model Device {
   // NULL = the source reports no compliance (renders "Not tracked").
   sourceCompliance Json?
 
+  // Manual devices only: who attested the four checks and when (set on POST/PUT /v1/devices).
+  attestedById String?
+  attestedBy   User?     @relation("DeviceAttestedBy", fields: [attestedById], references: [id], onDelete: SetNull)
+  attestedAt   DateTime?
+
   @@unique([serialNumber, organizationId])
   // Prevents duplicate integration-sourced devices for the same connection and
   // also serves the device-sync fallback lookup (externalDeviceId + connection).

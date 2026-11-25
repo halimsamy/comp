@@ -187,6 +187,9 @@ export async function appendRiskReviewPdfs({
   return reviews.length;
 }
 
+/** What appendRootRecords wrote: Vendors/ and Risk reviews/ exist only when non-zero. */
+export type RootRecordCounts = { vendorDocuments: number; riskReviews: number };
+
 /**
  * Root-level records: offboarding evidence, vendor documents and risk review
  * PDFs (each only with read access to its register), and for an audit
@@ -210,7 +213,7 @@ export async function appendRootRecords({
   offboardingExport?: OffboardingExportService;
   auditId?: string;
   requirementLabels: Map<string, string>;
-}): Promise<void> {
+}): Promise<RootRecordCounts> {
   if (offboardingExport && natives.registers.has('offboarding')) {
     await offboardingExport.appendAllOffboardings({
       archive,
@@ -218,15 +221,18 @@ export async function appendRootRecords({
       prefix: `${root}/_Platform records/Offboarding evidence/`,
     });
   }
-  if (natives.registers.has('vendors')) {
-    await appendVendorFolders({ archive, root, organizationId, framework });
-  }
-  if (natives.registers.has('risk-reviews')) {
-    await appendRiskReviewPdfs({ archive, root, organizationId, framework });
-  }
-  if (!auditId) return;
+  const counts = {
+    vendorDocuments: natives.registers.has('vendors')
+      ? await appendVendorFolders({ archive, root, organizationId, framework })
+      : 0,
+    riskReviews: natives.registers.has('risk-reviews')
+      ? await appendRiskReviewPdfs({ archive, root, organizationId, framework })
+      : 0,
+  };
+  if (!auditId) return counts;
   archive.append(await buildAuditTrailCsv({ organizationId, auditId }), {
     name: `${root}/audit-trail.csv`,
   });
   await appendAuditRequests({ archive, root, organizationId, auditId, requirementLabels });
+  return counts;
 }

@@ -27,7 +27,7 @@ describe('createManualDevice', () => {
 
   it('404s for a member outside the organization', async () => {
     mocked(db.member.findFirst).mockResolvedValue(null);
-    await expect(createManualDevice({ organizationId: 'org_1', dto })).rejects.toBeInstanceOf(NotFoundException);
+    await expect(createManualDevice({ organizationId: 'org_1', dto, attestedById: 'usr_admin' })).rejects.toBeInstanceOf(NotFoundException);
     expect(db.member.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: 'mem_1', organizationId: 'org_1', deactivated: false } }),
     );
@@ -36,8 +36,8 @@ describe('createManualDevice', () => {
 
   it('records a manual device, compliant only when every check passes', async () => {
     mocked(db.member.findFirst).mockResolvedValue({ id: 'mem_1' });
-    await createManualDevice({ organizationId: 'org_1', dto });
-    await createManualDevice({ organizationId: 'org_1', dto: { ...dto, screenLockEnabled: false } });
+    await createManualDevice({ organizationId: 'org_1', dto, attestedById: 'usr_admin' });
+    await createManualDevice({ organizationId: 'org_1', dto: { ...dto, screenLockEnabled: false }, attestedById: null });
     const [first, second] = mocked(db.device.create).mock.calls.map((c) => c[0].data);
     expect(first).toEqual(
       expect.objectContaining({
@@ -49,9 +49,12 @@ describe('createManualDevice', () => {
         serialNumber: null,
         isCompliant: true,
         lastCheckIn: expect.any(Date),
+        attestedById: 'usr_admin',
+        attestedAt: first.lastCheckIn,
       }),
     );
     expect(second.isCompliant).toBe(false);
+    expect(second.attestedById).toBeNull();
   });
 });
 
@@ -61,7 +64,7 @@ describe('updateManualDevice', () => {
   it('only edits manual devices of the organization', async () => {
     mocked(db.device.findFirst).mockResolvedValue(null);
     await expect(
-      updateManualDevice({ organizationId: 'org_1', id: 'dev_agent', dto }),
+      updateManualDevice({ organizationId: 'org_1', id: 'dev_agent', dto, attestedById: 'usr_admin' }),
     ).rejects.toBeInstanceOf(NotFoundException);
     expect(db.device.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: 'dev_agent', organizationId: 'org_1', source: 'manual' } }),
@@ -69,14 +72,25 @@ describe('updateManualDevice', () => {
     expect(db.device.update).not.toHaveBeenCalled();
   });
 
-  it('replaces the details and recomputes compliance', async () => {
+  it('replaces the details, recomputes compliance and re-attests as the editor', async () => {
     mocked(db.device.findFirst).mockResolvedValue({ id: 'dev_1' });
     mocked(db.member.findFirst).mockResolvedValue({ id: 'mem_1' });
-    await updateManualDevice({ organizationId: 'org_1', id: 'dev_1', dto: { ...dto, antivirusEnabled: false } });
+    await updateManualDevice({
+      organizationId: 'org_1',
+      id: 'dev_1',
+      dto: { ...dto, antivirusEnabled: false },
+      attestedById: 'usr_editor',
+    });
     expect(db.device.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'dev_1' },
-        data: expect.objectContaining({ name: 'Linux box', antivirusEnabled: false, isCompliant: false }),
+        data: expect.objectContaining({
+          name: 'Linux box',
+          antivirusEnabled: false,
+          isCompliant: false,
+          attestedById: 'usr_editor',
+          attestedAt: expect.any(Date),
+        }),
       }),
     );
   });

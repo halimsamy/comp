@@ -1,5 +1,5 @@
 import { inflateSync } from 'zlib';
-import { applicabilityLabel, generateSOAExportFile, toAnnexCode } from './export-generator';
+import { applicabilityLabel, generateSOAExportFile, soaStatus, toAnnexCode } from './export-generator';
 
 const metadata = { preparedBy: 'Halim', answeredQuestions: 1, totalQuestions: 2 };
 const question = (id: string, closure: string, isApplicable: boolean | null) => ({
@@ -71,5 +71,21 @@ describe('SoA export', () => {
     // Org-prefixed ISMS document ID, version kept out of it.
     expect(text).toContain('SP-ISMS-SOA');
     expect(text).not.toContain('SOA-v3');
+  });
+
+  it('heads a completed but unapproved SoA as completed, with a "Not approved" line', () => {
+    expect(soaStatus({ status: 'completed' })).toBe('completed');
+    expect(soaStatus({ status: 'draft' })).toBe('draft');
+    expect(soaStatus({ status: 'completed', approvedAt: new Date('2026-11-01') })).toBe('approved');
+    expect(soaStatus({ status: 'completed', declinedAt: new Date('2026-11-01') })).toBe('declined');
+    expect(soaStatus({ status: 'needs_review' })).toBe('needs_review');
+
+    const text = pdfText(
+      generateSOAExportFile([question('q1', '5.15', true)], 'ISO 27001', 1, { ...metadata, status: 'completed' })
+        .fileBuffer,
+    );
+    expect(text).toContain('v1 \u00B7 COMPLETED');
+    expect(text).not.toContain('APPROVED');
+    expect(text).toContain('(Not approved)');
   });
 });

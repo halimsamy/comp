@@ -1,13 +1,23 @@
 import { db } from '@db';
 import { listTrainingRecords } from '../../../training/training-records.service';
-import { humanize, toCsv, type RegisterParams } from './register-csv';
+import { humanize, toCsv, type CitedTable, type RegisterParams } from './register-csv';
 
-/** Every training completion (ISO 27001 7.2, 7.3, A.6.3; PCI DSS 12.6.3.x). */
-export async function buildTrainingRecordsCsv({
+/**
+ * Every training completion (ISO 27001 7.2, 7.3, A.6.3; PCI DSS 12.6.3.x),
+ * citing its module's framework reference ("PCI DSS 6.2.2").
+ */
+export async function loadTrainingRecordsTable({
   organizationId,
-}: RegisterParams): Promise<string> {
-  const records = await listTrainingRecords(organizationId);
-  return toCsv({
+}: RegisterParams): Promise<CitedTable> {
+  const [records, modules] = await Promise.all([
+    listTrainingRecords(organizationId),
+    db.trainingModule.findMany({
+      where: { organizationId },
+      select: { id: true, frameworkReference: true },
+    }),
+  ]);
+  const reference = new Map(modules.map((m) => [m.id, m.frameworkReference ?? '']));
+  return {
     headers: [
       'Name',
       'Email',
@@ -26,7 +36,12 @@ export async function buildTrainingRecordsCsv({
       humanize(r.source),
       r.hasAttachment,
     ]),
-  });
+    cites: records.map((r) => reference.get(r.moduleId) ?? ''),
+  };
+}
+
+export async function buildTrainingRecordsCsv(params: RegisterParams): Promise<string> {
+  return toCsv(await loadTrainingRecordsTable(params));
 }
 
 const CHECKLIST_LABELS: Record<string, string> = {

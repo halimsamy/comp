@@ -1,90 +1,16 @@
 import { NotFoundException } from '@nestjs/common';
-
-type AppendCall = { source: unknown; name: string };
-const appendCalls: AppendCall[] = [];
-const archive = {
-  append: jest.fn((source: unknown, options: { name: string }) => {
-    appendCalls.push({ source, name: options.name });
-    return archive;
-  }),
-  finalize: jest.fn(),
-};
-
-const mockDb = {
-  frameworkInstance: { findFirst: jest.fn() },
-  requirementMap: { findMany: jest.fn() },
-  evidenceFormSetting: { findMany: jest.fn() },
-  policy: { findMany: jest.fn() },
-  control: { findMany: jest.fn() },
-  auditEngagement: { findFirst: jest.fn() },
-};
-jest.mock('@db', () => ({ db: mockDb }));
-
-const mockLoadRequirements = jest.fn();
-jest.mock('../../frameworks/frameworks-requirements.helper', () => ({
-  loadRequirementDefinitions: (...args: unknown[]) => mockLoadRequirements(...args),
-}));
-
-const mockAppendAttachment = jest.fn();
-jest.mock('./evidence-attachment-streamer', () => ({
-  ...jest.requireActual('./evidence-attachment-streamer'),
-  appendAttachmentToArchive: (...args: unknown[]) => mockAppendAttachment(...args),
-}));
-
-const mockLoadTaskBundle = jest.fn();
-jest.mock('./framework-evidence-tasks', () => ({
-  loadTaskBundle: (...args: unknown[]) => mockLoadTaskBundle(...args),
-  appendTaskEvidence: async ({
-    archive,
-    bundle,
-    folderPath,
-  }: {
-    archive: { append: (source: unknown, options: { name: string }) => void };
-    bundle: { summaryPdf: Buffer };
-    folderPath: string;
-  }) => archive.append(bundle.summaryPdf, { name: `${folderPath}/00-summary.pdf` }),
-}));
-
-const mockLoadDocumentBundle = jest.fn();
-jest.mock('./framework-evidence-documents', () => ({
-  loadDocumentBundle: (...args: unknown[]) => mockLoadDocumentBundle(...args),
-  appendDocumentEvidence: async ({
-    archive,
-    bundle,
-    folderPath,
-  }: {
-    archive: { append: (source: unknown, options: { name: string }) => void };
-    bundle: { csv: string };
-    folderPath: string;
-  }) => archive.append(bundle.csv, { name: `${folderPath}/submissions.csv` }),
-}));
-
-const mockListApplicability = jest.fn();
-jest.mock('../../frameworks/applicability/requirement-applicability.service', () => ({
-  RequirementApplicabilityService: jest.fn(() => ({ list: mockListApplicability })),
-}));
-const mockAppendRootRecords = jest.fn();
-jest.mock('./framework-evidence-records', () => ({
-  appendRootRecords: (...args: unknown[]) => mockAppendRootRecords(...args),
-}));
-const mockRenderWorksheet = jest.fn();
-jest.mock('./record-pdf', () => ({
-  renderRecordPdf: (...args: unknown[]) => mockRenderWorksheet(...args),
-}));
-
-const mockLoadNatives = jest.fn();
-jest.mock('../../utils/compliance-filters', () => ({ filterComplianceMembers: jest.fn() }));
-jest.mock('../../soa/soa.service', () => ({ SOAService: jest.fn() }));
-jest.mock('../../app/s3', () => ({ BUCKET_NAME: 'bucket', getObjectAsBuffer: jest.fn() }));
-jest.mock('../../isms/utils/export-payload', () => ({
-  parseExportSnapshot: jest.fn(),
-  renderSnapshot: jest.fn(),
-}));
-jest.mock('./framework-evidence-native', () => ({
-  ...jest.requireActual('./framework-evidence-native'),
-  loadNativeArtifacts: (...args: unknown[]) => mockLoadNatives(...args),
-}));
-
+import {
+  appendCalls,
+  archive,
+  mockAppendAttachment,
+  mockAppendRootRecords,
+  mockDb,
+  mockLoadDocumentBundle,
+  mockLoadNatives,
+  mockLoadRequirements,
+  mockLoadTaskBundle,
+  resetExportMocks,
+} from './framework-evidence-export.mockspec';
 import { FrameworkEvidenceExportService } from './framework-evidence-export.service';
 
 import {
@@ -101,38 +27,7 @@ describe('FrameworkEvidenceExportService', () => {
     renderer as unknown as ConstructorParameters<typeof FrameworkEvidenceExportService>[0],
   );
 
-  beforeEach(() => {
-    jest.clearAllMocks();
-    appendCalls.length = 0;
-    mockDb.frameworkInstance.findFirst.mockResolvedValue({
-      id: 'frm_1',
-      frameworkId: 'frk_1',
-      customFrameworkId: null,
-      currentVersionId: 'fv_1',
-      framework: { name: 'PCI DSS Level 1' },
-      customFramework: null,
-      organization: { name: 'Spare Payments', primaryColor: null },
-    });
-    mockLoadRequirements.mockResolvedValue([
-      requirement('r1', '1.1.1', 'Security policies are documented.'),
-      requirement('r2', '2.1.1', 'Secure configuration'),
-      requirement('r3', '3.1', 'Nothing mapped yet'),
-    ]);
-    mockDb.requirementMap.findMany.mockResolvedValue([
-      mapping('r1', { policyId: 'pol_1', taskId: 'tsk_1' }),
-      mapping('r2', { policyId: 'pol_1', formType: 'rbac_matrix', templateId: RISK_MANAGEMENT_TEMPLATE }),
-      mapping('r2', { formType: 'network_diagram' }),
-    ]);
-    mockDb.evidenceFormSetting.findMany.mockResolvedValue([{ formType: 'network_diagram' }]);
-    mockDb.policy.findMany.mockResolvedValue([approvedPolicy()]);
-    mockDb.control.findMany.mockResolvedValue([{ id: 'ctl_x', name: 'Network segmentation' }]);
-    mockDb.auditEngagement.findFirst.mockResolvedValue(null);
-    mockListApplicability.mockResolvedValue({ data: [], count: 0 });
-    mockRenderWorksheet.mockReturnValue(Buffer.from('worksheet'));
-    mockLoadTaskBundle.mockResolvedValue({ title: 'Access Review', summaryPdf: Buffer.from('task') });
-    mockLoadDocumentBundle.mockResolvedValue({ title: 'RBAC Matrix', csv: 'a,b', files: [] });
-    mockLoadNatives.mockResolvedValue(natives());
-  });
+  beforeEach(() => resetExportMocks());
 
   async function exportNames(): Promise<string[]> {
     const framework = await service.loadFramework('org_1', 'frm_1');
@@ -151,7 +46,6 @@ describe('FrameworkEvidenceExportService', () => {
     const names = await exportNames();
 
     expect(names).toEqual([
-      'README.txt',
       '_Platform records/ISMS/Risk Treatment Plan v2.pdf',
       '_Platform records/Registers/risk-register.csv',
       '1.1.1 Security policies are documented/00-requirement.txt',
@@ -166,6 +60,8 @@ describe('FrameworkEvidenceExportService', () => {
       'index.csv',
       'Applicability summary.csv',
       'native-artifacts.csv',
+      // README last, describing only what was written.
+      'README.txt',
     ]);
   });
 
@@ -203,11 +99,60 @@ describe('FrameworkEvidenceExportService', () => {
 
     const index = appendCalls.find((call) => call.name.endsWith('/index.csv'));
     expect(String(index?.source).split('\n')).toEqual([
-      '"requirement","name","folder","controls","policies","tasks","documents","isms_documents","registers","applicability","justification","set_by","set_at"',
-      '"1.1.1","Security policies are documented.","1.1.1 Security policies are documented","1","1","1","0","0","0","Applicable","","",""',
-      '"2.1.1","Secure configuration","2.1.1 Secure configuration","2","1","0","1","0","1","Applicable","","",""',
-      '"3.1","Nothing mapped yet","3.1 Nothing mapped yet","0","0","0","0","1","0","Applicable","","",""',
+      '"requirement","name","folder","controls","control_owners","policies","tasks","documents","isms_documents","registers","applicability","justification","set_by","set_at"',
+      '"1.1.1","Security policies are documented.","1.1.1 Security policies are documented","1","","1","1","0","0","0","Applicable","","",""',
+      '"2.1.1","Secure configuration","2.1.1 Secure configuration","2","","1","0","1","0","1","Applicable","","",""',
+      '"3.1","Nothing mapped yet","3.1 Nothing mapped yet","0","","0","0","0","1","0","Applicable","","",""',
     ]);
+  });
+
+  it('names the owner of each mapped control in 00-requirement.txt and index.csv', async () => {
+    const owned = mapping('r1', { policyId: 'pol_1' });
+    mockDb.requirementMap.findMany.mockResolvedValue([
+      { ...owned, control: { ...owned.control, owner: { user: { name: 'Ada', email: 'ada@spare.test' } } } },
+      mapping('r1', { taskId: 'tsk_1' }),
+    ]);
+    await exportNames();
+
+    const readme = String(appendCalls.find((c) => c.name.endsWith('1.1.1 Security policies are documented/00-requirement.txt'))?.source);
+    expect(readme).toContain('  - Control pol_1 (owner: Ada)\n  - Control tsk_1 (owner: not assigned)');
+    const index = String(appendCalls.find((c) => c.name.endsWith('/index.csv'))?.source);
+    expect(index.split('\n')[1]).toMatch(/^"1.1.1","Security policies are documented.","1.1.1 Security policies are documented","2","Ada",/);
+  });
+
+  it('puts a scan report in its folder unless a document submission already holds it', async () => {
+    mockLoadRequirements.mockResolvedValue([
+      requirement('r1', '11.3.2', 'External scans'),
+      requirement('r2', '11.4.3', 'External pentest'),
+    ]);
+    mockDb.requirementMap.findMany.mockResolvedValue([mapping('r2', { formType: 'penetration_test' })]);
+    mockLoadDocumentBundle.mockResolvedValue({
+      title: 'Penetration Test',
+      csv: 'a,b',
+      files: [{ id: 'evs_1', name: 'Pentest.pdf', url: 'org_1/pt.pdf' }],
+    });
+    const report = (key: string) => ({ name: `${key}.pdf`, key: `org_1/${key}.pdf`, pdf: Buffer.from(key) });
+    const scan = { vendor: 'V', scannedAt: new Date('2026-10-29T00:00:00Z'), findingCount: 0 };
+    mockLoadNatives.mockResolvedValue(
+      natives({
+        isms: [],
+        scans: [
+          { ...scan, id: 'vscan_1', kind: 'external_asv', passed: true, report: report('asv') },
+          { ...scan, id: 'vscan_2', kind: 'pentest', passed: null, report: report('pt') },
+        ],
+      }),
+    );
+
+    const names = await exportNames();
+
+    expect(names.filter((n) => n.includes('Vulnerability scans/'))).toEqual([
+      '11.3.2 External scans/Vulnerability scans/asv.pdf',
+      '11.3.2 External scans/Vulnerability scans/scans.csv',
+      '11.4.3 External pentest/Vulnerability scans/scans.csv',
+    ]);
+    const readme = String(appendCalls.find((c) => c.name.endsWith('11.3.2 External scans/00-requirement.txt'))?.source);
+    expect(readme).toContain('Vulnerability scan: ASV scan 2026-10-29 by V, passed');
+    expect(String(appendCalls.find((c) => c.name.endsWith('/README.txt'))?.source)).toContain('"Vulnerability scans/"');
   });
 
   it('indexes every native artifact with the files it was placed in', async () => {
@@ -234,7 +179,9 @@ describe('FrameworkEvidenceExportService', () => {
     expect(mockLoadNatives).toHaveBeenCalledWith({
       organizationId: 'org_1',
       frameworkId: 'frk_1',
+      frameworkName: 'PCI DSS Level 1',
       access: { registers: ['risks'], soa: false },
+      period: { from: new Date('2026-01-01T00:00:00Z') },
     });
     expect(mockLoadTaskBundle).toHaveBeenCalledWith({
       organizationId: 'org_1',

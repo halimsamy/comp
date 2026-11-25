@@ -43,6 +43,7 @@ export async function GET(req: Request) {
         },
       },
       agentSession: { select: { expiresAt: true } },
+      attestedBy: { select: { name: true, email: true } },
     },
     orderBy: { installedAt: 'desc' },
   });
@@ -133,6 +134,14 @@ export async function GET(req: Request) {
         // SyncDeviceSchema at sync time.
         ...(source === 'integration'
           ? { sourceCompliance: (device.sourceCompliance as SourceCompliance) ?? null }
+          : {}),
+        ...(source === 'manual'
+          ? {
+              attestation: {
+                by: device.attestedBy?.name || device.attestedBy?.email || null,
+                at: device.attestedAt?.toISOString() ?? null,
+              },
+            }
           : {}),
         complianceStatus,
         daysSinceLastCheckIn: daysSinceCheckIn(device.lastCheckIn),

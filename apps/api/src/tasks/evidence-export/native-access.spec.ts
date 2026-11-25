@@ -39,6 +39,7 @@ describe('resolveNativeAccess', () => {
       finding: ['read'],
       audit: ['read'],
       training: ['read'],
+      policy: ['read'],
     });
 
     await expect(resolveNativeAccess(base)).resolves.toEqual({
@@ -57,6 +58,7 @@ describe('resolveNativeAccess', () => {
         'vendor-reviews',
         'risk-reviews',
         'risk-treatment-actions',
+        'policy-acknowledgements',
       ],
       soa: true,
     });
@@ -69,6 +71,7 @@ describe('resolveNativeAccess', () => {
     mockResolveRolePermissions.mockResolvedValue({
       risk: ['read'],
       vendor: ['create'],
+      policy: ['update'],
     });
 
     await expect(resolveNativeAccess(base)).resolves.toEqual({

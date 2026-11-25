@@ -1,6 +1,7 @@
 import { generateTaskSummaryPDF } from './evidence-pdf-generator';
 import type { TaskEvidenceSummary } from './evidence-export.types';
 import { pdfText } from './pdf-text.test-util';
+import { taskDetails } from './task-summary-details';
 
 describe('generateTaskSummaryPDF', () => {
   it('should generate a summary PDF for a task with multiple automations', () => {
@@ -50,6 +51,42 @@ describe('generateTaskSummaryPDF', () => {
     expect(text).toContain('(1. Automations)');
     expect(text).toContain('(Custom Evidence Collection)');
     expect(text).toContain('(Custom automations)');
+  });
+
+  it('states the task description, status, people, review frequency and dates', () => {
+    const summary: TaskEvidenceSummary = {
+      taskId: 'tsk_123',
+      taskTitle: 'Access Review',
+      organizationId: 'org_123',
+      organizationName: 'Test Organization',
+      automations: [],
+      exportedAt: new Date('2026-11-25T10:00:00Z'),
+      task: taskDetails({
+        description: 'Review every account quarterly.',
+        status: 'done',
+        frequency: 'quarterly',
+        assignee: { user: { name: 'Ada', email: 'ada@x.test' } },
+        approver: { user: { name: null, email: 'cto@x.test' } },
+        approvedAt: new Date('2026-11-20T00:00:00Z'),
+        lastCompletedAt: new Date('2026-11-19T00:00:00Z'),
+        reviewDate: new Date('2027-02-19T00:00:00Z'),
+        updatedAt: new Date('2026-11-21T00:00:00Z'),
+      }),
+    };
+
+    const text = pdfText(generateTaskSummaryPDF(summary));
+    for (const expected of [
+      '(Task description)',
+      '(Review every account quarterly.)',
+      '(Done)',
+      '(Ada)',
+      '(cto@x.test, approved 2026-11-20)',
+      '(Quarterly)',
+      '(2027-02-19)',
+      '(2026-11-21)',
+    ]) {
+      expect(text).toContain(expected);
+    }
   });
 
   it('should handle tasks with no automations', () => {

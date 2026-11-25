@@ -28,6 +28,7 @@ jest.mock('../tasks/evidence-export/framework-evidence-mappings', () => ({
 jest.mock('../tasks/evidence-export/native-artifact-control-map', () => ({
   registersForControlTemplates: () => [],
   registersForRequirement: () => [],
+  frameworkFamily: () => null,
 }));
 jest.mock('./audit-evidence', () => ({
   loadAuditEvidence: jest.fn().mockResolvedValue({
@@ -39,6 +40,7 @@ jest.mock('./audit-evidence', () => ({
 
 import { ForbiddenException } from '@nestjs/common';
 import type { AuthContext } from '../auth/types';
+import { loadMappings } from '../tasks/evidence-export/framework-evidence-mappings';
 import { AuditWorkspaceService } from './audit-workspace.service';
 
 const auth = (roles: string[], memberId: string): AuthContext => ({
@@ -86,6 +88,8 @@ describe('AuditWorkspaceService', () => {
       policies: [{ id: 'pol_1' }],
     });
     expect(rows[1]).toMatchObject({ id: 'r2', readiness: 'not_applicable', blockedBy: [], review: null });
+    // Same mappings as the evidence export: not-relevant tasks and retired forms are left out here too.
+    expect(loadMappings).toHaveBeenCalledWith('frm_1');
     expect(mockDb.frameworkInstance.findFirstOrThrow.mock.calls[0][0].where).toEqual({
       id: 'frm_1',
       organizationId: 'org_1',

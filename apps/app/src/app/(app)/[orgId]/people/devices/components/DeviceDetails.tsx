@@ -18,6 +18,7 @@ import {
 import { ArrowLeft, Information } from '@trycompai/design-system/icons';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@trycompai/ui/tooltip';
 import type { DeviceWithChecks } from '../types';
+import { DeviceSourceInfo } from './DeviceSourceInfo';
 import {
   CANONICAL_DEVICE_CHECKS,
   CHECK_FIELDS,
@@ -209,16 +210,7 @@ export const DeviceDetails = ({ device, onClose }: DeviceDetailsProps) => {
                 {device.lastCheckIn ? new Date(device.lastCheckIn).toLocaleString() : 'Never'}
               </Text>
             </div>
-            <div>
-              <Text size="sm" variant="muted">
-                {device.source === 'integration' ? 'Source' : 'Agent Version'}
-              </Text>
-              <Text size="sm" weight="medium">
-                {device.source === 'integration'
-                  ? (device.integrationProvider?.name ?? 'Integration')
-                  : (device.agentVersion ?? 'N/A')}
-              </Text>
-            </div>
+            <DeviceSourceInfo device={device} />
             <div>
               <Text size="sm" variant="muted">
                 Installed

@@ -156,7 +156,7 @@ describe('FrameworkEvidenceExportService: applicability, policies and audits', (
       count: 2,
     });
     mockRenderWorksheet.mockReturnValue(Buffer.from('worksheet'));
-    mockLoadTaskBundle.mockResolvedValue({ title: 'Firewall review', summaryPdf: Buffer.from('task') });
+    mockLoadTaskBundle.mockResolvedValue({ title: 'Firewall review', summaryPdf: Buffer.from('task'), attachments: [] });
     mockLoadDocumentBundle.mockResolvedValue({ title: 'Doc', csv: 'a,b', files: [] });
     mockLoadNatives.mockResolvedValue(natives({ isms: [], registers: new Map() }));
   });

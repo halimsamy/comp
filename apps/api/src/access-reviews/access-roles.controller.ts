@@ -124,7 +124,8 @@ export class AccessRolesController {
   @RequirePermission('member', 'read')
   @ApiOperation({
     summary: 'List privileged accounts',
-    description: 'Returns every active admin account across all systems with owner, roles, MFA and last login (PCI DSS 7.2.2, 8.4.1).',
+    description:
+      'Returns active admin accounts and holders of roles marked privileged in the approved role catalog, across all systems, with owner, roles, MFA and last login (PCI DSS 7.2.2, 8.4.1).',
   })
   async privileged(@OrganizationId() organizationId: string) {
     const data = await listPrivilegedAccounts(organizationId, this.accounts);

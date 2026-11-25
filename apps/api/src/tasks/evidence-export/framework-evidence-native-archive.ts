@@ -10,7 +10,9 @@ import type {
   NativeArtifacts,
 } from './framework-evidence-native';
 import type { RequirementFolder } from './framework-evidence-plan';
-import { REGISTERS } from './registers/registers';
+import type { RootRecordCounts } from './framework-evidence-records';
+import { REGISTERS, type RegisterKey } from './registers/registers';
+import { appendFolderScans, SCANS_FOLDER } from './framework-evidence-scans';
 
 export type AuditPeriod = { from?: Date; to?: Date };
 
@@ -110,6 +112,21 @@ export function appendFolderNative({
       source: csv,
     });
   }
+  for (const { key, csv, count } of native.cited) {
+    add({
+      type: 'Register',
+      title: `${REGISTERS[key].title} citing the requirement`,
+      detail: `${count} row(s) per folder, snapshot at export time`,
+      path: `${folder}/Registers/${citingFileName(key)}`,
+      source: csv,
+    });
+  }
+  appendFolderScans({ archive, root, folder, scans: native.scans ?? [], index });
+}
+
+/** `findings-citing-this-requirement.csv` */
+export function citingFileName(key: RegisterKey): string {
+  return REGISTERS[key].fileName.replace(/\.csv$/, '-citing-this-requirement.csv');
 }
 
 /** Root-level copies: every register, every published ISMS document and the SoA. */
@@ -132,6 +149,7 @@ export function appendRootNative({
       isms: natives.isms,
       soa: natives.soa !== null,
       registers: [...natives.registers.keys()],
+      cited: [],
     },
     natives,
     index,
@@ -153,6 +171,7 @@ export function indexRow({
     folder.requirement.name,
     folder.folder,
     String(folder.controlNames.length),
+    Array.from(new Set((folder.controlOwners ?? []).filter(Boolean))).join(' | '),
     ...counts.map(String),
     ...applicabilityColumns(applies),
   ];
@@ -161,7 +180,7 @@ export function indexRow({
 export function buildIndexCsv(rows: string[][]): string {
   return [
     toCsvRow([
-      'requirement', 'name', 'folder', 'controls', 'policies', 'tasks',
+      'requirement', 'name', 'folder', 'controls', 'control_owners', 'policies', 'tasks',
       'documents', 'isms_documents', 'registers', ...APPLICABILITY_HEADERS,
     ]),
     ...rows.map((row) => toCsvRow(row)),
@@ -176,6 +195,7 @@ export function buildReadme({
   unapprovedPolicies = [],
   notApplicable = 0,
   auditTitle,
+  records = { vendorDocuments: 0, riskReviews: 0 },
 }: {
   frameworkName: string;
   organizationName: string;
@@ -186,11 +206,13 @@ export function buildReadme({
   /** Requirements marked not applicable. */
   notApplicable?: number;
   auditTitle?: string;
+  /** Only folders that were written are described. */
+  records?: RootRecordCounts & { scanFolders?: number };
 }): string {
   const day = (d?: Date) => (d ? d.toISOString().slice(0, 10) : '');
   const periodLine =
     period.from || period.to
-      ? `Audit period: ${day(period.from) || 'start'} to ${day(period.to) || 'today'} (task attachments, automation runs and document submissions outside it are left out)`
+      ? `Audit period: ${day(period.from) || 'start'} to ${day(period.to) || 'today'} (task attachments, automation runs, document submissions and vulnerability scans outside it are left out)`
       : 'Audit period: all time';
   const lines = [
     `${frameworkName} evidence export for ${organizationName}`,
@@ -210,10 +232,20 @@ export function buildReadme({
     'only 00-requirement.txt and NOT_APPLICABLE.txt. Requirements met with compensating',
     'controls carry "CCW - <requirement>.pdf" (PCI DSS Appendix C).',
     `Requirements marked not applicable: ${notApplicable}.`,
-    '',
-    'Vendors/ holds each vendor\'s latest documents and AI report summaries; Risk reviews/',
-    'holds the register as frozen at each periodic review.',
   ];
+  if (records.scanFolders) {
+    lines.push(
+      '',
+      `"${SCANS_FOLDER}/" (PCI DSS 11.3.x, 11.4.x; ISO 27001 A.8.8) holds the scan records`,
+      'and their attached reports; a report already filed as a document is not copied again.',
+    );
+  }
+  if (records.vendorDocuments > 0) {
+    lines.push('', 'Vendors/ holds each vendor\'s latest documents and AI report summaries.');
+  }
+  if (records.riskReviews > 0) {
+    lines.push('', 'Risk reviews/ holds the risk register as frozen at each periodic review.');
+  }
   if (auditTitle) {
     lines.push(
       '',
@@ -245,7 +277,7 @@ export function buildReadme({
       'Statement of Applicability left out (the exporting user lacks audit read access).',
     );
   }
-  if (natives.soa && natives.soa.status !== 'completed') {
+  if (natives.soa && natives.soa.status !== 'approved') {
     lines.push(
       '',
       `Note: the Statement of Applicability is not approved yet (status: ${natives.soa.status}).`,

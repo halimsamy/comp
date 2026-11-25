@@ -1,9 +1,11 @@
 import { db } from '@db';
 import { IsmsNonconformityService } from '../../../isms/isms-nonconformity.service';
+import { citationPrefix } from '../requirement-citations';
 import {
   humanize,
   personName,
   toCsv,
+  type CitedTable,
   type RegisterParams,
 } from './register-csv';
 
@@ -40,9 +42,9 @@ function findingSubject(f: Finding): string {
  * row of the 10.2 register (standalone NCs, internal audit findings and, once
  * merged there, platform findings), plus any platform finding not in it yet.
  */
-export async function buildFindingsRegisterCsv({
+export async function loadFindingsTable({
   organizationId,
-}: RegisterParams): Promise<string> {
+}: RegisterParams): Promise<CitedTable> {
   const [{ data: register }, findings] = await Promise.all([
     new IsmsNonconformityService().list({ organizationId }),
     loadFindings(organizationId),
@@ -59,7 +61,8 @@ export async function buildFindingsRegisterCsv({
     : [];
   const ownerName = new Map(owners.map((m) => [m.id, personName(m.user)]));
 
-  return toCsv({
+  const pending = findings.filter((f) => !listed.has(f.id));
+  return {
     headers: [
       'Reference',
       'Kind',
@@ -93,24 +96,31 @@ export async function buildFindingsRegisterCsv({
         row.effectivenessReviewedAt,
         row.createdAt,
       ]),
-      ...findings
-        .filter((f) => !listed.has(f.id))
-        .map((f) => [
-          f.id,
-          'Finding',
-          humanize(f.type),
-          findingSubject(f),
-          humanize(f.severity),
-          humanize(f.status),
-          f.content,
-          '',
-          f.revisionNote,
-          '',
-          null,
-          '',
-          null,
-          f.createdAt,
-        ]),
+      ...pending.map((f) => [
+        f.id,
+        'Finding',
+        humanize(f.type),
+        findingSubject(f),
+        humanize(f.severity),
+        humanize(f.status),
+        f.content,
+        '',
+        f.revisionNote,
+        '',
+        null,
+        '',
+        null,
+        f.createdAt,
+      ]),
     ],
-  });
+    // Findings name what they breach up front: "PCI DSS 10.3.4; ISO 27001 A.8.15: …".
+    cites: [
+      ...register.map((row) => citationPrefix(row.description)),
+      ...pending.map((f) => citationPrefix(f.content)),
+    ],
+  };
+}
+
+export async function buildFindingsRegisterCsv(params: RegisterParams): Promise<string> {
+  return toCsv(await loadFindingsTable(params));
 }

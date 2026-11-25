@@ -18,6 +18,7 @@ jest.mock('../../soa/soa.service', () => ({
   SOAService: jest.fn(() => ({ exportDocument: mockExportSoa })),
 }));
 const mockBuildRisks = jest.fn();
+const mockFindingsTable = jest.fn();
 jest.mock('./registers/registers', () => {
   const actual = jest.requireActual('./registers/registers');
   return {
@@ -28,18 +29,28 @@ jest.mock('./registers/registers', () => {
         ...actual.REGISTERS.risks,
         build: (...a: unknown[]) => mockBuildRisks(...a),
       },
+      findings: {
+        ...actual.REGISTERS.findings,
+        cited: (...a: unknown[]) => mockFindingsTable(...a),
+      },
     },
   };
 });
+jest.mock('./framework-evidence-scans', () => ({
+  ...jest.requireActual('./framework-evidence-scans'),
+  loadScanEvidence: jest.fn().mockResolvedValue([]),
+}));
 jest.mock('../../utils/compliance-filters', () => ({
   filterComplianceMembers: jest.fn(),
 }));
 
 import {
+  folderNativeTitles,
   loadNativeArtifacts,
   nativeForFolder,
 } from './framework-evidence-native';
 import type { RequirementFolder } from './framework-evidence-plan';
+import { toCitedRows } from './requirement-citations';
 
 const version = (
   n: number,
@@ -142,6 +153,24 @@ describe('loadNativeArtifacts', () => {
     expect(natives.soaOmitted).toBe(true);
   });
 
+  it('keeps the requirements each findings row cites, from a single load', async () => {
+    mockFindingsTable.mockResolvedValue({
+      headers: ['Reference'],
+      rows: [['NC-14'], ['NC-30']],
+      cites: ['PCI DSS 10.6.2', ''],
+    });
+
+    const natives = await loadNativeArtifacts({
+      organizationId: 'org_1',
+      frameworkId: null,
+      access: { registers: ['findings'], soa: false },
+    });
+
+    expect(mockFindingsTable).toHaveBeenCalledTimes(1);
+    expect(natives.registers.get('findings')).toBe('"Reference"\n"NC-14"\n"NC-30"');
+    expect(natives.cited?.get('findings')?.rows.map((r) => r.keys)).toEqual([['pci:10.6.2'], []]);
+  });
+
   it('has no ISMS documents or SoA for a custom framework', async () => {
     const natives = await loadNativeArtifacts({
       organizationId: 'org_1',
@@ -230,7 +259,38 @@ describe('nativeForFolder', () => {
     expect(riskFolder.registers).toEqual(['risks']);
 
     expect(nativeForFolder({ folder: folder('r1', 'A.5.1'), natives })).toEqual(
-      { isms: [], soa: false, registers: [] },
+      { isms: [], soa: false, registers: [], cited: [], scans: [] },
     );
+  });
+
+  it('gives a folder the register rows citing its requirement', () => {
+    const withCited = {
+      ...natives,
+      cited: new Map([
+        [
+          'findings' as const,
+          toCitedRows({
+            headers: ['Reference'],
+            rows: [['NC-14'], ['NC-52']],
+            cites: ['PCI DSS 10.6.2', 'PCI DSS 10.3.4; ISO 27001 A.8.15'],
+          }),
+        ],
+      ]),
+    };
+    const cited = (citation: string | null) =>
+      nativeForFolder({ folder: folder('r', 'x', { citation }), natives: withCited }).cited;
+
+    expect(cited('pci:10.6.2')).toEqual([
+      { key: 'findings', csv: '"Reference"\n"NC-14"', count: 1 },
+    ]);
+    expect(cited('iso27001:A.8.15').map((c) => c.count)).toEqual([1]);
+    expect(cited('pci:12.1.1')).toEqual([]);
+    expect(
+      folderNativeTitles(
+        { isms: [], soa: false, registers: [], cited: cited('pci:10.6.2') },
+        withCited,
+      ),
+    ).toEqual(['Nonconformities and findings citing this requirement (1)']);
+    expect(cited(null)).toEqual([]);
   });
 });

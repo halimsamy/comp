@@ -8,7 +8,10 @@ import {
 
 export type RegisterParams = { organizationId: string };
 
-type Cell = string | number | boolean | Date | null | undefined;
+export type Cell = string | number | boolean | Date | null | undefined;
+
+/** Register rows plus, per row, the requirement reference it cites ("PCI DSS 6.2.2"). */
+export type CitedTable = { headers: string[]; rows: Cell[][]; cites: string[] };
 
 function toCell(value: Cell): string {
   if (value === null || value === undefined) return '';

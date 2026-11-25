@@ -35,6 +35,7 @@ function deviceRule({ requireCompliant }: { requireCompliant: boolean }): Native
       ]);
       const devices = await db.device.findMany({
         where: { organizationId, memberId: { in: members.map((m) => m.id) } },
+        include: { attestedBy: { select: { name: true, email: true } } },
         orderBy: { name: 'asc' },
       });
       const lastSeen = (d: (typeof devices)[number]) => d.lastCheckIn ?? d.updatedAt;
@@ -43,6 +44,11 @@ function deviceRule({ requireCompliant }: { requireCompliant: boolean }): Native
       const missing = members.filter((m) => !devices.some((d) => d.memberId === m.id && counts(d)));
       const enabled = !!org?.deviceAgentStepEnabled;
       const memberOf = new Map(members.map((m) => [m.id, m]));
+      const ownerOf = (d: (typeof devices)[number]) => {
+        const user = memberOf.get(d.memberId)?.user;
+        return user ? personLabel(user) : '—';
+      };
+      const attested = devices.filter((d) => d.source === 'manual');
 
       return {
         holds: enabled && members.length > 0 && missing.length === 0,
@@ -66,23 +72,38 @@ function deviceRule({ requireCompliant }: { requireCompliant: boolean }): Native
             ...(devices.length > 0 && {
               table: {
                 headers: ['Person', 'Device', 'OS', 'Serial', 'Compliant', 'Disk encryption', 'Antivirus', 'Screen lock', 'Last seen'],
-                rows: devices.map((d) => {
-                  const user = memberOf.get(d.memberId)?.user;
-                  return [
-                    user ? personLabel(user) : '—',
-                    d.name,
-                    `${d.platform} ${d.osVersion}`,
-                    d.serialNumber ?? '—',
-                    yesNo(d.isCompliant),
-                    yesNo(d.diskEncryptionEnabled),
-                    yesNo(d.antivirusEnabled),
-                    yesNo(d.screenLockEnabled),
-                    formatDate(lastSeen(d)),
-                  ];
-                }),
+                rows: devices.map((d) => [
+                  ownerOf(d),
+                  d.name,
+                  `${d.platform} ${d.osVersion}`,
+                  d.serialNumber ?? '—',
+                  yesNo(d.isCompliant),
+                  yesNo(d.diskEncryptionEnabled),
+                  yesNo(d.antivirusEnabled),
+                  yesNo(d.screenLockEnabled),
+                  formatDate(lastSeen(d)),
+                ]),
               },
             }),
           },
+          ...(attested.length
+            ? [
+                {
+                  heading: 'Attested devices',
+                  intro:
+                    'These devices have no agent or device sync. Their checks were attested by hand when the device was added or last edited.',
+                  table: {
+                    headers: ['Person', 'Device', 'Attested by', 'Attested on'],
+                    rows: attested.map((d) => [
+                      ownerOf(d),
+                      d.name,
+                      d.attestedBy ? personLabel(d.attestedBy) : 'Not recorded',
+                      formatDate(d.attestedAt),
+                    ]),
+                  },
+                },
+              ]
+            : []),
           ...(missing.length
             ? [{ heading: 'Gaps', bullets: missing.map((m) => personLabel(m.user)) }]
             : []),

@@ -140,6 +140,28 @@ describe('People rules', () => {
     mockDb.device.findMany.mockResolvedValue([{ ...device, lastCheckIn: daysAgo(60) }]);
     expect((await deviceListRule.evaluate(ctx)).holds).toBe(false);
   });
+
+  it('lists who attested each manually added device', async () => {
+    mockDb.organization.findUnique.mockResolvedValue({ deviceAgentStepEnabled: true });
+    mockDb.member.findMany.mockResolvedValue([member('a')]);
+    const device = {
+      memberId: 'a', platform: 'linux', osVersion: '24.04', serialNumber: null, isCompliant: true,
+      lastCheckIn: daysAgo(2), updatedAt: daysAgo(2),
+    };
+    mockDb.device.findMany.mockResolvedValue([
+      { ...device, id: 'd1', name: 'Agent', source: 'agent', attestedBy: null, attestedAt: null },
+      { ...device, id: 'd2', name: 'Box', source: 'manual', attestedBy: { name: 'Admin', email: 'ad@x.io' }, attestedAt: daysAgo(1) },
+      { ...device, id: 'd3', name: 'Old', source: 'manual', attestedBy: null, attestedAt: daysAgo(3) },
+    ]);
+    const { sections } = await secureDevicesRule.evaluate(ctx);
+    expect(mockDb.device.findMany.mock.calls[0][0].include).toEqual({
+      attestedBy: { select: { name: true, email: true } },
+    });
+    expect(sections.find((s) => s.heading === 'Attested devices')?.table?.rows).toEqual([
+      ['A (a@x.io)', 'Box', 'Admin (ad@x.io)', '2026-11-17'],
+      ['A (a@x.io)', 'Old', 'Not recorded', '2026-11-15'],
+    ]);
+  });
 });
 
 describe('Access review and vendor rules', () => {

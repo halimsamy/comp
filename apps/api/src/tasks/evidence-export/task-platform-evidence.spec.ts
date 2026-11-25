@@ -70,16 +70,27 @@ describe('appendTaskPlatformEvidence', () => {
   });
 
   it('adds each Structured evidence form with submissions in its own sub-folder', async () => {
-    mockListTaskForms.mockResolvedValue([{ formType: 'network-diagram' }, { formType: 'empty-form' }]);
+    mockListTaskForms.mockResolvedValue([
+      { formType: 'penetration-test', retiredTo: null },
+      { formType: 'empty-form', retiredTo: null },
+    ]);
     mockLoadBundle.mockImplementation(async ({ formType }: { formType: string }) =>
-      formType === 'db_network-diagram'
-        ? { title: 'Network Diagram', csv: 'a,b', files: [] }
+      formType === 'db_penetration-test'
+        ? { title: 'Penetration Test', csv: 'a,b', files: [] }
         : { title: 'Empty', csv: null, files: [] },
     );
     await run();
-    expect(mockLoadBundle).toHaveBeenCalledWith({ organizationId: 'org_1', formType: 'db_network-diagram' });
+    expect(mockLoadBundle).toHaveBeenCalledWith({ organizationId: 'org_1', formType: 'db_penetration-test' });
     expect(mockAppendDocs).toHaveBeenCalledTimes(1);
-    expect(mockAppendDocs.mock.calls[0][0].folderPath).toBe('root/01-attachments/network-diagram');
+    expect(mockAppendDocs.mock.calls[0][0].folderPath).toBe('root/01-attachments/penetration-test');
+  });
+
+  it('never exports a retired form, even with a pending submission', async () => {
+    mockListTaskForms.mockResolvedValue([{ formType: 'network-diagram', retiredTo: { label: 'Assets', path: '/assets' } }]);
+    mockLoadBundle.mockResolvedValue({ title: 'Network Diagram', csv: 'a,b', files: [] });
+    await run();
+    expect(mockLoadBundle).not.toHaveBeenCalled();
+    expect(mockAppendDocs).not.toHaveBeenCalled();
   });
 
   it('renders no snapshot for a task outside the organization', async () => {

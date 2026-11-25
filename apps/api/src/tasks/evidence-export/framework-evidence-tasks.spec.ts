@@ -19,6 +19,7 @@ jest.mock('./task-platform-evidence', () => ({
 }));
 
 import type { Archiver } from 'archiver';
+import type { TaskAttachment } from './evidence-attachment-streamer';
 import { appendTaskEvidence, loadTaskBundle } from './framework-evidence-tasks';
 
 describe('framework export task bundle — Auto-evidence', () => {
@@ -66,5 +67,18 @@ describe('framework export task bundle — Auto-evidence', () => {
     expect(append).toHaveBeenCalledWith(snapshot.buffer, {
       name: 'A.1/Tasks/Scope/attachments/auto-scope-evidence-2026-11-19.pdf',
     });
+  });
+
+  it('copies a task upload into every requirement folder the task maps to', async () => {
+    const { appendAttachmentToArchive } = jest.requireMock('./evidence-attachment-streamer');
+    const upload: TaskAttachment = { id: 'att_1', name: 'scan.png', url: 'org/scan.png', type: 'image', createdAt: now };
+    const bundle = { title: 'Scope', summaryPdf: Buffer.from('S'), automationPdfs: [], attachments: [upload], autoEvidence: null };
+    const archive = { append: jest.fn() } as unknown as Archiver;
+
+    await appendTaskEvidence({ archive, bundle, folderPath: 'A.1/Tasks/Scope' });
+    await appendTaskEvidence({ archive, bundle, folderPath: 'A.2/Tasks/Scope' });
+
+    const folders = appendAttachmentToArchive.mock.calls.map(([p]: [{ folderPath: string }]) => p.folderPath);
+    expect(folders).toEqual(['A.1/Tasks/Scope/attachments', 'A.2/Tasks/Scope/attachments']);
   });
 });

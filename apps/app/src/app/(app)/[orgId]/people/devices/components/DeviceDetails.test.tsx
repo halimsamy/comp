@@ -38,6 +38,36 @@ function makeDevice(overrides: Partial<DeviceWithChecks> = {}): DeviceWithChecks
   };
 }
 
+describe('DeviceDetails manual device attestation', () => {
+  it('shows who attested the checks instead of an agent version', () => {
+    render(
+      <DeviceDetails
+        device={makeDevice({
+          source: 'manual',
+          agentVersion: null,
+          attestation: { by: 'Admin', at: '2026-11-25T10:00:00.000Z' },
+        })}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('Checks attested by')).toBeInTheDocument();
+    expect(
+      screen.getByText(`Admin on ${new Date('2026-11-25T10:00:00.000Z').toLocaleDateString()}`),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Agent Version')).not.toBeInTheDocument();
+  });
+
+  it('says the attester was not recorded for older manual devices', () => {
+    render(
+      <DeviceDetails
+        device={makeDevice({ source: 'manual', attestation: { by: null, at: null } })}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(screen.getByText('Not recorded')).toBeInTheDocument();
+  });
+});
+
 describe('DeviceDetails compliance badge', () => {
   it('renders "Compliant" when complianceStatus is compliant', () => {
     render(<DeviceDetails device={makeDevice()} onClose={vi.fn()} />);

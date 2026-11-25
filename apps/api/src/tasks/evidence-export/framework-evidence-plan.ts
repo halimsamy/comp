@@ -1,9 +1,11 @@
 import type { EvidenceFormType as DbEvidenceFormType } from '@db';
 import type { RequirementDef } from '../../frameworks/frameworks-requirements.helper';
 import {
+  frameworkFamily,
   registersForControlTemplates,
   registersForRequirement,
 } from './native-artifact-control-map';
+import { citationKey } from './requirement-citations';
 import type { RegisterKey } from './registers/registers';
 
 export type MappedControl = {
@@ -13,6 +15,8 @@ export type MappedControl = {
     id: string;
     controlTemplateId: string | null;
     name: string;
+    /** Accountable owner (Control.ownerId), by name. */
+    owner?: string | null;
     policyIds: string[];
     taskIds: string[];
     formTypes: DbEvidenceFormType[];
@@ -23,12 +27,16 @@ export type RequirementFolder = {
   folder: string;
   requirement: RequirementDef;
   controlNames: string[];
+  /** Owner of each of `controlNames` ('' when none is assigned). */
+  controlOwners?: string[];
   controlIds: string[];
   policyIds: string[];
   taskIds: string[];
   formTypes: DbEvidenceFormType[];
   /** Platform registers that evidence this requirement's controls. */
   registers: RegisterKey[];
+  /** `pci:10.6.2`: how register rows cite this requirement (ISO 27001 / PCI DSS only). */
+  citation?: string | null;
 };
 
 /** A readable, cross-platform-safe path segment (keeps case and spaces). */
@@ -57,6 +65,7 @@ export function planRequirementFolders({
   frameworkName?: string;
 }): RequirementFolder[] {
   const usedFolders = new Set<string>();
+  const family = frameworkFamily(frameworkName);
 
   return requirements.map((requirement) => {
     const controls = mappings
@@ -75,11 +84,15 @@ export function planRequirementFolders({
       folder = `${safeSegment(label, 74)} (${i})`;
     }
     usedFolders.add(folder.toLowerCase());
+    // A name shared by several controls shows the first owner set.
+    const owners = new Map<string, string>();
+    for (const c of controls) if (!owners.get(c.name)) owners.set(c.name, c.owner ?? '');
 
     return {
       folder,
       requirement,
-      controlNames: unique(controls.map((c) => c.name)),
+      controlNames: [...owners.keys()],
+      controlOwners: [...owners.values()],
       controlIds: unique(controls.map((c) => c.id)),
       policyIds: unique(controls.flatMap((c) => c.policyIds)),
       taskIds: unique(controls.flatMap((c) => c.taskIds)),
@@ -88,6 +101,10 @@ export function planRequirementFolders({
         ...registersForControlTemplates(controls.map((c) => c.controlTemplateId)),
         ...registersForRequirement({ frameworkName, identifier: requirement.identifier }),
       ]),
+      citation:
+        family && requirement.identifier
+          ? citationKey({ family, identifier: requirement.identifier })
+          : null,
     };
   });
 }
@@ -111,7 +128,7 @@ export function buildRequirementReadme({
   /** ISMS documents, SoA and registers placed in this folder. */
   nativeTitles?: string[];
 }): string {
-  const { requirement, controlNames } = folder;
+  const { requirement, controlNames, controlOwners = [] } = folder;
   const list = (items: string[]) =>
     items.length > 0 ? items.map((item) => `  - ${item}`) : ['  (none)'];
 
@@ -123,7 +140,7 @@ export function buildRequirementReadme({
     '',
     ...applicability,
     'Mapped controls:',
-    ...list(controlNames),
+    ...list(controlNames.map((name, i) => `${name} (owner: ${controlOwners[i] || 'not assigned'})`)),
     '',
     'Policies (Policies/):',
     ...list(policyNames),

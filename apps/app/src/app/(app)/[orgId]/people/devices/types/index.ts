@@ -68,6 +68,8 @@ export interface DeviceWithChecks {
    * compliance: the source's verdict and/or its own named checks.
    */
   sourceCompliance?: SourceCompliance | null;
+  /** Set only when `source === 'manual'`: who attested the checks and when (null = not recorded). */
+  attestation?: { by: string | null; at: string | null };
   /** Derived on the server; 'stale' = no check-in for >= 7 days. */
   complianceStatus: DeviceComplianceStatus;
   /** Whole days since last check-in, or null when never synced. */
