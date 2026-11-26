@@ -50,7 +50,8 @@ export function AccountsPanel({ members }: { members: OwnerOption[] }) {
   const [search, setSearch] = useState('');
   const [ownerTarget, setOwnerTarget] = useState<AccessAccount | null>(null);
   const [addOpen, setAddOpen] = useState(false);
-  const [addAccountOpen, setAddAccountOpen] = useState(false);
+  // 'new' adds an account; an account edits it.
+  const [accountDialog, setAccountDialog] = useState<AccessAccount | 'new' | null>(null);
   const [removeTarget, setRemoveTarget] = useState<AccessAccount | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -117,9 +118,9 @@ export function AccountsPanel({ members }: { members: OwnerOption[] }) {
     try {
       await mutations.addAccount({ id: manualId, account });
       await refresh();
-      toast.success('Account added');
+      toast.success(accountDialog === 'new' ? 'Account added' : 'Account saved');
     } catch (caught) {
-      toast.error(caught instanceof Error ? caught.message : 'Failed to add the account');
+      toast.error(caught instanceof Error ? caught.message : 'Failed to save the account');
       throw caught;
     }
   };
@@ -200,7 +201,7 @@ export function AccountsPanel({ members }: { members: OwnerOption[] }) {
           isManual={Boolean(manualId)}
           canUpdate={canUpdate}
           canExportSystem={visible.length > 0}
-          onAddAccount={() => setAddAccountOpen(true)}
+          onAddAccount={() => setAccountDialog('new')}
           onAddSystem={() => setAddOpen(true)}
           onImport={() => setImportOpen(true)}
           onExportSystem={handleExport}
@@ -251,6 +252,7 @@ export function AccountsPanel({ members }: { members: OwnerOption[] }) {
           accounts={visible}
           canMapOwners={canUpdate}
           onMapOwner={setOwnerTarget}
+          onEdit={canUpdate && manualId ? setAccountDialog : undefined}
           onRemove={canUpdate && manualId ? setRemoveTarget : undefined}
         />
       )}
@@ -279,8 +281,9 @@ export function AccountsPanel({ members }: { members: OwnerOption[] }) {
       />
       <AddAccountDialog
         systemName={system?.name ?? ''}
-        open={addAccountOpen}
-        onOpenChange={setAddAccountOpen}
+        account={accountDialog === 'new' ? null : accountDialog}
+        open={accountDialog !== null}
+        onOpenChange={(open) => !open && setAccountDialog(null)}
         onSave={handleAddAccount}
       />
       <ImportAccountsDialog

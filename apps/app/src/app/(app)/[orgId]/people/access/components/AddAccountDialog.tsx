@@ -1,6 +1,6 @@
 'use client';
 
-import type { ImportedAccount } from '@/hooks/use-access-reviews';
+import type { AccessAccount, ImportedAccount } from '@/hooks/use-access-reviews';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Button,
@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@trycompai/design-system';
+import { useEffect } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { z } from 'zod';
 
@@ -37,9 +38,33 @@ const EMPTY: AccountValues = { accountId: '', name: '', email: '', roles: '', ty
 const TYPE_LABEL = { human: 'Person', service: 'Service account', shared: 'Shared account' };
 const MFA_LABEL = { unknown: 'Unknown', on: 'On', off: 'Off' };
 
-export function toImportedAccount(values: AccountValues): ImportedAccount {
+const TYPES = ['human', 'service', 'shared'] as const;
+const STATUSES = ['active', 'suspended', 'deactivated'] as const;
+const pick = <T extends string>(options: readonly T[], value: string | null): T | undefined =>
+  options.find((o) => o === value);
+
+/** Form values for editing an existing account. */
+export function toAccountValues(account: AccessAccount): AccountValues {
+  return {
+    accountId: account.accountId,
+    name: account.name === account.accountId ? '' : account.name,
+    email: account.email ?? '',
+    roles: account.roles.join(', '),
+    type: pick(TYPES, account.type) ?? 'human',
+    mfa: account.mfaEnabled === null ? 'unknown' : account.mfaEnabled ? 'on' : 'off',
+    isAdmin: account.isAdmin,
+  };
+}
+
+/** `existing` keeps what the form doesn't edit (status, last login, created date). */
+export function toImportedAccount(values: AccountValues, existing?: AccessAccount | null): ImportedAccount {
   const email = values.email.trim() || (values.accountId.includes('@') ? values.accountId.trim() : '');
   return {
+    ...(existing && {
+      status: pick(STATUSES, existing.status),
+      lastLoginAt: existing.lastLoginAt ?? undefined,
+      createdAt: existing.accountCreatedAt ?? undefined,
+    }),
     accountId: values.accountId.trim(),
     name: values.name.trim() || undefined,
     email: email || undefined,
@@ -50,14 +75,16 @@ export function toImportedAccount(values: AccountValues): ImportedAccount {
   };
 }
 
-/** Add one account to a manual system, without re-importing the whole CSV. */
+/** Add one account to a manual system, or edit one (`account` set), without re-importing the CSV. */
 export function AddAccountDialog({
   systemName,
+  account,
   open,
   onOpenChange,
   onSave,
 }: {
   systemName: string;
+  account?: AccessAccount | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSave: (account: ImportedAccount) => Promise<void>;
@@ -69,19 +96,22 @@ export function AddAccountDialog({
     formState: { errors, isSubmitting },
   } = useForm<AccountValues>({ resolver: zodResolver(accountSchema), defaultValues: EMPTY });
 
+  useEffect(() => {
+    if (open) reset(account ? toAccountValues(account) : EMPTY);
+  }, [open, account, reset]);
+
   const handleSave = handleSubmit(async (values) => {
-    await onSave(toImportedAccount(values));
-    reset(EMPTY);
+    await onSave(toImportedAccount(values, account));
     onOpenChange(false);
   });
 
-  const text = (name: 'accountId' | 'name' | 'email' | 'roles', label: string, placeholder: string) => (
+  const text = (name: 'accountId' | 'name' | 'email' | 'roles', label: string, placeholder: string, disabled = false) => (
     <div className="flex flex-col gap-2">
       <Label htmlFor={`account-${name}`}>{label}</Label>
       <Controller
         control={control}
         name={name}
-        render={({ field: { ref: _ref, ...field } }) => <Input {...field} id={`account-${name}`} placeholder={placeholder} />}
+        render={({ field: { ref: _ref, ...field } }) => <Input {...field} id={`account-${name}`} placeholder={placeholder} disabled={disabled} />}
       />
       {errors[name] && (
         <span role="alert" className="text-xs text-destructive">
@@ -95,13 +125,15 @@ export function AddAccountDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="md">
         <DialogHeader>
-          <DialogTitle>Add an account to {systemName}</DialogTitle>
+          <DialogTitle>{account ? `Edit ${account.accountId}` : `Add an account to ${systemName}`}</DialogTitle>
           <DialogDescription>
-            The account is matched to a member by email. Adding an existing username updates it.
+            {account
+              ? 'The username can’t change; remove the account and add it again instead.'
+              : 'The account is matched to a member by email. Adding an existing username updates it.'}
           </DialogDescription>
         </DialogHeader>
         <form id="add-account-form" onSubmit={handleSave} className="flex flex-col gap-4">
-          {text('accountId', 'Username or email', 'jane@acme.com')}
+          {text('accountId', 'Username or email', 'jane@acme.com', Boolean(account))}
           <div className="grid gap-4 sm:grid-cols-2">
             {text('name', 'Name (optional)', 'Jane Doe')}
             {text('email', 'Email (optional)', 'jane@acme.com')}
@@ -167,7 +199,7 @@ export function AddAccountDialog({
             Cancel
           </Button>
           <Button type="submit" form="add-account-form" loading={isSubmitting}>
-            Add account
+            {account ? 'Save changes' : 'Add account'}
           </Button>
         </DialogFooter>
       </DialogContent>

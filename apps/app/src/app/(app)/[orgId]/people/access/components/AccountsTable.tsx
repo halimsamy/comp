@@ -12,7 +12,7 @@ import {
   TableRow,
   Text,
 } from '@trycompai/design-system';
-import { TrashCan } from '@trycompai/design-system/icons';
+import { Edit, TrashCan } from '@trycompai/design-system/icons';
 import { formatDay, ownerLabel } from '../lib/access-labels';
 import { AccessFlagBadges, MfaCell } from './AccessFlagBadges';
 
@@ -21,12 +21,14 @@ export function AccountsTable({
   accounts,
   canMapOwners,
   onMapOwner,
+  onEdit,
   onRemove,
 }: {
   accounts: AccessAccount[];
   canMapOwners: boolean;
   onMapOwner: (account: AccessAccount) => void;
-  /** Manual systems only: remove one account. */
+  /** Manual systems only: edit or remove one account. */
+  onEdit?: (account: AccessAccount) => void;
   onRemove?: (account: AccessAccount) => void;
 }) {
   return (
@@ -60,7 +62,10 @@ export function AccountsTable({
             </TableCell>
             <TableCell>
               <div className="flex min-w-[140px] items-center gap-2">
-                <Text size="sm" variant={account.owner || account.isServiceAccount ? 'default' : 'muted'}>
+                <Text
+                  size="sm"
+                  variant={account.owner || account.isServiceAccount ? 'default' : 'muted'}
+                >
                   {ownerLabel(account)}
                 </Text>
                 {canMapOwners && (
@@ -82,21 +87,35 @@ export function AccountsTable({
               <span className="whitespace-nowrap">{formatDay(account.lastLoginAt)}</span>
             </TableCell>
             <TableCell>
-              <Badge variant={account.status === 'active' ? 'accent' : 'secondary'}>{account.status}</Badge>
+              <Badge variant={account.status === 'active' ? 'accent' : 'secondary'}>
+                {account.status}
+              </Badge>
             </TableCell>
             <TableCell>
               <AccessFlagBadges flags={account.flags} />
             </TableCell>
             {onRemove && (
               <TableCell>
-                <Button
-                  size="icon-sm"
-                  variant="ghost"
-                  aria-label={`Remove ${account.name}`}
-                  onClick={() => onRemove(account)}
-                >
-                  <TrashCan size={14} />
-                </Button>
+                <div className="flex justify-end gap-1">
+                  {onEdit && (
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      aria-label={`Edit ${account.name}`}
+                      onClick={() => onEdit(account)}
+                    >
+                      <Edit size={14} />
+                    </Button>
+                  )}
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    aria-label={`Remove ${account.name}`}
+                    onClick={() => onRemove(account)}
+                  >
+                    <TrashCan size={14} />
+                  </Button>
+                </div>
               </TableCell>
             )}
           </TableRow>
